@@ -10,7 +10,7 @@ proves the complete single-player loop with authored content.
   template validation. Test valid demo content and malformed packages.
 - [x] Engine: explicit in-memory state and command/event API. Test the entire quest
   loop, identical replays, rejected commands, death and reward idempotence.
-- [ ] Presentation: line-oriented CLI for play, validate and inspect; deterministic
+- [x] Presentation: line-oriented CLI for play, validate and inspect; deterministic
   parsing and stored prose rendering. Exercise the real binary with a scripted game.
 - [x] Worldgen: validate/export authored WorldSpec values without overwriting an
   existing destination; typed create/update/link operations and structured
