@@ -3,6 +3,12 @@
 A small, deterministic text-RPG engine for authored or generated worlds.
 **AI authors the game at build time. RealmKit runs the finished game offline.**
 
+“RPG” does not require combat. RealmKit's long-term model is a narrative world
+plus source-grounded capabilities: a detective story may use interviews, clues,
+deductions and accusations while omitting combat completely. The current demo and
+format are the first combat-enabled slice, not a requirement for every world.
+See the [optional capability catalog](docs/capabilities.md).
+
 The first playable world, *The Bell in the Pines*, is hand-authored. Talk to
 Elder Mara, choose dialogue, accept her quest, defeat the ash wolf, collect loot
 and XP, level up, and return to unlock the chapel and its crypt.
@@ -127,6 +133,8 @@ metadata, and Unicode template interpolation.
 
 See [the milestone roadmap](ROADMAP.md) for proposed menu interaction, saves,
 combat stats and timing, character builds, and source-grounded authoring.
+Unresolved design questions and their decision points are tracked in the
+[open-decisions register](docs/open-decisions.md).
 
 This is a playable scaffold, not a complete RPG system. Equipment, skills/MP,
 multi-target kill counts, encounters, independent dungeon instances, factions,
@@ -135,6 +143,7 @@ an ordinary graph location. No empty crates or placeholder runtime systems
 are created for those features.
 
 Future authoring can add canon IR, provenance sidecars, world-building
-instructions, simulation, and CLI/MCP adapters without changing the engine's
-AI-free boundary. Validation currently checks structure and references; it
-does not prove reachability, narrative fidelity, or solvability.
+instructions, simulation, source-specific gameplay capabilities, and CLI/MCP
+adapters without changing the engine's AI-free boundary. Validation currently
+checks structure and references; it does not prove reachability, narrative
+fidelity, or solvability.

@@ -3,6 +3,8 @@
 Status: discussion draft. Milestones describe playable outcomes, not release
 dates. M0 is implemented; later milestones are proposed. Combat pacing and
 balance formulas remain design decisions, not promises about current behavior.
+The [open-decisions register](docs/open-decisions.md) records unresolved choices
+and when they must be settled.
 
 ## Principles that carry through every milestone
 
@@ -14,6 +16,11 @@ balance formulas remain design decisions, not promises about current behavior.
   dialogue and branches are authored before play.
 - Rules, scheduling, template selection and any future randomness are replayable.
 - External agents use a typed authoring core; serialization and MCP are adapters.
+- Gameplay capabilities are source-grounded and composable. Combat, crafting,
+  investigation, equipment and similar systems are optional; absent capabilities
+  contribute no required data, runtime state or player actions. The
+  [capability catalog](docs/capabilities.md) guides selection without defining a
+  mandatory feature list.
 - Add a system when a milestone needs it. No empty future crates or generic ECS.
 
 ## M0 — Playable foundation · complete
@@ -49,7 +56,8 @@ Ashbell Village
 ```
 
 - Offer both arrow selection and numbered shortcuts for location actions,
-  dialogue, targets and combat actions. Players never need to type an entity ID.
+  dialogue, targets and combat actions when present. Players never need to type
+  an entity ID.
 - Keep selection numbering stable while a menu is displayed. Explain unavailable
   actions and recheck legality in the engine when an action is submitted.
 - Use explicit menu focus: arrows navigate the active list. Retain directional
@@ -69,8 +77,9 @@ terminal settings are restored on normal exit and handled errors.
 
 ## M2 — Continue an adventure across sessions
 
-- Save/load location, stats, inventory, quests, flags, defeated monsters and
-  dialogue state. Keep authored content separate from mutable saves.
+- Save/load location, flags, dialogue and the state of capabilities enabled by
+  that world—for example inventory, quests, stats or defeated monsters. Keep
+  authored content separate from mutable saves.
 - Version saves and identify the world package they belong to. Reject incompatible
   saves clearly; add migrations when an actual format change requires them.
 - Write saves atomically and keep the previous save safe if writing fails.
@@ -81,9 +90,18 @@ terminal settings are restored on normal exit and handled errors.
 events as uninterrupted play. A broken or mismatched save cannot corrupt a world
 or silently reset progress.
 
-## M3 — Combat stats and meaningful speed
+## M3 — Optional combat capability: stats and meaningful speed
 
-Introduce one coherent combat model rather than adding unrelated stat fields.
+Introduce one coherent combat model for worlds that need combat rather than
+adding unrelated stat fields to every world. A combat-free package has no combat
+profiles, HP/MP state, monsters, skills, damage templates, attack commands or
+combat UI. Engine and clients discover that absence from the validated package.
+
+The existing demo remains a combat-enabled fixture. Before expanding its combat
+rules, move combat-only player fields out of mandatory base state so a future
+detective fixture can load and play without dummy HP or attack values. Use a small
+optional state component or equivalent explicit Rust type; do not build a generic
+plugin framework or ECS.
 
 | Stat | Initial purpose |
 | --- | --- |
@@ -113,6 +131,7 @@ resistance, accuracy and critical chance can come later when builds need them.
 **Done when:** a small duel demonstrates distinct physical/magical builds, MP
 expenditure and recovery, and a measurable benefit from increased speed. Tests
 cover formulas, scheduling, ties, death, resource rejection, replay and save/load.
+A combat-free fixture also validates and plays without combat data or menus.
 
 ### Speed: current recommendation is a paused initiative timeline
 
@@ -328,7 +347,7 @@ adventure, with tested equipment/resource rules and readable combat feedback.
 The forge → equip → improve → enchant → save/load journey preserves individual
 item identity and consumes resources atomically without duplicating bonuses.
 
-## M5 — Longer authored adventures
+## M5 — Longer authored adventures and source-specific mechanics
 
 - Separate monster definitions from encounter instances; support multiple enemies
   without reusing one global HP record.
@@ -338,17 +357,25 @@ item identity and consumes resources atomically without duplicating bonuses.
   combat. Preserve quest progress and prevent duplicate completion rewards.
 - Expand authored dialogue and branches, with consistent NPC availability and
   understandable journal entries.
+- Add source-specific capabilities only with a representative world. For example,
+  a detective story may use clues, evidence, interviews, contradictions,
+  deductions and a final accusation while omitting combat entirely. Its success
+  and failure paths remain deterministic and pre-authored.
+- Establish first-class authored endings and campaign completion state, rather
+  than treating player death as the only terminal outcome.
 
-**Done when:** a longer hand-authored adventure demonstrates branching quests and
-a dungeon, can be saved/resumed, and has a tested path to completion.
+**Done when:** longer hand-authored fixtures demonstrate branching progression
+and at least one non-combat interaction path, can be saved/resumed, and have
+tested paths to completion. A dungeon is useful only for a world that needs one.
 
 ## M6 — Authoring feedback and deterministic simulation
 
 - Extend typed authoring operations where real content workflows need them.
 - Add structured diagnostics for unreachable objectives, unavailable required
   items, unsatisfied prerequisites and invalid story/dialogue links.
-- Expose deterministic combat and progression simulation with explicit starting
-  state and player policy. Report outcomes, costs and blocking conditions.
+- Expose deterministic progression simulation with explicit starting state and
+  player policy. Add combat simulation only for combat-enabled worlds. Report
+  outcomes, costs and blocking conditions.
 - Distinguish a failed simulation under one policy from proof that a quest is
   impossible. Report the scenario and assumptions with the result.
 - Add an authoring CLI or MCP adapter over the same core when there is a consumer.
@@ -364,8 +391,17 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 - Introduce canon IR only as source adaptation needs it: identities, chronology,
   relationships and evidence, separate from runtime NPCs and quests.
 - Retain source references for reviewing fidelity and regenerating selected content.
+- Ask the user to choose a canonical protagonist, an original character, or a
+  canonical-then-original package. In the last mode, completing the canonical
+  campaign unlocks a fully pre-generated original-character campaign.
+- Let the user choose whether that second campaign is a concurrent perspective,
+  post-canon continuation or bounded alternate branch. Keep campaign saves
+  separate and carry only explicitly authored facts between them.
 - Derive gameplay from source events and preserve characterization and atmosphere.
   Do not turn every named character into a monster.
+- Select the game's capabilities from the source. A detective novel may compile
+  to exploration, interviews, evidence, deductions and accusation branches with
+  no combat system. Do not add fights merely to satisfy an RPG convention.
 - Enable optional gameplay systems such as forging and enchanting only when the
   source mentions or supports them. Absence in the source produces absence in the
   package and player interface, rather than generic RPG filler.
@@ -375,6 +411,8 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 **Done when:** a short source produces an inspectable world whose provenance,
 language and fidelity can be reviewed, whose main progression is tested, and
 which remains playable after removing all generation tools and source files.
+For a two-campaign fixture, runtime completion unlocks already-packaged content
+without calling worldgen, and both campaigns validate from independent starts.
 
 ## M8 — Additional clients and shared play · optional later
 
@@ -388,6 +426,9 @@ question automatically. Add storage/networking crates only at that point.
 scheduling and persistence policies have reproducible tests. No runtime AI.
 
 ## Decisions to discuss next
+
+This is the immediate combat-oriented subset. The complete cross-project list is
+maintained in the [open-decisions register](docs/open-decisions.md).
 
 1. Confirm the paused timeline, including whether very fast actors can take
    several consecutive turns as in the example above. Choose the speed cap and

@@ -1,5 +1,18 @@
 # World package format 1
 
+Format 1 is the combat-enabled scaffold format used by the demo. Its mandatory
+level table and narrative combat templates mean it does **not yet** represent the
+long-term rule that combat is optional. A later compatible extension or format
+version must allow combat data and combat state to be wholly absent; authors
+should not insert dummy combat content into non-combat worlds. The roadmap treats
+combat and other genre mechanics as source-grounded capabilities.
+
+Format 1 also represents one fixed protagonist and one campaign. Future
+multi-campaign support may package a canonical campaign and an unlockable
+original-character campaign together. Each will require its own start state and
+endings, plus explicit cross-campaign facts; runtime unlocking must never require
+source material or generation tools.
+
 A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
