@@ -297,6 +297,17 @@ vulnerability/resistance stacking before allowing multiple sources in a build.
 
 ## M4 — Equipment, skills and character builds
 
+Scope includes both defining equipment during world authoring and letting players
+forge, improve and enchant it. See the [equipment and crafting proposal](docs/equipment.md)
+for shared definitions, individual item instances, recipes and the first playable
+crafting journey. Its detailed rules remain proposals.
+
+Equipment does not imply crafting. Forging, improvement and enchanting are
+independent optional world capabilities. Source-derived worlds include them only
+when grounded in the source material; otherwise their data and UI are absent.
+The M4 demonstration world proves the reusable systems without enabling them in
+every package.
+
 - Add a small equipment slot set, equip/unequip, consumables and learned skills.
 - Derive effective stats from base progression plus equipment; prevent repeated
   equip/unequip from permanently accumulating bonuses.
@@ -305,9 +316,17 @@ vulnerability/resistance stacking before allowing multiple sources in a build.
 - Define durations in terms of the chosen combat clock; do not casually mix
   wall-clock seconds, actor turns and timeline units.
 - Show why stats changed and what an action costs before confirming it.
+- Deliver in slices: M4a equipment instances and equip/unequip; M4b stations,
+  forging and improvements; M4c one compatible enchantment per item. Preserve
+  authored source-language names and prose throughout crafting.
+- Keep recipe knowledge separate from proficiency: authored teachers, plans,
+  quests or discoveries grant recipes, while smithing determines whether a known
+  recipe can be used. Proficiency alone does not reveal recipes initially.
 
 **Done when:** at least two meaningfully different builds can finish a short
 adventure, with tested equipment/resource rules and readable combat feedback.
+The forge → equip → improve → enchant → save/load journey preserves individual
+item identity and consumes resources atomically without duplicating bonuses.
 
 ## M5 — Longer authored adventures
 
@@ -347,6 +366,9 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 - Retain source references for reviewing fidelity and regenerating selected content.
 - Derive gameplay from source events and preserve characterization and atmosphere.
   Do not turn every named character into a monster.
+- Enable optional gameplay systems such as forging and enchanting only when the
+  source mentions or supports them. Absence in the source produces absence in the
+  package and player interface, rather than generic RPG filler.
 - Generate every player-facing string in the source language, including the menu
   action labels added in M1. Review actual text, not just language metadata.
 

@@ -85,6 +85,12 @@ A future world-builder skill should teach the author to:
 5. Prewrite all runtime prose, dialogue choices and supported alternate branches.
 6. Validate references and simulate progression, then repair problems before export.
 
+Optional mechanics also require source grounding. Equipment may exist without a
+player crafting system. Add forging, improvement, enchanting, alchemy or similar
+loops only when the source mentions or reasonably supports them. When absent,
+omit their definitions, progression, stations and UI actions completely; do not
+fill every adaptation with a default fantasy-RPG feature set.
+
 These are authoring instructions, distinct from the Rust definitions of valid
 and executable content. There is no skill framework in this scaffold.
 
