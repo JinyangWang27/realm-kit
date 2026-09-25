@@ -125,6 +125,9 @@ metadata, and Unicode template interpolation.
 
 ## Scope
 
+See [the milestone roadmap](ROADMAP.md) for proposed menu interaction, saves,
+combat stats and timing, character builds, and source-grounded authoring.
+
 This is a playable scaffold, not a complete RPG system. Equipment, skills/MP,
 multi-target kill counts, encounters, independent dungeon instances, factions,
 save files, TUI, multiplayer, and source compilation are deferred. The crypt is
