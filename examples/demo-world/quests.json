@@ -1,0 +1,14 @@
+[
+  {
+    "id": "quiet_the_track",
+    "name": "A Thread in the Thorns",
+    "giver": "elder",
+    "objective": { "kind": "defeat", "monster": "wolf" },
+    "introduction": "Mara watches the trees. 'The wolf has taken the north track. Drive it off, and bring me word. There is something in the chapel you ought to see.'",
+    "progress": "The pine track is quiet. Mara should hear what happened.",
+    "completion": "Mara listens without moving. Then she puts the candle in your hand. 'I thought I wanted the bell to ring again,' she says. 'Now I should like to know who has been listening.' She opens the chapel gate.",
+    "reward_xp": 5,
+    "reward_items": [{ "item": "candle", "quantity": 1 }],
+    "completion_flags": ["ruins_open"]
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "attack": [
+    "{attacker} strike through the pine-dark air. {target} takes {damage} damage.",
+    "{attacker} press forward; {target} yields a step, taking {damage} damage."
+  ],
+  "hurt": [
+    "{attacker} snaps at {target}: {damage} damage.",
+    "A flash of teeth. {attacker} deals {damage} damage to {target}."
+  ],
+  "victory": "{target} falls still. In the branches above, a bird ventures one uncertain note.",
+  "death": "The trees close over the last of the light. Somewhere beyond them, a bell begins to ring.\nYour journey has ended. Start a new game to try again."
+}

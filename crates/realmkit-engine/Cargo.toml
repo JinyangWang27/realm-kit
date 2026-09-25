@@ -1,0 +1,9 @@
+[package]
+name = "realmkit-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+realmkit-spec.workspace = true
+thiserror.workspace = true

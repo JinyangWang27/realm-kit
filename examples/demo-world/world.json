@@ -1,0 +1,14 @@
+{
+  "format_version": 1,
+  "id": "bell_in_the_pines",
+  "name": "The Bell in the Pines",
+  "language": "en",
+  "start": "village",
+  "player_name": "You",
+  "levels": [
+    { "xp": 0, "hp": 24, "attack": 5 },
+    { "xp": 10, "hp": 30, "attack": 7 },
+    { "xp": 30, "hp": 36, "attack": 9 }
+  ],
+  "flags": ["ruins_open"]
+}

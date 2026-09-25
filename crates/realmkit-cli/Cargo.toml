@@ -1,0 +1,13 @@
+[package]
+name = "realmkit-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "realmkit"
+path = "src/main.rs"
+
+[dependencies]
+realmkit-spec.workspace = true
+realmkit-engine.workspace = true

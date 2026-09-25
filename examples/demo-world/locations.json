@@ -1,0 +1,38 @@
+[
+  {
+    "id": "village",
+    "name": "Ashbell Village",
+    "description": "Rain beads on the well-rope. Beyond the last thatched roof, the pines stand close as listeners. The chapel bell has been silent for three winters; tonight, someone has laid fresh flowers beneath its door.",
+    "exits": {
+      "north": { "destination": "forest", "blocked_text": "The pine track is closed." },
+      "east": {
+        "destination": "ruins",
+        "requires": [{ "kind": "flag", "flag": "ruins_open" }],
+        "blocked_text": "The elder keeps the chapel gate locked. Speak with her first."
+      }
+    },
+    "npcs": ["elder"]
+  },
+  {
+    "id": "forest",
+    "name": "The Pine Track",
+    "description": "The path narrows to a seam of black earth. A shepherd's red thread hangs from a thorn, turning slowly though there is no wind. Something pale moves between the roots.",
+    "exits": { "south": { "destination": "village", "blocked_text": "The village road is closed." } },
+    "monsters": ["wolf"]
+  },
+  {
+    "id": "ruins",
+    "name": "The Roofless Chapel",
+    "description": "Birch saplings rise between the pews. Above them the bell hangs whole, its clapper bound in red thread. Scratched into the stair rail are four words: WE HEARD IT ANSWER.",
+    "exits": {
+      "west": { "destination": "village", "blocked_text": "The village gate is closed." },
+      "down": { "destination": "crypt", "blocked_text": "The stair is barred." }
+    }
+  },
+  {
+    "id": "crypt",
+    "name": "Beneath the Bell",
+    "description": "The stair ends beside a dry basin. In its dust lies the print of a small bare foot, pointing toward the wall. You set down the elder's candle. For the first time all evening, the silence feels like silence.\n\nYour journey through the demo is complete.",
+    "exits": { "up": { "destination": "ruins", "blocked_text": "The stair is barred." } }
+  }
+]

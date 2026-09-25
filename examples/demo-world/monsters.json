@@ -1,0 +1,11 @@
+[
+  {
+    "id": "wolf",
+    "name": "The Ash Wolf",
+    "description": "Its coat is the colour of cold hearths. A length of red thread is caught between its teeth.",
+    "hp": 12,
+    "attack": 4,
+    "xp": 10,
+    "loot": [{ "item": "ash_pelt", "quantity": 1 }]
+  }
+]

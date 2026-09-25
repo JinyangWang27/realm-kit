@@ -1,0 +1,192 @@
+//! Synchronous gameplay; no generation or presentation dependencies.
+
+use realmkit_spec::{
+    Condition, DialogueChoice, DialogueEffect, Direction, Id, ItemStack, QuestObjective,
+    QuestStatus, SpecError, WorldSpec,
+};
+use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Command {
+    Look,
+    Move(Direction),
+    Attack(Id),
+    Talk(Id),
+    /// One-based index into the currently visible choices.
+    ChooseDialogue(usize),
+    AcceptQuest(Id),
+    CompleteQuest(Id),
+    Inventory,
+    Status,
+    Quests,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Event {
+    LocationViewed {
+        location: Id,
+    },
+    Moved {
+        from: Id,
+        to: Id,
+    },
+    DamageDealt {
+        target: Id,
+        amount: u32,
+        variant: usize,
+    },
+    DamageReceived {
+        source: Id,
+        amount: u32,
+        variant: usize,
+    },
+    EnemyDefeated {
+        monster: Id,
+    },
+    ItemReceived {
+        item: Id,
+        quantity: u64,
+    },
+    ExperienceGranted {
+        amount: u64,
+    },
+    LevelUp {
+        level: usize,
+    },
+    PlayerDied,
+    Dialogue {
+        npc: Id,
+        node: Id,
+        choices: Vec<String>,
+    },
+    DialogueEnded,
+    QuestAccepted {
+        quest: Id,
+    },
+    QuestProgressed {
+        quest: Id,
+    },
+    QuestCompleted {
+        quest: Id,
+    },
+    StoryFlagSet {
+        flag: Id,
+    },
+    InventoryViewed,
+    StatusViewed,
+    QuestsViewed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlayerState {
+    pub location: Id,
+    pub hp: u32,
+    pub max_hp: u32,
+    pub attack: u32,
+    pub xp: u64,
+    pub level: usize,
+    pub inventory: BTreeMap<Id, u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DialogueState {
+    pub npc: Id,
+    pub node: Id,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GameState {
+    pub player: PlayerState,
+    pub monster_hp: BTreeMap<Id, u32>,
+    pub quests: BTreeMap<Id, QuestStatus>,
+    pub flags: BTreeSet<Id>,
+    pub dialogue: Option<DialogueState>,
+    pub turn: u64,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EngineError {
+    #[error(transparent)]
+    World(#[from] SpecError),
+    #[error("there is no exit in that direction")]
+    NoExit,
+    #[error("that exit is locked")]
+    ExitLocked { location: Id, direction: Direction },
+    #[error("{0} is not available here")]
+    NotHere(Id),
+    #[error("{0} has already been defeated")]
+    AlreadyDefeated(Id),
+    #[error("there is no active conversation")]
+    NoDialogue,
+    #[error("choose one of the displayed options")]
+    InvalidChoice,
+    #[error("quest cannot be accepted or completed in its current state: {0}")]
+    QuestState(Id),
+    #[error("unknown quest: {0}")]
+    UnknownQuest(Id),
+    #[error("the player is dead; start a new game")]
+    PlayerDead,
+    #[error("numeric limit exceeded; command was not applied")]
+    NumericLimit,
+}
+
+pub struct Engine<'w> {
+    world: &'w WorldSpec,
+    state: GameState,
+}
+
+mod rules;
+
+impl<'w> Engine<'w> {
+    pub fn new(world: &'w WorldSpec) -> Result<Self, EngineError> {
+        world.validate()?;
+        let stats = &world.world.levels[0];
+        Ok(Self {
+            world,
+            state: GameState {
+                player: PlayerState {
+                    location: world.world.start.clone(),
+                    hp: stats.hp,
+                    max_hp: stats.hp,
+                    attack: stats.attack,
+                    xp: 0,
+                    level: 1,
+                    inventory: BTreeMap::new(),
+                },
+                monster_hp: world
+                    .monsters
+                    .iter()
+                    .map(|m| (m.id.clone(), m.hp))
+                    .collect(),
+                quests: world
+                    .quests
+                    .iter()
+                    .map(|q| (q.id.clone(), QuestStatus::Available))
+                    .collect(),
+                flags: BTreeSet::new(),
+                dialogue: None,
+                turn: 0,
+            },
+        })
+    }
+
+    pub fn state(&self) -> &GameState {
+        &self.state
+    }
+    pub fn world(&self) -> &WorldSpec {
+        self.world
+    }
+
+    pub fn execute(&mut self, command: Command) -> Result<Vec<Event>, EngineError> {
+        // ponytail: clone for atomic commands; use a change set if worlds become large.
+        let mut next = self.state.clone();
+        let events = rules::execute(self.world, &mut next, command)?;
+        next.turn = next.turn.checked_add(1).ok_or(EngineError::NumericLimit)?;
+        self.state = next;
+        Ok(events)
+    }
+
+    pub fn conditions_met(&self, conditions: &[Condition]) -> bool {
+        rules::conditions_met(&self.state, conditions)
+    }
+}

@@ -1,0 +1,180 @@
+use realmkit_engine::{Command::*, *};
+use realmkit_spec::{Direction::*, *};
+
+fn demo() -> WorldSpec {
+    WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/demo-world"
+    ))
+    .unwrap()
+}
+
+fn accept(engine: &mut Engine<'_>) {
+    engine.execute(Talk("elder".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+}
+
+fn kill(engine: &mut Engine<'_>) -> Vec<Event> {
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Attack("wolf".into())).unwrap();
+    engine.execute(Attack("wolf".into())).unwrap();
+    engine.execute(Attack("wolf".into())).unwrap()
+}
+
+#[test]
+fn full_quest_loop_and_replay_produce_identical_state_and_events() {
+    let world = demo();
+    let commands = vec![
+        Look,
+        Talk("elder".into()),
+        ChooseDialogue(1),
+        ChooseDialogue(1),
+        Move(North),
+        Attack("wolf".into()),
+        Attack("wolf".into()),
+        Attack("wolf".into()),
+        Move(South),
+        Talk("elder".into()),
+        ChooseDialogue(1),
+        Move(East),
+        Move(Down),
+    ];
+    let play = || {
+        let mut engine = Engine::new(&world).unwrap();
+        let mut events = Vec::new();
+        for command in commands.clone() {
+            events.extend(engine.execute(command).unwrap());
+        }
+        (engine.state().clone(), events)
+    };
+    let (state, events) = play();
+    assert_eq!((state.clone(), events.clone()), play());
+    assert_eq!(state.player.location, "crypt");
+    assert_eq!(state.player.level, 2);
+    assert_eq!(state.player.xp, 15);
+    assert_eq!(state.player.hp, 30);
+    assert_eq!(state.player.inventory["ash_pelt"], 1);
+    assert_eq!(state.player.inventory["candle"], 1);
+    assert_eq!(state.quests["quiet_the_track"], QuestStatus::Completed);
+    assert!(state.flags.contains("ruins_open"));
+    assert!(events.contains(&Event::QuestProgressed {
+        quest: "quiet_the_track".into()
+    }));
+    assert!(events.contains(&Event::LevelUp { level: 2 }));
+}
+
+#[test]
+fn rejected_commands_are_atomic_and_remote_targets_cannot_be_used() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    for command in [
+        Move(East),
+        Move(West),
+        Attack("wolf".into()),
+        Talk("missing".into()),
+        ChooseDialogue(1),
+        CompleteQuest("quiet_the_track".into()),
+    ] {
+        let before = engine.state().clone();
+        assert!(engine.execute(command).is_err());
+        assert_eq!(engine.state(), &before);
+    }
+    engine.execute(Talk("elder".into())).unwrap();
+    let before = engine.state().clone();
+    for choice in [0, 3, usize::MAX] {
+        assert!(engine.execute(ChooseDialogue(choice)).is_err());
+        assert_eq!(engine.state(), &before);
+    }
+    engine.execute(Move(North)).unwrap();
+    let before = engine.state().clone();
+    for command in [
+        Talk("elder".into()),
+        AcceptQuest("quiet_the_track".into()),
+        ChooseDialogue(1),
+    ] {
+        assert!(engine.execute(command).is_err());
+        assert_eq!(engine.state(), &before);
+    }
+}
+
+#[test]
+fn combat_tracks_damage_and_never_rewards_a_defeat_twice() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    accept(&mut engine);
+    engine.execute(Move(North)).unwrap();
+    let events = engine.execute(Attack("wolf".into())).unwrap();
+    assert_eq!(engine.state().monster_hp["wolf"], 7);
+    assert_eq!(engine.state().player.hp, 20);
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::DamageDealt { amount: 5, .. })));
+    engine.execute(Attack("wolf".into())).unwrap();
+    let events = engine.execute(Attack("wolf".into())).unwrap();
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::DamageDealt { amount: 2, .. })));
+    assert!(!events
+        .iter()
+        .any(|e| matches!(e, Event::DamageReceived { .. })));
+    let before = engine.state().clone();
+    assert!(engine.execute(Attack("wolf".into())).is_err());
+    assert_eq!(engine.state(), &before);
+    engine.execute(Move(South)).unwrap();
+    engine
+        .execute(CompleteQuest("quiet_the_track".into()))
+        .unwrap();
+    let before = engine.state().clone();
+    assert!(engine
+        .execute(CompleteQuest("quiet_the_track".into()))
+        .is_err());
+    assert!(engine
+        .execute(AcceptQuest("quiet_the_track".into()))
+        .is_err());
+    assert_eq!(engine.state(), &before);
+}
+
+#[test]
+fn defeating_the_target_before_accepting_does_not_softlock_the_quest() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    kill(&mut engine);
+    engine.execute(Move(South)).unwrap();
+    accept(&mut engine);
+    assert_eq!(engine.state().quests["quiet_the_track"], QuestStatus::Ready);
+    engine
+        .execute(CompleteQuest("quiet_the_track".into()))
+        .unwrap();
+}
+
+#[test]
+fn death_blocks_actions_but_allows_inspection() {
+    let mut world = demo();
+    world.monsters[0].attack = u32::MAX;
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(North)).unwrap();
+    let events = engine.execute(Attack("wolf".into())).unwrap();
+    assert_eq!(engine.state().player.hp, 0);
+    assert!(events.contains(&Event::PlayerDied));
+    assert!(engine.execute(Move(South)).is_err());
+    assert!(engine.execute(Attack("wolf".into())).is_err());
+    assert!(engine.execute(Status).is_ok());
+}
+
+#[test]
+fn overflowing_rewards_roll_back_the_entire_command() {
+    let mut world = demo();
+    world.monsters[0].xp = u64::MAX;
+    let mut engine = Engine::new(&world).unwrap();
+    accept(&mut engine);
+    kill(&mut engine);
+    assert_eq!(engine.state().player.level, 3);
+    engine.execute(Move(South)).unwrap();
+    let before = engine.state().clone();
+    assert!(matches!(
+        engine.execute(CompleteQuest("quiet_the_track".into())),
+        Err(EngineError::NumericLimit)
+    ));
+    assert_eq!(engine.state(), &before);
+}
