@@ -1,0 +1,17 @@
+look
+talk elder
+choose 1
+choose 1
+north
+attack wolf
+attack wolf
+attack wolf
+south
+talk elder
+choose 1
+inventory
+status
+quests
+east
+down
+quit

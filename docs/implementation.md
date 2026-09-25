@@ -15,7 +15,7 @@ proves the complete single-player loop with authored content.
 - [x] Worldgen: validate/export authored WorldSpec values without overwriting an
   existing destination; typed create/update/link operations and structured
   diagnostics. No AI provider or source compiler yet.
-- [ ] Documentation and verification: explain content/rules and deferred scope;
+- [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
 ## Concrete boundaries
