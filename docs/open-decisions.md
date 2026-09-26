@@ -32,8 +32,9 @@ than replacing them.
   a physical item may be linked to an evidence definition, but possession alone
   does not automatically make an item evidence.
 - Combat and crafting are optional. Equipment does not imply crafting.
-- World generation offers canonical, original, or canonical-then-original
-  protagonist campaigns. Unlockable campaigns are pre-generated.
+- World generation offers canonical, original, or both player-entry modes.
+  Canonical and original routes are independently playable; `both` exposes the
+  choice at New Game rather than requiring one route to unlock the other.
 - Failed commands do not mutate state. Presentation uses structured commands and
   events shared by typed commands, menus and future clients.
 - Combat uses gradual defence reduction with explicit immunity/vulnerability.
@@ -168,42 +169,73 @@ and eligible for unlocks. Restart/checkpoint behavior belongs to the campaign.
 
 **Needed before:** source-grounded generation.
 
-Declare an adaptation policy per campaign:
-
-- Strict: routes vary while major canonical events remain fixed.
-- Bounded: alternate outcomes are allowed when consistent with established
-  characters, knowledge and causality.
-- Free: the source provides setting/cast, with broader authored divergence.
+RealmKit source adaptations do not permit unrestricted rewrite of the source.
+Major canonical anchors remain protected in both canonical and original routes.
+Generated play may change routes, local outcomes, assistance, relationships,
+side-story consequences and other bounded details, but it must not transform the
+source into a fundamentally different story.
 
 Open questions:
 
-- Should bounded divergence be the default?
-- Which canon facts may never change, and how are they represented?
+- Which canon facts are protected anchors for a given source, and how are they
+  represented?
 - How should worldgen report invented connective material versus sourced facts?
-- When a canonical protagonist can make a noncanonical choice, how far may its
-  consequences propagate?
+- How much bounded variation is allowed around each anchor without invalidating
+  characterization or causality?
 
-The generation report should record the selected policy and provenance for major
-deviations. Runtime only consumes the compiled branches.
+The generation report should record protected anchors and provenance for major
+expansions. Runtime only consumes the compiled branches.
 
-## 4. Original-character generation
+## 4. Player entry and original-character generation
 
-**Needed before:** the first original-protagonist campaign.
+**Resolved foundation:** source-backed worlds support three player-entry modes:
+
+```text
+canonical
+original
+both
+```
+
+- `canonical`: the player controls a canonical protagonist and follows a
+  source-grounded main questline with bounded freedom around required canon
+  anchors.
+- `original`: the player controls a new character in the same shared world and
+  canonical timeline. Canonical protagonists remain world entities/NPCs and their
+  required story anchors continue to occur.
+- `both`: the package contains both routes and New Game offers the choice
+  immediately. The routes use separate mutable saves and do not implicitly
+  transfer inventory, relationships, injuries, flags or quest state.
+
+The route choice determines who is player-controlled, not which canonical
+characters exist. In an original-character *The Return of the Condor Heroes*
+route, Yang Guo still exists and proceeds through the authored canonical
+timeline; the player's own main questline may intersect with and locally affect
+his story without replacing him.
+
+Static identity and mutable state are separate. Conceptually:
+
+```text
+ProtagonistSpec = who the player is
+PlayerState     = what has happened to the player
+```
+
+Canonical-character binding, background and initial identity belong to authored
+content. Location, story phase, quests, faction membership/reputation,
+relationships and enabled capability state belong to mutable runtime/save state.
 
 Open questions:
 
-- Which attributes does the user supply: name, identity, background, abilities,
-  relationship to canon characters, insertion point?
+- Which original-character attributes does the user supply: name, identity,
+  background, abilities, relationships to canon characters, insertion point?
 - Which attributes may worldgen propose for approval?
 - May the player customize appearance/name at runtime without invalidating
   pre-authored grammar or dialogue?
-- How is knowledge limited so an original character cannot act on facts they have
-  not learned?
-- For canonical-then-original mode, which ending facts can carry forward?
+- How is player knowledge represented so an original character cannot act on
+  facts that worldgen knows but the character has not learned?
 
-Current leaning: generation establishes a concrete role and knowledge boundary;
-runtime customization is a separate optional capability. Campaigns carry only an
-explicit mapping of cross-campaign facts.
+Current leaning: generation establishes a concrete role, knowledge boundary and
+insertion point. Runtime customization is a separate optional capability. Do not
+add a first-class `Campaign` type until a concrete multi-route package needs it.
 
 ## 5. Conditions and effects
 
