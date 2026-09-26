@@ -77,9 +77,10 @@ presentation-only: they do not advance the engine turn. The complete demo is
 tested through numbered menus as well as scripted typed input.
 
 The later architecture discussion added richer presentation goals that were not
-part of the merged M1 implementation: a 3×3 local neighborhood map, diagonal
-context/discovery rules, and full fixed-interface localization to the package
-language. Those remain future presentation work tracked in
+part of the merged M1 implementation: optional Area-based spatial layouts,
+full-map or client-sized viewport rendering, discovery-aware map disclosure, and
+full fixed-interface localization to the package language. Those remain future
+presentation work tracked in
 [Section 14](docs/open-decisions.md#14-presentation-and-information-disclosure);
 they are not retroactively part of M1 acceptance.
 
