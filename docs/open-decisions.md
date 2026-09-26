@@ -403,13 +403,28 @@ optional provenance sidecar can retain the rationale and references.
 
 **Needed first:** M1 menu navigation; revisited per capability.
 
-Arrow/Enter navigation plus numbered shortcuts and typed commands is agreed.
+A 3×3 local neighborhood view is agreed for spatial presentation. The player is
+shown in the center; surrounding cells may show nearby locations for context.
+Traversal remains cardinal-only through explicit north/south/east/west exits.
+Diagonal cells are informational, not implicit movement edges. Vertical
+`up`/`down` travel remains a separate contextual action.
+
+Map layout and connectivity are separate concepts: presentation may know that a
+location lies northeast of the player even when there is no direct traversable
+edge to it. The engine remains authoritative over exits and movement legality.
+Arrow/Enter navigation, numbered shortcuts and typed commands remain supported.
+
 Open questions:
 
 - Which actions appear disabled with a reason, and which remain hidden to avoid
   spoilers?
 - Should combat previews show exact damage and future turns or qualitative hints?
 - How are long action lists grouped on small terminals?
+- How much of the 3×3 neighborhood should be shown before discovery: exact names,
+  silhouettes/unknown cells, or only locations the protagonist could reasonably
+  know or see?
+- Should spatial layout use authored integer coordinates, area-local placement
+  metadata, or another representation that does not constrain the traversal graph?
 - Where should fixed client translations live: RealmKit-owned locale resources,
   package-provided interface text, or a hybrid with well-defined fallback rules?
 - How should a client behave when it does not have fixed-interface translations
