@@ -13,6 +13,13 @@ original-character campaign together. Each will require its own start state and
 endings, plus explicit cross-campaign facts; runtime unlocking must never require
 source material or generation tools.
 
+Format 1 also requires item and quest tables because they serve the current demo.
+That must not be interpreted as a long-term universal-core decision. Quests and
+inventory are optional capabilities; a future non-combat format must permit a
+valid world with neither. Investigation evidence is independent state and may
+optionally reference a physical entity/item without being stored "inside"
+inventory or inferred from possession.
+
 A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
@@ -84,6 +91,10 @@ no separate monster templates/spawns and no respawns. Quest targets must be
 placed. NPCs may appear at several locations; conditions determine availability.
 
 ## Dialogue and quests
+
+Quests are mandatory in Format 1's file layout but are not part of RealmKit's
+intended universal core. Future formats/capability sections must allow dialogue,
+story progression and campaign outcomes without a quest subsystem.
 
 Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 `text` and optional `choices`. Each choice has authored `text`, optional
