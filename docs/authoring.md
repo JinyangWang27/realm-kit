@@ -266,7 +266,11 @@ EXPANDED  new gameplay material constrained by canon
 ```
 
 Retain source references/rationale in an authoring report or optional provenance
-sidecar. Runtime does not require source text, Canon IR, or provenance analysis.
+sidecar. The same authoring artifact may record the proposed/final capability set,
+meaningful omissions and explicit author/user overrides. Capability selection is
+finalized after canon extraction and before detailed gameplay generation. Runtime
+does not require source text, Canon IR, selection rationale, or provenance
+analysis.
 
 ## Time authoring
 
