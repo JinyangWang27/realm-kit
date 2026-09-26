@@ -288,6 +288,20 @@ recoverable death restores the newest valid snapshot.
 Auto-saves are created at stable boundaries such as route start and story-phase
 transitions rather than on every command or movement step.
 
+## Authoritative Server
+
+The multiplayer process that owns canonical mutable state, executes and
+revalidates player commands, resolves RNG, assigns committed command order and
+persists the resulting state. Clients submit intents/commands rather than trusted
+outcomes.
+
+## Authoritative Scope
+
+A mutable multiplayer state scope whose commands must be ordered consistently,
+such as world-, player-, party/session- or encounter-owned state. Independent
+scopes may progress concurrently. Concrete scope types are introduced only when a
+multiplayer system needs them.
+
 ## Campaign
 
 A non-normative term in RealmKit.
