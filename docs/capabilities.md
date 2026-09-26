@@ -150,12 +150,16 @@ uses explicit optional typed composition. This does not require runtime-loaded
 plugins, scripting, an ECS, one crate per capability, or AI during play. Add the
 smallest typed implementation when a representative world needs it.
 
-Campaign selection sits above capabilities. One package may contain independently
-validated campaigns with different protagonists, starting states and capability
-sets. An authored completion outcome can unlock another campaign, including an
-original-character perspective after a canonical one. Unlocking exposes static
-packaged content; it never invokes AI. Campaign saves remain separate unless the
-package explicitly maps selected outcome facts between them.
+Player-entry route selection sits above capabilities. A package may contain a
+canonical route, an original-character route, or both. When both are present,
+New Game offers the choice immediately; neither route must unlock the other.
+
+Routes reuse the same validated world definitions and canonical timeline where
+possible, but have their own player-controlled protagonist, starting state, main
+questline and mutable save. In the original route, canonical protagonists remain
+ordinary world entities/NPCs from the player's perspective and continue through
+their protected canonical anchors. Route selection changes who the player controls,
+not which source characters exist.
 
 ## Suggested implementation order
 
