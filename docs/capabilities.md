@@ -1,14 +1,16 @@
 # Optional world capabilities
 
-RealmKit's universal core includes a shared location graph, authored narrative
-and choices, a main questline, typed quest objectives, story phases, conditions /
-effects, world state and authored outcomes. Side questlines are optional content.
-Inventory, combat, investigation, equipment and similar mechanics are optional
-capabilities used by quests when justified by the source.
+RealmKit's universal core separates a shared world from one or more player
+routes. The world owns the shared location graph, characters/NPCs, factions,
+narrative content, story-phase definitions, conditions/effects and world state.
+Each player route owns its PlayerSpec-like player definition, starting state,
+exactly one main questline and one or more authored outcomes. Side questlines are
+optional content. Inventory, combat, investigation, equipment and similar
+mechanics are optional capabilities used by quests when justified by the source.
 
 This document catalogs those optional capabilities. A capability may be absent
-without placeholder data, but the main questline remains the story-progression
-spine of every playable world.
+without placeholder data, but every player route still has a main questline as
+its story-progression spine.
 
 ## When something deserves a capability
 
@@ -155,8 +157,8 @@ canonical route, an original-character route, or both. When both are present,
 New Game offers the choice immediately; neither route must unlock the other.
 
 Routes reuse the same validated world definitions and canonical timeline where
-possible, but have their own player-controlled protagonist, starting state, main
-questline and mutable save. In the original route, canonical protagonists remain
+possible, but have their own player-controlled character, PlayerSpec-like static
+identity, starting state, main questline and mutable save. In the original route, canonical protagonists remain
 ordinary world entities/NPCs from the player's perspective and continue through
 their protected canonical anchors. Route selection changes who the player controls,
 not which source characters exist.
