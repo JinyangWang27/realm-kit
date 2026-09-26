@@ -52,9 +52,21 @@ from playable runtime types; future provenance can live in an optional package
 sidecar keyed by runtime entity IDs. A simulator can consume WorldSpec and replay
 engine Commands, with no need to put generation into the engine.
 
-All generated player-facing content must be in the same language as its source:
-names, descriptions, dialogue, choices, quests, story passages, and templates.
-World metadata declares the content language; a source-backed draft checks it
-against the declared source language. This checks metadata only: the author must
-review language and literary fidelity. The hand-authored English demo has no
-source input. The initial CLI's fixed interface labels are English.
+All player-facing text in a source-backed world must be in the same language
+as its source. This includes authored names, descriptions, dialogue, choices,
+quests, story passages and templates, plus client-owned labels, help, prompts,
+status text and runtime errors shown during play. World metadata declares the
+content language; a source-backed draft checks it against the declared source
+language. This checks metadata only: the author must review language and literary
+fidelity. Machine-facing schema keys, IDs, enum values and stable typed-command
+tokens may remain language-neutral ASCII.
+
+The hand-authored English demo has no source input. The initial M0 CLI still
+contains English-only fixed interface text. That is a known presentation-layer
+limitation to remove in M1, not an exception to the source-language invariant.
+
+Format 1 also selects combat prose variants from the global successful-command
+count. This preserves deterministic replay, but means inspection/presentation
+commands can alter later combat wording. Do not treat that coupling as intended
+game semantics. M1 should move selection to deterministic state associated with
+the relevant narrative/gameplay event sequence so browsing does not affect prose.
