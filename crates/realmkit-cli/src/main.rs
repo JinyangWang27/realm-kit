@@ -157,7 +157,8 @@ fn erase(output: &mut impl Write, lines: u16) -> io::Result<()> {
     )
 }
 
-/// Reads a typed command from keys, echoing it; `None` when cancelled with Esc.
+/// Reads a typed command from keys, echoing it. Esc cancels (an empty line);
+/// `None` means quit (Ctrl-C/Ctrl-D or end of input).
 fn read_typed(
     keys: &mut impl Iterator<Item = io::Result<Key>>,
     output: &mut impl Write,
@@ -173,10 +174,11 @@ fn read_typed(
                 write!(output, "{c}")?;
             }
             Some(Key::Backspace) if line.pop().is_some() => write!(output, "\u{8} \u{8}")?,
-            Some(Key::Esc | Key::Quit) | None => {
+            Some(Key::Esc) => {
                 writeln!(output)?;
-                return Ok(None);
+                return Ok(Some(String::new()));
             }
+            Some(Key::Quit) | None => return Ok(None),
             _ => {}
         }
     }
@@ -227,7 +229,7 @@ fn play_keys(
                 }
                 Outcome::Typed => {
                     let Some(line) = read_typed(&mut keys, output)? else {
-                        continue 'scene;
+                        break 'scene;
                     };
                     match input::parse(&line) {
                         Ok(input::Input::Quit) => break 'scene,
@@ -347,6 +349,21 @@ mod tests {
         ] {
             assert!(text.contains(passage), "missing {passage:?} in {text}");
         }
+    }
+
+    #[test]
+    fn quitting_from_the_typed_prompt_ends_play() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/demo-world"
+        ))
+        .unwrap();
+        let mut output = Vec::new();
+        let keys = [Char(':'), Char('x'), Quit, Enter];
+        play_keys(&world, keys.into_iter().map(Ok), &mut output).unwrap();
+        assert!(!String::from_utf8(output)
+            .unwrap()
+            .contains("looking at the bell"));
     }
 
     #[test]

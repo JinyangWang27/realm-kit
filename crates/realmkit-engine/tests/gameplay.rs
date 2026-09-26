@@ -160,6 +160,10 @@ fn death_blocks_actions_but_allows_inspection() {
     assert!(engine.execute(Move(South)).is_err());
     assert!(engine.execute(Attack("wolf".into())).is_err());
     assert!(engine.execute(Status).is_ok());
+    assert_eq!(
+        offered(&engine),
+        vec![(Inventory, true), (Status, true), (Quests, true)]
+    );
 }
 
 #[test]

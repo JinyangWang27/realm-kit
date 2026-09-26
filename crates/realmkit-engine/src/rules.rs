@@ -179,13 +179,14 @@ pub(super) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         available: conditions_met(state, &exit.requires),
     }));
     actions.extend([Command::Inventory, Command::Status, Command::Quests].map(available));
+    // Death is not a locked door: offer only what can still be done.
     if state.player.hp == 0 {
-        for action in &mut actions {
-            action.available &= matches!(
-                action.command,
+        actions.retain(|a| {
+            matches!(
+                a.command,
                 Command::Inventory | Command::Status | Command::Quests
-            );
-        }
+            )
+        });
     }
     actions
 }
