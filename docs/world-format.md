@@ -7,11 +7,16 @@ version must allow combat data and combat state to be wholly absent; authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
 combat and other genre mechanics as source-grounded capabilities.
 
-Format 1 also represents one fixed protagonist and one campaign. Future
-multi-campaign support may package a canonical campaign and an unlockable
-original-character campaign together. Each will require its own start state and
-endings, plus explicit cross-campaign facts; runtime unlocking must never require
-source material or generation tools.
+Format 1 also represents one fixed player-controlled protagonist and one
+playable route. Future formats may package a canonical route, an original-character
+route, or both over the same shared world and canonical timeline. When both are
+present, New Game selects between them directly; one route does not unlock the
+other. Each route has its own protagonist binding, start state, main questline,
+outcomes and mutable save while reusing shared locations, NPCs, factions and
+other world definitions where appropriate.
+
+In an original-character route, the canonical protagonist remains in the package
+as a canonical world entity/NPC rather than being replaced by the player.
 
 Format 1 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
