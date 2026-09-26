@@ -39,8 +39,11 @@ than replacing them.
   events shared by typed commands, menus and future clients.
 - Combat uses gradual defence reduction with explicit immunity/vulnerability.
   Immunity overrides minimum damage; vulnerability and defence bypass differ.
-- Speed controls action frequency on a proposed paused timeline. Effective speed
-  has a cap, and heavy armour can trade speed for protection.
+- Story phase is universal narrative progression; world clock/calendar time is
+  optional; encounter timing is local scheduling state; real-world thinking time
+  advances none of them.
+- Speed controls action frequency on a proposed paused encounter timeline.
+  Effective speed has a cap, and heavy armour can trade speed for protection.
 - Recipe knowledge and proficiency are separate: authored sources teach recipes;
   proficiency gates their use.
 
@@ -305,26 +308,95 @@ capabilities need the same semantics.
 
 ## 8. Time models
 
-**Needed before:** combat timeline implementation, schedules or deadlines.
+**Resolved foundation:** RealmKit separates narrative progression from optional
+clock/calendar simulation and from encounter scheduling.
 
-Keep three concepts distinct:
+Keep four concepts distinct:
 
 ```text
-real time        player thinking time; never advances game rules
-story time       dates, travel, schedules and deadlines
-action timeline  fine-grained ordering inside encounters
+real time           human thinking/input time; never advances game rules
+story phase         discrete narrative/canonical progression; universal core
+world time          optional in-world clock/calendar for schedules and deadlines
+encounter timeline  local deterministic ordering inside combat/other encounters
+```
+
+### Story phase
+
+Story phase is part of the universal world model. It represents bounded periods
+of narrative/canonical progression and is advanced primarily by explicit
+main-quest milestones or other authored story transitions.
+
+Free exploration, reading, menu use, side quests, ordinary dialogue and player
+thinking do not implicitly advance the canonical story. A player can therefore
+explore the side content available in one phase without the source timeline
+silently running ahead.
+
+Story-phase transitions may change NPC locations/availability, world
+presentation, side-quest availability, routes and other authored world state.
+
+### World time
+
+World time is an optional capability, not a universal requirement. Enable it only
+when the source/gameplay needs concepts such as:
+
+- travel durations
+- day/night behavior
+- NPC schedules
+- appointments
+- rest/recovery tied to elapsed time
+- explicit deadlines
+- calendar/date-sensitive events
+
+Commands do not have universal durations. Presentation-only actions such as
+`look`, map/menu navigation, inventory/status/journal inspection and similar
+browsing consume no world time. When world time is enabled, meaningful
+advancement is authored or capability-defined—for example a six-day journey or
+"rest until morning"—rather than inferred from arbitrary command counts.
+
+Hard deadlines are not a default RealmKit mechanic. Source adaptations should
+normally let the main story wait for explicit progression; add deadlines only
+when the source or intended gameplay actually depends on them.
+
+### Encounter timeline
+
+The encounter timeline is local scheduling state used to answer which actor acts
+next. Its units have no intrinsic conversion to world time or wall-clock seconds.
+Combat balancing parameters such as action cost, speed and speed caps must not
+accidentally change narrative/calendar chronology.
+
+If an encounter should consume world time, that relationship is an explicit
+authored/capability effect after or around the encounter; do not derive it by
+summing combat ticks.
+
+### Real time
+
+Real-world time spent reading, thinking or choosing never advances story phase,
+world time or encounter rules.
+
+Conceptually:
+
+```text
+main-quest milestone ───────→ StoryPhase transition
+
+optional authored action ───→ WorldTime advance
+
+combat/encounter action ────→ EncounterTimeline scheduling
+
+human thinking time ────────→ no gameplay-time effect
 ```
 
 Open questions:
 
-- Which commands advance story time, and by authored or calculated amounts?
-- How does an encounter's action timeline map back to story time, if at all?
-- What happens when several story events share a timestamp?
-- How do rest, recovery and NPC schedules interact?
-- Are deadlines visible exactly or described narratively?
+- What concrete representation should optional world time use when first needed
+  (for example integer minutes, authored periods, or calendar-aware timestamps)?
+- How should simultaneous world-time events be ordered deterministically?
+- When world time exists, which recovery/schedule mechanics need shared engine
+  semantics versus capability-specific rules?
+- How should exact deadlines versus qualitative time pressure be presented to the
+  player?
 
 Combat timing details, action costs, speed cap and armour penalties remain in the
-[roadmap](../ROADMAP.md). Do not equate combat ticks with wall-clock seconds.
+[roadmap](../ROADMAP.md).
 
 ## 9. Definitions, instances and identity
 
