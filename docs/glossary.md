@@ -86,8 +86,30 @@ milestones, rather than by real-world time or ordinary exploration.
 
 A protected major source fact or event that a source-backed adaptation must not
 invalidate. Routes and side content may vary the path, context and local
-consequences around an anchor without rewriting the source into a fundamentally
-different story.
+consequences around an anchor, but every supported branch must preserve
+reachability of required downstream anchors in a canon-compatible state.
+
+Canon anchors are primarily authoring/worldgen concepts rather than runtime
+gameplay entities.
+
+## Canon Constraint
+
+A broader source-fidelity rule that may not correspond to one event, including
+established identity, relationships, chronology, character knowledge, core
+characterization, world facts and causal consistency.
+
+## Expansion Space
+
+The authored space between protected canon anchors in which RealmKit may add
+exploration, side questlines, minor characters, inferred events, alternate
+methods, relationship development and bounded local consequences.
+
+## Provenance
+
+Authoring metadata classifying generated source-backed material as `SOURCE`,
+`INFERRED`, or `EXPANDED`, with source references or rationale where useful.
+Provenance supports fidelity review/regeneration and is not required runtime
+gameplay state.
 
 ## Capability
 
