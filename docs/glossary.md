@@ -114,8 +114,21 @@ in the spatial layout.
 
 ## Outcome
 
-An authored route-level result/end state. Exact completion, terminality, failure
-and replay semantics are defined separately in the outcomes design.
+An authored route-level result/end state selected from explicit deterministic
+conditions. Outcomes independently declare whether they count as route completion
+and whether they terminate the playthrough.
+
+A playthrough records at most one immutable route outcome. Ordinary setbacks and
+recoverable gameplay death are not outcomes unless explicitly authored as such.
+
+## Recovery Save
+
+A valid saved deterministic playthrough snapshot eligible for death recovery.
+Manual saves and auto-saves share one chronological recovery history; ordinary
+recoverable death restores the newest valid snapshot.
+
+Auto-saves are created at stable boundaries such as route start and story-phase
+transitions rather than on every command or movement step.
 
 ## Campaign
 
