@@ -19,7 +19,7 @@ fn npc_here(world: &WorldSpec, state: &GameState, id: &str) -> bool {
             .is_some_and(|n| conditions_met(state, &n.requires))
 }
 
-fn choices<'a>(
+pub(super) fn choices<'a>(
     world: &'a WorldSpec,
     state: &GameState,
     npc: &str,
@@ -153,6 +153,41 @@ fn quest(
         }
     }
     Ok(())
+}
+
+pub(super) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
+    let location = world.location(&state.player.location).unwrap();
+    let available = |command| Action {
+        command,
+        available: true,
+    };
+    let mut actions: Vec<_> = location
+        .npcs
+        .iter()
+        .filter(|id| npc_here(world, state, id))
+        .map(|id| available(Command::Talk(id.clone())))
+        .collect();
+    actions.extend(
+        location
+            .monsters
+            .iter()
+            .filter(|id| state.monster_hp[*id] > 0)
+            .map(|id| available(Command::Attack(id.clone()))),
+    );
+    actions.extend(location.exits.iter().map(|(direction, exit)| Action {
+        command: Command::Move(*direction),
+        available: conditions_met(state, &exit.requires),
+    }));
+    actions.extend([Command::Inventory, Command::Status, Command::Quests].map(available));
+    if state.player.hp == 0 {
+        for action in &mut actions {
+            action.available &= matches!(
+                action.command,
+                Command::Inventory | Command::Status | Command::Quests
+            );
+        }
+    }
+    actions
 }
 
 pub(super) fn execute(
