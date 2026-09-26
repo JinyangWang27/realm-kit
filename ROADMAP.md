@@ -401,7 +401,11 @@ every package.
   wall-clock seconds, actor turns and timeline units.
 - Show why stats changed and what an action costs before confirming it.
 - Deliver in slices: M4a equipment instances and equip/unequip; M4b stations,
-  forging and improvements; M4c one compatible enchantment per item. Preserve
+  forging and improvements; M4c one compatible enchantment per item. Runtime
+  instances use deterministic saved IDs only when distinguishable copies need
+  independent state; unique legendary equipment may still have one mutable
+  instance, while fungible identical resources remain definition + quantity.
+  Preserve
   authored source-language names and prose throughout crafting.
 - Keep recipe knowledge separate from proficiency: authored teachers, plans,
   quests or discoveries grant recipes, while smithing determines whether a known
@@ -415,7 +419,8 @@ item identity and consumes resources atomically without duplicating bonuses.
 ## M5 — Longer authored adventures and source-specific mechanics
 
 - Separate monster definitions from encounter instances; support multiple enemies
-  without reusing one global HP record.
+  without reusing one global HP record. Use instances only where distinguishable
+  copies require independent mutable state; do not instance every authored entity.
 - Generalize the core quest model into main and side questlines with typed
   multi-target objectives, prerequisites and chains. Side questlines are unlocked
   by explicit main-story/story-phase conditions and may feed explicit state back
