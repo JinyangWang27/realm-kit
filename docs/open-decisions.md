@@ -239,7 +239,7 @@ add a first-class `Campaign` type until a concrete multi-route package needs it.
 
 ## 5. Conditions and effects
 
-**Needed before:** expanding dialogue, investigation or multi-campaign state.
+**Needed before:** expanding dialogue, investigation or multi-route state.
 
 Define the shared typed vocabulary used by story branches and capabilities.
 Likely conditions include flags, optional quest/objective state, item possession,
@@ -247,7 +247,7 @@ evidence-obtained state, relationship thresholds, time windows and entity state.
 An evidence condition is not shorthand for inventory possession: investigation
 may obtain evidence from testimony, observation or a physical entity. Likely effects include
 setting flags, transferring items, changing relationships, advancing objectives,
-moving entities and ending campaigns.
+moving entities and reaching authored outcomes.
 
 Open questions:
 
@@ -360,8 +360,9 @@ Open questions:
 - Can a package update remove content referenced by a save?
 
 Current leaning: versioned saves record engine format, package ID/revision,
-campaign ID and all deterministic state. Refuse unknown incompatibilities rather
-than silently resetting fields. Add migrations only for real released changes.
+player-route ID (when a package contains more than one route) and all deterministic
+state. Refuse unknown incompatibilities rather than silently resetting fields.
+Add migrations only for real released changes.
 
 ## 11. Validation, reachability and simulation
 
