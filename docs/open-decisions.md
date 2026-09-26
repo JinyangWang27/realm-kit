@@ -5,6 +5,7 @@ are intentionally unresolved. It prevents an implementation detail from silently
 becoming policy. Decide items when their milestone needs them; do not block M1 on
 questions that only affect later generation or multiplayer work.
 
+Normative architecture terminology is defined in the [glossary](glossary.md).
 Detailed proposals already live in the [roadmap](../ROADMAP.md),
 [equipment proposal](equipment.md), [capability catalog](capabilities.md), and
 [authoring guide](authoring.md). This register links to those decisions rather
