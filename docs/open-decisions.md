@@ -38,6 +38,8 @@ than replacing them.
 - World generation offers canonical, original, or both player-entry modes.
   Canonical and original routes are independently playable; `both` exposes the
   choice at New Game rather than requiring one route to unlock the other.
+- World characters are shared entities; `PlayerSpec` binds control of one
+  character to a route. Player and protagonist are not synonymous.
 - Source adaptations use protected canon anchors/constraints with bounded
   expansion between them. Required downstream anchors must remain reachable; no
   unrestricted/free adaptation mode exists.
@@ -351,61 +353,75 @@ Decisions:
 
 ## 5. Player entry and original-character generation
 
-**Resolved foundation:** source-backed worlds support three player-entry modes:
+**Resolved.**
+
+RealmKit separates world character identity from player control:
 
 ```text
-canonical
-original
-both
+Character   = who exists in the world
+PlayerSpec  = which Character the human controls
+PlayerRoute = how that player experiences the world
 ```
 
-- `canonical`: the player controls a canonical protagonist and follows a
-  source-grounded main questline with bounded freedom around required canon
-  anchors.
-- `original`: the player controls a new character in the same shared world and
-  canonical timeline. Canonical protagonists remain world entities/NPCs and their
-  required story anchors continue to occur.
-- `both`: the package contains both routes and New Game offers the choice
-  immediately. The routes use separate mutable saves and do not implicitly
-  transfer inventory, relationships, injuries, flags or quest state.
+All playable characters are ordinary shared world characters. Player control is a
+route-level binding rather than a separate character species.
 
-The route choice determines who is player-controlled, not which canonical
-characters exist. In an original-character *The Return of the Condor Heroes*
-route, Yang Guo still exists and proceeds through the authored canonical
-timeline; the player's own main questline may intersect with and locally affect
-his story without replacing him.
-
-Static player identity and mutable state are separate. Conceptually:
+Conceptually:
 
 ```text
-PlayerSpec  = who the player-controlled character is
-PlayerState = mutable state intrinsic to that character
-GameState   = mutable state of the whole playthrough
+World
+├── characters
+│   ├── canonical characters
+│   └── authored original characters
+│
+└── PlayerRoutes
+    ├── canonical route
+    │   └── PlayerSpec.character = canonical_character_id
+    └── original route
+        └── PlayerSpec.character = original_character_id
 ```
 
-"Player" must not be treated as synonymous with "protagonist". In a canonical
-route they may be the same character; in an original route the canonical
-protagonist remains a world NPC while the player controls someone else.
+Decisions:
 
-Canonical-character binding, background and other fixed identity belong to
-authored `PlayerSpec`-like content. The existing engine `PlayerState` remains
-the mutable player component. Quest progression, story/world flags, dialogue and
-other run-wide state belong to `GameState` or typed sub-state beneath it rather
-than being folded into `PlayerState` merely because they affect the player.
+- Future shared character identity belongs to a `CharacterSpec`-like world
+  entity. Names, descriptions, background/origin, canonical identity and other
+  intrinsic authored facts belong there.
+- `PlayerSpec` identifies which character is controlled by the human. It should
+  stay small rather than absorbing route state or capability data.
+- In a canonical route, `PlayerSpec` references the appropriate canonical
+  character.
+- In an original route, worldgen creates an original world character and
+  `PlayerSpec` references it. Canonical protagonists continue to exist as normal
+  world characters/NPCs.
+- Original-character creation is constraint/override driven rather than a
+  universal fixed form. The user may provide as little or as much identity,
+  background, ability or insertion context as desired; worldgen may propose
+  unspecified details.
+- The final original-character identity is resolved before generating dependent
+  route prose, relationships, quests and dialogue.
+- Starting location and story phase belong to the player route. Initial
+  relationships, faction membership and similar mutable facts belong to route
+  initial state or the relevant capability state. Combat stats, inventory,
+  evidence and learned skills remain capability-owned.
+- Runtime identity customization is not universal. A world may explicitly support
+  safe typed cosmetic/customization fields, but canonical identity/background and
+  other authored facts do not become freely mutable by default.
+- Worldgen maintains an authoring-side knowledge boundary for the player
+  character. Omniscient Canon IR knowledge is not player knowledge.
+- Runtime tracks only knowledge distinctions that gameplay actually needs, using
+  typed state such as evidence, discovered locations/facts, flags or a future
+  dedicated knowledge component when justified.
+- Original-character insertion and starting relationships/history must satisfy
+  canon constraints. Worldgen may create plausible local connections, but must
+  not invent major retroactive relationships/events that rewrite established
+  canon.
+- `PlayerState` remains mutable state intrinsic to the controlled character;
+  run-wide story/world state belongs to `GameState` or typed state beneath it.
 
-Open questions:
-
-- Which original-character attributes does the user supply: name, identity,
-  background, abilities, relationships to canon characters, insertion point?
-- Which attributes may worldgen propose for approval?
-- May the player customize appearance/name at runtime without invalidating
-  pre-authored grammar or dialogue?
-- How is player knowledge represented so an original character cannot act on
-  facts that worldgen knows but the character has not learned?
-
-Current leaning: generation establishes a concrete role, knowledge boundary and
-insertion point. Runtime customization is a separate optional capability. Do not
-add a first-class `Campaign` type until a concrete multi-route package needs it.
+The current Format 1 `Npc` type is an implementation limitation. When the format
+needs canonical characters that may be player-controlled in one route and
+non-player-controlled in another, evolve toward a shared `Character` entity
+rather than duplicating the same person as separate NPC/player definitions.
 
 ## 6. Conditions and effects
 
