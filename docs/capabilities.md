@@ -115,19 +115,32 @@ inferred from generic tags or hidden global state.
 
 ## World-generation selection
 
-The author or external agent should select capabilities after extracting canon:
+Select capabilities after canon extraction and before detailed gameplay
+generation.
 
-1. Identify the source's repeated conflicts, decisions and consequences.
-2. Describe the smallest mechanics that let the player participate in them.
-3. Cite source passages or canon facts supporting each selected capability.
-4. Prefer existing RealmKit capabilities where their semantics match.
-5. Represent isolated moments with authored dialogue, conditions and flags.
-6. Omit unsupported genre conventions, even if common in other RPGs.
-7. Validate and simulate each enabled capability and its interactions.
+A fictional concept does not automatically imply a mechanic. Require recurring
+mutable state, reusable rules and meaningful player-facing consequences before
+promoting something into a capability. A village blacksmith alone does not
+justify crafting; repeated player forging/material/proficiency decisions may.
 
-The resulting authoring report should explain selections and omissions. “It is an
-RPG” is not sufficient justification for combat, crafting, loot, classes or an
-economy. Generated player-facing text for every enabled capability follows the
+Worldgen should propose the smallest useful capability set and explain it with
+short rationale plus source references. Existing provenance labels
+(`SOURCE / INFERRED / EXPANDED`) are sufficient; do not add numeric confidence
+scores.
+
+The author/user may accept the proposal or explicitly include/exclude capabilities.
+Automation need not stop for human approval, but overrides should be retained in
+the authoring report rather than presented as source-derived evidence.
+
+Finalize the capability set before generating detailed quests, prose and mechanic
+content. The resulting authoring report may also explain meaningful omissions,
+especially unsupported genre conventions such as combat, crafting, classes or an
+economy.
+
+Capabilities are package/world-level mechanics. Individual player routes may use
+different subsets of those mechanics without duplicating their definitions.
+
+Generated player-facing text for every enabled capability follows the
 source-language rule.
 
 ## Validation and runtime expectations
@@ -144,8 +157,10 @@ Each capability defines:
 
 Validation accepts complete absence. When present, it detects missing references,
 unreachable required outcomes and incomplete definitions as far as that
-capability's analyzer supports. Clients build their action menus from the world
-and current state, so absent capabilities remain invisible.
+capability's analyzer supports. Cross-capability conditions/effects/references are
+explicit and invalid when they require an absent or incompatible capability.
+Clients build their action menus from the world and current state, so absent
+capabilities remain invisible.
 
 Core state should contain only data truly shared by all worlds. Capability state
 uses explicit optional typed composition. This does not require runtime-loaded
