@@ -11,9 +11,11 @@ Format 1 also represents one fixed player-controlled protagonist and one
 playable route. Future formats may package a canonical route, an original-character
 route, or both over the same shared world and canonical timeline. When both are
 present, New Game selects between them directly; one route does not unlock the
-other. Each route has its own protagonist binding, start state, main questline,
-outcomes and mutable save while reusing shared locations, NPCs, factions and
-other world definitions where appropriate.
+other. Each route has its own player binding, start state, main questline, outcomes and
+mutable save while reusing shared locations, NPCs, factions and other world
+definitions where appropriate. Future static player identity should use a
+`PlayerSpec`-like concept rather than `ProtagonistSpec`: the controlled
+character is not necessarily the source story's protagonist.
 
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world entity/NPC rather than being replaced by the player.
