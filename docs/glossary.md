@@ -92,6 +92,20 @@ A discrete narrative/canonical progression period shared by the world. Story
 phases are advanced by explicit authored transitions, usually main-quest
 milestones, rather than by real-world time or ordinary exploration.
 
+## World Time
+
+Optional simulated in-world time represented as a monotonic minute count from an
+authored epoch. It advances only through explicit gameplay actions/effects and is
+independent of story-phase progression and encounter scheduling.
+
+Presentation may render the same scalar using setting-appropriate clocks, dates or
+qualitative periods.
+
+## Encounter Timeline
+
+A local deterministic scheduler used to order actions inside an encounter. Its
+units have no implicit conversion to real time or optional World Time.
+
 ## Canon Anchor
 
 A protected major source fact or event that a source-backed adaptation must not
