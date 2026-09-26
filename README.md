@@ -91,9 +91,14 @@ thresholds and fully restore HP. Quests remember earlier defeats, so accepting
 after a kill does not strand the quest. Death stops actions; inspection remains
 available, and a new session starts a fresh game.
 
-All story prose comes from the world package. The engine chooses combat
-template variants using the successful-command count; presentation only
-substitutes event values. Nothing generates new prose or branches during play.
+All story prose comes from the world package. Format 1 currently chooses
+combat template variants using the successful-command count; presentation only
+substitutes event values. This is deterministic, but inspection commands can
+currently change which combat prose variant appears. Treat that as an M0
+implementation limitation, not a semantic guarantee: future selection should be
+driven by the relevant gameplay/narrative event sequence so browsing and
+inspection cannot change combat prose. Nothing generates new prose or branches
+during play.
 
 ## World authoring
 
@@ -106,12 +111,18 @@ directional links, structured validation, and export. External agents can
 construct `realmkit-spec` values and drive this core. It does not own an LLM
 or implement a source compiler yet. See [the authoring guide](docs/authoring.md).
 
-**Every piece of player-facing content generated from a source must use the
-source's language**, including names, descriptions, dialogue, choices, quest
-text and templates. World metadata declares that language. Source-backed
-drafts check the declared source and world languages match; this is a metadata
-check, not linguistic verification. Authors must also review the actual text.
-The hand-authored demo and the CLI's fixed interface labels are English.
+**Everything displayed to a player in a source-backed world must use the
+source's language.** World-authored names, descriptions, dialogue, choices,
+quest text and templates are generated in that language, and RealmKit clients
+must localize their own fixed labels, help, prompts and runtime messages to the
+world's declared language. Machine-facing schema keys, IDs, enum values and
+stable typed-command tokens may remain language-neutral ASCII.
+
+Source-backed drafts check that the declared source and world languages match;
+this is a metadata check, not linguistic verification. Authors must also review
+the actual text. The hand-authored demo is English. The current M0 CLI still has
+English-only fixed interface text; that is a known limitation to remove as part
+of the M1 presentation work, not an exception to the language invariant.
 
 ## Verify
 
