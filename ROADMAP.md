@@ -123,12 +123,24 @@ normal exit and handled errors.
 - Version saves and identify the world package they belong to. Reject incompatible
   saves clearly; add migrations when an actual format change requires them.
 - Write saves atomically and keep the previous save safe if writing fails.
+- Support manual saves and deterministic auto-saves in one chronological recovery
+  history. Auto-save at route start and major stable authored progression
+  boundaries such as story-phase transitions; allow additional authored/capability
+  checkpoints where useful, but do not auto-save on every ordinary movement step
+  or presentation command.
+- Ordinary recoverable death restores the newest valid manual/auto-save snapshot.
+  Restoring replaces the current playthrough state with the saved deterministic
+  snapshot; it does not "undo" commands piecemeal. Explicit authored terminal
+  death/failure outcomes bypass this recovery behavior.
+- Save creation consumes no story/world/encounter time and must not perturb
+  narrative variant selection.
 - Preserve every deterministic counter; later combat scheduling must also survive
   save/load. Treat loaded saves as input that needs validation.
 
 **Done when:** saving mid-quest, quitting and resuming produces the same subsequent
-events as uninterrupted play. A broken or mismatched save cannot corrupt a world
-or silently reset progress.
+events as uninterrupted play; ordinary death restores the newest valid recovery
+snapshot; story-phase auto-saves are reproducible; and a broken or mismatched save
+cannot corrupt a world or silently reset progress.
 
 ## M3 — Optional combat capability: stats and meaningful speed
 
