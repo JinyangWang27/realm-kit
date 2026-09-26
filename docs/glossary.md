@@ -233,6 +233,22 @@ and whether they terminate the playthrough.
 A playthrough records at most one immutable route outcome. Ordinary setbacks and
 recoverable gameplay death are not outcomes unless explicitly authored as such.
 
+## Save Snapshot
+
+A storage-neutral serialized representation of deterministic mutable playthrough
+state, bound to a package ID/revision and player route. The engine defines and
+validates the snapshot; clients/servers choose the persistence backend.
+
+A save snapshot contains mutable state and stable references to authored
+definitions rather than copying the full world package.
+
+## Recovery Scope
+
+The state scope that a checkpoint is permitted to rewind. A single-player
+playthrough may rewind its whole state; an isolated multiplayer instance may
+rewind itself; a persistent shared world normally cannot be rewound because one
+player dies.
+
 ## Recovery Save
 
 A valid saved deterministic playthrough snapshot eligible for death recovery.
