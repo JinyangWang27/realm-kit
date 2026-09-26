@@ -47,6 +47,31 @@ fn terminal_plays_the_complete_authored_journey() {
 }
 
 #[test]
+fn numbered_menus_alone_finish_the_demo() {
+    // 3 first: the locked chapel gate explains itself instead of opening.
+    let output = run(&["play", WORLD], "3\n1\n1\n1\n2\n1\n1\n1\n1\n1\n1\n3\n2\n");
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "1. Talk to Elder Mara",
+        "2. Travel north — The Pine Track",
+        "3. Travel east — The Roofless Chapel [locked]",
+        "The elder keeps the chapel gate locked",
+        "1. Attack The Ash Wolf",
+        "Level 2",
+        "She opens the chapel gate",
+        "Your journey through the demo is complete.",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    assert!(!text.contains("talk elder"));
+    let output = run(&["play", WORLD], "9\nstatus\n");
+    assert!(String::from_utf8(output.stdout)
+        .unwrap()
+        .contains("Choose one of the listed numbers"));
+}
+
+#[test]
 fn eof_and_bad_input_do_not_crash_or_mutate_gameplay() {
     let output = run(
         &["play", WORLD],

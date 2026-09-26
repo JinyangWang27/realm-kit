@@ -15,6 +15,9 @@ proves the complete single-player loop with authored content.
 - [x] Worldgen: validate/export authored WorldSpec values without overwriting an
   existing destination; typed create/update/link operations and structured
   diagnostics. No AI provider or source compiler yet.
+- [x] Menus (M1): the engine lists context-sensitive actions with availability;
+  the CLI numbers them, supports arrows/Enter/Esc via crossterm in a terminal
+  and numbered lines elsewhere. Viewing panels does not advance the turn.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
@@ -22,7 +25,7 @@ proves the complete single-player loop with authored content.
 
 `realmkit-spec` owns serializable content and package validation; engine and
 worldgen depend only on spec. CLI depends on engine and spec. Only serde,
-serde_json and thiserror are needed; the CLI uses standard-library I/O.
+serde_json and thiserror are needed; the CLI adds crossterm for raw key input.
 
 The package uses fixed JSON filenames, with world metadata, locations, NPCs,
 monsters, items, quests, dialogues and narrative in separate files. IDs are
@@ -57,4 +60,5 @@ names, descriptions, dialogue, choices, quests, story passages, and templates.
 World metadata declares the content language; a source-backed draft checks it
 against the declared source language. This checks metadata only: the author must
 review language and literary fidelity. The hand-authored English demo has no
-source input. The initial CLI's fixed interface labels are English.
+source input. The CLI's fixed interface labels are English and kept in one table in
+`realmkit-cli/src/menu.rs`, apart from authored world text.

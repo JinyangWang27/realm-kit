@@ -1,7 +1,7 @@
 # RealmKit roadmap
 
 Status: discussion draft. Milestones describe playable outcomes, not release
-dates. M0 is implemented; later milestones are proposed. Combat pacing and
+dates. M0 and M1 are implemented; later milestones are proposed. Combat pacing and
 balance formulas remain design decisions, not promises about current behavior.
 The [open-decisions register](docs/open-decisions.md) records unresolved choices
 and when they must be settled.
@@ -34,11 +34,10 @@ loot, XP, leveling, quest completion and unlocking the chapel. Tests exercise th
 full journey and replay it deterministically. Runtime builds independently of
 worldgen and plays offline.
 
-Current limits: fixed damage, immediate enemy counterattacks, session-only state,
-and typed commands for location interactions. Dialogue already accepts bare
-choice numbers; location actions do not yet have a selection menu.
+Current limits: fixed damage, immediate enemy counterattacks and session-only
+state.
 
-## M1 — Play without memorizing commands · next
+## M1 — Play without memorizing commands · complete
 
 Provide a context-sensitive action list for each scene:
 
@@ -440,6 +439,5 @@ maintained in the [open-decisions register](docs/open-decisions.md).
 4. Decide how much to show in the combat menu: exact damage/turn previews, or
    simpler qualitative descriptions backed by an optional detailed log.
 
-Recommended next implementation: M1. It improves the existing game immediately
-while these combat choices are discussed; no need to settle all future systems
-before making the demo comfortable to play.
+Recommended next implementation: M2 save/load, while these combat choices are
+discussed.
