@@ -1,9 +1,14 @@
 # Optional world capabilities
 
-RealmKit's universal core is small: authored narrative content, locations,
-entities, deterministic state, conditions, choices, commands and events. A world
-adds only the gameplay capabilities justified by its source. This document is a
-catalog for authors and future engine work, not a checklist or promised backlog.
+RealmKit's universal core is intentionally small. Quests, inventory, combat,
+investigation, equipment and similar mechanics are optional capabilities rather
+than universal requirements. A world adds only the gameplay structures justified
+by its source. This document is a catalog for authors and future engine work, not
+a checklist or promised backlog.
+
+The exact minimum universal core is still being refined in the
+[open-decisions register](open-decisions.md); do not infer that a concept is core
+merely because Format 1 currently requires it.
 
 ## When something deserves a capability
 
@@ -64,9 +69,19 @@ A detective adaptation might use:
 exploration + dialogue + investigation + relationships + time + accusation
 ```
 
-It needs no combat, equipment or crafting. The investigation state records which
+It needs no combat, equipment, crafting, quest log or inventory unless the
+source actually calls for them. The investigation capability records which
 evidence the player has legitimately obtained; authored dialogue and accusation
 branches inspect that state.
+
+Evidence is not an inventory subtype. An evidence definition may optionally refer
+to a physical entity—such as a letter, weapon, receipt or photograph—that can
+also be represented as an inventory item. The relation should be typed and
+validated, for example conceptually `EvidenceDefinition { subject: Option<EntityRef> }`,
+rather than a free-form `"evidence"` tag on arbitrary items. Testimony,
+observations and deductions can be evidence without corresponding inventory
+objects. Possessing an item and recognizing/obtaining its evidentiary significance
+are separate state transitions.
 
 A court-intrigue adaptation might use:
 
@@ -85,10 +100,13 @@ things. Combat belongs only if physical or magical conflict is an important
 playable part of the source.
 
 Capabilities compose through explicit shared concepts such as entity IDs,
-locations, inventory entries, conditions, flags, commands and events. For
-example, an investigation can set a story flag consumed by dialogue; combat can
-yield a clue; a deadline can close an accusation branch. Cross-capability effects
-must be declared and validated rather than discovered through hidden global state.
+locations, conditions, flags, commands and events, plus typed cross-capability
+references when needed. Optional inventory state can reference the same physical
+entity that an investigation evidence definition references without making either
+capability depend on the other. For example, examining a carried letter may mark
+an evidence definition as obtained; testimony may do the same with no inventory
+object. Cross-capability effects must be declared and validated rather than
+inferred from generic tags or hidden global state.
 
 ## World-generation selection
 
@@ -140,8 +158,10 @@ package explicitly maps selected outcome facts between them.
 
 The current combat demo proves the command/event and static-content seams. The
 next non-combat fixture should exercise investigation because it tests the
-optional-capability architecture directly. Relationships/reputation and time are
-then broadly useful. Inventory/equipment can serve combat and non-combat worlds.
+optional-capability architecture directly, ideally without quests or inventory at
+first. A second investigation slice can then add a physical evidence object to
+prove that inventory and evidence compose through typed references rather than
+inheritance or tags. Relationships/reputation and time are then broadly useful.
 Skill checks should be introduced only with clear semantics for certainty,
 difficulty and any deterministic randomness.
 
