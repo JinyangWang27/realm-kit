@@ -209,9 +209,14 @@ Decisions:
 - Death is not universally a terminal outcome. An authored route may define a
   terminal death/failure ending, but ordinary gameplay death is recoverable by
   default when a valid save exists.
-- On ordinary recoverable death, play resumes from the most recent valid recovery
-  save snapshot. Manual saves and auto-saves participate in the same chronological
-  recovery history; the newest valid snapshot wins.
+- In single-player, ordinary recoverable death resumes from the most recent valid
+  recovery save snapshot. Manual saves and auto-saves participate in the same
+  chronological recovery history; the newest valid snapshot wins.
+- Recovery is scoped: a snapshot may rewind only state exclusively owned by that
+  playthrough/session/instance. A persistent shared multiplayer world normally
+  cannot be rewound because one player dies; multiplayer recovery uses authored
+  player/session respawn rules instead. A private instanced session may rewind its
+  own isolated state when appropriate.
 - Recovery is an explicit restore of a saved deterministic state, not an implicit
   reversal of engine commands. Unsaved changes after that snapshot are discarded.
 - Auto-saves occur at meaningful stable boundaries rather than on every command or
@@ -780,20 +785,132 @@ not automatically imply that its evidentiary significance has been discovered.
 
 ## 11. Save compatibility and package evolution
 
-**Needed before:** M2 save/load.
+**Resolved.**
 
-Open questions:
+A save is a storage-neutral snapshot of deterministic mutable playthrough state,
+not a filesystem concept. The engine defines/validates the snapshot representation;
+the client or authoritative server decides where it is persisted.
 
-- How is a save bound to a package ID and content revision?
-- Which changes are compatible with existing saves?
-- Are migrations owned by the world package, RealmKit, or both?
-- How are atomic writes, backup saves and corruption diagnostics handled?
-- Can a package update remove content referenced by a save?
+Conceptually:
 
-Current leaning: versioned saves record engine format, package ID/revision,
-player-route ID (when a package contains more than one route) and all deterministic
-state. Refuse unknown incompatibilities rather than silently resetting fields.
-Add migrations only for real released changes.
+```text
+realmkit-engine
+      │
+      │ SaveSnapshot
+      ▼
+persistence adapter
+      ├── CLI / desktop → local file or SQLite
+      ├── mobile        → app-local storage
+      └── server        → database / durable service storage
+```
+
+A save records at least:
+
+```text
+save_format_version
+package_id
+package_revision
+player_route_id
+deterministic mutable state
+```
+
+Do not bind saves to a particular RealmKit binary version. Compatibility is
+defined by save format plus package identity/revision.
+
+### Initial compatibility policy
+
+For the first save/load implementation, require an exact package revision match:
+
+```text
+save.package_id       == loaded package.id
+save.package_revision == loaded package.revision
+save.player_route_id  exists
+```
+
+A revision mismatch is rejected rather than guessed compatible. Package revisions
+may add, remove or change authored content freely; old saves remain valid against
+the exact revision they were created with unless an explicit future migration is
+provided.
+
+The exact representation of `package_revision` (content digest, export revision,
+author version, etc.) is an implementation choice. Semantically, gameplay content
+that RealmKit treats as a different revision must have a different revision ID.
+
+### Save contents
+
+Saves contain mutable state and stable references to authored definitions; they do
+not duplicate the complete world package.
+
+Examples of saved state include player/capability state, quest/objective state,
+flags, runtime instances and their IDs, RNG state, World Time, encounter schedules
+and deterministic counters.
+
+### Validation and corruption
+
+Loading is all-or-nothing:
+
+```text
+decode
+  ↓
+save-format validation
+  ↓
+package/revision/route match
+  ↓
+reference + state invariant validation
+  ↓
+usable GameState
+```
+
+Do not silently reset missing/invalid fields or references. Unknown IDs, invalid
+instance counters, incompatible RNG/time state and other corruption produce clear
+load errors unless an explicit migration defines the transformation.
+
+Manual saves, auto-saves and recovery checkpoints use the same snapshot format;
+their role is persistence metadata/policy.
+
+Local persistence should write a complete replacement atomically (for example,
+write temporary state then replace the current snapshot) and retain the previous
+successful snapshot as recovery. If the latest snapshot is invalid, clients may
+offer the previous one explicitly; do not silently substitute it.
+
+### Migrations
+
+Do not build a migration framework before a real released compatibility need
+exists.
+
+If/when needed, keep two concerns separate:
+
+- RealmKit save-schema migration: old `SaveSnapshot` format → new format.
+- Package/content migration: state bound to package revision A → revision B.
+
+Generic save-schema migrations may belong to RealmKit. Content-aware package
+migrations belong with package/release authoring tooling rather than generic engine
+guesswork.
+
+### Multiplayer persistence
+
+In authoritative multiplayer, the server owns the canonical state and durable
+persistence. Clients submit commands; they do not authoritatively submit outcomes,
+RNG results or mutated state.
+
+Server persistence may be continuous transactional state rather than a literal
+save file. Snapshot representations remain useful for restart, backup, testing,
+migration and isolated checkpoints.
+
+Shared multiplayer state may eventually be partitioned into world-, player- and
+session/instance-scoped state, but those concrete structures are deferred until
+multiplayer implementation.
+
+A recovery snapshot may rewind only a state scope it exclusively owns:
+
+```text
+single-player playthrough → may rewind whole playthrough
+private party instance    → may rewind that isolated instance
+persistent shared world   → normally cannot rewind for one player's death
+```
+
+This preserves the single-player Skyrim-like checkpoint model without making it a
+constraint on future online worlds.
 
 ## 12. Validation, reachability and simulation
 
