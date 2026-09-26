@@ -22,6 +22,9 @@ and when they must be settled.
   authored outcomes are core. Side questlines are optional, but main-story
   progress unlocks them in bounded waves so exploration remains open without
   making the main story irrelevant.
+- Time models stay separate: story phase is core narrative progression; an
+  in-world clock/calendar is optional; encounter timelines are local schedulers;
+  real-world thinking time advances none of them.
 - Gameplay capabilities are source-grounded and composable. Inventory, combat,
   crafting, investigation, equipment and similar systems are optional; absent
   capabilities contribute no required data, runtime state or player actions.
@@ -175,10 +178,16 @@ Its limitation is that extra speed does nothing after an actor already outranks
 all opponents. Our discussion has reopened that choice; a timeline is the current
 recommendation, pending agreement on its practical rules.
 
-On a timeline, each actor has a next-action timestamp in **virtual engine time**.
-The engine advances directly to the next actor. It pauses for player input;
-thinking for five minutes takes no game time. Enemy turns can resolve automatically
-until the player is ready again. This is still turn-based play, not a reflex game.
+On a timeline, each actor has a next-action timestamp in **encounter timeline
+units**. The engine advances directly to the next actor. It pauses for player
+input; thinking for five minutes advances neither encounter time, optional world
+time nor story phase. Enemy turns can resolve automatically until the player is
+ready again. This is still turn-based play, not a reflex game.
+
+Encounter timeline units have no intrinsic conversion to wall-clock seconds or
+optional world time. If an authored encounter should consume world time, that
+must be an explicit effect; never derive calendar progression by summing combat
+ticks.
 
 A starting proposal is:
 
@@ -401,8 +410,12 @@ item identity and consumes resources atomically without duplicating bonuses.
   needs one; link it to investigation evidence through a typed reference rather
   than treating evidence as inventory. Its success and failure paths remain
   deterministic and pre-authored.
-- Establish first-class authored endings and campaign completion state, rather
+- Establish first-class authored endings and route completion state, rather
   than treating player death as the only terminal outcome.
+- Keep story-phase transitions event-driven. Add an optional world-time capability
+  only when a representative world needs travel durations, schedules, day/night,
+  rest tied to elapsed time, appointments or deadlines. Do not assign universal
+  durations to ordinary commands.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and at least one non-combat interaction path, can be saved/resumed, and have
