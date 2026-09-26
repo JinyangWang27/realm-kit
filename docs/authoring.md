@@ -223,6 +223,25 @@ Generation should prefer side stories in this order:
 Track whether generated material is sourced, inferred or expanded so reviewers
 can distinguish adaptation from invention.
 
+## Time authoring
+
+Treat canonical/narrative progression as **story phases**, not as a continuously
+running clock. Main-quest milestones or other explicit authored transitions move
+the world between phases. Free exploration and side content inside a phase do not
+silently advance the source chronology.
+
+An in-world clock/calendar is optional. Add world-time data only when the source
+or intended mechanics genuinely need travel durations, day/night behavior, NPC
+schedules, appointments, rest tied to elapsed time, or deadlines. Do not assign
+generic durations to every command merely to simulate time passing.
+
+Encounter timelines are separate local schedulers. Their units exist to order
+actors deterministically and do not represent seconds, minutes or calendar time.
+If an encounter should consume world time, author that consequence explicitly
+rather than deriving it from combat/action ticks.
+
+Real-world time spent reading or choosing never changes any gameplay state.
+
 ## Deliberately open extensions
 
 Canon IR belongs to worldgen: source identities, aliases, chronology,
