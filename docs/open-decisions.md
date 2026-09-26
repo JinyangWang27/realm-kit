@@ -125,7 +125,10 @@ quest  questline  questline
 ```
 
 Side quest outcomes may feed back into the main questline through typed,
-pre-authored state. Examples include:
+pre-authored state. A main quest must not silently require completion of a side
+quest; if a particular quest is required for canonical progression, it is part of
+the main questline (or an explicit alternative main objective), not merely side
+content. Examples include:
 
 - dialogue/options changing because of a relationship or reputation result
 - an NPC helping, refusing, moving, disappearing or surviving
