@@ -1011,21 +1011,79 @@ simulations, not mathematically proven bug-free.
 
 ## 13. Capability selection and provenance
 
-**Needed before:** automated source compilation.
+**Resolved.**
 
-Open questions:
+Capability selection is an authoring/worldgen decision made after canon
+extraction and before detailed gameplay generation.
 
-- What evidence must worldgen cite to justify enabling a capability?
-- When is an implication strong enough—for example, a village blacksmith implying
-  player forging versus merely supplying an NPC occupation?
-- How does the user approve, add or remove proposed capabilities?
-- Should the package retain the selection rationale, or only authoring artifacts?
-- How are cross-capability interactions declared and validated?
+A concept merely existing in the fiction does not justify a gameplay capability.
+Enable a capability when the intended game repeatedly needs all of:
 
-Current leaning: worldgen proposes the smallest capability set with source
-references and a short rationale. The user approves it before detailed content
-generation. The exported playable package need not contain source text, but an
-optional provenance sidecar can retain the rationale and references.
+1. mutable state;
+2. reusable rules; and
+3. meaningful player choices/consequences enforced by the engine.
+
+For example, a blacksmith existing in a village does not imply a crafting system.
+Repeated player-facing forging, materials, proficiency and consequences may.
+
+Worldgen should produce a reviewable capability proposal containing the smallest
+supported capability set, short rationale and relevant source references. It may
+also explain meaningful omissions where an RPG convention could otherwise be
+mistaken for a source requirement.
+
+Do not use numeric confidence scores for capability selection. Existing authoring
+provenance is sufficient:
+
+```text
+SOURCE
+INFERRED
+EXPANDED
+```
+
+The author/user may explicitly include or exclude proposed capabilities. Human
+approval is supported but is not a runtime or automated-generation requirement.
+Overrides are recorded in the authoring report rather than being misrepresented as
+source evidence.
+
+The generation order is:
+
+```text
+Source
+  ↓
+Canon IR
+  ↓
+Capability proposal
+  ↓
+author/user constraints or overrides
+  ↓
+Final capability set
+  ↓
+Gameplay / quest design
+  ↓
+Detailed content generation
+```
+
+The playable runtime package contains the actual definitions/state required by the
+final capability set, not generation reasoning or source excerpts. An optional
+authoring report/provenance sidecar may retain:
+
+- selected and meaningfully omitted capabilities;
+- `SOURCE / INFERRED / EXPANDED` classification;
+- source references and rationale; and
+- explicit author/user overrides.
+
+Cross-capability interaction remains explicit and typed through conditions,
+effects and references. Do not infer behavior from generic tags or hidden naming
+conventions. Validation rejects references that require an absent/incompatible
+capability.
+
+Capability implementations are primarily package/world-level definitions and
+rules. A capability may exist in the package because one player route uses it
+while another route never exposes it. Do not duplicate an entire capability
+system per route merely because route content differs.
+
+No generic capability dependency graph is required until real implementations
+demonstrate a need for one.
 
 ## 14. Presentation and information disclosure
 
