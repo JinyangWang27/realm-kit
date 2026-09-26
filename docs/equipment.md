@@ -1,9 +1,9 @@
 # Equipment and crafting proposal
 
-Status: discussion draft for M4. Scope agreed: both world-author equipment
-definitions and player crafting. The types and rules below are proposals, not
-implemented APIs. They build on gradual defence, separate damage-type modifiers,
-the armour/speed trade-off, and capped effective speed.
+Status: architecture foundation agreed for M4; concrete APIs and balance values
+remain implementation work. The design builds on selective runtime instances,
+typed capability-owned modifiers, gradual defence, separate damage-type
+modifiers, the armour/speed trade-off, and capped effective speed.
 
 Equipment and crafting are separate capabilities. A world may contain weapons
 and armour without allowing the player to forge, improve or enchant them. For a
@@ -55,18 +55,19 @@ bonuses and the action cost of its basic attack. Armour describes its slots,
 physical/magical defence, speed penalty and any explicit damage-type modifiers.
 Items may also grant bounded HP/MP or other supported stat bonuses.
 
-A possible slot set is main hand, off hand, head, body, hands, feet and accessory.
-The first crafting slice only needs one weapon and one body armour piece. Add
-other slots with content that uses them. Two-handed weapons must reserve both
-hands; do not allow a shield to coexist accidentally. Dual-wield attack rules can
-wait for a dedicated design.
+Equipment-enabled worlds define the small set of slot IDs their content needs.
+An equipment definition declares one or more occupied slots. A two-handed weapon,
+for example, may occupy both main-hand and off-hand slots; validation prevents a
+shield from occupying a conflicting slot. Do not hard-code a universal slot list
+until multiple worlds prove that one is useful. Dual-wield attack rules can wait
+for a dedicated design.
 
-Materials distinguish equipment identities and recipes. Authors might define
-iron, steel and a source-specific rare metal, with different stat trade-offs.
-Do not assume every stronger material improves every stat or supports every
-weapon category. Material/archetype helpers can resolve properties during
-authoring; export concrete item definitions to avoid counting a material bonus
-again at runtime. No automatic all-materials × all-weapons catalogue is needed.
+Materials are authored resources and recipe inputs rather than a universal
+runtime progression hierarchy. Authors may define iron, steel and source-specific
+rare materials with any trade-offs the world needs. Material/archetype helpers
+may resolve properties during authoring, but export concrete item definitions so
+runtime never re-derives or double-counts material bonuses. No automatic
+all-materials × all-weapons catalogue is needed.
 
 Conceptual typed authoring operations can grow from the existing WorldDraft:
 
@@ -107,9 +108,11 @@ Proposed first rules:
   plans, quests and authored discoveries grant recipes; smithing proficiency
   determines whether the character can use a known recipe. Raising proficiency
   alone does not automatically reveal recipes in the initial system.
-- Use one smithing proficiency and one enchanting proficiency when those operations
-  arrive. Recipes/tier transitions have authored thresholds; flags or learned
-  recipes can provide special unlocks. No full perk tree is needed initially.
+- Proficiency is capability/world-specific. A first fixture may use one smithing
+  proficiency and one enchanting proficiency, but RealmKit does not impose a
+  universal scale or track. Recipes/tier transitions use authored thresholds;
+  flags or learned recipes can provide special unlocks. No full perk tree is
+  needed initially.
 - Preview the exact material cost and resulting properties. The displayed result
   and the committed result must use the same engine calculation.
 - Given valid inputs, the result is guaranteed. No random failure or hidden
@@ -209,8 +212,9 @@ These milestones build reusable optional capabilities and a fixture world that
 demonstrates them; they do not make crafting mandatory in every RealmKit world.
 
 Recipe learning through teachers, found plans, quests and authored discoveries is
-agreed. Each world chooses which source grants each recipe. Whether examining or
-destroying equipment can teach an enchantment remains open. Also choose actual
-material progression, improvement tiers and proficiency thresholds. Defer
-durability/repair, arbitrary affix rolling, crafting-boost feedback loops,
-disenchanting, dual wielding and an economy until their gameplay is requested.
+agreed. Each world chooses which source grants each recipe or enchantment.
+Material costs, improvement strengths, proficiency thresholds, armour penalties
+and speed-cap values are fixture/world balance decisions rather than architecture.
+Defer durability/repair, arbitrary affix rolling, crafting-boost feedback loops,
+disenchanting/replacement, dual wielding and an economy until their gameplay is
+requested.
