@@ -115,7 +115,7 @@ invalidating its required canon anchors.
 In `both` mode, the static package contains both independently playable routes.
 New Game offers the choice immediately; one route does not have to unlock the
 other. They reuse the same world definitions and canonical timeline where
-possible but keep protagonist-specific main questlines, starting state and saves
+possible but keep player-route-specific main questlines, starting state and saves
 separate. There is no implicit transfer of inventory, injuries, relationships,
 flags or quest state between routes.
 
@@ -134,12 +134,18 @@ the conceptual unit for an independently playable protagonist/storyline. The
 current Format 1 supports one fixed route. Multiple simultaneously controlled
 protagonists remain a separate future design.
 
-Static protagonist identity and mutable play state are separate concerns.
-Conceptually, `ProtagonistSpec` answers "who is the player?" while
-`PlayerState` answers "what has happened to them?". Canonical identity,
-background and source-character binding belong to authored content; current
-location, quest/story phase, faction membership/reputation, relationships and
-optional capability state belong to mutable runtime/save state.
+Static player identity and mutable runtime state are separate concerns.
+Conceptually, `PlayerSpec` answers "who is the player-controlled character?"
+while the existing engine `PlayerState` stores mutable state intrinsic to that
+character during play.
+
+"Player" is intentionally different from "protagonist": a canonical route may
+make the player the source protagonist, while an original-character route may
+place the player beside the canonical protagonist rather than replacing them.
+Canonical/source-character binding, background and other fixed identity belong to
+authored `PlayerSpec`-like content. Mutable run-wide story data such as quest
+progress, flags, dialogue and future NPC/world state belongs to `GameState` (or
+typed state owned beneath it), not automatically to `PlayerState`.
 
 A future world-builder skill should teach the author to:
 
