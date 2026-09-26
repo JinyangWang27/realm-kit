@@ -1258,12 +1258,67 @@ parameters rather than unresolved architecture.
 
 ## 16. Multiplayer authority and pacing
 
-**Needed before:** any server milestone; not needed for single-player work.
+**Resolved foundation; concrete networking/session policies are deferred until a
+server milestone.**
 
-The server will be authoritative and execute the same engine commands. Still
-decide how a paused action timeline waits for multiple players, handles disconnects,
-resolves simultaneous choices and controls information visible to each player.
-Do not constrain current single-player rules around hypothetical networking.
+Multiplayer keeps RealmKit's deterministic command/event model. It adds an
+authoritative coordinator rather than turning the engine into a real-time
+simulation.
+
+```text
+Client
+   │ Command
+   ▼
+Authoritative server
+   ├── validate against current state
+   ├── resolve RNG
+   ├── execute atomically
+   ├── assign authoritative commit order
+   ├── persist
+   └── emit permitted events/views
+```
+
+Decisions:
+
+- The server owns canonical mutable state, rule execution, RNG resolution and
+  durable persistence. Clients submit commands rather than authoritative state or
+  outcomes.
+- Commands that touch the same mutable authoritative scope are serialized into a
+  committed order and revalidated against the state that exists when committed.
+  Independent scopes may progress concurrently; RealmKit does not require global
+  lockstep.
+- Deterministic replay is defined by initial state + authoritative committed
+  command order + RNG state. Network arrival timing itself is not gameplay state.
+- A pending human decision pauses only the encounter/session scope that requires
+  it, not the whole server. Other independent players/encounters may continue.
+- Equal encounter-timeline timestamps use the same stable deterministic
+  tie-breaking semantics as single-player. RealmKit does not require universal
+  simultaneous-secret action selection.
+- Disconnect/AFK timeout behavior is server/session coordination policy. A timeout
+  may submit a predefined ordinary fallback command (for example wait/defend), but
+  wall-clock timeout duration does not advance StoryPhase, WorldTime or
+  EncounterTimeline by itself and does not invoke runtime AI.
+- Race conditions over shared/unique resources resolve naturally through
+  authoritative ordering plus command revalidation: the first committed valid
+  command changes state; later commands may become invalid.
+- Genuine group voting, ready checks or simultaneous collective choices are
+  explicit future party mechanics rather than default command semantics.
+- Server information disclosure is per player. The server sends only state,
+  actions and events that player is permitted to know; hidden server state need
+  not be transmitted.
+- Multiplayer-capable systems explicitly define ownership of mutable state when
+  implemented (for example world-, player-, party/session- or encounter-scoped).
+  Do not add a generic scope field to every current single-player datum in
+  anticipation of networking.
+- Reconnecting clients synchronize from current authoritative server state. Client
+  snapshots never rewind persistent shared world state.
+- Recovery remains scoped as defined in Sections 3 and 11: a private isolated
+  instance may restore its own checkpoint; persistent shared-world state normally
+  cannot rewind because one player dies.
+
+Exact network protocol, authentication, database design, timeout values, fallback
+commands, party ownership rules and horizontal scaling are implementation/server
+policy to decide with the first real multiplayer consumer.
 
 ## Discussion order
 
