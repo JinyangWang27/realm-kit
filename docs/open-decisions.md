@@ -425,27 +425,69 @@ rather than duplicating the same person as separate NPC/player definitions.
 
 ## 6. Conditions and effects
 
-**Needed before:** expanding dialogue, investigation or multi-route state.
+**Resolved.**
 
-Define the shared typed vocabulary used by story branches and capabilities.
-Likely conditions include flags, optional quest/objective state, item possession,
-evidence-obtained state, relationship thresholds, time windows and entity state.
-An evidence condition is not shorthand for inventory possession: investigation
-may obtain evidence from testimony, observation or a physical entity. Likely effects include
-setting flags, transferring items, changing relationships, advancing objectives,
-moving entities and reaching authored outcomes.
+RealmKit uses a small typed condition/effect model rather than an expression
+language or scripting system.
 
-Open questions:
+Conditions are pure queries over current deterministic state:
 
-- Do conditions need AND, OR and NOT initially, or can authored branches keep the
-  first version conjunctive?
-- Which numeric comparisons are needed, and which create needless scripting?
-- Can an effect batch fail atomically when one effect is invalid?
-- How are conflicting simultaneous effects ordered?
-- When does repeated application become an error versus an idempotent no-op?
+```text
+Condition
+├── All(Vec<Condition>)
+├── Any(Vec<Condition>)
+├── Not(Box<Condition>)
+└── typed leaf predicates
+```
 
-Current leaning: closed Rust enums, atomic effect batches and explicit ordering.
-No arbitrary expression language or embedded scripts.
+Leaf predicates are added only when a real core/capability need exists, for
+example flags, quest/objective state, story phase, item possession, evidence,
+relationships, faction state, entity state or optional world-time windows.
+
+Effects are closed typed state changes:
+
+```text
+effects: Vec<Effect>
+```
+
+Examples include setting a flag, transferring an item, obtaining evidence,
+advancing an objective, changing a relationship, moving a character, changing
+story phase or reaching an authored outcome. Add variants with the capability
+that actually needs them.
+
+Decisions:
+
+- Condition evaluation is pure and side-effect free. Clients/engine code may
+  evaluate a condition repeatedly without consuming resources, advancing time,
+  drawing randomness or mutating state.
+- Boolean composition supports `All / Any / Not` so authors do not need synthetic
+  flags merely to express ordinary branching logic.
+- Leaf predicates remain typed. Do not add arbitrary property paths, reflection,
+  formula strings, embedded scripts or a generic expression evaluator.
+- Do not introduce a generic numeric-comparison abstraction until repeated
+  capability implementations prove it useful. A predicate should initially expose
+  domain-appropriate semantics such as `RelationshipAtLeast` or
+  `HasItem { quantity }`.
+- Effects remain closed typed variants. No generic `set(path, value)`,
+  `eval(...)` or executable scripts.
+- Effects in one authored transition execute in authored order against staged
+  state.
+- The enclosing engine command/state transition remains atomic: if any required
+  effect fails, none of the staged effects are committed.
+- Each effect defines deterministic behavior when applied to its current state.
+  Do not add a generic repeat-policy abstraction prematurely. For example, setting
+  an already-set flag may be a no-op, granting an item may accumulate, and quest
+  completion must not duplicate rewards.
+- Hidden-versus-disabled presentation is not part of condition semantics.
+  Conditions answer whether something is legal/available; presentation decides
+  how unavailable authored actions are shown.
+- Do not build generic conflicting-write analysis now. Authored order defines
+  deterministic behavior; higher-level validation/simulation can diagnose bad
+  content when concrete cases justify it.
+
+The current Format 1 `requires: Vec<Condition>` is implicitly conjunctive and is
+an implementation limitation. A future format revision can introduce the
+composable condition tree when richer story branching first needs it.
 
 ## 7. Randomness and reproducibility
 
