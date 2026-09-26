@@ -15,6 +15,9 @@ proves the complete single-player loop with authored content.
 - [x] Worldgen: validate/export authored WorldSpec values without overwriting an
   existing destination; typed create/update/link operations and structured
   diagnostics. No AI provider or source compiler yet.
+- [x] Menus (M1): the engine lists context-sensitive actions with availability;
+  the CLI numbers them, supports arrows/Enter/Esc via crossterm in a terminal
+  and numbered lines elsewhere. Viewing panels does not advance the turn.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
@@ -22,7 +25,8 @@ proves the complete single-player loop with authored content.
 
 `realmkit-spec` owns serializable content and package validation; engine and
 worldgen depend only on spec. CLI depends on engine and spec. Only serde,
-serde_json and thiserror are needed; the CLI uses standard-library I/O.
+serde_json and thiserror are needed by the core crates; the CLI adds crossterm
+for raw terminal key input.
 
 The package uses fixed JSON filenames, with world metadata, locations, NPCs,
 monsters, items, quests, dialogues and narrative in separate files. IDs are
@@ -61,12 +65,12 @@ language. This checks metadata only: the author must review language and literar
 fidelity. Machine-facing schema keys, IDs, enum values and stable typed-command
 tokens may remain language-neutral ASCII.
 
-The hand-authored English demo has no source input. The initial M0 CLI still
-contains English-only fixed interface text. That is a known presentation-layer
-limitation to remove in M1, not an exception to the source-language invariant.
+The hand-authored English demo has no source input. The current CLI still contains
+English-only fixed interface labels (centralized in its menu/presentation code).
+Full package-language UI localization remains future presentation work, not an
+exception to the source-language invariant.
 
-Format 1 also selects combat prose variants from the global successful-command
-count. This preserves deterministic replay, but means inspection/presentation
-commands can alter later combat wording. Do not treat that coupling as intended
-game semantics. M1 should move selection to deterministic state associated with
-the relevant narrative/gameplay event sequence so browsing does not affect prose.
+Format 1's combat prose selection remains an implementation detail. M1 ensures
+presentation-only inspection commands do not advance the turn, so browsing no
+longer perturbs later combat prose. Future formats may use more semantically local
+event/encounter counters when needed.

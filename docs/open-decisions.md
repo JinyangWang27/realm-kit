@@ -914,21 +914,100 @@ constraint on future online worlds.
 
 ## 12. Validation, reachability and simulation
 
-**Needed incrementally:** with every new capability.
+**Resolved.**
 
-Open questions:
+RealmKit separates three quality mechanisms rather than pretending one mechanism
+can prove a whole branching RPG correct:
 
-- What does “reachable” mean when several mutually exclusive endings are valid?
-- How does validation distinguish impossible content from intentionally secret or
-  optional content?
-- Which player policies should deterministic simulation exercise?
-- How are difficulty and balance targets authored?
-- What proof is required before worldgen calls a package complete?
+```text
+Validation
+    ↓
+Reachability analysis
+    ↓
+Simulation
+```
 
-Current leaning: validators report structural errors separately from reachability
-warnings. Required outcomes/objectives declare themselves. Simulations state their
-starting state, policy and assumptions; failure under one policy is not proof of
-impossibility.
+### Validation
+
+Validation checks hard structural and semantic invariants required for safe engine
+execution: schema/version rules, duplicate or missing IDs, invalid references,
+malformed conditions/effects, invalid probabilities, impossible unique-instance
+initialization, broken dialogue links, missing route structure and
+capability-specific invariants.
+
+A validation error prevents export/load. Validation is not a claim that every
+authored path is enjoyable or solvable.
+
+### Reachability analysis
+
+Reachability asks whether authored targets can theoretically become available from
+the relevant initial state, using bounded/domain-specific analyzers rather than a
+universal state-space model checker.
+
+Required progression is held to a stronger standard than optional content:
+
+```text
+required target + proven unreachable → error
+optional/secret + apparently unreachable → warning
+```
+
+Required targets include the route's main progression and required canon anchors;
+capabilities may define additional required targets.
+
+Reachability is evaluated per target/history. Mutually exclusive outcomes do not
+need to be reachable in one playthrough; each required outcome/branch only needs
+a valid history when the package declares it required.
+
+### Simulation
+
+Simulation executes the real RealmKit engine rather than a second simplified rule
+system:
+
+```text
+WorldSpec
++ initial GameState
++ player policy
++ RNG seed/state when stochastic
+        ↓
+engine Commands
+        ↓
+trace / outcome / failure
+```
+
+Every simulation records its route, starting state, player policy, seed/state and
+assumptions.
+
+A successful simulation demonstrates that particular execution path. A failed
+simulation demonstrates only that the stated policy/seed/path failed; it is not
+proof that the route is impossible. Likewise, one successful run does not prove
+all branches.
+
+For stochastic authored branches, validation checks that each explicit reachable
+result has a valid continuation/recovery/outcome where analyzable. RealmKit does
+not attempt to enumerate the complete PRNG state space.
+
+### Balance and completion
+
+Balance is separate from validity. Combat length, economy pacing, survival
+pressure and similar targets belong to world/capability-specific tests and
+authoring guidance rather than universal core validity types.
+
+Worldgen may call a package complete only when:
+
+1. hard structural/capability validation has no errors;
+2. every PlayerRoute has a valid initial state;
+3. every required main-progression target is reachable as far as the available
+   analyzers can determine;
+4. required canon anchors remain reachable;
+5. every required route has at least one successful real-engine simulation to a
+   completion outcome;
+6. each explicit stochastic result used by required progression has a valid
+   authored continuation, recovery path or outcome; and
+7. capability-specific completion checks pass.
+
+The generation report states exactly what was validated/simulated and what remains
+unproven. "Complete" means passed RealmKit's available checks and representative
+simulations, not mathematically proven bug-free.
 
 ## 13. Capability selection and provenance
 
@@ -950,7 +1029,8 @@ optional provenance sidecar can retain the rationale and references.
 
 ## 14. Presentation and information disclosure
 
-**Needed first:** M1 menu navigation; revisited per capability.
+**M1 context menus are implemented; richer presentation remains open and is
+revisited per capability.**
 
 A 3×3 local neighborhood view is agreed for spatial presentation. The player is
 shown in the center; surrounding cells may show nearby locations for context.

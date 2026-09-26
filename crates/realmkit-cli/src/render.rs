@@ -26,7 +26,7 @@ fn interpolate(template: &TextTemplate, values: &[(&str, &str)]) -> io::Result<S
     Ok(output)
 }
 
-fn direction_name(direction: Direction) -> &'static str {
+pub fn direction_name(direction: Direction) -> &'static str {
     match direction {
         Direction::North => "north",
         Direction::South => "south",
@@ -65,7 +65,7 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 for id in &location.npcs {
                     let npc = world.npc(id).unwrap();
                     if engine.conditions_met(&npc.requires) {
-                        writeln!(output, "{} — {}\n  talk {}", npc.name, npc.description, id)?;
+                        writeln!(output, "{} — {}", npc.name, npc.description)?;
                     }
                 }
                 for id in &location.monsters {
@@ -73,8 +73,8 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                         let monster = world.monster(id).unwrap();
                         writeln!(
                             output,
-                            "{} (HP {}) — {}\n  attack {}",
-                            monster.name, state.monster_hp[id], monster.description, id
+                            "{} (HP {}) — {}",
+                            monster.name, state.monster_hp[id], monster.description
                         )?;
                     }
                 }
@@ -134,14 +134,12 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             )?,
             Event::ExperienceGranted { amount } => writeln!(output, "+{amount} XP")?,
             Event::LevelUp { level } => writeln!(output, "Level {level}! Health restored.")?,
-            Event::Dialogue { npc, node, choices } => {
+            // Choices are shown by the menu, which also numbers them.
+            Event::Dialogue { npc, node, .. } => {
                 let npc = world.npc(npc).unwrap();
                 let dialogue = world.dialogue(&npc.dialogue).unwrap();
                 let node = dialogue.nodes.iter().find(|n| &n.id == node).unwrap();
                 writeln!(output, "{}: {}", npc.name, node.text)?;
-                for (index, choice) in choices.iter().enumerate() {
-                    writeln!(output, "  {}. {}", index + 1, choice)?;
-                }
             }
             Event::QuestAccepted { quest } => {
                 writeln!(output, "{}", world.quest(quest).unwrap().introduction)?

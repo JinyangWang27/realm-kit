@@ -35,9 +35,14 @@ Building initially downloads Rust dependencies. Playing requires only the
 compiled `realmkit` binary and the world directory: no network, account, API key,
 model, worldgen crate, or source material.
 
-Type `help` in the game. Commands are line-oriented; press Enter after each one.
-Use `north/south/east/west`, `n/s/e/w`, or `h/j/k/l` to move. `up/down` move
-vertically; raw arrow-key input is reserved for a future TUI.
+In a terminal, each scene shows a context-sensitive menu: use ↑/↓ and Enter,
+or press the number. Esc steps back out of a conversation,
+`n/s/e/w/u/d` (or `h/j/k/l`) move directly, and `:` opens a typed command
+such as `:talk elder`. Ctrl-C quits.
+
+Piped input, scripts and `realmkit play <world> --line` use line mode: type a
+menu number or a command and press Enter. Type `help` for the command list.
+Typed commands still work everywhere:
 
 ```text
 look
@@ -59,10 +64,11 @@ down
 quit
 ```
 
-Choices are numbered from one among the currently visible choices; entering a
-number alone also selects it. `accept <quest-id>` and `complete <quest-id>` work
-at the available quest giver. Entity IDs appear in the interface and are case
-sensitive. Progress exists only for the current session; restarting starts over.
+Choices and scene actions are numbered from one among the currently visible
+options. Normal menu play uses authored display names rather than requiring entity
+IDs; typed commands such as `accept <quest-id>` and `complete <quest-id>` still
+use stable machine IDs. Progress exists only for the current session; restarting
+starts over.
 
 The same journey is available as a scripted smoke test:
 
@@ -92,14 +98,12 @@ thresholds and fully restore HP. Quests remember earlier defeats, so accepting
 after a kill does not strand the quest. Death stops actions; inspection remains
 available, and a new session starts a fresh game.
 
-All story prose comes from the world package. Format 1 currently chooses
-combat template variants using the successful-command count; presentation only
-substitutes event values. This is deterministic, but inspection commands can
-currently change which combat prose variant appears. Treat that as an M0
-implementation limitation, not a semantic guarantee: future selection should be
-driven by the relevant gameplay/narrative event sequence so browsing and
-inspection cannot change combat prose. Nothing generates new prose or branches
-during play.
+All story prose comes from the world package. Format 1 currently chooses combat
+template variants from deterministic engine progression; M1 makes `look`,
+inventory, status and quest-panel inspection spend no turn, so presentation-only
+browsing no longer perturbs later combat prose. The exact variant-selection key is
+still an implementation detail rather than a content contract. Nothing generates
+new prose or branches during play.
 
 ## World authoring
 
@@ -121,9 +125,9 @@ stable typed-command tokens may remain language-neutral ASCII.
 
 Source-backed drafts check that the declared source and world languages match;
 this is a metadata check, not linguistic verification. Authors must also review
-the actual text. The hand-authored demo is English. The current M0 CLI still has
-English-only fixed interface text; that is a known limitation to remove as part
-of the M1 presentation work, not an exception to the language invariant.
+the actual text. The hand-authored demo is English. The current CLI still has
+English-only fixed interface labels; full package-language UI localization remains
+future presentation work and is not an exception to the language invariant.
 
 ## Verify
 

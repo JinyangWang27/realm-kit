@@ -1,11 +1,13 @@
 use realmkit_engine::Command;
 use realmkit_spec::Direction;
 
-pub const HELP: &str = "look\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\nattack <monster-id>\ntalk <npc-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nhelp\nquit";
+pub const HELP: &str = "<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\nattack <monster-id>\ntalk <npc-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nhelp\nquit";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Input {
     Command(Command),
+    /// One-based number from the menu currently on screen.
+    Select(usize),
     Help,
     Quit,
     Blank,
@@ -47,7 +49,7 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
             Command::ChooseDialogue(number.parse().map_err(|_| "expected a choice number")?)
         }
         (value, []) if direction(value).is_some() => Command::Move(direction(value).unwrap()),
-        (value, []) => Command::ChooseDialogue(value.parse().map_err(|_| "unknown command")?),
+        (value, []) => return Ok(Input::Select(value.parse().map_err(|_| "unknown command")?)),
         _ => return Err("wrong arguments"),
     };
     Ok(Input::Command(command))
@@ -73,7 +75,11 @@ mod tests {
             parse(" TALK Elder_1 "),
             Ok(Input::Command(Command::Talk("Elder_1".into())))
         );
-        assert_eq!(parse("2"), Ok(Input::Command(Command::ChooseDialogue(2))));
+        assert_eq!(parse("2"), Ok(Input::Select(2)));
+        assert_eq!(
+            parse("choose 2"),
+            Ok(Input::Command(Command::ChooseDialogue(2)))
+        );
         assert!(parse("north extra").is_err());
     }
 }

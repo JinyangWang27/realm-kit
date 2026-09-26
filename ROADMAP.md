@@ -1,7 +1,7 @@
 # RealmKit roadmap
 
 Status: discussion draft. Milestones describe playable outcomes, not release
-dates. M0 is implemented; later milestones are proposed. Combat pacing and
+dates. M0 and M1 are implemented; later milestones are proposed. Combat pacing and
 balance formulas remain design decisions, not promises about current behavior.
 The [open-decisions register](docs/open-decisions.md) records unresolved choices
 and when they must be settled.
@@ -49,72 +49,39 @@ loot, XP, leveling, quest completion and unlocking the chapel. Tests exercise th
 full journey and replay it deterministically. Runtime builds independently of
 worldgen and plays offline.
 
-Current limits: fixed damage, immediate enemy counterattacks, session-only state,
-and typed commands for location interactions. Dialogue already accepts bare
-choice numbers; location actions do not yet have a selection menu.
+Current limits: fixed damage, immediate enemy counterattacks and session-only
+state.
 
-## M1 — Play without memorizing commands · next
+## M1 — Play without memorizing commands · complete
 
-Provide a context-sensitive local map and action list for each scene. The
-preferred spatial presentation is a 3×3 neighborhood centered on the player's
-current location:
+Delivered: context-sensitive engine actions plus a terminal menu that supports
+arrow/Enter/Esc navigation, numbered shortcuts, direct movement keys and typed
+commands. Pipes/scripts retain line mode, and the engine rechecks legality when a
+selected action executes.
 
 ```text
-┌────────────┬────────────┬────────────┐
-│ Northwest  │ Pine Track │ Northeast  │
-├────────────┼────────────┼────────────┤
-│ Old Mill   │ YOU        │ Chapel     │
-│            │ Ashbell    │ [locked]   │
-├────────────┼────────────┼────────────┤
-│ Southwest  │ River Road │ Southeast  │
-└────────────┴────────────┴────────────┘
+Ashbell Village
 
-> Talk to Elder Mara
-  Inventory
-  Character
-  Quests
+> 1. Talk to Elder Mara
+  2. Travel north — The Pine Track
+  3. Travel east — The Chapel [locked]
+  4. Inventory
+  5. Character
+  6. Quests
+
+↑/↓ select · Enter confirm · number choose · Esc back
 ```
 
-The 3×3 grid is a **view of nearby space**, not a change to movement semantics.
-Players move only through explicit cardinal exits (north/south/east/west).
-Diagonal cells provide additional spatial context but are not directly traversable
-unless a future mechanic explicitly defines such movement. Vertical `up`/`down`
-travel is separate from the 2D grid (for stairs, floors, caves, cliffs, etc.).
+M1 also makes `look`, inventory, status and quest-panel inspection
+presentation-only: they do not advance the engine turn. The complete demo is
+tested through numbered menus as well as scripted typed input.
 
-- Arrow keys select or move among legal cardinal actions; numbered shortcuts
-  remain available for contextual actions, dialogue, targets and combat actions.
-  Players never need to type an entity ID.
-- Keep selection numbering stable while a menu is displayed. Explain unavailable
-  actions and recheck legality in the engine when an action is submitted.
-- Keep map layout separate from traversal rules. A visible neighboring cell does
-  not imply an exit. The engine remains authoritative about whether a cardinal
-  move is legal; presentation may show locked, blocked or currently unavailable
-  locations without making them traversable.
-- Use explicit menu focus: arrows navigate the active list when a menu has focus.
-  On the local map, directional input attempts the corresponding cardinal move.
-  Vertical travel remains a distinct contextual action.
-- Preserve the line-oriented interface for pipes, scripts and terminals without
-  interactive input. There, numbered selections are followed by Enter.
-- Keep typed commands available. Menu browsing, inspecting panels and reading
-  dialogue choices must not spend combat time.
-- Select authored action labels in the world's language and localize all fixed
-  interface labels, help, prompts and runtime messages to the world's language.
-  Stable typed-command aliases may remain language-neutral ASCII, but displayed
-  guidance must not leak English into a non-English world.
-- Menu browsing, panel inspection and other presentation-only actions must not
-  change which narrative/combat template variant is selected. Move variant
-  selection away from the global successful-command count toward a deterministic
-  counter or key tied to the relevant gameplay event sequence.
-- Build the smallest terminal menu that serves this loop; a full-screen layout
-  can follow if needed. No engine rewrite to accommodate keyboard events.
-
-**Done when:** a new player can finish the demo using the 3×3 local map and
-context menus without memorizing commands. Cardinal movement and diagonal
-visibility are tested separately, including locked/blocked neighbors and vertical
-travel. A non-English fixture verifies that player-visible menus/help/messages do
-not fall back to English. Browsing or inspection does not alter subsequent combat
-prose selection. Scripted play still works; terminal settings are restored on
-normal exit and handled errors.
+The later architecture discussion added richer presentation goals that were not
+part of the merged M1 implementation: a 3×3 local neighborhood map, diagonal
+context/discovery rules, and full fixed-interface localization to the package
+language. Those remain future presentation work tracked in
+[Section 14](docs/open-decisions.md#14-presentation-and-information-disclosure);
+they are not retroactively part of M1 acceptance.
 
 ## M2 — Continue an adventure across sessions
 
@@ -461,11 +428,16 @@ tested paths to completion. A dungeon is useful only for a world that needs one.
 - Extend typed authoring operations where real content workflows need them.
 - Add structured diagnostics for unreachable objectives, unavailable required
   items, unsatisfied prerequisites and invalid story/dialogue links.
-- Expose deterministic progression simulation with explicit starting state and
-  player policy. Add combat simulation only for combat-enabled worlds. Report
-  outcomes, costs and blocking conditions.
-- Distinguish a failed simulation under one policy from proof that a quest is
-  impossible. Report the scenario and assumptions with the result.
+- Keep structural validation, bounded reachability analysis and executable
+  simulation distinct. Hard structural/invariant failures are errors; apparently
+  unreachable optional/secret content is normally a warning, while required
+  progression that the available analyzer proves unreachable is an error.
+- Expose deterministic progression simulation through the real engine with
+  explicit starting state, route, player policy, RNG seed/state and assumptions.
+  Add combat simulation only for combat-enabled worlds. Report outcomes, costs
+  and blocking conditions.
+- Treat simulation as evidence, not a theorem: one failed policy/seed is not proof
+  of impossibility, and one successful path does not prove every branch.
 - Add an authoring CLI or MCP adapter over the same core when there is a consumer.
 
 **Done when:** an external agent can author, validate, simulate, read structured
@@ -539,6 +511,5 @@ maintained in the [open-decisions register](docs/open-decisions.md).
 4. Decide how much to show in the combat menu: exact damage/turn previews, or
    simpler qualitative descriptions backed by an optional detailed log.
 
-Recommended next implementation: M1. It improves the existing game immediately
-while these combat choices are discussed; no need to settle all future systems
-before making the demo comfortable to play.
+Recommended next implementation: M2 save/load, while these combat choices are
+discussed.

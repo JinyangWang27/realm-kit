@@ -147,6 +147,24 @@ A closed typed state change executed as part of an authored transition/engine
 command. Multiple effects execute in authored order against staged state, and the
 enclosing state transition commits atomically.
 
+## Validation
+
+Hard package/save correctness checks required for safe execution. Structural,
+reference and invariant failures are errors; validation does not by itself prove
+that every gameplay path is solvable.
+
+## Reachability Analysis
+
+Bounded/domain-specific analysis of whether an authored target can become
+available from a relevant starting state. Required targets proven unreachable are
+errors; apparently unreachable optional/secret content is normally a warning.
+
+## Simulation
+
+Execution of real RealmKit engine commands from an explicit starting state under
+a stated player policy and RNG seed/state. A simulation is evidence for that
+particular path, not a proof of every possible playthrough.
+
 ## Capability
 
 An optional reusable gameplay system with recurring mutable state, reusable rules
