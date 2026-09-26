@@ -205,12 +205,23 @@ Active RNG state is saved/restored with the playthrough, and presentation/pure
 condition evaluation never consumes random draws. Semantically independent random
 domains should not be coupled accidentally through unrelated draws.
 
+## Area
+
+An optional spatial/presentation grouping of locations, such as a city, building
+floor or wilderness region. An area may provide local map positions for its
+locations, but does not own traversal semantics.
+
+Areas are not required for graph-only worlds and are not a replacement for the
+World/PlayerRoute hierarchy.
+
 ## Spatial Layout
 
-Presentation-oriented information describing where nearby locations appear
-relative to one another. The 3×3 local map uses spatial layout.
+Optional presentation-oriented placement of locations inside an Area, initially
+expressible as area-local integer `(x, y)` coordinates when a grid is useful.
 
-Spatial layout does not create movement edges.
+Spatial layout never creates movement edges. A client may render an entire compact
+area or any viewport size appropriate to its screen. A fixed 3×3 viewport is not a
+RealmKit semantic requirement.
 
 ## Traversal Graph
 
