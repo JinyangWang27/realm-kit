@@ -72,9 +72,20 @@ Every generated player-facing string **must be in the same language as the
 source input**: names, location/NPC/monster/item/skill descriptions, dialogue,
 choices, quest introductions/progress/completion, story branches, encounter
 text, combat templates, ambient passages, victory and death text. Internal
-IDs and schema keys remain machine-oriented. A language tag does not prove
-that prose obeys this rule; author review must check the text itself. Do not
-silently fall back to English or generic fantasy prose.
+IDs, schema keys, enum values and stable typed-command tokens remain
+machine-oriented.
+
+The same-language rule applies to the final play experience, not only generated
+world content. RealmKit clients must localize their own fixed labels, help,
+prompts, status messages and player-visible errors to the world's declared
+language. Those strings need not be generated from the source, but they must not
+silently fall back to English. The current M0 CLI is English-only and therefore
+requires presentation-layer localization before a non-English source-backed
+world fully satisfies this invariant.
+
+A language tag does not prove that prose obeys this rule; author review must
+check the text itself. Do not silently fall back to English or generic fantasy
+prose.
 
 ## Protagonist and campaign choice
 
