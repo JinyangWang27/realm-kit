@@ -143,6 +143,17 @@ The existence of an entity in the fiction does not require its corresponding
 mechanical capability. For example, factions can exist as world entities without
 a faction/reputation system.
 
+## Randomness
+
+An optional engine-level deterministic pseudo-random facility used by world-level
+systems and capabilities such as rare events, encounters, critical hits, loot or
+checks.
+
+Randomness selects among authored possibilities; it never generates content.
+Active RNG state is saved/restored with the playthrough, and presentation/pure
+condition evaluation never consumes random draws. Semantically independent random
+domains should not be coupled accidentally through unrelated draws.
+
 ## Spatial Layout
 
 Presentation-oriented information describing where nearby locations appear
