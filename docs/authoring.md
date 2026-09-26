@@ -87,46 +87,59 @@ A language tag does not prove that prose obeys this rule; author review must
 check the text itself. Do not silently fall back to English or generic fantasy
 prose.
 
-## Protagonist and campaign choice
+## Player entry mode
 
-World generation asks the user how they want to enter the source story. The
-initial authoring model should support three explicit choices:
+World generation asks how the player wants to enter the source world. The
+authoring model supports three product-level choices:
 
 ```text
 canonical
 original
-canonical_then_original
+both
 ```
 
-In canonical mode, the user selects or approves a character extracted from the
-source. Worldgen preserves that character's knowledge, relationships, voice and
-plausible choices. In original mode, the user supplies or approves a new role and
-its insertion point; worldgen must integrate it without casually replacing a
-canonical character or granting knowledge the new character could not possess.
+In `canonical` mode, the player controls an extracted canonical protagonist.
+For a *The Return of the Condor Heroes* world this could be Yang Guo. Worldgen
+preserves that character's identity, knowledge, relationships, voice and major
+canonical anchors while allowing exploration, side questlines and bounded
+variation in how events are reached.
 
-`canonical_then_original` compiles two campaigns into the same static package.
-The original-character campaign unlocks after an authored completion outcome in
-the canonical campaign. This is package-local meta-progression, not generation at
-runtime: all locations, dialogue, branches and prose for both campaigns already
-exist before the first session begins.
+In `original` mode, the player controls a newly authored character inserted
+into the same shared world and canonical timeline. Canonical protagonists do not
+disappear or get replaced: Yang Guo, Xiaolongnü, Guo Jing, Huang Rong and other
+canonical characters remain world entities/NPCs and continue through their
+pre-authored canonical story. The original player has a separate main questline
+that intersects with, observes and locally influences that timeline without
+invalidating its required canon anchors.
 
-The user also chooses what the second campaign represents:
+In `both` mode, the static package contains both independently playable routes.
+New Game offers the choice immediately; one route does not have to unlock the
+other. They reuse the same world definitions and canonical timeline where
+possible but keep protagonist-specific main questlines, starting state and saves
+separate. There is no implicit transfer of inventory, injuries, relationships,
+flags or quest state between routes.
 
-- Another perspective during the same chronology.
-- A continuation after the canonical campaign.
-- A bounded alternate branch from an authored point.
+The route choice controls who is player-controlled, not who exists in the world:
 
-Campaigns have separate mutable saves. Completing the first campaign unlocks the
-second but does not implicitly copy inventory, injuries, relationships or flags.
-The package declares any facts that carry across—for example which canonical
-ending occurred, an NPC's survival, or a public event. This prevents accidental
-state leakage and lets validation analyze each starting state.
+```text
+shared world / canon timeline
+├── canonical route: player = Yang Guo
+└── original route:  Yang Guo = canonical NPC
+                     player = original protagonist
+```
 
-Conceptually, a campaign has an ID, protagonist definition, start location/state,
-enabled capabilities, endings, and an optional unlock condition. The current
-format supports one fixed campaign; add this typed structure when the first
-multi-campaign world is implemented. Multiple simultaneously controlled
+Do not introduce a dedicated runtime `Campaign` abstraction merely to express
+this before a concrete multi-route package needs one. For now, treat "route" as
+the conceptual unit for an independently playable protagonist/storyline. The
+current Format 1 supports one fixed route. Multiple simultaneously controlled
 protagonists remain a separate future design.
+
+Static protagonist identity and mutable play state are separate concerns.
+Conceptually, `ProtagonistSpec` answers "who is the player?" while
+`PlayerState` answers "what has happened to them?". Canonical identity,
+background and source-character binding belong to authored content; current
+location, quest/story phase, faction membership/reputation, relationships and
+optional capability state belong to mutable runtime/save state.
 
 A future world-builder skill should teach the author to:
 
