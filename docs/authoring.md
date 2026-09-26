@@ -275,15 +275,31 @@ running clock. Main-quest milestones or other explicit authored transitions move
 the world between phases. Free exploration and side content inside a phase do not
 silently advance the source chronology.
 
-An in-world clock/calendar is optional. Add world-time data only when the source
-or intended mechanics genuinely need travel durations, day/night behavior, NPC
-schedules, appointments, rest tied to elapsed time, or deadlines. Do not assign
-generic durations to every command merely to simulate time passing.
+An in-world clock/calendar is optional. When a world needs it, author world time
+as a monotonic minute count from a world/route-defined epoch. Presentation may map
+that scalar to clock times, dates, day counts or setting-specific periods; the
+runtime does not need to understand the display calendar.
 
-Encounter timelines are separate local schedulers. Their units exist to order
+Advance world time only through explicit authored/capability actions such as
+travel, waiting, rest or appointments. Do not assign generic durations to every
+command. Presentation-only actions consume zero world time.
+
+When advancement crosses scheduled events, resolve them chronologically and use
+stable authored declaration order for equal timestamps. Capabilities define what
+elapsed time means to them; the core time model does not hard-code hunger,
+recovery, crafting or NPC-schedule semantics.
+
+Deadlines may use exact runtime timestamps while being described narratively to
+the player.
+
+Encounter timelines remain separate local schedulers. Their units exist to order
 actors deterministically and do not represent seconds, minutes or calendar time.
 If an encounter should consume world time, author that consequence explicitly
-rather than deriving it from combat/action ticks.
+rather than deriving it from encounter ticks.
+
+Story phase and world time remain independent. A story-phase transition may also
+explicitly advance world time for a canonical time skip, but elapsed world time
+never silently advances the source story.
 
 Real-world time spent reading or choosing never changes any gameplay state.
 
