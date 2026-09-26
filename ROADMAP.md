@@ -18,9 +18,11 @@ and when they must be settled.
   remain language-neutral. Narrative and branches are authored before play.
 - Rules, scheduling, template selection and any future randomness are replayable.
 - External agents use a typed authoring core; serialization and MCP are adapters.
-- Gameplay capabilities are source-grounded and composable. Combat, crafting,
-  investigation, equipment and similar systems are optional; absent capabilities
-  contribute no required data, runtime state or player actions. The
+- Gameplay capabilities are source-grounded and composable. Quests, inventory,
+  combat, crafting, investigation, equipment and similar systems are optional;
+  absent capabilities contribute no required data, runtime state or player
+  actions. Evidence belongs to investigation state; a physical item may be linked
+  to evidence through a typed relation without making inventory universal. The
   [capability catalog](docs/capabilities.md) guides selection without defining a
   mandatory feature list.
 - Add a system when a milestone needs it. No empty future crates or generic ECS.
@@ -87,9 +89,10 @@ works; terminal settings are restored on normal exit and handled errors.
 
 ## M2 — Continue an adventure across sessions
 
-- Save/load location, flags, dialogue and the state of capabilities enabled by
-  that world—for example inventory, quests, stats or defeated monsters. Keep
-  authored content separate from mutable saves.
+- Save/load the universal campaign state plus only the capabilities enabled by
+  that world—for example investigation evidence, inventory, quests, combat stats
+  or defeated enemies. Keep authored definitions separate from mutable saves; do
+  not require empty quest/inventory state in worlds that omit those capabilities.
 - Version saves and identify the world package they belong to. Reject incompatible
   saves clearly; add migrations when an actual format change requires them.
 - Write saves atomically and keep the previous save safe if writing fails.
@@ -361,16 +364,21 @@ item identity and consumes resources atomically without duplicating bonuses.
 
 - Separate monster definitions from encounter instances; support multiple enemies
   without reusing one global HP record.
-- Add multi-target quest objectives, quest prerequisites and chains, richer story
-  conditions, and explicit dungeon/encounter completion state.
+- For worlds that use quests, add multi-target objectives, prerequisites and
+  chains. Independently expand richer story conditions and explicit
+  dungeon/encounter completion state so non-quest worlds do not depend on a quest
+  subsystem.
 - Define encounter reset/respawn and retreat rules before relying on repeatable
   combat. Preserve quest progress and prevent duplicate completion rewards.
 - Expand authored dialogue and branches, with consistent NPC availability and
   understandable journal entries.
 - Add source-specific capabilities only with a representative world. For example,
   a detective story may use clues, evidence, interviews, contradictions,
-  deductions and a final accusation while omitting combat entirely. Its success
-  and failure paths remain deterministic and pre-authored.
+  deductions and a final accusation while omitting combat, quests and inventory
+  entirely. Add a physical evidence item only when the story needs one; link it
+  to investigation evidence through a typed reference rather than treating
+  evidence as inventory. Its success and failure paths remain deterministic and
+  pre-authored.
 - Establish first-class authored endings and campaign completion state, rather
   than treating player death as the only terminal outcome.
 
