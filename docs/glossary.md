@@ -24,6 +24,16 @@ questline, one or more outcomes, and an independent mutable save/playthrough.
 Canonical and original-character routes may reuse the same world definitions and
 canonical timeline.
 
+## Character
+
+A person/entity that exists in the shared world regardless of who controls it in
+a particular route. Canonical and original playable characters should use the
+same shared character model as non-player-controlled characters.
+
+A future `CharacterSpec`-like type owns intrinsic authored identity such as
+name, description, origin/background and canonical identity. The current Format 1
+`Npc` type is a narrower implementation scaffold.
+
 ## Player
 
 The character controlled by the human in a particular player route.
@@ -41,12 +51,12 @@ entity while the player controls someone else.
 
 ## PlayerSpec
 
-The planned static authored definition of the player-controlled character: who the
-player is before mutable playthrough state is applied. It may include canonical
-character binding, background, fixed identity and other authored starting facts.
+The planned static route-level binding that identifies which shared `Character`
+the human controls. It should not duplicate intrinsic character identity or absorb
+mutable route/capability state.
 
-This type does not exist in Format 1 yet; the name describes the intended
-static counterpart to the existing engine `PlayerState`.
+This type does not exist in Format 1 yet; the name describes the intended static
+counterpart to the existing engine `PlayerState`.
 
 ## PlayerState
 
