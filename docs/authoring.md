@@ -131,13 +131,20 @@ protagonists remain a separate future design.
 A future world-builder skill should teach the author to:
 
 1. Extract canon, chronology, relationships and source references before gameplay.
-2. Build a coherent location graph and distinguish characters from combat enemies.
-3. Derive quests and encounters from source events with narrative justification.
-4. Preserve characterization, vocabulary, rhythm, tone and the source language.
-5. Prewrite all runtime prose, dialogue choices and supported alternate branches.
-6. Validate references and simulate progression, then repair problems before export.
-7. Apply the user's protagonist/campaign choice and validate each campaign from
-   its own starting state.
+2. Build a coherent shared location graph and keep NPCs/locations/factions as
+   world entities rather than nesting them inside quests.
+3. Compile the canonical story into a main questline and major story phases.
+4. Extract side-story seeds from canonical people, places, factions, conflicts,
+   occupations and unresolved details, then expand those seeds into side
+   questlines before inventing generic filler.
+5. Gate side questlines by explicit main-story/story-phase progress. Let their
+   outcomes feed typed state back into later main quests where authored.
+6. Preserve characterization, vocabulary, rhythm, tone and the source language.
+7. Prewrite all runtime prose, dialogue choices and supported alternate branches.
+8. Validate references and simulate main/side progression, including unlock and
+   feedback paths, then repair problems before export.
+9. Apply the user's protagonist/campaign choice and validate each independently
+   playable storyline from its own starting state.
 
 Optional mechanics also require source grounding. Equipment may exist without a
 player crafting system. Add forging, improvement, enchanting, alchemy or similar
@@ -162,6 +169,37 @@ and state, so absent systems leave no empty screens or disabled global commands.
 
 These are authoring instructions, distinct from the Rust definitions of valid
 and executable content. There is no skill framework in this scaffold.
+
+## Open-world quest authoring
+
+RealmKit's intended source-adaptation shape is one shared open world with a
+canonical main questline plus optional side questlines. Side content should not
+form disconnected mini-worlds: it reuses and changes the same NPCs, locations,
+factions and world state as the main story.
+
+Main progress establishes a `story_phase` (or equivalent typed progression
+state). A phase exposes a bounded set of side questlines. Players can explore and
+finish those stories in any supported order, but later side content remains
+locked until the main story advances. This provides Skyrim-like freedom within
+the source chronology without making the canonical story permanently optional.
+
+Side quests may influence the main questline, but only through explicit
+pre-authored state and conditions. Valid effects include changing dialogue,
+relationships/reputation, NPC availability or survival, evidence/knowledge,
+available routes, assistance/resources, or substituting/skipping authored main
+objectives. Any larger canonical divergence must be permitted by the world's
+adaptation policy and compiled before play.
+
+Generation should prefer side stories in this order:
+
+1. reuse canonical NPCs, locations and conflicts
+2. expand minor canonical characters/events
+3. infer plausible events strongly supported by the setting
+4. introduce implied/background characters when needed
+5. create new minor material only when the source leaves a genuine gameplay gap
+
+Track whether generated material is sourced, inferred or expanded so reviewers
+can distinguish adaptation from invention.
 
 ## Deliberately open extensions
 
