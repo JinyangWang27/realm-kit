@@ -67,18 +67,24 @@ for English worlds.
 Exits are directed. To return along a path, author a separate reverse exit.
 Directions are `north`, `south`, `east`, `west`, `up`, `down`.
 
-The long-term presentation model should distinguish **spatial placement** from
-**traversal connectivity**. Clients may render a 3×3 local neighborhood centered
-on the current location, including diagonal nearby cells for orientation, while
-movement remains limited to explicit cardinal exits. A location shown northeast
-of the player is not automatically reachable by a diagonal move.
+The long-term presentation model distinguishes **spatial placement** from
+**traversal connectivity**. The explicit exit graph is authoritative movement
+state. Future formats may optionally group locations into Areas (for example a
+city, one building floor or a wilderness region) and give locations area-local
+integer `(x, y)` positions for map presentation.
 
-Future format work may therefore add presentation-oriented placement metadata
-(for example area-local integer coordinates or an equivalent layout relation)
-without deriving exits from coordinates. Conversely, an exit remains the
-authoritative statement that movement is possible even if a client chooses a
-different visual layout. Vertical `up`/`down` travel is outside the 2D 3×3
-plane and should be rendered as a separate contextual action.
+Coordinates never create exits: adjacent cells need not be traversable, and an
+explicit exit may connect locations that are not adjacent in the layout. For an
+initial grid layout, one coordinate should identify at most one location.
+
+Clients decide how much of an area to show. A compact 5×5 city or building may be
+shown in full; a larger area may use a scrolling viewport/minimap; a graph-only
+area needs no grid at all. Viewport size is not package semantics. Opening a map
+must not be required for ordinary movement through explicit exits.
+
+An enterable building may be represented as a location on a city area whose exit
+leads into another Area for the interior. Vertical `up`/`down` traversal remains
+explicit and does not require a universal z-axis.
 
 ```json
 {
