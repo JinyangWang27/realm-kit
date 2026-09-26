@@ -167,23 +167,79 @@ adaptation policy.
 
 ## 3. Outcomes, failure and replay
 
-**Needed before:** saves and the first non-combat fixture.
+**Resolved.**
 
-Define first-class outcomes such as ongoing, completed, failed and named alternate
-endings. Death is one possible outcome, not the universal failure state.
+Every player route defines one or more authored outcomes. Outcome semantics use
+two independent properties:
 
-Open questions:
+```text
+completion  whether reaching this outcome counts as completing the route
+terminal    whether this playthrough stops at the outcome
+```
 
-- Can a player route continue after a nominal ending, or does a terminal outcome
-  freeze that playthrough?
-- Which outcomes count as route completion?
-- Does failure restart the route, restore a checkpoint, or remain as a valid
-  ending chosen by the world?
-- Can one save discover several endings, or does each branch use a separate save?
-- What completion metadata persists outside route saves?
+This permits, for example:
 
-Current leaning: authored outcomes declare whether they are terminal and whether
-they count as route completion. Restart/checkpoint behavior belongs to the route.
+```text
+canonical ending      completion=true   terminal=false
+tragic ending         completion=true   terminal=true
+terminal failure      completion=false  terminal=true
+```
+
+`completion=false, terminal=false` is not a route outcome; it is an ordinary
+setback or state transition.
+
+Decisions:
+
+- A route may continue after a completed non-terminal outcome. This supports a
+  Skyrim-like post-story phase in which the main quest is finished but exploration
+  and remaining side content continue.
+- A playthrough records at most one immutable route outcome. Continuing after a
+  non-terminal outcome does not allow the same history to later become a different
+  ending.
+- To experience a mutually exclusive outcome, the player loads/branches from an
+  earlier save or starts another playthrough. One deterministic history does not
+  collect several endings.
+- Failed quests, defeat, imprisonment, injury and similar setbacks are ordinary
+  authored state changes unless the route explicitly maps them to an outcome.
+- Death is not universally a terminal outcome. An authored route may define a
+  terminal death/failure ending, but ordinary gameplay death is recoverable by
+  default when a valid save exists.
+- On ordinary recoverable death, play resumes from the most recent valid recovery
+  save snapshot. Manual saves and auto-saves participate in the same chronological
+  recovery history; the newest valid snapshot wins.
+- Recovery is an explicit restore of a saved deterministic state, not an implicit
+  reversal of engine commands. Unsaved changes after that snapshot are discarded.
+- Auto-saves occur at meaningful stable boundaries rather than on every command or
+  map step. Required/default triggers should include route start and major
+  authored progression boundaries such as story-phase transitions; authors or
+  capabilities may add stable checkpoints around major encounters, long travel,
+  rest, or similar transitions where appropriate.
+- Auto-save creation itself must not advance story phase, world time or encounter
+  time, and must not change deterministic narrative selection.
+- Outcomes are selected from explicit authored conditions over deterministic
+  playthrough/world state. The runtime does not invent endings.
+- No universal cross-save profile/meta-progression is required. A client may later
+  track discovered endings or achievements outside the route save, but the core
+  engine does not depend on such metadata.
+
+Conceptually:
+
+```text
+quests / relationships / flags / NPC state / side consequences
+                            ↓
+                     outcome conditions
+                            ↓
+                     OutcomeReached(id)
+
+ordinary recoverable death
+            ↓
+ latest valid manual/auto-save snapshot
+            ↓
+       restored GameState
+```
+
+Validation should eventually reject impossible required outcomes and ambiguous
+states in which mutually exclusive outcomes can become true simultaneously.
 
 ## 4. Canon fidelity and divergence
 
