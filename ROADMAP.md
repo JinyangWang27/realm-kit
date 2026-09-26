@@ -431,12 +431,13 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 - Introduce canon IR only as source adaptation needs it: identities, chronology,
   relationships and evidence, separate from runtime NPCs and quests.
 - Retain source references for reviewing fidelity and regenerating selected content.
-- Ask the user to choose a canonical protagonist, an original character, or a
-  canonical-then-original package. In the last mode, completing the canonical
-  campaign unlocks a fully pre-generated original-character campaign.
-- Let the user choose whether that second campaign is a concurrent perspective,
-  post-canon continuation or bounded alternate branch. Keep campaign saves
-  separate and carry only explicitly authored facts between them.
+- Ask the user to choose a canonical protagonist route, an original-character
+  route, or both. In `both` mode, New Game offers the choice immediately; one
+  route does not have to unlock the other.
+- Reuse the same shared world and canonical timeline across routes where possible.
+  Keep protagonist-specific main questlines, starting state and saves separate.
+  In the original route, canonical protagonists remain world entities/NPCs and
+  continue through protected canon anchors.
 - Derive the main questline from the source's canonical story and preserve
   characterization and atmosphere. Generate side-story seeds from canonical NPCs,
   locations, factions, relationships, occupations, conflicts and unresolved
