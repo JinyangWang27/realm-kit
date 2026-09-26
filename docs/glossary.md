@@ -132,8 +132,9 @@ methods, relationship development and bounded local consequences.
 
 Authoring metadata classifying generated source-backed material as `SOURCE`,
 `INFERRED`, or `EXPANDED`, with source references or rationale where useful.
-Provenance supports fidelity review/regeneration and is not required runtime
-gameplay state.
+The authoring report may also retain capability-selection rationale, meaningful
+omissions and explicit author/user overrides. Provenance supports fidelity
+review/regeneration and is not required runtime gameplay state.
 
 ## Condition
 
