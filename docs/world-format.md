@@ -14,11 +14,13 @@ endings, plus explicit cross-campaign facts; runtime unlocking must never requir
 source material or generation tools.
 
 Format 1 also requires item and quest tables because they serve the current demo.
-That must not be interpreted as a long-term universal-core decision. Quests and
-inventory are optional capabilities; a future non-combat format must permit a
-valid world with neither. Investigation evidence is independent state and may
-optionally reference a physical entity/item without being stored "inside"
-inventory or inferred from possession.
+Inventory is not a long-term universal requirement, but quest progression is:
+future formats should generalize quests into main and optional side questlines
+rather than remove them. A non-combat world still has a main questline whose
+objectives may use dialogue, exploration, investigation or other capabilities
+instead of combat. Investigation evidence is independent state and may optionally
+reference a physical entity/item without being stored "inside" inventory or
+inferred from possession.
 
 A package is a directory containing these required UTF-8 JSON files:
 
@@ -92,9 +94,12 @@ placed. NPCs may appear at several locations; conditions determine availability.
 
 ## Dialogue and quests
 
-Quests are mandatory in Format 1's file layout but are not part of RealmKit's
-intended universal core. Future formats/capability sections must allow dialogue,
-story progression and campaign outcomes without a quest subsystem.
+Format 1 has a single flat quest collection. The long-term model should retain
+quests as core story progression but organize them into a main questline plus
+optional side questlines. Questlines share world entities rather than owning
+private copies of NPCs or locations. Side quest availability should be gated by
+explicit main-story/story-phase conditions, and side outcomes may feed typed
+state into later main-quest conditions.
 
 Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 `text` and optional `choices`. Each choice has authored `text`, optional
