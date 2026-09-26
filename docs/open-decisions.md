@@ -18,9 +18,11 @@ than replacing them.
   identifiers and stable typed-command tokens may remain language-neutral.
 - Gameplay capabilities are optional and source-grounded. Complete absence is
   valid and produces no placeholder state or UI.
-- Every playable world has a location graph, a main questline, and one or more
-  authored outcomes. Quests are RealmKit's primary story-progression abstraction.
-  Side questlines are optional content layered over the same shared world.
+- Every playable world has a shared location graph and one or more player routes.
+  Every player route has a PlayerSpec-like static player definition, an initial
+  state/location, exactly one main questline, and one or more authored outcomes.
+  Quests are RealmKit's primary story-progression abstraction. Side questlines are
+  optional content layered over the same shared world.
 - Main-story progress unlocks bounded sets of side questlines through explicit
   story-phase/quest conditions. This preserves open exploration within a phase
   without allowing the player to consume an unlimited independent game while
@@ -52,48 +54,61 @@ default during implementation.
 
 ## 1. Minimum universal world core
 
-**Needed before:** the first non-combat format revision.
+**Resolved.**
 
-Resolved minimum core:
+RealmKit separates the shared fictional world from an independently playable
+player route:
 
 ```text
-world identity
-player-controlled character
-location graph
-authored narrative / dialogue / choices
-main questline
-quest objectives
-story phases
-flags and typed state
-typed conditions and effects
-one or more outcomes
+World
+├── identity / language
+├── shared location graph
+├── shared characters / NPCs
+├── factions / organizations
+├── shared entities / lore
+├── authored narrative / dialogue / choices
+├── story-phase definitions
+├── typed conditions / effects / world state
+│
+└── PlayerRoutes [1..N]
+    └── PlayerRoute
+        ├── PlayerSpec
+        ├── initial state / starting location
+        ├── exactly one main questline
+        │   └── quests
+        │       └── typed objectives
+        └── one or more authored outcomes
 ```
 
-Additional decisions:
+Decisions:
 
+- `World` is the shared fictional environment. Canonical characters, locations,
+  factions and reusable entities belong to the world rather than being duplicated
+  inside a route or quest.
+- Every world has at least one `PlayerRoute`. A route is one independently
+  playable way of entering and experiencing that world.
+- Every route has one player-controlled character definition (`PlayerSpec`),
+  initial state/location, exactly one main questline, and one or more outcomes.
+- A questline contains quests; quests contain one or more typed objectives.
+- Story phases belong to the shared world/canonical chronology. Route progression
+  can trigger authored phase transitions.
+- Side questlines are optional and may be shared or route-gated as authored.
 - The location graph is universal. A constrained story may use only one or a few
   locations, but movement/place remains part of RealmKit's world model.
-- Every world has a main questline. Side questlines are optional.
-- A questline contains quests; quests contain one or more typed objectives.
-- NPCs, locations, factions and reusable entities belong to the shared world,
-  not to an individual quest. Quests reference and change that shared world.
-- Story phases provide bounded open-world periods around major main-story
-  transitions. Main progress changes phase and can move NPCs, alter availability,
-  unlock/close questlines, and change world presentation.
+- Factions/organizations may exist as ordinary world entities without enabling a
+  faction/reputation gameplay capability.
 - Inventory is optional.
 - Evidence is owned by an investigation capability. Evidence may refer to a
   physical entity such as a letter, weapon or photograph, including an item that
   can also be carried in inventory, but evidence state is separate from item
   possession. Prefer a typed relation/reference over an unstructured string tag.
+- `Campaign` is not a normative RealmKit architecture term. Use `World` for the
+  shared setting and `PlayerRoute` for an independently playable entry/storyline.
+  Introduce a first-class campaign abstraction only if a future requirement proves
+  that these concepts are insufficient.
 
-Open question:
-
-- Which concepts, if any, should later be extracted from a single-world model into
-  a separate `Campaign` type when one package supports multiple independently
-  playable protagonists/storylines?
-
-Avoid answering by making every field optional. The core should express the
-smallest real playable world clearly.
+Avoid answering future format questions by making every field optional. The core
+should express the smallest real playable world and route clearly.
 
 ## 2. Open-world quest progression
 
@@ -149,7 +164,7 @@ allowing side content to alter the route, context, assistance, difficulty and
 bounded outcomes around those anchors. Broader divergence belongs to an explicit
 adaptation policy.
 
-## 2. Outcomes, failure and replay
+## 3. Outcomes, failure and replay
 
 **Needed before:** saves and the first non-combat fixture.
 
@@ -158,17 +173,18 @@ endings. Death is one possible outcome, not the universal failure state.
 
 Open questions:
 
-- Can a campaign continue after a nominal ending, or does an outcome freeze it?
-- Which outcomes count as completion for unlocking another campaign?
-- Does failure restart the campaign, restore a checkpoint, or remain as a valid
+- Can a player route continue after a nominal ending, or does a terminal outcome
+  freeze that playthrough?
+- Which outcomes count as route completion?
+- Does failure restart the route, restore a checkpoint, or remain as a valid
   ending chosen by the world?
 - Can one save discover several endings, or does each branch use a separate save?
-- What completion metadata persists outside campaign saves?
+- What completion metadata persists outside route saves?
 
-Current leaning: authored outcomes declare whether they are terminal, successful,
-and eligible for unlocks. Restart/checkpoint behavior belongs to the campaign.
+Current leaning: authored outcomes declare whether they are terminal and whether
+they count as route completion. Restart/checkpoint behavior belongs to the route.
 
-## 3. Canon fidelity and divergence
+## 4. Canon fidelity and divergence
 
 **Needed before:** source-grounded generation.
 
@@ -189,7 +205,7 @@ Open questions:
 The generation report should record protected anchors and provenance for major
 expansions. Runtime only consumes the compiled branches.
 
-## 4. Player entry and original-character generation
+## 5. Player entry and original-character generation
 
 **Resolved foundation:** source-backed worlds support three player-entry modes:
 
@@ -247,7 +263,7 @@ Current leaning: generation establishes a concrete role, knowledge boundary and
 insertion point. Runtime customization is a separate optional capability. Do not
 add a first-class `Campaign` type until a concrete multi-route package needs it.
 
-## 5. Conditions and effects
+## 6. Conditions and effects
 
 **Needed before:** expanding dialogue, investigation or multi-route state.
 
@@ -271,7 +287,7 @@ Open questions:
 Current leaning: closed Rust enums, atomic effect batches and explicit ordering.
 No arbitrary expression language or embedded scripts.
 
-## 6. Randomness and reproducibility
+## 7. Randomness and reproducibility
 
 **Needed before:** any randomized check, loot or encounter.
 
@@ -287,7 +303,7 @@ Current leaning: randomness remains optional. If enabled, use a specified seeded
 PRNG whose state is saved and included in replay. Never use platform randomness
 implicitly. Weighted authored outcomes still consume deterministic draws.
 
-## 7. Skills and checks
+## 8. Skills and checks
 
 **Needed before:** reusable persuasion, stealth, scholarship or survival rules.
 
@@ -306,7 +322,7 @@ Stats unlock approaches or change costs/consequences; investigation rewards play
 reasoning and obtained evidence. Add a shared skill system only after two
 capabilities need the same semantics.
 
-## 8. Time models
+## 9. Time models
 
 **Resolved foundation:** RealmKit separates narrative progression from optional
 clock/calendar simulation and from encounter scheduling.
@@ -398,7 +414,7 @@ Open questions:
 Combat timing details, action costs, speed cap and armour penalties remain in the
 [roadmap](../ROADMAP.md).
 
-## 9. Definitions, instances and identity
+## 10. Definitions, instances and identity
 
 **Needed before:** saves, equipment, repeatable encounters or movable NPCs.
 
@@ -426,7 +442,7 @@ Open questions:
 Current leaning: stable authored definition IDs plus monotonically allocated,
 saved instance IDs. Avoid instances for content that is inherently unique.
 
-## 10. Save compatibility and package evolution
+## 11. Save compatibility and package evolution
 
 **Needed before:** M2 save/load.
 
@@ -443,7 +459,7 @@ player-route ID (when a package contains more than one route) and all determinis
 state. Refuse unknown incompatibilities rather than silently resetting fields.
 Add migrations only for real released changes.
 
-## 11. Validation, reachability and simulation
+## 12. Validation, reachability and simulation
 
 **Needed incrementally:** with every new capability.
 
@@ -461,7 +477,7 @@ warnings. Required outcomes/objectives declare themselves. Simulations state the
 starting state, policy and assumptions; failure under one policy is not proof of
 impossibility.
 
-## 12. Capability selection and provenance
+## 13. Capability selection and provenance
 
 **Needed before:** automated source compilation.
 
@@ -479,7 +495,7 @@ references and a short rationale. The user approves it before detailed content
 generation. The exported playable package need not contain source text, but an
 optional provenance sidecar can retain the rationale and references.
 
-## 13. Presentation and information disclosure
+## 14. Presentation and information disclosure
 
 **Needed first:** M1 menu navigation; revisited per capability.
 
@@ -519,7 +535,7 @@ fallback for scripts and inaccessible raw-terminal environments. All displayed
 UI must follow the world's language; the open decision is where those fixed
 translations are owned, not whether localization is required.
 
-## 14. Equipment and crafting details
+## 15. Equipment and crafting details
 
 **Needed before:** M4.
 
@@ -530,7 +546,7 @@ thresholds, enchantment learning/replacement, modifier stacking, exact armour
 speed penalties and actual speed cap. Durability, random affixes and crafting
 feedback loops remain deferred until a source/world requires them.
 
-## 15. Multiplayer authority and pacing
+## 16. Multiplayer authority and pacing
 
 **Needed before:** any server milestone; not needed for single-player work.
 
