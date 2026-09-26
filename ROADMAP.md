@@ -491,11 +491,20 @@ intended world/canon data, and validate independently from their own starts.
 Add a richer TUI or web/mobile client over the same command model when useful.
 Introduce an authoritative server and party play as a separate milestone once
 the single-player rules are stable. The server owns canonical state, RNG
-resolution and durable persistence; clients submit commands rather than outcomes.
+resolution, authoritative command ordering and durable persistence; clients submit
+commands rather than outcomes.
+
+Serialize commands that touch the same mutable scope, while allowing independent
+world/player/session/encounter scopes to progress concurrently. A pending human
+turn pauses only its relevant encounter/session scope, not the whole server.
+Timeouts/disconnect handling may submit predefined fallback commands but wall-clock
+waiting does not itself advance gameplay time. Reconnect from current server
+state; never rewind a persistent shared world from a client snapshot.
+
 Single-player checkpoint rewind does not imply rewinding a persistent shared
-world—multiplayer recovery is scoped to player/session/instance state. Shared combat needs an explicit policy for
-waiting on several players; a paused single-player timeline does not answer that
-question automatically. Add storage/networking crates only at that point.
+world—multiplayer recovery remains scoped to state exclusively owned by the
+relevant player/session/instance. Add storage/networking crates only when this
+milestone becomes active work.
 
 **Done when:** clients cannot bypass engine rules, and the chosen multiplayer
 scheduling and persistence policies have reproducible tests. No runtime AI.
