@@ -13,7 +13,9 @@ than replacing them.
 ## Agreed foundations
 
 - Gameplay runtime is deterministic, static-package-driven and AI-free.
-- Generated player-facing content uses the source language.
+- All player-facing text in a source-backed world uses the source language,
+  including client-owned labels, help, prompts and runtime messages. Machine-facing
+  identifiers and stable typed-command tokens may remain language-neutral.
 - Gameplay capabilities are optional and source-grounded. Complete absence is
   valid and produces no placeholder state or UI.
 - Combat and crafting are optional. Equipment does not imply crafting.
@@ -282,13 +284,19 @@ Open questions:
   spoilers?
 - Should combat previews show exact damage and future turns or qualitative hints?
 - How are long action lists grouped on small terminals?
-- Which fixed interface labels come from a RealmKit locale versus world content?
+- Where should fixed client translations live: RealmKit-owned locale resources,
+  package-provided interface text, or a hybrid with well-defined fallback rules?
+- How should a client behave when it does not have fixed-interface translations
+  for the world's declared language? Silent fallback to English is not acceptable
+  for normal source-backed play.
 - What accessibility behavior is required for color, screen readers and terminals
   without raw input support?
 
 Current leaning: show actions the protagonist could reasonably consider; explain
 ordinary unmet requirements but hide secret branches. Retain the line-oriented
-fallback for scripts and inaccessible raw-terminal environments.
+fallback for scripts and inaccessible raw-terminal environments. All displayed
+UI must follow the world's language; the open decision is where those fixed
+translations are owned, not whether localization is required.
 
 ## 14. Equipment and crafting details
 
