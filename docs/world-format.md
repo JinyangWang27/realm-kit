@@ -65,6 +65,19 @@ for English worlds.
 Exits are directed. To return along a path, author a separate reverse exit.
 Directions are `north`, `south`, `east`, `west`, `up`, `down`.
 
+The long-term presentation model should distinguish **spatial placement** from
+**traversal connectivity**. Clients may render a 3×3 local neighborhood centered
+on the current location, including diagonal nearby cells for orientation, while
+movement remains limited to explicit cardinal exits. A location shown northeast
+of the player is not automatically reachable by a diagonal move.
+
+Future format work may therefore add presentation-oriented placement metadata
+(for example area-local integer coordinates or an equivalent layout relation)
+without deriving exits from coordinates. Conversely, an exit remains the
+authoritative statement that movement is possible even if a client chooses a
+different visual layout. Vertical `up`/`down` travel is outside the 2D 3×3
+plane and should be rendered as a separate contextual action.
+
 ```json
 {
   "id": "courtyard",
