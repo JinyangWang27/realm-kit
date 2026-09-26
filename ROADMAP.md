@@ -16,7 +16,9 @@ and when they must be settled.
   This includes authored narrative/dialogue and client-owned labels, help, prompts
   and runtime messages. Machine-facing identifiers and stable command tokens may
   remain language-neutral. Narrative and branches are authored before play.
-- Rules, scheduling, template selection and any future randomness are replayable.
+- Rules, scheduling, template selection and stochastic mechanics are replayable.
+  Randomness, when used, comes from explicit saved RNG state and only selects among
+  authored possibilities.
 - External agents use a typed authoring core; serialization and MCP are adapters.
 - The shared world owns the location graph, characters/entities and story-phase
   definitions. Every world has one or more player routes; each route owns a
@@ -177,8 +179,13 @@ resistance, accuracy and critical chance can come later when builds need them.
   parameters, never executable formula strings.
 - Specify rounding, minimum damage, resource costs, death and action cancellation.
   Use checked integer arithmetic and reject invalid stats or parameters.
-- Keep initial hit outcomes certain. If randomness arrives later, use an explicit,
-  versioned PRNG algorithm with saved state and a defined draw order.
+- Keep the first combat slice simple, but support stochastic combat mechanics such
+  as critical hits through RealmKit's explicit seeded RNG facility. Basic attacks
+  may remain certain initially; randomness is an authored rule rather than a
+  requirement for every combat action.
+- When stochastic mechanics are implemented, use explicit/versioned PRNG behavior
+  with saved RNG state. Keep semantically unrelated random domains independent
+  where incidental draw coupling would produce surprising gameplay changes.
 
 **Done when:** a small duel demonstrates distinct physical/magical builds, MP
 expenditure and recovery, and a measurable benefit from increased speed. Tests
@@ -430,6 +437,9 @@ item identity and consumes resources atomically without duplicating bonuses.
   only when a representative world needs travel durations, schedules, day/night,
   rest tied to elapsed time, appointments or deadlines. Do not assign universal
   durations to ordinary commands.
+- Support authored stochastic world-event opportunities when a representative
+  world needs rare encounters/discoveries. Trigger rolls only at explicit gameplay
+  transitions and select only among pre-authored outcomes.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and at least one non-combat interaction path, can be saved/resumed, and have
