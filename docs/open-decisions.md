@@ -621,95 +621,78 @@ Decisions:
 
 ## 9. Time models
 
-**Resolved foundation:** RealmKit separates narrative progression from optional
-clock/calendar simulation and from encounter scheduling.
+**Resolved.**
 
-Keep four concepts distinct:
+RealmKit keeps four time concepts distinct:
 
 ```text
 real time           human thinking/input time; never advances game rules
 story phase         discrete narrative/canonical progression; universal core
-world time          optional in-world clock/calendar for schedules and deadlines
-encounter timeline  local deterministic ordering inside combat/other encounters
+world time          optional in-world clock/calendar simulation
+encounter timeline  local deterministic action scheduling
 ```
 
 ### Story phase
 
-Story phase is part of the universal world model. It represents bounded periods
-of narrative/canonical progression and is advanced primarily by explicit
-main-quest milestones or other authored story transitions.
+Story phase is universal and event-driven. It represents bounded periods of
+narrative/canonical progression and advances only through explicit authored story
+transitions, normally main-quest milestones.
 
-Free exploration, reading, menu use, side quests, ordinary dialogue and player
-thinking do not implicitly advance the canonical story. A player can therefore
-explore the side content available in one phase without the source timeline
-silently running ahead.
-
-Story-phase transitions may change NPC locations/availability, world
-presentation, side-quest availability, routes and other authored world state.
+Exploration, side content, ordinary dialogue, menu use and real-world thinking do
+not implicitly advance canonical chronology.
 
 ### World time
 
-World time is an optional capability, not a universal requirement. Enable it only
-when the source/gameplay needs concepts such as:
+World time is optional. When enabled, use a monotonic integer count of minutes
+from an authored epoch:
 
-- travel durations
-- day/night behavior
-- NPC schedules
-- appointments
-- rest/recovery tied to elapsed time
-- explicit deadlines
-- calendar/date-sensitive events
+```text
+WorldTime = u64 minutes since authored epoch
+```
 
-Commands do not have universal durations. Presentation-only actions such as
-`look`, map/menu navigation, inventory/status/journal inspection and similar
-browsing consume no world time. When world time is enabled, meaningful
-advancement is authored or capability-defined—for example a six-day journey or
-"rest until morning"—rather than inferred from arbitrary command counts.
+The epoch may be route-relative ("minute 0 = route start") or mapped by the
+world's presentation layer to a setting-specific calendar/date. The engine stores
+the scalar; presentation may render it as clock time, day number, traditional
+period names or other authored text.
 
-Hard deadlines are not a default RealmKit mechanic. Source adaptations should
-normally let the main story wait for explicit progression; add deadlines only
-when the source or intended gameplay actually depends on them.
+World time advances only through explicit authored/capability actions such as
+travel, waiting, rest, appointments or other mechanics that genuinely consume
+time. There are no universal command durations. Presentation-only actions consume
+zero world time.
+
+Normal world time is monotonic. Time travel/loops are separate explicit mechanics
+rather than weakening ordinary time semantics.
+
+### Scheduled world-time events
+
+When advancing world time crosses scheduled events, process due events in
+chronological order. Events with the same timestamp resolve in stable authored
+declaration order. Do not add a generic priority framework unless a concrete
+world requires one.
+
+The engine owns current world time, explicit advancement and deterministic
+ordering of due authored events. Capabilities own the consequences of elapsed time,
+such as hunger, schedules, recovery, crafting completion or deadline behavior.
+
+Deadlines are mechanically exact when world time is used, while presentation may
+describe them exactly or narratively ("before sunset", "within three days", etc.).
 
 ### Encounter timeline
 
-The encounter timeline is local scheduling state used to answer which actor acts
-next. Its units have no intrinsic conversion to world time or wall-clock seconds.
-Combat balancing parameters such as action cost, speed and speed caps must not
-accidentally change narrative/calendar chronology.
+Encounter timeline remains a separate local scheduler. Its units have no implicit
+mapping to seconds/minutes or world time. If an encounter should consume world
+time, author that consequence explicitly, for example by applying a world-time
+advance after resolution.
 
-If an encounter should consume world time, that relationship is an explicit
-authored/capability effect after or around the encounter; do not derive it by
-summing combat ticks.
+### Cross-layer rules
 
-### Real time
-
-Real-world time spent reading, thinking or choosing never advances story phase,
-world time or encounter rules.
-
-Conceptually:
-
-```text
-main-quest milestone ───────→ StoryPhase transition
-
-optional authored action ───→ WorldTime advance
-
-combat/encounter action ────→ EncounterTimeline scheduling
-
-human thinking time ────────→ no gameplay-time effect
-```
-
-Open questions:
-
-- What concrete representation should optional world time use when first needed
-  (for example integer minutes, authored periods, or calendar-aware timestamps)?
-- How should simultaneous world-time events be ordered deterministically?
-- When world time exists, which recovery/schedule mechanics need shared engine
-  semantics versus capability-specific rules?
-- How should exact deadlines versus qualitative time pressure be presented to the
-  player?
-
-Combat timing details, action costs, speed cap and armour penalties remain in the
-[roadmap](../ROADMAP.md).
+- Real-world thinking/input time advances none of StoryPhase, WorldTime or
+  EncounterTimeline.
+- WorldTime never implicitly advances StoryPhase.
+- A StoryPhase transition may explicitly advance WorldTime when representing an
+  authored canonical time skip.
+- EncounterTimeline never implicitly advances WorldTime.
+- Save/load preserves all enabled time state exactly.
 
 ## 10. Definitions, instances and identity
 
