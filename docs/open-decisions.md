@@ -563,24 +563,61 @@ Decisions:
 A fully deterministic world that uses no stochastic mechanics remains valid and
 needs no active RNG state.
 
-## 8. Skills and checks
+## 8. Checks and proficiencies
 
-**Needed before:** reusable persuasion, stealth, scholarship or survival rules.
+**Resolved.**
 
-Open questions:
+RealmKit has no universal RPG skill/proficiency table. Capabilities define the
+proficiencies and check semantics they actually need.
 
-- Are checks deterministic thresholds, seeded rolls, resource spends, player
-  reasoning, or capability-specific combinations?
-- Does failure close content, add a consequence, or offer another approach?
-- How are difficulty and expected proficiency exposed to authors and players?
-- Can critical information be lost to chance?
-- Are broad shared skills useful, or should worlds define only source-relevant
-  proficiencies?
+A learned ability/technique and a proficiency are separate concepts. For example,
+a combat skill may be an authored action the character knows, while smithing or
+stealth proficiency may influence whether/how a capability resolves an attempt.
 
-Current leaning: critical progression cannot depend on a single unlucky roll.
-Stats unlock approaches or change costs/consequences; investigation rewards player
-reasoning and obtained evidence. Add a shared skill system only after two
-capabilities need the same semantics.
+A condition and a check also have different responsibilities:
+
+```text
+Condition
+"may this be attempted?"
+        │
+        ├── false → reject command
+        │
+        └── true
+             ↓
+ capability-specific check/resolution
+             ↓
+       ┌─────┴─────┐
+    success      failure
+       │             │
+ authored effects  authored effects
+```
+
+Decisions:
+
+- There is no universal `skills: Map<SkillId, Value>` model and no mandatory set
+  of persuasion/stealth/survival/etc. stats shared by every world.
+- A capability owns only the proficiencies it needs. Investigation, for example,
+  may rely on obtained evidence and player reasoning without any numeric
+  investigation proficiency.
+- Checks are gameplay resolution, while conditions are pure legality/availability
+  queries.
+- A legal check may be deterministic, stochastic through RealmKit's saved RNG,
+  resource-based, or another capability-specific rule. Do not introduce a generic
+  check/formula DSL.
+- A rejected command is different from a failed check. Rejection mutates nothing,
+  advances no modeled time and consumes no committed randomness.
+- Once a legal attempt begins, failure is a valid gameplay result. It may consume
+  resources/time/random draws and apply authored consequences.
+- Retry rules and failure consequences belong to the capability/content rather
+  than a global RealmKit rule.
+- Proficiency scales and difficulty representation remain capability-specific.
+  Do not force every system into a common numeric range or difficulty enum until
+  repeated implementations prove such an abstraction useful.
+- Every reachable check result used by required progression must lead to a valid
+  authored continuation, recovery path or explicit outcome. A single failed roll
+  must not silently make the route impossible.
+- Whether the player sees exact odds, qualitative difficulty, or no preview is a
+  presentation decision rather than part of check semantics.
 
 ## 9. Time models
 
