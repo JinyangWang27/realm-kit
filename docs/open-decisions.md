@@ -55,7 +55,7 @@ Resolved minimum core:
 
 ```text
 world identity
-controlled protagonist
+player-controlled character
 location graph
 authored narrative / dialogue / choices
 main questline
@@ -212,16 +212,23 @@ route, Yang Guo still exists and proceeds through the authored canonical
 timeline; the player's own main questline may intersect with and locally affect
 his story without replacing him.
 
-Static identity and mutable state are separate. Conceptually:
+Static player identity and mutable state are separate. Conceptually:
 
 ```text
-ProtagonistSpec = who the player is
-PlayerState     = what has happened to the player
+PlayerSpec  = who the player-controlled character is
+PlayerState = mutable state intrinsic to that character
+GameState   = mutable state of the whole playthrough
 ```
 
-Canonical-character binding, background and initial identity belong to authored
-content. Location, story phase, quests, faction membership/reputation,
-relationships and enabled capability state belong to mutable runtime/save state.
+"Player" must not be treated as synonymous with "protagonist". In a canonical
+route they may be the same character; in an original route the canonical
+protagonist remains a world NPC while the player controls someone else.
+
+Canonical-character binding, background and other fixed identity belong to
+authored `PlayerSpec`-like content. The existing engine `PlayerState` remains
+the mutable player component. Quest progression, story/world flags, dialogue and
+other run-wide state belong to `GameState` or typed sub-state beneath it rather
+than being folded into `PlayerState` merely because they affect the player.
 
 Open questions:
 
