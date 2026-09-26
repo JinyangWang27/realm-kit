@@ -159,8 +159,8 @@ A future world-builder skill should teach the author to:
 7. Prewrite all runtime prose, dialogue choices and supported alternate branches.
 8. Validate references and simulate main/side progression, including unlock and
    feedback paths, then repair problems before export.
-9. Apply the user's protagonist/campaign choice and validate each independently
-   playable storyline from its own starting state.
+9. Apply the user's player-entry route choice and validate each independently
+   playable route from its own starting state.
 
 Optional mechanics also require source grounding. Equipment may exist without a
 player crafting system. Add forging, improvement, enchanting, alchemy or similar
