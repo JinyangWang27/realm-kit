@@ -199,6 +199,31 @@ The explicit location exits that define where the player can actually move.
 Cardinal exits remain authoritative even when diagonal nearby cells are visible
 in the spatial layout.
 
+## Definition
+
+Stable authored content identity. A definition describes what an entity/object is
+independently of mutable playthrough state.
+
+Inherently unique authored entities may use their DefinitionId directly as runtime
+identity. Repeatable definitions may produce runtime instances when distinguishable
+copies need independent mutable state.
+
+## Instance
+
+A distinguishable runtime copy of a repeatable or unique authored definition,
+identified by a deterministic playthrough-local `InstanceId`.
+
+An instance retains an immutable `definition_id` while ownership, location,
+damage, improvement, enchantment and other mutable state may change. Instance IDs
+are saved, never reused within a playthrough, and are only created where distinct
+copy identity is actually needed.
+
+## Unique Definition
+
+An authored definition that permits at most one live runtime instance. Uniqueness
+does not eliminate the need for an instance when the physical object carries
+mutable state; a legendary weapon is the typical example.
+
 ## Outcome
 
 An authored route-level result/end state selected from explicit deterministic
