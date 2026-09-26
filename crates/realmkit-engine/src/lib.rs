@@ -130,6 +130,15 @@ pub enum EngineError {
     NumericLimit,
 }
 
+/// A command a client may offer in the current scene. Unavailable actions are
+/// shown for explanation; the engine still rechecks legality on execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Action {
+    pub command: Command,
+    pub available: bool,
+}
+
+#[derive(Clone)]
 pub struct Engine<'w> {
     world: &'w WorldSpec,
     state: GameState,
@@ -180,10 +189,31 @@ impl<'w> Engine<'w> {
     pub fn execute(&mut self, command: Command) -> Result<Vec<Event>, EngineError> {
         // ponytail: clone for atomic commands; use a change set if worlds become large.
         let mut next = self.state.clone();
+        let spends_time = !matches!(
+            command,
+            Command::Look | Command::Inventory | Command::Status | Command::Quests
+        );
         let events = rules::execute(self.world, &mut next, command)?;
-        next.turn = next.turn.checked_add(1).ok_or(EngineError::NumericLimit)?;
+        if spends_time {
+            next.turn = next.turn.checked_add(1).ok_or(EngineError::NumericLimit)?;
+        }
         self.state = next;
         Ok(events)
+    }
+
+    /// Location-level actions in display order: talk, attack, travel, panels.
+    pub fn actions(&self) -> Vec<Action> {
+        rules::actions(self.world, &self.state)
+    }
+
+    /// Text of the choices in the active conversation; empty when none.
+    pub fn dialogue_choices(&self) -> Vec<&'w str> {
+        self.state.dialogue.as_ref().map_or_else(Vec::new, |d| {
+            rules::choices(self.world, &self.state, &d.npc, &d.node)
+                .into_iter()
+                .map(|c| c.text.as_str())
+                .collect()
+        })
     }
 
     pub fn conditions_met(&self, conditions: &[Condition]) -> bool {

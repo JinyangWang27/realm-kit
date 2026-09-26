@@ -11,3 +11,4 @@ path = "src/main.rs"
 [dependencies]
 realmkit-spec.workspace = true
 realmkit-engine.workspace = true
+crossterm = "0.29"

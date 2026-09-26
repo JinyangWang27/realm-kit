@@ -160,6 +160,10 @@ fn death_blocks_actions_but_allows_inspection() {
     assert!(engine.execute(Move(South)).is_err());
     assert!(engine.execute(Attack("wolf".into())).is_err());
     assert!(engine.execute(Status).is_ok());
+    assert_eq!(
+        offered(&engine),
+        vec![(Inventory, true), (Status, true), (Quests, true)]
+    );
 }
 
 #[test]
@@ -176,5 +180,92 @@ fn overflowing_rewards_roll_back_the_entire_command() {
         engine.execute(CompleteQuest("quiet_the_track".into())),
         Err(EngineError::NumericLimit)
     ));
+    assert_eq!(engine.state(), &before);
+}
+
+fn offered(engine: &Engine<'_>) -> Vec<(Command, bool)> {
+    engine
+        .actions()
+        .into_iter()
+        .map(|a| (a.command, a.available))
+        .collect()
+}
+
+#[test]
+fn actions_list_context_sensitive_commands_with_availability() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    assert_eq!(
+        offered(&engine),
+        vec![
+            (Talk("elder".into()), true),
+            (Move(North), true),
+            (Move(East), false),
+            (Inventory, true),
+            (Status, true),
+            (Quests, true),
+        ]
+    );
+    engine.execute(Move(North)).unwrap();
+    assert_eq!(offered(&engine)[0], (Attack("wolf".into()), true));
+    for _ in 0..3 {
+        engine.execute(Attack("wolf".into())).unwrap();
+    }
+    assert!(!offered(&engine).iter().any(|(c, _)| matches!(c, Attack(_))));
+}
+
+#[test]
+fn offered_actions_match_engine_legality_throughout_the_demo() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    let path = [
+        Talk("elder".into()),
+        ChooseDialogue(1),
+        ChooseDialogue(1),
+        Move(North),
+        Attack("wolf".into()),
+        Attack("wolf".into()),
+        Attack("wolf".into()),
+        Move(South),
+        Talk("elder".into()),
+        ChooseDialogue(1),
+        Move(East),
+        Move(Down),
+    ];
+    for step in path {
+        for action in engine.actions() {
+            // Probe on a copy so exploring actions never alters the real run.
+            let mut probe = engine.clone();
+            assert_eq!(
+                probe.execute(action.command.clone()).is_ok(),
+                action.available,
+                "{:?} at {}",
+                action.command,
+                engine.state().player.location
+            );
+        }
+        let events = engine.execute(step).unwrap();
+        if let Some(Event::Dialogue { choices, .. }) = events
+            .iter()
+            .rev()
+            .find(|e| matches!(e, Event::Dialogue { .. }))
+        {
+            if engine.state().dialogue.is_some() {
+                assert_eq!(&engine.dialogue_choices(), choices);
+            }
+        }
+    }
+    assert!(engine.dialogue_choices().is_empty());
+}
+
+#[test]
+fn viewing_panels_does_not_spend_time() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(North)).unwrap();
+    let before = engine.state().clone();
+    for command in [Look, Inventory, Status, Quests] {
+        engine.execute(command).unwrap();
+    }
     assert_eq!(engine.state(), &before);
 }

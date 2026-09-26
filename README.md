@@ -34,9 +34,13 @@ Building initially downloads Rust dependencies. Playing requires only the
 compiled `realmkit` binary and the world directory: no network, account, API key,
 model, worldgen crate, or source material.
 
-Type `help` in the game. Commands are line-oriented; press Enter after each one.
-Use `north/south/east/west`, `n/s/e/w`, or `h/j/k/l` to move. `up/down` move
-vertically; raw arrow-key input is reserved for a future TUI.
+In a terminal, each scene shows a menu: use ↑/↓ and Enter, or press the
+number. Esc steps back out of a conversation, `n/s/e/w/u/d` (or `h/j/k/l`) move
+directly, and `:` opens a typed command such as `:talk elder`. Ctrl-C quits.
+
+Piped input, scripts and `realmkit play <world> --line` use line mode: type a
+menu number or a command and press Enter. Type `help` for the command list.
+Typed commands still work everywhere:
 
 ```text
 look
