@@ -143,6 +143,24 @@ The existence of an entity in the fiction does not require its corresponding
 mechanical capability. For example, factions can exist as world entities without
 a faction/reputation system.
 
+## Proficiency
+
+Capability-owned competence state used when a mechanic needs it, such as
+smithing or stealth. RealmKit does not require a universal proficiency table or
+shared numeric scale.
+
+A proficiency is distinct from a learned ability/technique.
+
+## Check
+
+Capability-specific resolution of a legal gameplay attempt. A check may be
+deterministic, stochastic, resource-based or otherwise explicitly defined by that
+capability.
+
+A failed check is a valid gameplay result and may have authored consequences. It
+is distinct from a rejected command, which does not commit state changes or
+consume randomness.
+
 ## Randomness
 
 An optional engine-level deterministic pseudo-random facility used by world-level
