@@ -13,12 +13,13 @@ route, or both over the same shared world and canonical timeline. When both are
 present, New Game selects between them directly; one route does not unlock the
 other. Each route has its own player binding, start state, main questline, outcomes and
 mutable save while reusing shared locations, NPCs, factions and other world
-definitions where appropriate. Future static player identity should use a
-`PlayerSpec`-like concept rather than `ProtagonistSpec`: the controlled
-character is not necessarily the source story's protagonist.
+definitions where appropriate. Future formats should evolve toward shared `Character` definitions plus a small
+`PlayerSpec` route binding that identifies which character the human controls.
+Do not duplicate a canonical person as separate player and NPC entities merely
+because control differs by route.
 
 In an original-character route, the canonical protagonist remains in the package
-as a canonical world entity/NPC rather than being replaced by the player.
+as a canonical world character/NPC rather than being replaced by the player.
 
 Format 1 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
