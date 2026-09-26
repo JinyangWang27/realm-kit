@@ -491,19 +491,77 @@ composable condition tree when richer story branching first needs it.
 
 ## 7. Randomness and reproducibility
 
-**Needed before:** any randomized check, loot or encounter.
+**Resolved.**
 
-Open questions:
+RealmKit supports genuinely stochastic worlds while preserving deterministic
+replay. Randomness is an optional engine-level facility available to both
+world-level systems and gameplay capabilities; it is not itself a gameplay
+capability.
 
-- Which mechanics benefit from randomness rather than authored uncertainty?
-- Is the seed chosen by the package, player or new-game operation?
-- Must the exact PRNG algorithm be part of the format version?
-- What is the stable draw order when several effects resolve together?
-- Can authors require a fully non-random campaign?
+Typical uses include:
 
-Current leaning: randomness remains optional. If enabled, use a specified seeded
-PRNG whose state is saved and included in replay. Never use platform randomness
-implicitly. Weighted authored outcomes still consume deterministic draws.
+- low-probability world/ambient events
+- random encounters or discoveries
+- combat critical hits
+- randomized loot
+- skill/check outcomes
+- weighted selection among authored event variants
+
+Runtime randomness only selects among finite pre-authored possibilities. It never
+generates new prose, entities, quests or rules.
+
+Conceptually:
+
+```text
+World / capability
+        ↓
+ explicit random opportunity
+        ↓
+ deterministic seeded RNG
+        ↓
+ one authored result
+```
+
+Decisions:
+
+- A world may declare/use stochastic mechanics even when no other optional
+  capability requires them.
+- A new playthrough initializes explicit RNG state from a seed supplied by the
+  caller/new-game layer. The gameplay engine must not silently obtain entropy from
+  wall-clock time, OS randomness or other hidden external state while executing
+  commands.
+- Current RNG state is part of deterministic `GameState`/save state whenever
+  randomness is in use. Loading or death-recovering a save restores the exact RNG
+  state as well as the rest of the playthrough.
+- Deterministic replay means that the same validated package, same initial state
+  including RNG state/seed, and same gameplay decisions produce the same events
+  and resulting state.
+- Conditions and presentation-only actions never consume random draws.
+- Rejected/rolled-back atomic commands do not consume committed RNG state.
+- Random opportunities occur only at explicit gameplay transitions such as
+  entering/travelling through a location, resting, resolving an attack, opening a
+  loot result or executing a skill/check. Merely opening menus or inspecting
+  state cannot trigger a rare event.
+- Probabilities/weights are authored content. The exact serialization
+  representation is deferred until the first stochastic content format needs it.
+- Combat may use randomness for mechanics such as critical hits even when basic
+  hit/damage rules remain deterministic.
+- Semantically unrelated stochastic systems should not accidentally perturb one
+  another merely because an unrelated random draw happened first. When
+  implementation needs multiple stochastic domains, use deterministic independent
+  streams/sub-seeds or another equally explicit mechanism rather than one fragile
+  incidental global draw sequence.
+- The exact PRNG algorithm and stream/sub-seed mechanism are deferred until the
+  first implementation, but once shipped they must be explicit/versioned for
+  replay and save compatibility rather than relying on a library's unspecified
+  default behavior.
+- Every reachable stochastic result must lead to a valid authored continuation,
+  recovery path or explicit outcome. Randomness may alter progression, but one
+  unlucky draw must not leave the playthrough in an invalid dead end with no
+  authored resolution.
+
+A fully deterministic world that uses no stochastic mechanics remains valid and
+needs no active RNG state.
 
 ## 8. Skills and checks
 
