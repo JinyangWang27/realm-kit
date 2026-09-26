@@ -12,8 +12,10 @@ and when they must be settled.
   credentials, source material or network access.
 - The engine owns all state and rules. Menus, typed commands and future clients
   invoke the same structured commands.
-- All generated player-facing content retains its source's language. Narrative,
-  dialogue and branches are authored before play.
+- All player-facing text in a source-backed world uses the source's language.
+  This includes authored narrative/dialogue and client-owned labels, help, prompts
+  and runtime messages. Machine-facing identifiers and stable command tokens may
+  remain language-neutral. Narrative and branches are authored before play.
 - Rules, scheduling, template selection and any future randomness are replayable.
 - External agents use a typed authoring core; serialization and MCP are adapters.
 - Gameplay capabilities are source-grounded and composable. Combat, crafting,
@@ -66,14 +68,22 @@ Ashbell Village
   interactive input. There, numbered selections are followed by Enter.
 - Keep typed commands available. Menu browsing, inspecting panels and reading
   dialogue choices must not spend combat time.
-- Select authored action labels in the world's language; localize fixed interface
-  labels separately. Avoid introducing English-only generated menu sentences.
+- Select authored action labels in the world's language and localize all fixed
+  interface labels, help, prompts and runtime messages to the world's language.
+  Stable typed-command aliases may remain language-neutral ASCII, but displayed
+  guidance must not leak English into a non-English world.
+- Menu browsing, panel inspection and other presentation-only actions must not
+  change which narrative/combat template variant is selected. Move variant
+  selection away from the global successful-command count toward a deterministic
+  counter or key tied to the relevant gameplay event sequence.
 - Build the smallest terminal menu that serves this loop; a full-screen layout
   can follow if needed. No engine rewrite to accommodate keyboard events.
 
 **Done when:** a new player can finish the demo using only menus, with both
-arrow/Enter and numbered selection paths tested. Scripted play still works;
-terminal settings are restored on normal exit and handled errors.
+arrow/Enter and numbered selection paths tested. A non-English fixture verifies
+that player-visible menus/help/messages do not fall back to English. Browsing or
+inspection does not alter subsequent combat prose selection. Scripted play still
+works; terminal settings are restored on normal exit and handled errors.
 
 ## M2 — Continue an adventure across sessions
 
