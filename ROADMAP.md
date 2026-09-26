@@ -48,28 +48,44 @@ choice numbers; location actions do not yet have a selection menu.
 
 ## M1 — Play without memorizing commands · next
 
-Provide a context-sensitive action list for each scene:
+Provide a context-sensitive local map and action list for each scene. The
+preferred spatial presentation is a 3×3 neighborhood centered on the player's
+current location:
 
 ```text
-Ashbell Village
+┌────────────┬────────────┬────────────┐
+│ Northwest  │ Pine Track │ Northeast  │
+├────────────┼────────────┼────────────┤
+│ Old Mill   │ YOU        │ Chapel     │
+│            │ Ashbell    │ [locked]   │
+├────────────┼────────────┼────────────┤
+│ Southwest  │ River Road │ Southeast  │
+└────────────┴────────────┴────────────┘
 
-> 1. Talk to Elder Mara
-  2. Travel north — The Pine Track
-  3. Travel east — The Chapel [locked]
-  4. Inventory
-  5. Character
-  6. Quests
-
-↑/↓ select · Enter confirm · number choose · Esc back
+> Talk to Elder Mara
+  Inventory
+  Character
+  Quests
 ```
 
-- Offer both arrow selection and numbered shortcuts for location actions,
-  dialogue, targets and combat actions when present. Players never need to type
-  an entity ID.
+The 3×3 grid is a **view of nearby space**, not a change to movement semantics.
+Players move only through explicit cardinal exits (north/south/east/west).
+Diagonal cells provide additional spatial context but are not directly traversable
+unless a future mechanic explicitly defines such movement. Vertical `up`/`down`
+travel is separate from the 2D grid (for stairs, floors, caves, cliffs, etc.).
+
+- Arrow keys select or move among legal cardinal actions; numbered shortcuts
+  remain available for contextual actions, dialogue, targets and combat actions.
+  Players never need to type an entity ID.
 - Keep selection numbering stable while a menu is displayed. Explain unavailable
   actions and recheck legality in the engine when an action is submitted.
-- Use explicit menu focus: arrows navigate the active list. Retain directional
-  movement shortcuts outside menus; vertical travel remains a distinct action.
+- Keep map layout separate from traversal rules. A visible neighboring cell does
+  not imply an exit. The engine remains authoritative about whether a cardinal
+  move is legal; presentation may show locked, blocked or currently unavailable
+  locations without making them traversable.
+- Use explicit menu focus: arrows navigate the active list when a menu has focus.
+  On the local map, directional input attempts the corresponding cardinal move.
+  Vertical travel remains a distinct contextual action.
 - Preserve the line-oriented interface for pipes, scripts and terminals without
   interactive input. There, numbered selections are followed by Enter.
 - Keep typed commands available. Menu browsing, inspecting panels and reading
@@ -85,11 +101,13 @@ Ashbell Village
 - Build the smallest terminal menu that serves this loop; a full-screen layout
   can follow if needed. No engine rewrite to accommodate keyboard events.
 
-**Done when:** a new player can finish the demo using only menus, with both
-arrow/Enter and numbered selection paths tested. A non-English fixture verifies
-that player-visible menus/help/messages do not fall back to English. Browsing or
-inspection does not alter subsequent combat prose selection. Scripted play still
-works; terminal settings are restored on normal exit and handled errors.
+**Done when:** a new player can finish the demo using the 3×3 local map and
+context menus without memorizing commands. Cardinal movement and diagonal
+visibility are tested separately, including locked/blocked neighbors and vertical
+travel. A non-English fixture verifies that player-visible menus/help/messages do
+not fall back to English. Browsing or inspection does not alter subsequent combat
+prose selection. Scripted play still works; terminal settings are restored on
+normal exit and handled errors.
 
 ## M2 — Continue an adventure across sessions
 
