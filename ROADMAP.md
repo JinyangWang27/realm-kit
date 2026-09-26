@@ -364,7 +364,9 @@ when grounded in the source material; otherwise their data and UI are absent.
 The M4 demonstration world proves the reusable systems without enabling them in
 every package.
 
-- Add a small equipment slot set, equip/unequip, consumables and learned skills.
+- Add explicit authored equipment slots, equip/unequip, consumables and learned
+  skills. Items may occupy multiple slots; do not require a universal global slot
+  list before representative worlds need one.
 - Derive effective stats from base progression plus equipment; prevent repeated
   equip/unequip from permanently accumulating bonuses.
 - Give skills authored descriptions, MP costs, damage channels and power.
@@ -373,12 +375,13 @@ every package.
   wall-clock seconds, actor turns and timeline units.
 - Show why stats changed and what an action costs before confirming it.
 - Deliver in slices: M4a equipment instances and equip/unequip; M4b stations,
-  forging and improvements; M4c one compatible enchantment per item. Runtime
-  instances use deterministic saved IDs only when distinguishable copies need
-  independent state; unique legendary equipment may still have one mutable
-  instance, while fungible identical resources remain definition + quantity.
-  Preserve
-  authored source-language names and prose throughout crafting.
+  deterministic forging and authored improvement-state transitions; M4c one
+  compatible learned enchantment per item. Runtime instances use deterministic
+  saved IDs only when distinguishable copies need independent state; unique
+  legendary equipment may still have one mutable instance, while fungible
+  identical resources remain definition + quantity. Materials/quality are concrete
+  authored data rather than a universal runtime hierarchy. Preserve authored
+  source-language names and prose throughout crafting.
 - Keep recipe knowledge separate from proficiency: authored teachers, plans,
   quests or discoveries grant recipes, while smithing determines whether a known
   recipe can be used. Proficiency alone does not reveal recipes initially.
