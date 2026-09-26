@@ -696,31 +696,87 @@ advance after resolution.
 
 ## 10. Definitions, instances and identity
 
-**Needed before:** saves, equipment, repeatable encounters or movable NPCs.
+**Resolved.**
 
-Separate authored definitions from mutable playthrough instances. This is already
-agreed for equipment but needs consistent treatment for NPCs, enemies, clues,
-containers and encounters.
+RealmKit distinguishes authored definitions from mutable runtime identity without
+forcing every entity into an instance model.
 
-Resolved here:
+Use three representations:
 
-- Investigation evidence has its own authored identity/state. It may optionally
-  reference a physical entity or item as its subject/source, but it need not be a
-  physical object at all; testimony, observations and deductions can also become
-  evidence.
-- A physical object can participate in both inventory and investigation through a
-  typed cross-reference. Do not encode investigation semantics as a generic item
-  tag or infer evidence solely from possession.
+```text
+1. authored singleton
+   stable DefinitionId + mutable state keyed by that ID
 
-Open questions:
+2. fungible quantity
+   DefinitionId + count
 
-- Which entities can have multiple instances?
-- How are deterministic instance IDs allocated and preserved across saves?
-- Can an instance change definition through transformation or disguise?
-- How are spawned/removed entities represented without losing provenance?
+3. runtime instance
+   InstanceId + DefinitionId + independent mutable state
+```
 
-Current leaning: stable authored definition IDs plus monotonically allocated,
-saved instance IDs. Avoid instances for content that is inherently unique.
+The deciding rule is:
+
+> Create a runtime instance only when several distinguishable copies of the same
+> authored definition may exist and carry independent mutable state.
+
+Examples:
+
+- Canonical characters, locations, quests and evidence normally use their stable
+  authored IDs directly; do not manufacture redundant runtime instance IDs for
+  inherently unique authored identities such as Yang Guo.
+- Fungible resources such as coins, arrows or identical herbs use a definition
+  plus quantity when individual copies have no meaningful state.
+- Equipment, spawned enemies, containers or other repeatable mutable objects use
+  runtime instances when individual copies can differ.
+
+### Instance identity
+
+When instances are needed, use deterministic monotonically allocated
+playthrough-local IDs. Save and restore both existing IDs and the next allocation
+counter. Instance IDs are never reused within a playthrough.
+
+Every instance retains an immutable authored `definition_id`:
+
+```text
+Instance
+├── instance_id
+├── definition_id
+└── mutable instance state
+```
+
+Runtime mutation changes state, not authored definition identity. Improvement,
+damage, enchantment, ownership, location or disguise keep the same underlying
+definition/identity. A genuine replacement/transformation that creates a different
+thing consumes/removes the old entity and creates a new one.
+
+### Multiplicity and unique items
+
+Definition multiplicity is authored and orthogonal to whether an instance exists.
+
+- A repeatable definition may have multiple live instances.
+- A unique definition may have at most one live instance.
+- A unique object may still require a runtime instance when it carries mutable
+  physical state.
+
+For example, a unique legendary weapon can have one instance whose ownership,
+equipment state, damage, improvement or enchantment changes over time. Moving it
+between characters does not change its `InstanceId`.
+
+### Removal and durable consequences
+
+Removed/destroyed/consumed instances do not require universal permanent
+tombstones. Instance IDs are not reused. Gameplay facts that must survive removal
+belong to the relevant durable state, such as quest/objective state, evidence,
+flags or another capability-owned record.
+
+Do not build a universal runtime provenance/history graph. An instance's
+`definition_id` supplies its basic authored origin; capabilities may retain
+additional provenance such as crafting/encounter origin only when gameplay needs
+it.
+
+Investigation evidence remains a separate authored identity/state. It may
+reference a physical definition or instance, but possession of that object does
+not automatically imply that its evidentiary significance has been discovered.
 
 ## 11. Save compatibility and package evolution
 
