@@ -38,6 +38,9 @@ than replacing them.
 - World generation offers canonical, original, or both player-entry modes.
   Canonical and original routes are independently playable; `both` exposes the
   choice at New Game rather than requiring one route to unlock the other.
+- Source adaptations use protected canon anchors/constraints with bounded
+  expansion between them. Required downstream anchors must remain reachable; no
+  unrestricted/free adaptation mode exists.
 - Failed commands do not mutate state. Presentation uses structured commands and
   events shared by typed commands, menus and future clients.
 - Combat uses gradual defence reduction with explicit immunity/vulnerability.
@@ -243,24 +246,108 @@ states in which mutually exclusive outcomes can become true simultaneously.
 
 ## 4. Canon fidelity and divergence
 
-**Needed before:** source-grounded generation.
+**Resolved.**
 
-RealmKit source adaptations do not permit unrestricted rewrite of the source.
-Major canonical anchors remain protected in both canonical and original routes.
-Generated play may change routes, local outcomes, assistance, relationships,
-side-story consequences and other bounded details, but it must not transform the
-source into a fundamentally different story.
+RealmKit source adaptations use one bounded-fidelity model rather than global
+`strict / bounded / free` modes:
 
-Open questions:
+> RealmKit may expand canon, route around canon, and vary local consequences, but
+> generated play must not contradict protected canon or transform the source into
+> a fundamentally different story.
 
-- Which canon facts are protected anchors for a given source, and how are they
-  represented?
-- How should worldgen report invented connective material versus sourced facts?
-- How much bounded variation is allowed around each anchor without invalidating
-  characterization or causality?
+Worldgen represents source fidelity through three authoring concepts:
 
-The generation report should record protected anchors and provenance for major
-expansions. Runtime only consumes the compiled branches.
+```text
+Canon IR
+├── Canon Anchors
+├── Canon Constraints
+└── Expansion Space
+```
+
+### Canon anchors
+
+A canon anchor is a protected major source fact or event that generated routes
+must preserve. Examples include critical identities, relationships, chronology,
+major encounters and source-defining outcomes.
+
+Canon anchors belong to Canon IR / worldgen authoring metadata, not necessarily
+to the runtime playable format. Their concrete schema should be introduced only
+when source-grounded generation needs it.
+
+Every supported generated branch must preserve reachability of required
+downstream anchors in a state consistent with their prerequisites. A branch that
+permanently invalidates a required anchor is an authoring/validation error.
+
+### Canon constraints
+
+Some fidelity requirements are broader than individual events. Worldgen must also
+preserve relevant source constraints such as:
+
+- established character identity
+- established relationships
+- chronology and ordering
+- what a character can legitimately know at that point
+- core characterization and motivations
+- established world facts
+- causal consistency
+
+Worldgen's omniscient source knowledge must never silently become player or NPC
+knowledge before the authored story provides a legitimate path to it.
+
+### Expansion space
+
+RealmKit's open-world freedom lives primarily between canon anchors. Valid
+expansion includes exploration, side questlines, minor/new characters, inferred
+events, alternate methods, relationship development and local consequences.
+
+A branch may diverge substantially after one anchor provided it can still reach
+the next required anchor in a canon-compatible state:
+
+```text
+Canon Anchor A
+      │
+      ├── exploration
+      ├── side questline
+      ├── alternate route
+      └── local consequences
+              │
+              ▼
+        Canon Anchor B
+```
+
+Side content may therefore change assistance, difficulty, dialogue, route,
+relationships, NPC/local state and objective alternatives without deleting or
+contradicting protected source facts.
+
+### Provenance
+
+Worldgen records generated material using authoring-side provenance:
+
+```text
+SOURCE    directly represented in the source
+INFERRED  not explicit, but strongly supported by source facts
+EXPANDED  newly authored gameplay material constrained by canon
+```
+
+Provenance retains source references or rationale in an authoring report/sidecar.
+The runtime package does not need the source text or source-analysis machinery.
+
+Decisions:
+
+- Canon IR and fidelity/provenance analysis belong to worldgen/authoring, not the
+  AI-free runtime engine.
+- Protected anchors are explicit authoring constraints.
+- Broader canon constraints cover identity, relationships, chronology, knowledge,
+  characterization, established facts and causality.
+- Generated branches may vary locally but must remain compatible with required
+  downstream anchors.
+- Contradicting or making a required anchor permanently unreachable is a
+  validation error, not merely a style warning.
+- `SOURCE / INFERRED / EXPANDED` provenance is retained outside core runtime
+  state for review and regeneration.
+- There is no unrestricted/free source-adaptation mode. More or less fidelity is
+  expressed by the chosen protected anchors/constraints and the expansion space
+  between them, not by a global fidelity slider.
 
 ## 5. Player entry and original-character generation
 
