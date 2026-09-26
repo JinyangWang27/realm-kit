@@ -118,6 +118,10 @@ normal exit and handled errors.
 
 ## M2 — Continue an adventure across sessions
 
+Treat saves as storage-neutral `SaveSnapshot` data. The engine serializes and
+validates deterministic state; CLI/mobile/server layers choose files, SQLite,
+databases or other durable storage.
+
 - Save/load the playthrough state for the selected player route plus only the
   capabilities enabled by that world—for example investigation evidence,
   inventory, quests, combat stats or defeated enemies. Keep authored definitions separate from mutable saves; do
@@ -510,7 +514,10 @@ intended world/canon data, and validate independently from their own starts.
 
 Add a richer TUI or web/mobile client over the same command model when useful.
 Introduce an authoritative server and party play as a separate milestone once
-the single-player rules are stable. Shared combat needs an explicit policy for
+the single-player rules are stable. The server owns canonical state, RNG
+resolution and durable persistence; clients submit commands rather than outcomes.
+Single-player checkpoint rewind does not imply rewinding a persistent shared
+world—multiplayer recovery is scoped to player/session/instance state. Shared combat needs an explicit policy for
 waiting on several players; a paused single-player timeline does not answer that
 question automatically. Add storage/networking crates only at that point.
 
