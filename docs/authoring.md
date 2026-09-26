@@ -144,8 +144,11 @@ optional capability state belong to mutable runtime/save state.
 A future world-builder skill should teach the author to:
 
 1. Extract canon, chronology, relationships and source references before gameplay.
-2. Build a coherent shared location graph and keep NPCs/locations/factions as
-   world entities rather than nesting them inside quests.
+2. Build a coherent shared location graph and a readable spatial layout. Keep
+   traversal exits separate from presentation placement: the 3×3 local map may
+   show diagonal nearby locations, while actual movement remains through explicit
+   cardinal exits. Keep NPCs/locations/factions as world entities rather than
+   nesting them inside quests.
 3. Compile the canonical story into a main questline and major story phases.
 4. Extract side-story seeds from canonical people, places, factions, conflicts,
    occupations and unresolved details, then expand those seeds into side
