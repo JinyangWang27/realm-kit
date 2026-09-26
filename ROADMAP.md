@@ -18,11 +18,15 @@ and when they must be settled.
   remain language-neutral. Narrative and branches are authored before play.
 - Rules, scheduling, template selection and any future randomness are replayable.
 - External agents use a typed authoring core; serialization and MCP are adapters.
-- Gameplay capabilities are source-grounded and composable. Quests, inventory,
-  combat, crafting, investigation, equipment and similar systems are optional;
-  absent capabilities contribute no required data, runtime state or player
-  actions. Evidence belongs to investigation state; a physical item may be linked
-  to evidence through a typed relation without making inventory universal. The
+- The shared location graph, main questline, typed objectives, story phases and
+  authored outcomes are core. Side questlines are optional, but main-story
+  progress unlocks them in bounded waves so exploration remains open without
+  making the main story irrelevant.
+- Gameplay capabilities are source-grounded and composable. Inventory, combat,
+  crafting, investigation, equipment and similar systems are optional; absent
+  capabilities contribute no required data, runtime state or player actions.
+  Evidence belongs to investigation state; a physical item may be linked to
+  evidence through a typed relation without making inventory universal. The
   [capability catalog](docs/capabilities.md) guides selection without defining a
   mandatory feature list.
 - Add a system when a milestone needs it. No empty future crates or generic ECS.
@@ -364,21 +368,21 @@ item identity and consumes resources atomically without duplicating bonuses.
 
 - Separate monster definitions from encounter instances; support multiple enemies
   without reusing one global HP record.
-- For worlds that use quests, add multi-target objectives, prerequisites and
-  chains. Independently expand richer story conditions and explicit
-  dungeon/encounter completion state so non-quest worlds do not depend on a quest
-  subsystem.
+- Generalize the core quest model into main and side questlines with typed
+  multi-target objectives, prerequisites and chains. Side questlines are unlocked
+  by explicit main-story/story-phase conditions and may feed explicit state back
+  into later main quests.
 - Define encounter reset/respawn and retreat rules before relying on repeatable
   combat. Preserve quest progress and prevent duplicate completion rewards.
 - Expand authored dialogue and branches, with consistent NPC availability and
   understandable journal entries.
 - Add source-specific capabilities only with a representative world. For example,
-  a detective story may use clues, evidence, interviews, contradictions,
-  deductions and a final accusation while omitting combat, quests and inventory
-  entirely. Add a physical evidence item only when the story needs one; link it
-  to investigation evidence through a typed reference rather than treating
-  evidence as inventory. Its success and failure paths remain deterministic and
-  pre-authored.
+  a detective story may use a main investigation questline with clues, evidence,
+  interviews, contradictions, deductions and a final accusation while omitting
+  combat and inventory entirely. Add a physical evidence item only when the story
+  needs one; link it to investigation evidence through a typed reference rather
+  than treating evidence as inventory. Its success and failure paths remain
+  deterministic and pre-authored.
 - Establish first-class authored endings and campaign completion state, rather
   than treating player death as the only terminal outcome.
 
@@ -415,8 +419,15 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 - Let the user choose whether that second campaign is a concurrent perspective,
   post-canon continuation or bounded alternate branch. Keep campaign saves
   separate and carry only explicitly authored facts between them.
-- Derive gameplay from source events and preserve characterization and atmosphere.
-  Do not turn every named character into a monster.
+- Derive the main questline from the source's canonical story and preserve
+  characterization and atmosphere. Generate side-story seeds from canonical NPCs,
+  locations, factions, relationships, occupations, conflicts and unresolved
+  details; expand those seeds into side questlines before inventing unrelated
+  generic content.
+- Gate side questlines by explicit main-story/story-phase progress. Side quest
+  outcomes may alter later main dialogue, routes, assistance, objectives and
+  bounded outcomes through authored state, but never through runtime generation.
+- Do not turn every named character into a monster.
 - Select the game's capabilities from the source. A detective novel may compile
   to exploration, interviews, evidence, deductions and accusation branches with
   no combat system. Do not add fights merely to satisfy an RPG convention.
