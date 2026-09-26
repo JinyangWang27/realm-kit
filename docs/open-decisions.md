@@ -18,6 +18,12 @@ than replacing them.
   identifiers and stable typed-command tokens may remain language-neutral.
 - Gameplay capabilities are optional and source-grounded. Complete absence is
   valid and produces no placeholder state or UI.
+- Quests are optional progression structures, not part of the universal world
+  core. A world may express progression entirely through choices, flags, outcomes
+  or capability-specific objectives.
+- Inventory is optional. Evidence belongs to investigation state, not inventory;
+  a physical item may be linked to an evidence definition, but possession alone
+  does not automatically make an item evidence.
 - Combat and crafting are optional. Equipment does not imply crafting.
 - World generation offers canonical, original, or canonical-then-original
   protagonist campaigns. Unlockable campaigns are pre-generated.
@@ -50,13 +56,20 @@ typed conditions and effects
 one or more outcomes
 ```
 
+Resolved here:
+
+- Quests are optional. They are one progression/presentation structure, not a
+  universal requirement.
+- Inventory is optional.
+- Evidence is owned by an investigation capability. Evidence may refer to a
+  physical entity such as a letter, weapon or photograph, including an item that
+  can also be carried in inventory, but evidence state is separate from item
+  possession. Prefer a typed relation/reference over an unstructured string tag.
+
 Open questions:
 
 - Must every campaign use a location graph, even if it remains in one courtroom
   or operates through letters and memories?
-- Are quests universal, or merely one optional progression presentation?
-- Is inventory core because clues and letters are objects, or optional because
-  evidence can have its own state?
 - Which concepts belong to a campaign rather than the whole package?
 
 Avoid answering by making every field optional. The core should express the
@@ -127,8 +140,10 @@ explicit mapping of cross-campaign facts.
 **Needed before:** expanding dialogue, investigation or multi-campaign state.
 
 Define the shared typed vocabulary used by story branches and capabilities.
-Likely conditions include flags, quest/objective state, item/evidence possession,
-relationship thresholds, time windows and entity state. Likely effects include
+Likely conditions include flags, optional quest/objective state, item possession,
+evidence-obtained state, relationship thresholds, time windows and entity state.
+An evidence condition is not shorthand for inventory possession: investigation
+may obtain evidence from testimony, observation or a physical entity. Likely effects include
 setting flags, transferring items, changing relationships, advancing objectives,
 moving entities and ending campaigns.
 
@@ -210,12 +225,21 @@ Separate authored definitions from mutable playthrough instances. This is alread
 agreed for equipment but needs consistent treatment for NPCs, enemies, clues,
 containers and encounters.
 
+Resolved here:
+
+- Investigation evidence has its own authored identity/state. It may optionally
+  reference a physical entity or item as its subject/source, but it need not be a
+  physical object at all; testimony, observations and deductions can also become
+  evidence.
+- A physical object can participate in both inventory and investigation through a
+  typed cross-reference. Do not encode investigation semantics as a generic item
+  tag or infer evidence solely from possession.
+
 Open questions:
 
 - Which entities can have multiple instances?
 - How are deterministic instance IDs allocated and preserved across saves?
 - Can an instance change definition through transformation or disguise?
-- Are clues unique facts, physical items, or sometimes both?
 - How are spawned/removed entities represented without losing provenance?
 
 Current leaning: stable authored definition IDs plus monotonically allocated,
