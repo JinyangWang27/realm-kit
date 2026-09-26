@@ -1087,44 +1087,112 @@ demonstrate a need for one.
 
 ## 14. Presentation and information disclosure
 
-**M1 context menus are implemented; richer presentation remains open and is
-revisited per capability.**
+**Resolved foundation.**
 
-A 3×3 local neighborhood view is agreed for spatial presentation. The player is
-shown in the center; surrounding cells may show nearby locations for context.
-Traversal remains cardinal-only through explicit north/south/east/west exits.
-Diagonal cells are informational, not implicit movement edges. Vertical
-`up`/`down` travel remains a separate contextual action.
+M1 provides context-sensitive menus. Longer-term presentation follows one strong
+boundary:
 
-Map layout and connectivity are separate concepts: presentation may know that a
-location lies northeast of the player even when there is no direct traversable
-edge to it. The engine remains authoritative over exits and movement legality.
-Arrow/Enter navigation, numbered shortcuts and typed commands remain supported.
+> The engine determines what the player is allowed to know and do; clients decide
+> how to render that information.
 
-Open questions:
+### Visibility and availability
 
-- Which actions appear disabled with a reason, and which remain hidden to avoid
-  spoilers?
-- Should combat previews show exact damage and future turns or qualitative hints?
-- How are long action lists grouped on small terminals?
-- How much of the 3×3 neighborhood should be shown before discovery: exact names,
-  silhouettes/unknown cells, or only locations the protagonist could reasonably
-  know or see?
-- Should spatial layout use authored integer coordinates, area-local placement
-  metadata, or another representation that does not constrain the traversal graph?
-- Where should fixed client translations live: RealmKit-owned locale resources,
-  package-provided interface text, or a hybrid with well-defined fallback rules?
-- How should a client behave when it does not have fixed-interface translations
-  for the world's declared language? Silent fallback to English is not acceptable
-  for normal source-backed play.
-- What accessibility behavior is required for color, screen readers and terminals
-  without raw input support?
+Do not conflate a secret action with an unavailable visible action.
 
-Current leaning: show actions the protagonist could reasonably consider; explain
-ordinary unmet requirements but hide secret branches. Retain the line-oriented
-fallback for scripts and inaccessible raw-terminal environments. All displayed
-UI must follow the world's language; the open decision is where those fixed
-translations are owned, not whether localization is required.
+Conceptually:
+
+```text
+visible?
+   ├── no  → client does not receive/offer it
+   └── yes
+        ↓
+available?
+   ├── yes → actionable
+   └── no  → may be shown disabled with authored explanation
+```
+
+Future authored gating should therefore distinguish visibility from ordinary
+requirements (for example `visible_if` versus `requires`). Hidden branches do
+not become spoilers merely because their requirements fail.
+
+Visible-but-unavailable actions may carry authored player-facing explanatory text.
+Clients should not reverse-engineer detailed reasons from hidden/internal state.
+
+### Spatial presentation
+
+A fixed 3×3 map is **not** a RealmKit architectural requirement.
+
+The universal gameplay truth is the explicit location/traversal graph. Worlds may
+optionally group locations into map areas and give locations area-local spatial
+positions:
+
+```text
+World
+├── traversal graph                 universal
+└── Areas                           optional grouping/layout
+    └── Locations
+        └── optional (x, y)
+```
+
+An `Area` is primarily spatial/presentation organization, such as a city, a
+building floor or a mountain region. Spatial coordinates do not create exits and
+adjacent cells do not imply movement. Explicit exits remain authoritative.
+
+For a first grid layout, one area coordinate maps to at most one location.
+Enterable structures may link from a city-map location to another area representing
+their interior. Vertical travel remains explicit through exits and does not require
+a universal z-axis.
+
+Clients choose the rendering strategy:
+
+- compact area → show the full map;
+- large area → show a viewport/minimap of any appropriate size;
+- graph-only area → present exits/actions without a grid.
+
+Viewport dimensions (3×3, 5×5, 7×7, etc.) are client choices, not world semantics.
+
+Opening a map is never required for ordinary movement. The player can always move
+through currently legal explicit exits. A future map may offer path planning or
+"travel to known location", but such behavior is a separate gameplay operation and
+must not silently teleport across encounters, time advancement, locked routes or
+other authored consequences.
+
+Map rendering must respect player knowledge. Package/world omniscience does not
+automatically reveal every location. A world that needs discovery/fog-of-war may
+track the smallest typed discovery state required; worlds where geography is common
+knowledge need no universal knowledge database.
+
+### Preview/detail policy
+
+RealmKit does not globally require exact or qualitative previews. Combat/check
+presentation may show exact numbers, qualitative difficulty or no preview according
+to world/client policy. Do not add a universal disclosure-level abstraction until
+multiple capabilities require common semantics.
+
+Long action-list grouping remains a client concern. The engine provides visible
+actions in stable deterministic order; richer clients may group them for display.
+
+### Localization
+
+Use a hybrid ownership model:
+
+- world/package content owns authored/world-specific player-facing prose;
+- RealmKit clients own standardized generic UI locale keys;
+- packages may later provide explicit setting-specific overrides.
+
+Missing fixed-interface translations for the package language must not silently
+fall back to English in normal source-backed play. Exact locale-file serialization
+is deferred until localization implementation.
+
+### Accessibility
+
+Presentation must not make gameplay semantics depend on one visual/input mode:
+
+- color is never the sole carrier of meaning;
+- every action has a textual label;
+- spatial maps have an equivalent textual/list representation;
+- raw-key interaction is optional convenience;
+- line-oriented play remains supported for accessibility and automation.
 
 ## 15. Equipment and crafting details
 
