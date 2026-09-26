@@ -433,10 +433,12 @@ item identity and consumes resources atomically without duplicating bonuses.
   deterministic and pre-authored.
 - Establish first-class authored endings and route completion state, rather
   than treating player death as the only terminal outcome.
-- Keep story-phase transitions event-driven. Add an optional world-time capability
-  only when a representative world needs travel durations, schedules, day/night,
-  rest tied to elapsed time, appointments or deadlines. Do not assign universal
-  durations to ordinary commands.
+- Keep story-phase transitions event-driven. Add optional World Time only when a
+  representative world needs travel durations, schedules, day/night, rest tied to
+  elapsed time, appointments or deadlines. Represent it as monotonic minutes from
+  an authored epoch, advance it only explicitly, and resolve crossed scheduled
+  events chronologically with stable authored order for ties. Do not assign
+  universal durations to ordinary commands.
 - Support authored stochastic world-event opportunities when a representative
   world needs rare encounters/discoveries. Trigger rolls only at explicit gameplay
   transitions and select only among pre-authored outcomes.
