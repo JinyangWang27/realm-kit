@@ -1196,14 +1196,65 @@ Presentation must not make gameplay semantics depend on one visual/input mode:
 
 ## 15. Equipment and crafting details
 
-**Needed before:** M4.
+**Resolved foundation.**
 
-The [equipment proposal](equipment.md) records the agreed source-gating,
-definition/instance split, forging/improvement/enchanting operations and recipe
-learning. Still decide material progression, improvement tiers, proficiency
-thresholds, enchantment learning/replacement, modifier stacking, exact armour
-speed penalties and actual speed cap. Durability, random affixes and crafting
-feedback loops remain deferred until a source/world requires them.
+Equipment and crafting are separate optional capabilities. Equipment describes
+persistent individual objects; crafting describes explicit authored transformations
+of resources and equipment. Neither implies a universal material, quality or
+enchantment system.
+
+Decisions:
+
+- Equipment definitions contain concrete authored properties. Runtime does not
+  derive item stats from a universal material hierarchy such as iron < steel <
+  rare metal. Authoring helpers may generate families of definitions, but export
+  concrete values.
+- Distinguishable equipment uses runtime instances under the definition/instance
+  rules from Section 10. Unique equipment may have at most one live instance.
+- Equipment slots are explicit authored slot IDs. An item may occupy multiple
+  slots (for example a two-handed weapon occupying main/off hand); validation
+  rejects conflicting equipped instances.
+- Effective ordinary stats are recalculated from base character/capability state
+  plus typed equipped modifiers. Repeated equip/unequip never permanently
+  accumulates bonuses.
+- Improvement mutates the same instance through explicit authored forward states
+  or tiers. Entering a new improvement state replaces the previous improvement
+  contribution; it does not stack the whole prior bonus again.
+- Improvement labels/counts are world-specific. RealmKit does not require a
+  universal Ordinary/Fine/Superior/etc. ladder.
+- Recipe knowledge and crafting proficiency are independent gates. Knowing a
+  recipe does not imply sufficient proficiency, and proficiency does not
+  automatically reveal recipes.
+- Proficiency scales and thresholds remain capability/world-specific.
+- Initial crafting is deterministic once all requirements are met. A later world
+  may use the general check/RNG model only when stochastic crafting is a genuine
+  gameplay requirement.
+- Forge consumes authored inputs and creates a new instance.
+- Improve consumes authored inputs and mutates the same instance's improvement
+  state.
+- Enchant consumes authored inputs and mutates the same instance by attaching one
+  learned authored enchantment.
+- Initial enchanting supports at most one enchantment per item. Disenchanting,
+  replacement/removal, random affixes, charges/recharge, multi-effect enchanting
+  and destructive learning are deferred until a representative world needs them.
+- Unique/quest artifacts may explicitly be ineligible for forging, improvement,
+  enchanting, destruction or other crafting operations.
+- Ordinary equipment modifiers are typed scalar contributions owned by the
+  relevant capability. For example armour may contribute defence and a speed
+  penalty, while the combat capability owns speed interpretation and the speed
+  cap.
+- Exceptional mechanics such as immunity/vulnerability retain their explicitly
+  authored semantics. Generic stacking rules for multiple exceptional sources are
+  deferred until an implementation actually needs simultaneous sources.
+- Crafting operations are atomic. Rejection consumes no materials/resources and
+  grants no progress/reward; success consumes inputs once and creates/updates the
+  intended instance once.
+- Durability/repair, arbitrary affix rolling and crafting feedback loops remain
+  absent until source/gameplay requirements justify them.
+
+Actual material costs, improvement strengths, proficiency thresholds, armour
+penalties, speed caps and similar numeric values are world/capability balance
+parameters rather than unresolved architecture.
 
 ## 16. Multiplayer authority and pacing
 
