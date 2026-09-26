@@ -223,6 +223,34 @@ Generation should prefer side stories in this order:
 Track whether generated material is sourced, inferred or expanded so reviewers
 can distinguish adaptation from invention.
 
+## Canon fidelity
+
+Source-backed generation uses bounded fidelity rather than an unrestricted
+adaptation mode. Worldgen extracts and maintains authoring-side Canon IR with
+protected canon anchors, broader canon constraints and provenance.
+
+Canon anchors are major source facts/events that supported branches must preserve.
+A generated branch may explore, add side stories, change local consequences or
+take alternate routes between anchors, but it must still be able to reach every
+required downstream anchor in a canon-compatible state. Making a required anchor
+permanently unreachable is a validation error.
+
+Broader constraints also preserve established identity, relationships, chronology,
+character knowledge, core characterization, world facts and causal consistency.
+Do not leak omniscient worldgen knowledge into player/NPC knowledge before an
+authored discovery path exists.
+
+Use authoring-side provenance:
+
+```text
+SOURCE    directly represented in the source
+INFERRED  strongly supported by the source but not explicitly narrated
+EXPANDED  new gameplay material constrained by canon
+```
+
+Retain source references/rationale in an authoring report or optional provenance
+sidecar. Runtime does not require source text, Canon IR, or provenance analysis.
+
 ## Time authoring
 
 Treat canonical/narrative progression as **story phases**, not as a continuously
