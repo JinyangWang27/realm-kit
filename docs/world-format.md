@@ -7,8 +7,8 @@ version must allow combat data and combat state to be wholly absent; authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
 combat and other genre mechanics as source-grounded capabilities.
 
-Format 1 also represents one fixed player-controlled protagonist and one
-playable route. Future formats may package a canonical route, an original-character
+Format 1 also represents one fixed player-controlled character and one playable
+route. Future formats may package a canonical route, an original-character
 route, or both over the same shared world and canonical timeline. When both are
 present, New Game selects between them directly; one route does not unlock the
 other. Each route has its own player binding, start state, main questline, outcomes and
@@ -23,9 +23,8 @@ as a canonical world entity/NPC rather than being replaced by the player.
 Format 1 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
-rather than remove them. A non-combat world still has a main questline whose
-objectives may use dialogue, exploration, investigation or other capabilities
-instead of combat. Investigation evidence is independent state and may optionally
+rather than remove them. A non-combat player route still has a main questline whose objectives may use
+dialogue, exploration, investigation or other capabilities instead of combat. Investigation evidence is independent state and may optionally
 reference a physical entity/item without being stored "inside" inventory or
 inferred from possession.
 
