@@ -105,8 +105,13 @@ quest state:
 
 Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags
-are monotonic in this version. Conditions govern availability/choice visibility;
-general prerequisite expressions, negation and quest chains are not implemented.
+are monotonic in this version. Conditions govern availability/choice visibility.
+
+This flat conjunctive representation is a Format 1 limitation. The long-term
+condition model uses pure typed predicates composed with `All / Any / Not`;
+predicates remain domain-specific and typed rather than becoming arbitrary
+expressions/property paths. Typed effects execute in authored order as part of the
+engine's atomic state transition.
 
 Each monster ID can appear at most once across all locations. This version has
 no separate monster templates/spawns and no respawns. Quest targets must be
