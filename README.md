@@ -7,7 +7,8 @@ A small, deterministic text-RPG engine for authored or generated worlds.
 plus source-grounded capabilities: a detective story may use interviews, clues,
 deductions and accusations while omitting combat completely. The current demo and
 format are the first combat-enabled slice, not a requirement for every world.
-See the [optional capability catalog](docs/capabilities.md).
+See the [architecture glossary](docs/glossary.md) and
+[optional capability catalog](docs/capabilities.md).
 
 The first playable world, *The Bell in the Pines*, is hand-authored. Talk to
 Elder Mara, choose dialogue, accept her quest, defeat the ash wolf, collect loot
@@ -144,8 +145,9 @@ metadata, and Unicode template interpolation.
 
 See [the milestone roadmap](ROADMAP.md) for proposed menu interaction, saves,
 combat stats and timing, character builds, and source-grounded authoring.
-Unresolved design questions and their decision points are tracked in the
-[open-decisions register](docs/open-decisions.md).
+Normative architecture terms are defined in the
+[glossary](docs/glossary.md). Unresolved design questions and their decision
+points are tracked in the [open-decisions register](docs/open-decisions.md).
 
 This is a playable scaffold, not a complete RPG system. Equipment, skills/MP,
 multi-target kill counts, encounters, independent dungeon instances, factions,
