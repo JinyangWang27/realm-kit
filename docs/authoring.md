@@ -134,18 +134,35 @@ the conceptual unit for an independently playable protagonist/storyline. The
 current Format 1 supports one fixed route. Multiple simultaneously controlled
 protagonists remain a separate future design.
 
-Static player identity and mutable runtime state are separate concerns.
-Conceptually, `PlayerSpec` answers "who is the player-controlled character?"
-while the existing engine `PlayerState` stores mutable state intrinsic to that
-character during play.
+World character identity and player control are separate concerns:
 
-"Player" is intentionally different from "protagonist": a canonical route may
-make the player the source protagonist, while an original-character route may
-place the player beside the canonical protagonist rather than replacing them.
-Canonical/source-character binding, background and other fixed identity belong to
-authored `PlayerSpec`-like content. Mutable run-wide story data such as quest
-progress, flags, dialogue and future NPC/world state belongs to `GameState` (or
-typed state owned beneath it), not automatically to `PlayerState`.
+```text
+Character   = who exists in the world
+PlayerSpec  = which Character the human controls
+PlayerRoute = how that player experiences the world
+```
+
+Future shared character identity should live on a `CharacterSpec`-like world
+entity. `PlayerSpec` should primarily reference that character rather than
+duplicate name/background/identity. A canonical route binds control to a canonical
+character; an original route binds control to a worldgen-authored original
+character while canonical protagonists remain ordinary world characters/NPCs.
+
+Original-character generation is constraint/override driven. Resolve the final
+identity before generating dependent route prose, quests, relationships and
+dialogue. Starting location/phase belong to the route; mutable relationships,
+faction state and capability data belong to route/game/capability state rather
+than `PlayerSpec`.
+
+Worldgen must maintain a player-knowledge boundary distinct from omniscient Canon
+IR knowledge. Compile only gameplay-relevant knowledge distinctions into runtime
+state. Original starting history/relationships must satisfy canon constraints and
+must not manufacture major retroactive canonical relationships.
+
+The existing engine `PlayerState` stores mutable state intrinsic to the
+controlled character. Run-wide quest, dialogue, NPC and world state belongs to
+`GameState` or typed state owned beneath it. Runtime identity customization is
+opt-in and typed rather than a universal right to rewrite authored identity.
 
 A future world-builder skill should teach the author to:
 
