@@ -18,10 +18,12 @@ and when they must be settled.
   remain language-neutral. Narrative and branches are authored before play.
 - Rules, scheduling, template selection and any future randomness are replayable.
 - External agents use a typed authoring core; serialization and MCP are adapters.
-- The shared location graph, main questline, typed objectives, story phases and
-  authored outcomes are core. Side questlines are optional, but main-story
-  progress unlocks them in bounded waves so exploration remains open without
-  making the main story irrelevant.
+- The shared world owns the location graph, characters/entities and story-phase
+  definitions. Every world has one or more player routes; each route owns a
+  PlayerSpec-like player definition, start state/location, exactly one main
+  questline and one or more authored outcomes. Side questlines are optional, but
+  main-story progress unlocks them in bounded waves so exploration remains open
+  without making the main story irrelevant.
 - Time models stay separate: story phase is core narrative progression; an
   in-world clock/calendar is optional; encounter timelines are local schedulers;
   real-world thinking time advances none of them.
@@ -114,9 +116,9 @@ normal exit and handled errors.
 
 ## M2 — Continue an adventure across sessions
 
-- Save/load the universal campaign state plus only the capabilities enabled by
-  that world—for example investigation evidence, inventory, quests, combat stats
-  or defeated enemies. Keep authored definitions separate from mutable saves; do
+- Save/load the playthrough state for the selected player route plus only the
+  capabilities enabled by that world—for example investigation evidence,
+  inventory, quests, combat stats or defeated enemies. Keep authored definitions separate from mutable saves; do
   not require empty quest/inventory state in worlds that omit those capabilities.
 - Version saves and identify the world package they belong to. Reject incompatible
   saves clearly; add migrations when an actual format change requires them.
@@ -448,7 +450,7 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
   route, or both. In `both` mode, New Game offers the choice immediately; one
   route does not have to unlock the other.
 - Reuse the same shared world and canonical timeline across routes where possible.
-  Keep protagonist-specific main questlines, starting state and saves separate.
+  Keep player-route-specific main questlines, starting state and saves separate.
   In the original route, canonical protagonists remain world entities/NPCs and
   continue through protected canon anchors.
 - Derive the main questline from the source's canonical story and preserve
@@ -472,8 +474,8 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 **Done when:** a short source produces an inspectable world whose provenance,
 language and fidelity can be reviewed, whose main progression is tested, and
 which remains playable after removing all generation tools and source files.
-For a two-campaign fixture, runtime completion unlocks already-packaged content
-without calling worldgen, and both campaigns validate from independent starts.
+For a two-route fixture, both routes are selectable from New Game, share the
+intended world/canon data, and validate independently from their own starts.
 
 ## M8 — Additional clients and shared play · optional later
 
