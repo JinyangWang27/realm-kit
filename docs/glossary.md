@@ -121,6 +121,18 @@ Authoring metadata classifying generated source-backed material as `SOURCE`,
 Provenance supports fidelity review/regeneration and is not required runtime
 gameplay state.
 
+## Condition
+
+A pure typed query over current deterministic state used to gate authored actions,
+branches and content. Conditions compose through `All`, `Any` and `Not` plus
+typed leaf predicates. Evaluating a condition never mutates state.
+
+## Effect
+
+A closed typed state change executed as part of an authored transition/engine
+command. Multiple effects execute in authored order against staged state, and the
+enclosing state transition commits atomically.
+
 ## Capability
 
 An optional reusable gameplay system with recurring mutable state, reusable rules
