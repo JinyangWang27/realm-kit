@@ -18,9 +18,16 @@ than replacing them.
   identifiers and stable typed-command tokens may remain language-neutral.
 - Gameplay capabilities are optional and source-grounded. Complete absence is
   valid and produces no placeholder state or UI.
-- Quests are optional progression structures, not part of the universal world
-  core. A world may express progression entirely through choices, flags, outcomes
-  or capability-specific objectives.
+- Every playable world has a location graph, a main questline, and one or more
+  authored outcomes. Quests are RealmKit's primary story-progression abstraction.
+  Side questlines are optional content layered over the same shared world.
+- Main-story progress unlocks bounded sets of side questlines through explicit
+  story-phase/quest conditions. This preserves open exploration within a phase
+  without allowing the player to consume an unlimited independent game while
+  permanently ignoring the main story.
+- Side quests may affect the main questline through explicit, pre-authored state
+  such as flags, relationships, evidence, items, NPC state, routes, dialogue and
+  objective alternatives. They never rewrite the main story dynamically at runtime.
 - Inventory is optional. Evidence belongs to investigation state, not inventory;
   a physical item may be linked to an evidence definition, but possession alone
   does not automatically make an item evidence.
@@ -43,37 +50,97 @@ default during implementation.
 
 **Needed before:** the first non-combat format revision.
 
-Decide which data every playable world must have. Current leaning:
+Resolved minimum core:
 
 ```text
-world/campaign identity
+world identity
 controlled protagonist
-current location
-authored narrative
-choices
-flags
+location graph
+authored narrative / dialogue / choices
+main questline
+quest objectives
+story phases
+flags and typed state
 typed conditions and effects
 one or more outcomes
 ```
 
-Resolved here:
+Additional decisions:
 
-- Quests are optional. They are one progression/presentation structure, not a
-  universal requirement.
+- The location graph is universal. A constrained story may use only one or a few
+  locations, but movement/place remains part of RealmKit's world model.
+- Every world has a main questline. Side questlines are optional.
+- A questline contains quests; quests contain one or more typed objectives.
+- NPCs, locations, factions and reusable entities belong to the shared world,
+  not to an individual quest. Quests reference and change that shared world.
+- Story phases provide bounded open-world periods around major main-story
+  transitions. Main progress changes phase and can move NPCs, alter availability,
+  unlock/close questlines, and change world presentation.
 - Inventory is optional.
 - Evidence is owned by an investigation capability. Evidence may refer to a
   physical entity such as a letter, weapon or photograph, including an item that
   can also be carried in inventory, but evidence state is separate from item
   possession. Prefer a typed relation/reference over an unstructured string tag.
 
-Open questions:
+Open question:
 
-- Must every campaign use a location graph, even if it remains in one courtroom
-  or operates through letters and memories?
-- Which concepts belong to a campaign rather than the whole package?
+- Which concepts, if any, should later be extracted from a single-world model into
+  a separate `Campaign` type when one package supports multiple independently
+  playable protagonists/storylines?
 
 Avoid answering by making every field optional. The core should express the
 smallest real playable world clearly.
+
+## 2. Open-world quest progression
+
+**Resolved foundation:** RealmKit should support a Skyrim-like open structure over
+a deterministic, source-grounded world.
+
+The main questline is the spine of story progression. Side questlines are
+optional stories that reuse the same locations, NPCs, factions and world state.
+They are not isolated mini-worlds.
+
+Side content is unlocked in bounded waves by main-story progress, usually through
+story phases and explicit quest/flag conditions. A player may freely explore and
+complete available side content before advancing the main quest, but later side
+questlines can remain unavailable until the main story moves forward. This keeps
+the world open without making the main story irrelevant.
+
+Conceptually:
+
+```text
+main quest progress
+       ↓
+   story phase
+       ↓
+┌──────┼──────────┐
+main   side A     side B
+quest  questline  questline
+       ↓          ↓
+       └────┬─────┘
+            ↓
+     explicit world state
+            ↓
+   later main-quest branches
+```
+
+Side quest outcomes may feed back into the main questline through typed,
+pre-authored state. Examples include:
+
+- dialogue/options changing because of a relationship or reputation result
+- an NPC helping, refusing, moving, disappearing or surviving
+- evidence or knowledge enabling a different main objective
+- an item/resource opening a route or avoiding an encounter
+- a side quest unlocking, replacing or skipping a main-quest objective
+- an authored alternate main-story outcome when the adaptation policy permits it
+
+This feedback must remain explicit and statically packaged. The runtime evaluates
+conditions; it does not invent consequences.
+
+For source adaptations, the default should preserve major canonical anchors while
+allowing side content to alter the route, context, assistance, difficulty and
+bounded outcomes around those anchors. Broader divergence belongs to an explicit
+adaptation policy.
 
 ## 2. Outcomes, failure and replay
 
