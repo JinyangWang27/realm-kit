@@ -1,14 +1,14 @@
 # Optional world capabilities
 
-RealmKit's universal core is intentionally small. Quests, inventory, combat,
-investigation, equipment and similar mechanics are optional capabilities rather
-than universal requirements. A world adds only the gameplay structures justified
-by its source. This document is a catalog for authors and future engine work, not
-a checklist or promised backlog.
+RealmKit's universal core includes a shared location graph, authored narrative
+and choices, a main questline, typed quest objectives, story phases, conditions /
+effects, world state and authored outcomes. Side questlines are optional content.
+Inventory, combat, investigation, equipment and similar mechanics are optional
+capabilities used by quests when justified by the source.
 
-The exact minimum universal core is still being refined in the
-[open-decisions register](open-decisions.md); do not infer that a concept is core
-merely because Format 1 currently requires it.
+This document catalogs those optional capabilities. A capability may be absent
+without placeholder data, but the main questline remains the story-progression
+spine of every playable world.
 
 ## When something deserves a capability
 
@@ -27,7 +27,9 @@ real expressive value.
 Capabilities are presence-driven. A complete absence is valid and creates no
 state, validation requirements, screens or commands. A present capability must
 be internally complete and machine-valid. Do not add placeholder data to make a
-world appear compatible with systems it does not use.
+world appear compatible with systems it does not use. Quest progression itself is
+core; capability-specific objective kinds are available only when their
+capability is present.
 
 ## Capability catalog
 
@@ -69,10 +71,11 @@ A detective adaptation might use:
 exploration + dialogue + investigation + relationships + time + accusation
 ```
 
-It needs no combat, equipment, crafting, quest log or inventory unless the
-source actually calls for them. The investigation capability records which
-evidence the player has legitimately obtained; authored dialogue and accusation
-branches inspect that state.
+It needs no combat, equipment, crafting or inventory unless the source calls
+for them. It still has a main questline: its objectives may be to interview,
+discover evidence, connect facts, make deductions and accuse rather than fight.
+The investigation capability records which evidence the player has legitimately
+obtained; authored dialogue and accusation branches inspect that state.
 
 Evidence is not an inventory subtype. An evidence definition may optionally refer
 to a physical entity—such as a letter, weapon, receipt or photograph—that can
@@ -157,13 +160,14 @@ package explicitly maps selected outcome facts between them.
 ## Suggested implementation order
 
 The current combat demo proves the command/event and static-content seams. The
-next non-combat fixture should exercise investigation because it tests the
-optional-capability architecture directly, ideally without quests or inventory at
-first. A second investigation slice can then add a physical evidence object to
-prove that inventory and evidence compose through typed references rather than
-inheritance or tags. Relationships/reputation and time are then broadly useful.
-Skill checks should be introduced only with clear semantics for certainty,
-difficulty and any deterministic randomness.
+next non-combat fixture should exercise a main investigation questline while
+omitting combat and inventory. A second slice can add a physical evidence object
+to prove that inventory and evidence compose through typed references rather than
+inheritance or tags. That fixture should also demonstrate that a side questline
+can be unlocked by main-story phase and feed explicit state back into a later
+main quest. Relationships/reputation and time are then broadly useful. Skill
+checks should be introduced only with clear semantics for certainty, difficulty
+and any deterministic randomness.
 
 Every new capability should ship with one small playable fixture proving why it
 exists. A capability without a representative world is speculative scaffolding.
