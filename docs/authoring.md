@@ -125,7 +125,7 @@ The route choice controls who is player-controlled, not who exists in the world:
 shared world / canon timeline
 ├── canonical route: player = Yang Guo
 └── original route:  Yang Guo = canonical NPC
-                     player = original protagonist
+                     player = original player character
 ```
 
 Do not introduce a dedicated runtime `Campaign` abstraction merely to express
@@ -167,26 +167,31 @@ opt-in and typed rather than a universal right to rewrite authored identity.
 A future world-builder skill should teach the author to:
 
 1. Extract canon, chronology, relationships and source references before gameplay.
-2. Build a coherent shared location/traversal graph. Add optional Areas and
+2. Resolve the player's entry choice (`canonical`, `original`, or `both`) and
+   therefore which PlayerRoutes will be packaged. Bind canonical routes to their
+   controlled canonical characters; for original routes, resolve the original
+   player's identity/constraints before generating route-dependent prose, quests,
+   relationships or dialogue.
+3. Build a coherent shared location/traversal graph. Add optional Areas and
    spatial placement only where the world benefits from map presentation; keep
    placement separate from traversal, and leave full-map versus viewport size to
    clients. Keep NPCs/locations/factions as world entities rather than nesting
    them inside quests.
-3. Compile shared canonical chronology into story phases. For each PlayerRoute,
-   author exactly one route-owned main questline: canonical routes derive theirs
-   directly from the canonical story, while original-character routes receive
-   their own main questline within the same canon constraints and story phases.
-4. Extract side-story seeds from canonical people, places, factions, conflicts,
+4. Compile shared canonical chronology into story phases. For each selected
+   PlayerRoute, author exactly one route-owned main questline: canonical routes
+   derive theirs directly from the canonical story, while original-character
+   routes receive their own main questline within the same canon constraints and
+   story phases.
+5. Extract side-story seeds from canonical people, places, factions, conflicts,
    occupations and unresolved details, then expand those seeds into side
    questlines before inventing generic filler.
-5. Gate side questlines by explicit main-story/story-phase progress. Let their
+6. Gate side questlines by explicit main-story/story-phase progress. Let their
    outcomes feed typed state back into later main quests where authored.
-6. Preserve characterization, vocabulary, rhythm, tone and the source language.
-7. Prewrite all runtime prose, dialogue choices and supported alternate branches.
-8. Validate references and simulate main/side progression, including unlock and
-   feedback paths, then repair problems before export.
-9. Apply the user's player-entry route choice and validate each independently
-   playable route from its own starting state.
+7. Preserve characterization, vocabulary, rhythm, tone and the source language.
+8. Prewrite all runtime prose, dialogue choices and supported alternate branches.
+9. Validate references and simulate main/side progression for every packaged
+   route from its own starting state, including unlock and feedback paths, then
+   repair problems before export.
 
 Optional mechanics also require source grounding. Equipment may exist without a
 player crafting system. Add forging, improvement, enchanting, alchemy or similar
