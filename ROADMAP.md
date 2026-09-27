@@ -91,18 +91,21 @@ validates deterministic state; CLI/mobile/server layers choose files, SQLite,
 databases or other durable storage.
 
 - Save/load the selected player route's core mutable state, including location,
-  main-quest progress and other authored story/world state, plus only the optional
-  capability state enabled by that world—for example investigation evidence,
-  inventory, combat stats or defeated enemies. Keep authored definitions separate
-  from mutable saves; do not require empty state for capabilities the world omits.
+  main-quest progress and other authored story/world state, plus only optional
+  capability state that exists for that route/playthrough, including any relevant
+  shared world-scoped capability state—for example investigation evidence,
+  inventory, combat stats or defeated enemies. A capability present elsewhere in
+  the package does not require placeholder state in a route that never uses it.
+  Keep authored definitions separate from mutable saves.
 - Version saves and identify the world package they belong to. Reject incompatible
   saves clearly; add migrations when an actual format change requires them.
 - Write saves atomically and keep the previous save safe if writing fails.
 - Support manual saves and deterministic auto-saves in one chronological recovery
-  history. Auto-save at route start and major stable authored progression
-  boundaries such as story-phase transitions; allow additional authored/capability
-  checkpoints where useful, but do not auto-save on every ordinary movement step
-  or presentation command.
+  history. For M2, auto-save at route start and at stable progression boundaries
+  the current format actually exposes (for example quest completion). As richer
+  story phases are implemented, their major transitions become default checkpoint
+  boundaries too. Allow additional authored/capability checkpoints where useful,
+  but do not auto-save on every ordinary movement step or presentation command.
 - Ordinary recoverable death attempts to restore the newest manual/auto-save
   recovery snapshot. If that snapshot fails load validation, surface the failure
   and let the client explicitly offer an older snapshot; never silently skip a
@@ -117,8 +120,9 @@ databases or other durable storage.
 **Done when:** saving mid-quest, quitting and resuming produces the same subsequent
 events as uninterrupted play; ordinary death attempts the newest recovery entry
 and surfaces validation failure before any explicit older-snapshot fallback;
-story-phase auto-saves are reproducible; and a broken or mismatched save cannot
-corrupt a world or silently reset progress.
+route-start and currently supported progression-boundary auto-saves are
+reproducible; and a broken or mismatched save cannot corrupt a world or silently
+reset progress.
 
 ## M3 — Optional combat capability: stats and meaningful speed
 
