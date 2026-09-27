@@ -20,10 +20,10 @@ than replacing them.
 - Gameplay capabilities are optional and source-grounded. Complete absence is
   valid and produces no placeholder state or UI.
 - Every playable world has a shared location graph and one or more player routes.
-  Every player route has a PlayerSpec-like static player definition, an initial
-  state/location, exactly one main questline, and one or more authored outcomes.
-  Quests are RealmKit's primary story-progression abstraction. Side questlines are
-  optional content layered over the same shared world.
+  Every player route has a PlayerSpec-like player-control binding to a shared
+  Character, an initial state/location, exactly one main questline, and one or more
+  authored outcomes. Quests are RealmKit's primary story-progression abstraction.
+  Side questlines are optional content layered over the same shared world.
 - Main-story progress unlocks bounded sets of side questlines through explicit
   story-phase/quest conditions. This preserves open exploration within a phase
   without allowing the player to consume an unlimited independent game while
@@ -653,8 +653,11 @@ Decisions:
 - Every reachable check result used by required progression must lead to a valid
   authored continuation, recovery path or explicit outcome. A single failed roll
   must not silently make the route impossible.
-- Whether the player sees exact odds, qualitative difficulty, or no preview is a
-  presentation decision rather than part of check semantics.
+- Whether the player may know exact odds, qualitative difficulty, or no preview
+  is a world/engine disclosure policy, not a client presentation choice. The
+  engine exposes only the permitted information; clients decide how to render
+  that representation. Do not add a universal disclosure-level abstraction until
+  repeated capability implementations prove one useful.
 
 ## 9. Time models
 
@@ -697,8 +700,11 @@ travel, waiting, rest, appointments or other mechanics that genuinely consume
 time. There are no universal command durations. Presentation-only actions consume
 zero world time.
 
-Normal world time is monotonic. Time travel/loops are separate explicit mechanics
-rather than weakening ordinary time semantics.
+Within one forward committed history, normal world time is monotonic. Restoring
+an older snapshot restores its saved WorldTime exactly, so time values that existed
+only in the discarded future may be traversed again on the new branch. Authored
+time travel/loops are separate explicit mechanics rather than weakening ordinary
+forward-time semantics.
 
 ### Scheduled world-time events
 
@@ -708,10 +714,19 @@ initial world time are invalid, and a runtime effect may not schedule an event f
 the current or a past minute. This avoids a separate initialization/current-time
 dispatch path and prevents same-timestamp self-scheduling loops.
 
-Advancing world time from `old_time` to `new_time` processes exactly the events
-whose timestamps fall in `(old_time, new_time]`, in chronological order. Events
-with the same timestamp resolve in stable authored declaration order. Do not add a
-generic priority framework unless a concrete world requires one.
+Advancing world time from `old_time` to `new_time` uses a deterministic
+dispatch cursor. Start with current world time at `old_time`; repeatedly take the
+earliest scheduled event with timestamp `<= new_time`, set current world time to
+that event's timestamp, and resolve it. An event may schedule a later event using
+that cursor time as "current"; if the new timestamp is still `<= new_time`, it is
+processed during the same advancement. Because scheduling for the current or a
+past minute is invalid, an event cannot recursively schedule another event at its
+own timestamp.
+
+After no due events remain, set current world time to `new_time`. Events with the
+same timestamp that were already scheduled resolve in stable authored declaration
+order. Do not add a generic priority framework unless a concrete world requires
+one.
 
 The engine owns current world time, explicit advancement and deterministic
 ordering of due authored events. Capabilities own the consequences of elapsed time,
@@ -1223,10 +1238,12 @@ knowledge need no universal knowledge database.
 
 ### Preview/detail policy
 
-RealmKit does not globally require exact or qualitative previews. Combat/check
-presentation may show exact numbers, qualitative difficulty or no preview according
-to world/client policy. Do not add a universal disclosure-level abstraction until
-multiple capabilities require common semantics.
+RealmKit does not globally require exact or qualitative previews. The
+world/engine determines what preview information the player is permitted to know:
+exact values, an authored qualitative representation, or none. Clients receive
+only that permitted representation and decide how to render it. Do not add a
+universal disclosure-level abstraction until multiple capabilities require common
+semantics.
 
 Long action-list grouping remains a client concern. The engine provides visible
 actions in stable deterministic order; richer clients may group them for display.
