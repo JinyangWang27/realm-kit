@@ -209,9 +209,10 @@ Decisions:
 - Death is not universally a terminal outcome. An authored route may define a
   terminal death/failure ending, but ordinary gameplay death is recoverable by
   default when a valid save exists.
-- In single-player, ordinary recoverable death resumes from the most recent valid
-  recovery save snapshot. Manual saves and auto-saves participate in the same
-  chronological recovery history; the newest valid snapshot wins.
+- In single-player, ordinary recoverable death attempts the newest recovery
+  snapshot in the shared chronological manual/auto-save history. If that snapshot
+  fails load validation, recovery surfaces the error; a client may explicitly
+  offer an older snapshot, but RealmKit does not silently skip the corrupt entry.
 - Recovery is scoped: a snapshot may rewind only state exclusively owned by that
   playthrough/session/instance. A persistent shared multiplayer world normally
   cannot be rewound because one player dies; multiplayer recovery uses authored
@@ -227,7 +228,14 @@ Decisions:
 - Auto-save creation itself must not advance story phase, world time or encounter
   time, and must not change deterministic narrative selection.
 - Outcomes are selected from explicit authored conditions over deterministic
-  playthrough/world state. The runtime does not invent endings.
+  playthrough/world state. The engine evaluates those conditions at route
+  initialization and after each successful state-changing transition, against the
+  resulting staged state before commit. If an unreached outcome matches, recording
+  the immutable outcome and emitting its event are part of the same atomic
+  transition. An explicit choice that should cause an ending does so by changing
+  typed state that makes the authored outcome condition true; there is no separate
+  `ReachOutcome` effect. The runtime never invents endings or resolves ambiguous
+  simultaneous outcome matches by arbitrary declaration order.
 - No universal cross-save profile/meta-progression is required. A client may later
   track discovered endings or achievements outside the route save, but the core
   engine does not depend on such metadata.
@@ -456,9 +464,10 @@ effects: Vec<Effect>
 ```
 
 Examples include setting a flag, transferring an item, obtaining evidence,
-advancing an objective, changing a relationship, moving a character, changing
-story phase or reaching an authored outcome. Add variants with the capability
-that actually needs them.
+advancing an objective, changing a relationship, moving a character or changing
+story phase. Add variants with the capability that actually needs them. Route
+outcomes are not effects: the engine derives them by evaluating authored outcome
+conditions after state transitions.
 
 Decisions:
 
@@ -483,9 +492,11 @@ Decisions:
   Do not add a generic repeat-policy abstraction prematurely. For example, setting
   an already-set flag may be a no-op, granting an item may accumulate, and quest
   completion must not duplicate rewards.
-- Hidden-versus-disabled presentation is not part of condition semantics.
-  Conditions answer whether something is legal/available; presentation decides
-  how unavailable authored actions are shown.
+- Visibility is distinct from ordinary availability conditions. The engine
+  evaluates authored visibility gating and does not expose hidden actions to the
+  client. For actions that are already visible but unavailable, ordinary
+  conditions answer whether they are legal/available and presentation decides
+  whether/how to render them disabled, including any authored explanation.
 - Do not build generic conflicting-write analysis now. Authored order defines
   deterministic behavior; higher-level validation/simulation can diagnose bad
   content when concrete cases justify it.
@@ -741,7 +752,11 @@ Examples:
 
 When instances are needed, use deterministic monotonically allocated
 playthrough-local IDs. Save and restore both existing IDs and the next allocation
-counter. Instance IDs are never reused within a playthrough.
+counter. Within one forward committed history, an ID is never assigned to a
+second concrete instance. Restoring an older snapshot also restores its allocation
+counter, so IDs that existed only in the discarded future may be allocated again
+on the new branch; those discarded objects/events are no longer part of the active
+playthrough history.
 
 Every instance retains an immutable authored `definition_id`:
 
