@@ -246,8 +246,10 @@ identified by a deterministic playthrough-local `InstanceId`.
 
 An instance retains an immutable `definition_id` while ownership, location,
 damage, improvement, enchantment and other mutable state may change. Instance IDs
-are saved, never reused within a playthrough, and are only created where distinct
-copy identity is actually needed.
+and allocator state are saved. An ID is not reused within one forward committed
+history; restoring an older snapshot may reuse IDs that existed only in the
+discarded future branch. Instances are created only where distinct copy identity
+is actually needed.
 
 ## Unique Definition
 
@@ -258,8 +260,10 @@ mutable state; a legendary weapon is the typical example.
 ## Outcome
 
 An authored route-level result/end state selected from explicit deterministic
-conditions. Outcomes independently declare whether they count as route completion
-and whether they terminate the playthrough.
+conditions. The engine evaluates those conditions at route initialization and
+after successful state-changing transitions; outcomes are derived from state rather
+than triggered by a separate outcome effect. Outcomes independently declare
+whether they count as route completion and whether they terminate the playthrough.
 
 A playthrough records at most one immutable route outcome. Ordinary setbacks and
 recoverable gameplay death are not outcomes unless explicitly authored as such.
@@ -282,9 +286,11 @@ player dies.
 
 ## Recovery Save
 
-A valid saved deterministic playthrough snapshot eligible for death recovery.
-Manual saves and auto-saves share one chronological recovery history; ordinary
-recoverable death restores the newest valid snapshot.
+A saved deterministic playthrough snapshot eligible for death recovery.
+Manual saves and auto-saves share one chronological recovery history. Ordinary
+recoverable death attempts the newest snapshot; if it fails load validation, the
+client may explicitly offer an older snapshot, but recovery never silently skips
+the corrupt entry.
 
 Auto-saves are created at stable boundaries such as route start and story-phase
 transitions rather than on every command or movement step.
