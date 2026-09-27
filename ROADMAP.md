@@ -90,10 +90,11 @@ Treat saves as storage-neutral `SaveSnapshot` data. The engine serializes and
 validates deterministic state; CLI/mobile/server layers choose files, SQLite,
 databases or other durable storage.
 
-- Save/load the playthrough state for the selected player route plus only the
-  capabilities enabled by that world—for example investigation evidence,
-  inventory, quests, combat stats or defeated enemies. Keep authored definitions separate from mutable saves; do
-  not require empty quest/inventory state in worlds that omit those capabilities.
+- Save/load the selected player route's core mutable state, including location,
+  main-quest progress and other authored story/world state, plus only the optional
+  capability state enabled by that world—for example investigation evidence,
+  inventory, combat stats or defeated enemies. Keep authored definitions separate
+  from mutable saves; do not require empty state for capabilities the world omits.
 - Version saves and identify the world package they belong to. Reject incompatible
   saves clearly; add migrations when an actual format change requires them.
 - Write saves atomically and keep the previous save safe if writing fails.
