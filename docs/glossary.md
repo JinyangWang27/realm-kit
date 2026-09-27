@@ -262,8 +262,10 @@ mutable state; a legendary weapon is the typical example.
 An authored route-level result/end state selected from explicit deterministic
 conditions. The engine evaluates those conditions at route initialization and
 after successful state-changing transitions; outcomes are derived from state rather
-than triggered by a separate outcome effect. Outcomes independently declare
-whether they count as route completion and whether they terminate the playthrough.
+than triggered by a separate outcome effect. If multiple unreached outcomes match
+the same staged state, the transition fails atomically with an ambiguity error.
+Outcomes independently declare whether they count as route completion and whether
+they terminate the playthrough.
 
 A playthrough records at most one immutable route outcome. Ordinary setbacks and
 recoverable gameplay death are not outcomes unless explicitly authored as such.
