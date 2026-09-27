@@ -300,9 +300,11 @@ the world between phases. Free exploration and side content inside a phase do no
 silently advance the source chronology.
 
 An in-world clock/calendar is optional. When a world needs it, author world time
-as a monotonic minute count from a world/route-defined epoch. Presentation may map
-that scalar to clock times, dates, day counts or setting-specific periods; the
-runtime does not need to understand the display calendar.
+as a minute count from a world/route-defined epoch that is monotonic within one
+forward committed history. Loading or recovering an older snapshot restores its
+saved value exactly. Presentation may map that scalar to clock times, dates, day
+counts or setting-specific periods; the runtime does not need to understand the
+display calendar.
 
 Advance world time only through explicit authored/capability actions such as
 travel, waiting, rest or appointments. Do not assign generic durations to every
