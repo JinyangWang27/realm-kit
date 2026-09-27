@@ -45,25 +45,6 @@ pub(super) fn check(
         "player stats do not match level",
     )?;
     ensure(
-        player.inventory.keys().all(|id| world.item(id).is_some()),
-        "unknown inventory item",
-    )?;
-    // Format 1 grants each loot and reward stack at most once, so no quantity
-    // can exceed the world's total; this also keeps later grants from overflowing.
-    let mut grantable: BTreeMap<&str, u64> = BTreeMap::new();
-    let stacks = world.monsters.iter().flat_map(|m| &m.loot);
-    for stack in stacks.chain(world.quests.iter().flat_map(|q| &q.reward_items)) {
-        let total = grantable.entry(&stack.item).or_default();
-        *total = total.saturating_add(stack.quantity);
-    }
-    ensure(
-        player
-            .inventory
-            .iter()
-            .all(|(id, count)| *count <= grantable.get(id.as_str()).copied().unwrap_or(0)),
-        "inventory holds more than this world can grant",
-    )?;
-    ensure(
         state.monster_hp.keys().eq(fresh.monster_hp.keys())
             && state
                 .monster_hp
@@ -84,12 +65,53 @@ pub(super) fn check(
             }),
         "invalid quest state",
     )?;
+    // Format 1 grants XP, items and quest flags exactly once, from defeated
+    // monsters and completed quests, so progress fixes their exact values.
+    // Anything else could not have been played, and could overflow later grants.
+    let no_flags: &[Id] = &[];
+    let defeated = world
+        .monsters
+        .iter()
+        .filter(|m| state.monster_hp[&m.id] == 0)
+        .map(|m| (m.xp, &m.loot, no_flags));
+    let completed = world
+        .quests
+        .iter()
+        .filter(|q| state.quests[&q.id] == QuestStatus::Completed)
+        .map(|q| (q.reward_xp, &q.reward_items, &q.completion_flags[..]));
+    let (mut xp, mut inventory, mut quest_flags) = (0_u64, BTreeMap::new(), BTreeSet::new());
+    for (reward, stacks, flags) in defeated.chain(completed) {
+        xp = xp.checked_add(reward).ok_or("impossible experience")?;
+        for stack in stacks {
+            let count: &mut u64 = inventory.entry(stack.item.clone()).or_default();
+            *count = count
+                .checked_add(stack.quantity)
+                .ok_or("impossible inventory")?;
+        }
+        quest_flags.extend(flags.iter().cloned());
+    }
+    ensure(player.xp == xp, "experience does not match progress")?;
     ensure(
-        state
-            .flags
-            .iter()
-            .all(|flag| world.world.flags.contains(flag)),
-        "unknown story flag",
+        player.inventory == inventory,
+        "inventory does not match progress",
+    )?;
+    let dialogue_flags: BTreeSet<_> = world
+        .dialogues
+        .iter()
+        .flat_map(|d| &d.nodes)
+        .flat_map(|n| &n.choices)
+        .filter_map(|c| match &c.effect {
+            Some(DialogueEffect::SetFlag { flag }) => Some(flag.clone()),
+            _ => None,
+        })
+        .collect();
+    ensure(
+        quest_flags.is_subset(&state.flags)
+            && state
+                .flags
+                .iter()
+                .all(|f| quest_flags.contains(f) || dialogue_flags.contains(f)),
+        "story flags do not match progress",
     )?;
     if let Some(dialogue) = &state.dialogue {
         let node_exists = world

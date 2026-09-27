@@ -104,16 +104,17 @@ fn apply(
         }
         Err(error) => return writeln!(output, "{error}"),
     };
+    // Checkpoint before printing, so a closed terminal cannot lose the progress.
+    let completed = events
+        .iter()
+        .any(|e| matches!(e, realmkit_engine::Event::QuestCompleted { .. }));
+    if let (Some(saves), true) = (saves, completed) {
+        save(engine, saves, Kind::Auto, output)?;
+    }
     render::events(output, engine, &events)?;
-    let Some(saves) = saves else { return Ok(()) };
-    if events.contains(&realmkit_engine::Event::PlayerDied) {
+    if let (Some(saves), true) = (saves, events.contains(&realmkit_engine::Event::PlayerDied)) {
         writeln!(output, "\nRestoring your most recent save…")?;
         restore(engine, saves, None, output)?;
-    } else if events
-        .iter()
-        .any(|e| matches!(e, realmkit_engine::Event::QuestCompleted { .. }))
-    {
-        save(engine, saves, Kind::Auto, output)?;
     }
     Ok(())
 }

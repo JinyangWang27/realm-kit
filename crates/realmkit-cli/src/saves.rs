@@ -51,7 +51,26 @@ impl Saves {
         match fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes)
                 .map_err(|e| format!("{}: {e}", path.display()).into()),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Lineage::default()),
+            // A missing index is a new directory only if it holds no saves;
+            // otherwise report it rather than hide existing progress.
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                let orphaned = fs::read_dir(&self.dir)
+                    .map_err(|e| format!("{}: {e}", self.dir.display()))?
+                    .filter_map(Result::ok)
+                    .any(|f| {
+                        let path = f.path();
+                        path.extension().is_some_and(|x| x == "json")
+                            && path
+                                .file_stem()
+                                .and_then(|s| s.to_str())
+                                .is_some_and(|s| s.parse::<u64>().is_ok())
+                    });
+                if orphaned {
+                    Err(format!("{} is missing but saves exist", path.display()).into())
+                } else {
+                    Ok(Lineage::default())
+                }
+            }
             Err(e) => Err(format!("{}: {e}", path.display()).into()),
         }
     }
@@ -145,6 +164,9 @@ mod tests {
         assert_eq!(ids, [0, 3, 4], "a stale counter skips existing files");
         assert!(dir.join("2.json").exists(), "abandoned saves are retained");
         assert_eq!(saves.read(3).unwrap(), snapshot);
+        fs::remove_file(dir.join(LINEAGE)).unwrap();
+        assert!(saves.entries().unwrap_err().to_string().contains("missing"));
+        assert!(saves.write(Kind::Manual, &snapshot).is_err());
         assert!(!fs::read_dir(&dir)
             .unwrap()
             .any(|f| f.unwrap().path().extension().unwrap() == "tmp"));

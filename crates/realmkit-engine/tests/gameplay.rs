@@ -306,6 +306,8 @@ fn saving_mid_quest_and_resuming_matches_uninterrupted_play() {
         );
     }
     assert_eq!(resumed.state(), uninterrupted.state());
+    // A finished quest's rewards, flags and level-up all pass validation.
+    assert!(Engine::restore(&world, resumed.snapshot()).is_ok());
 }
 
 #[test]
@@ -350,6 +352,13 @@ fn mismatched_or_corrupt_saves_are_rejected() {
         },
         |s| {
             s.state.monster_hp.insert("wolf".into(), 0);
+        },
+        |s| s.state.player.xp += 1,
+        |s| {
+            s.state.player.inventory.insert("ash_pelt".into(), 1);
+        },
+        |s| {
+            s.state.flags.insert("ruins_open".into());
         },
         |s| {
             s.state.dialogue = Some(DialogueState {
