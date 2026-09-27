@@ -45,8 +45,8 @@ capability is present.
 | Survival | Hunger, fatigue, temperature, injury, supplies | Eat, rest, shelter, forage, treat injury |
 | Travel and time | Calendar, journey progress, schedules, deadlines | Travel, wait, camp, choose a route |
 | Economy and trade | Currency, prices, merchant stock, debts | Buy, sell, bargain, borrow, repay |
-| Inventory | Carried item quantities and possession/ownership references | Take, drop, give, transfer |
-| Equipment | Equipped item instances, slots, effective modifiers | Equip, compare, unequip |
+| Inventory | Carried fungible/non-equipment items and their quantities/possession | Take, drop, give, transfer |
+| Equipment | Equipment instances, their ownership/possession, equipped slots and effective modifiers | Acquire, equip, compare, unequip, transfer |
 | Crafting | Recipes, materials, proficiency, stations | Forge, improve, enchant, brew |
 | Combat | HP/MP, stats, initiative, effects, opponents | Attack, use skill, defend, flee |
 | Magic and rituals | Known rites, costs, preparation, curses | Cast, prepare, dispel, perform a ritual |
@@ -61,6 +61,13 @@ capability is present.
 | Performance | Repertoire, audience mood, renown | Perform, rehearse, improvise, compete |
 | Transformation | Form, identity, corruption, disguise | Transform, resist, conceal, revert |
 | Time loop | Cycle, reset state, retained knowledge | Reset, exploit knowledge, prevent an event |
+
+Equipment does not require the general Inventory capability merely to keep an
+unequipped weapon or armour piece. Equipment owns the identity and
+ownership/possession state of equipment instances, including unequipped ones.
+Inventory owns general carried/fungible item state. When both are present, a client
+may present a unified carried-items view without duplicating authoritative
+ownership state.
 
 Names in this table describe design areas, not compulsory Rust modules. Closely
 related capabilities can share domain types where that makes the actual code
