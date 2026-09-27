@@ -228,16 +228,19 @@ Decisions:
 - Auto-save creation itself must not advance story phase, world time or encounter
   time, and must not change deterministic narrative selection.
 - Outcomes are selected from explicit authored conditions over deterministic
-  playthrough/world state. The engine evaluates those conditions at route
-  initialization and after each successful state-changing transition, against the
-  resulting staged state before commit. If an unreached outcome matches, recording
-  the immutable outcome and emitting its event are part of the same atomic
-  transition. An explicit choice that should cause an ending does so by changing
-  typed state that makes the authored outcome condition true; there is no separate
-  `ReachOutcome` effect. If more than one unreached outcome condition matches the
-  same staged state, the transition fails with an explicit outcome-ambiguity error
-  and none of its state changes are committed. The runtime never invents endings
-  or resolves ambiguity by arbitrary declaration order.
+  playthrough/world state only while the playthrough has no recorded outcome. The
+  engine evaluates those conditions at route initialization and after each
+  successful state-changing transition, against the resulting staged state before
+  commit. If exactly one outcome matches, recording the immutable outcome and
+  emitting its event are part of the same atomic transition. Once an outcome has
+  been recorded, later transitions do not evaluate or record additional route
+  outcomes, including after a non-terminal completion outcome. An explicit choice
+  that should cause an ending does so by changing typed state that makes the
+  authored outcome condition true; there is no separate `ReachOutcome` effect. If
+  multiple outcomes match while no outcome has yet been recorded, the transition
+  fails with an explicit outcome-ambiguity error and none of its state changes are
+  committed. The runtime never invents endings or resolves ambiguity by arbitrary
+  declaration order.
 - No universal cross-save profile/meta-progression is required. A client may later
   track discovered endings or achievements outside the route save, but the core
   engine does not depend on such metadata.
@@ -760,13 +763,19 @@ Examples:
 
 ### Instance identity
 
-When instances are needed, use deterministic monotonically allocated
-playthrough-local IDs. Save and restore both existing IDs and the next allocation
-counter. Within one forward committed history, an ID is never assigned to a
-second concrete instance. Restoring an older snapshot also restores its allocation
-counter, so IDs that existed only in the discarded future may be allocated again
-on the new branch; those discarded objects/events are no longer part of the active
-playthrough history.
+When instances are needed, use deterministic monotonically allocated IDs
+within an explicit authoritative identity domain. In single-player, that domain is
+the playthrough. In multiplayer, it is the smallest authoritative state domain
+within which instances may be transferred or jointly referenced; IDs from separate
+domains must never become ambiguous when state is combined. Do not add UUIDs or
+scope-qualified IDs unless a real server design requires them.
+
+Save and restore both existing IDs and the next allocation counter for a
+rewindable identity domain. Within one forward committed history, an ID is never
+assigned to a second concrete instance. Restoring an older snapshot also restores
+its allocation counter, so IDs that existed only in the discarded future may be
+allocated again on the new branch; those discarded objects/events are no longer
+part of the active history.
 
 Every instance retains an immutable authored `definition_id`:
 
@@ -1031,8 +1040,8 @@ Worldgen may call a package complete only when:
 4. required canon anchors remain reachable;
 5. every packaged PlayerRoute has at least one successful real-engine simulation
    to a completion outcome;
-6. each explicit stochastic result used by required progression has a valid
-   authored continuation, recovery path or outcome; and
+6. every reachable explicit stochastic result has a valid authored
+   continuation, recovery path or outcome; and
 7. capability-specific completion checks pass.
 
 The generation report states exactly what was validated/simulated and what remains
