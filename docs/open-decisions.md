@@ -210,9 +210,13 @@ Decisions:
   terminal death/failure ending, but ordinary gameplay death is recoverable by
   default when a valid save exists.
 - In single-player, ordinary recoverable death attempts the newest recovery
-  snapshot in the shared chronological manual/auto-save history. If that snapshot
-  fails load validation, recovery surfaces the error; a client may explicitly
-  offer an older snapshot, but RealmKit does not silently skip the corrupt entry.
+  snapshot in the active chronological manual/auto-save lineage. Loading an older
+  snapshot makes that snapshot the head of a new active lineage: snapshots from
+  the abandoned future are no longer eligible for automatic recovery, although a
+  client may retain them for explicit manual branch selection. If the newest
+  active snapshot fails load validation, recovery surfaces the error; a client may
+  explicitly offer an older snapshot from the same active lineage, but RealmKit
+  does not silently skip the corrupt entry.
 - Recovery is scoped: a snapshot may rewind only state exclusively owned by that
   playthrough/session/instance. A persistent shared multiplayer world normally
   cannot be rewound because one player dies; multiplayer recovery uses authored
@@ -227,18 +231,21 @@ Decisions:
   rest, or similar transitions where appropriate.
 - Auto-save creation itself must not advance story phase, world time or encounter
   time, and must not change deterministic narrative selection.
+- A valid route initial state must satisfy no route outcome condition. Validation
+  and engine construction reject an initial state that already matches one or
+  more outcomes, so initialization does not need to synthesize outcome events.
 - Outcomes are selected from explicit authored conditions over deterministic
   playthrough/world state only while the playthrough has no recorded outcome. The
-  engine evaluates those conditions at route initialization and after each
-  successful state-changing transition, against the resulting staged state before
-  commit. If exactly one outcome matches, recording the immutable outcome and
-  emitting its event are part of the same atomic transition. Once an outcome has
-  been recorded, later transitions do not evaluate or record additional route
-  outcomes, including after a non-terminal completion outcome. An explicit choice
-  that should cause an ending does so by changing typed state that makes the
-  authored outcome condition true; there is no separate `ReachOutcome` effect. If
-  multiple outcomes match while no outcome has yet been recorded, the transition
-  fails with an explicit outcome-ambiguity error and none of its state changes are
+  engine evaluates those conditions after each successful state-changing
+  transition, against the resulting staged state before commit. If exactly one
+  outcome matches, recording the immutable outcome and emitting its event are
+  part of the same atomic transition. Once an outcome has been recorded, later
+  transitions do not evaluate or record additional route outcomes, including
+  after a non-terminal completion outcome. An explicit choice that should cause
+  an ending does so by changing typed state that makes the authored outcome
+  condition true; there is no separate `ReachOutcome` effect. If multiple
+  outcomes match while no outcome has yet been recorded, the transition fails
+  with an explicit outcome-ambiguity error and none of its state changes are
   committed. The runtime never invents endings or resolves ambiguity by arbitrary
   declaration order.
 - No universal cross-save profile/meta-progression is required. A client may later
@@ -770,12 +777,18 @@ within which instances may be transferred or jointly referenced; IDs from separa
 domains must never become ambiguous when state is combined. Do not add UUIDs or
 scope-qualified IDs unless a real server design requires them.
 
-Save and restore both existing IDs and the next allocation counter for a
-rewindable identity domain. Within one forward committed history, an ID is never
-assigned to a second concrete instance. Restoring an older snapshot also restores
-its allocation counter, so IDs that existed only in the discarded future may be
-allocated again on the new branch; those discarded objects/events are no longer
-part of the active history.
+Save and restore both existing IDs and the next allocation counter only when
+the authoritative identity domain is fully contained within the same recovery
+scope. Within one forward committed history, an ID is never assigned to a second
+concrete instance. Restoring an older snapshot may restore that allocator and
+reuse IDs that existed only in the discarded future.
+
+If instances from an identity domain can survive outside a rewindable scope, that
+scope must not independently rewind the shared allocator. The allocator must be
+owned by non-rewound authority, or transfer into another identity domain must
+establish an unambiguous destination identity. Choose the concrete mechanism with
+the first multiplayer implementation; do not add UUIDs, tombstones or scoped-ID
+frameworks preemptively.
 
 Every instance retains an immutable authored `definition_id`:
 
