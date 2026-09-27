@@ -121,8 +121,11 @@ Proposed first rules:
   universal scale or track. Recipes/tier transitions use authored thresholds;
   flags or learned recipes can provide special unlocks. No full perk tree is
   needed initially.
-- Preview the exact material cost and resulting properties. The displayed result
-  and the committed result must use the same engine calculation.
+- Preview material costs and resulting properties only at the detail level
+  permitted by the world/engine disclosure policy. Whatever representation is
+  shown must derive from the same engine calculation used for the committed
+  result; clients must not receive hidden exact values merely to render a
+  qualitative/no-preview policy.
 - Given valid inputs, the result is guaranteed. No random failure or hidden
   quality roll in the first system.
 - Improvement selects an authored target tier, such as ordinary → fine → superior.
@@ -185,8 +188,10 @@ Fine Iron Sword + an authored catalyst + learned focus enchantment
 ```
 
 Pair that with leather and iron body armour, where the iron armour offers more
-physical defence but a larger speed penalty. Show both stat and action-timing
-changes before equipping. All names, descriptions, station text and menu labels
+physical defence but a larger speed penalty. Before equipping, show only the
+stat/action-timing preview permitted by the world/engine disclosure policy, derived
+from the same calculation that will be committed. All names, descriptions,
+station text and menu labels
 come from the authored world, in the source language. If names are assembled,
 use authored language-specific templates; never assume English suffix order.
 
