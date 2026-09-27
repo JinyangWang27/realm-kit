@@ -242,14 +242,17 @@ copies need independent mutable state.
 ## Instance
 
 A distinguishable runtime copy of a repeatable or unique authored definition,
-identified by a deterministic playthrough-local `InstanceId`.
+identified by a deterministic `InstanceId` that is unique within its authoritative
+identity domain. A single-player playthrough is one such domain; multiplayer
+chooses a domain large enough that instances which may be transferred or jointly
+referenced cannot collide.
 
 An instance retains an immutable `definition_id` while ownership, location,
 damage, improvement, enchantment and other mutable state may change. Instance IDs
-and allocator state are saved. An ID is not reused within one forward committed
-history; restoring an older snapshot may reuse IDs that existed only in the
-discarded future branch. Instances are created only where distinct copy identity
-is actually needed.
+and allocator state are saved for rewindable domains. An ID is not reused within
+one forward committed history; restoring an older snapshot may reuse IDs that
+existed only in the discarded future branch. Instances are created only where
+distinct copy identity is actually needed.
 
 ## Unique Definition
 
@@ -260,15 +263,16 @@ mutable state; a legendary weapon is the typical example.
 ## Outcome
 
 An authored route-level result/end state selected from explicit deterministic
-conditions. The engine evaluates those conditions at route initialization and
-after successful state-changing transitions; outcomes are derived from state rather
-than triggered by a separate outcome effect. If multiple unreached outcomes match
-the same staged state, the transition fails atomically with an ambiguity error.
-Outcomes independently declare whether they count as route completion and whether
-they terminate the playthrough.
+conditions. While a playthrough has no recorded outcome, the engine evaluates
+those conditions at route initialization and after successful state-changing
+transitions; outcomes are derived from state rather than triggered by a separate
+outcome effect. If multiple outcomes match the same staged state, the transition
+fails atomically with an ambiguity error.
 
-A playthrough records at most one immutable route outcome. Ordinary setbacks and
-recoverable gameplay death are not outcomes unless explicitly authored as such.
+A playthrough records at most one immutable route outcome. Once recorded, outcome
+evaluation stops for that playthrough even if a non-terminal outcome allows play
+to continue. Ordinary setbacks and recoverable gameplay death are not outcomes
+unless explicitly authored as such.
 
 ## Save Snapshot
 
