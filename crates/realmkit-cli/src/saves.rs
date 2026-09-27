@@ -46,61 +46,59 @@ impl Saves {
         Ok(Self { dir })
     }
 
+    /// Reads the index and rejects one that cannot be trusted: saves listed
+    /// out of order, or a save file at or past its counter. Every write
+    /// reserves its ID first, so no crash can produce the latter; a missing,
+    /// emptied or restored-from-backup index can, and would hide progress.
     fn lineage(&self) -> Result<Lineage, Box<dyn Error>> {
         let path = self.dir.join(LINEAGE);
-        match fs::read(&path) {
+        let lineage: Lineage = match fs::read(&path) {
             Ok(bytes) => {
-                let lineage: Lineage = serde_json::from_slice(&bytes)
-                    .map_err(|e| format!("{}: {e}", path.display()))?;
-                // Chronological order decides the newest save; never guess past damage.
-                let ids: Vec<_> = lineage.entries.iter().map(|e| e.id).collect();
-                if ids.windows(2).all(|w| w[0] < w[1])
-                    && ids.last().is_none_or(|id| *id < lineage.next)
-                {
-                    Ok(lineage)
-                } else {
-                    Err(format!("{} lists saves out of order", path.display()).into())
-                }
+                serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()))?
             }
-            // A missing index is a new directory only if it holds no saves;
-            // otherwise report it rather than hide existing progress.
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                let orphaned = fs::read_dir(&self.dir)
-                    .map_err(|e| format!("{}: {e}", self.dir.display()))?
-                    .filter_map(Result::ok)
-                    .any(|f| {
-                        let path = f.path();
-                        path.extension().is_some_and(|x| x == "json")
-                            && path
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                                .is_some_and(|s| s.parse::<u64>().is_ok())
-                    });
-                if orphaned {
-                    Err(format!("{} is missing but saves exist", path.display()).into())
-                } else {
-                    Ok(Lineage::default())
-                }
-            }
-            Err(e) => Err(format!("{}: {e}", path.display()).into()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Lineage::default(),
+            Err(e) => return Err(format!("{}: {e}", path.display()).into()),
+        };
+        let ids: Vec<_> = lineage.entries.iter().map(|e| e.id).collect();
+        if !ids.windows(2).all(|w| w[0] < w[1]) || ids.last().is_some_and(|id| *id >= lineage.next)
+        {
+            return Err(format!("{} lists saves out of order", path.display()).into());
         }
+        for file in fs::read_dir(&self.dir).map_err(|e| format!("{}: {e}", self.dir.display()))? {
+            let file = file?.path();
+            let id = file
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .and_then(|s| s.parse::<u64>().ok());
+            if file.extension().is_some_and(|x| x == "json")
+                && id.is_some_and(|id| id >= lineage.next)
+            {
+                return Err(format!(
+                    "{} does not list every save in {}",
+                    path.display(),
+                    self.dir.display()
+                )
+                .into());
+            }
+        }
+        Ok(lineage)
     }
 
     pub fn entries(&self) -> Result<Vec<Entry>, Box<dyn Error>> {
         Ok(self.lineage()?.entries)
     }
 
-    /// Writes the snapshot before listing it, so a failed write leaves every
-    /// earlier save and the chain untouched.
+    /// Reserves the ID, writes the snapshot, then lists it. A failure at any
+    /// step leaves earlier saves and the chain untouched; at worst an unlisted
+    /// file remains below the counter, like an abandoned save.
     pub fn write(&self, kind: Kind, snapshot: &SaveSnapshot) -> Result<(), Box<dyn Error>> {
         let mut lineage = self.lineage()?;
-        let mut id = lineage.next;
-        // A stale counter (say, lineage.json restored from a backup) must not
-        // overwrite an existing save.
-        while self.file(id).exists() {
-            id = id.checked_add(1).ok_or("save counter exhausted")?;
-        }
+        let id = lineage.next;
         lineage.next = id.checked_add(1).ok_or("save counter exhausted")?;
+        write_atomic(
+            &self.dir.join(LINEAGE),
+            &serde_json::to_vec_pretty(&lineage)?,
+        )?;
         write_atomic(&self.file(id), &serde_json::to_vec_pretty(snapshot)?)?;
         lineage.entries.push(Entry { id, kind });
         write_atomic(
@@ -140,10 +138,11 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     file.sync_all()?;
     fs::rename(temporary, path)?;
     // The rename lives in the directory; sync it so a crash cannot publish the
-    // lineage while losing the snapshot it names.
+    // lineage while losing the snapshot it names. The replacement is already
+    // committed, so a sync failure must not report the write as failed.
     // ponytail: Unix only; Windows cannot open a directory as a file for syncing.
     #[cfg(unix)]
-    fs::File::open(path.parent().unwrap_or(Path::new(".")))?.sync_all()?;
+    let _ = fs::File::open(path.parent().unwrap_or(Path::new("."))).and_then(|d| d.sync_all());
     Ok(())
 }
 
@@ -172,14 +171,27 @@ mod tests {
         saves.write(Kind::Auto, &snapshot).unwrap();
         let ids: Vec<_> = saves.entries().unwrap().iter().map(|e| e.id).collect();
         assert_eq!(ids, [0, 3]);
-        // An older, self-consistent index (say, from a backup) must not
-        // overwrite saves written after it.
-        let stale = r#"{"next": 1, "entries": [{"id": 0, "kind": "auto"}]}"#;
-        fs::write(dir.join(LINEAGE), stale).unwrap();
-        saves.write(Kind::Manual, &snapshot).unwrap();
-        let ids: Vec<_> = saves.entries().unwrap().iter().map(|e| e.id).collect();
-        assert_eq!(ids, [0, 4], "a stale counter skips existing files");
         assert!(dir.join("2.json").exists(), "abandoned saves are retained");
+        let good = fs::read_to_string(dir.join(LINEAGE)).unwrap();
+        // A snapshot written before its listing is just an unlisted save.
+        fs::write(dir.join("4.json"), "{}").unwrap();
+        let reserved = good.replace("\"next\": 4", "\"next\": 5");
+        fs::write(dir.join(LINEAGE), &reserved).unwrap();
+        assert_eq!(saves.entries().unwrap().len(), 2);
+        // Missing, emptied or older indexes would hide saves, so they are refused.
+        for damaged in [
+            r#"{"next": 1, "entries": [{"id": 0, "kind": "auto"}]}"#,
+            r#"{"next": 0, "entries": []}"#,
+        ] {
+            fs::write(dir.join(LINEAGE), damaged).unwrap();
+            assert!(saves
+                .entries()
+                .unwrap_err()
+                .to_string()
+                .contains("does not list every save"));
+            assert!(saves.write(Kind::Manual, &snapshot).is_err());
+        }
+        fs::write(dir.join(LINEAGE), &reserved).unwrap();
         assert_eq!(saves.read(3).unwrap(), snapshot);
         let lineage = fs::read_to_string(dir.join(LINEAGE)).unwrap();
         let reordered = lineage.replacen("\"id\": 0", "\"id\": 9", 1);
@@ -190,7 +202,11 @@ mod tests {
             .to_string()
             .contains("out of order"));
         fs::remove_file(dir.join(LINEAGE)).unwrap();
-        assert!(saves.entries().unwrap_err().to_string().contains("missing"));
+        assert!(saves
+            .entries()
+            .unwrap_err()
+            .to_string()
+            .contains("does not list every save"));
         assert!(saves.write(Kind::Manual, &snapshot).is_err());
         assert!(!fs::read_dir(&dir)
             .unwrap()

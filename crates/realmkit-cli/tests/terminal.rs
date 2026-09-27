@@ -166,6 +166,27 @@ fn a_corrupt_newest_save_is_reported_and_older_saves_are_offered() {
 }
 
 #[test]
+fn resuming_mid_conversation_repeats_the_line_being_answered() {
+    let dir = saves_dir("dialogue");
+    run(
+        &["play", WORLD, "--saves", &dir],
+        "talk elder\nsave\nquit\n",
+    );
+    let output = run(&["play", WORLD, "--saves", &dir], "");
+    let text = String::from_utf8(output.stdout).unwrap();
+    let resumed = &text[text.find("Loaded save 2.").expect(&text)..];
+    assert!(
+        resumed.contains("Elder Mara: 'You have been looking at the bell,'"),
+        "{resumed}"
+    );
+    assert!(
+        resumed.contains("1. What troubles the village?"),
+        "{resumed}"
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn saving_is_off_without_a_saves_directory() {
     let output = run(&["play", WORLD], "save\n");
     assert!(String::from_utf8(output.stdout)

@@ -180,6 +180,15 @@ fn restore(
                 .execute(Command::Look)
                 .expect("looking is always allowed");
             render::events(output, engine, &events)?;
+            // Resume a conversation with the line its choices answer.
+            if let Some(dialogue) = engine.state().dialogue.clone() {
+                let event = realmkit_engine::Event::Dialogue {
+                    npc: dialogue.npc,
+                    node: dialogue.node,
+                    choices: Vec::new(),
+                };
+                render::events(output, engine, &[event])?;
+            }
             Ok(true)
         }
         Err(error) => {
