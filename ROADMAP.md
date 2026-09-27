@@ -115,9 +115,10 @@ databases or other durable storage.
   save/load. Treat loaded saves as input that needs validation.
 
 **Done when:** saving mid-quest, quitting and resuming produces the same subsequent
-events as uninterrupted play; ordinary death restores the newest valid recovery
-snapshot; story-phase auto-saves are reproducible; and a broken or mismatched save
-cannot corrupt a world or silently reset progress.
+events as uninterrupted play; ordinary death attempts the newest recovery entry
+and surfaces validation failure before any explicit older-snapshot fallback;
+story-phase auto-saves are reproducible; and a broken or mismatched save cannot
+corrupt a world or silently reset progress.
 
 ## M3 — Optional combat capability: stats and meaningful speed
 
