@@ -100,12 +100,16 @@ databases or other durable storage.
 - Version saves and identify the world package they belong to. Reject incompatible
   saves clearly; add migrations when an actual format change requires them.
 - Write saves atomically and keep the previous save safe if writing fails.
-- Support manual saves and deterministic auto-saves in one chronological recovery
-  history. For M2, auto-save at route start and at stable progression boundaries
-  the current format actually exposes (for example quest completion). As richer
-  story phases are implemented, their major transitions become default checkpoint
-  boundaries too. Allow additional authored/capability checkpoints where useful,
-  but do not auto-save on every ordinary movement step or presentation command.
+- Support manual saves and deterministic auto-saves in one active chronological
+  recovery lineage. Loading an older snapshot forks the active lineage at that
+  snapshot: saves from the abandoned future are no longer automatic-recovery
+  candidates, though a client may retain them for explicit manual branch
+  selection. For M2, auto-save at route start and at stable progression
+  boundaries the current format actually exposes (for example quest completion).
+  As richer story phases are implemented, their major transitions become default
+  checkpoint boundaries too. Allow additional authored/capability checkpoints
+  where useful, but do not auto-save on every ordinary movement step or
+  presentation command.
 - Ordinary recoverable death attempts to restore the newest manual/auto-save
   recovery snapshot. If that snapshot fails load validation, surface the failure
   and let the client explicitly offer an older snapshot; never silently skip a
