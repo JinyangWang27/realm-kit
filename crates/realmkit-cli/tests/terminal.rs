@@ -145,12 +145,14 @@ fn a_corrupt_newest_save_is_reported_and_older_saves_are_offered() {
     let dir = saves_dir("corrupt");
     run(&["play", WORLD, "--saves", &dir], "north\nsave\nquit\n");
     std::fs::write(format!("{dir}/1.json"), "{ not json").unwrap();
-    let output = run(&["play", WORLD, "--saves", &dir], "load 1\nstatus\n");
+    let output = run(&["play", WORLD, "--saves", &dir], "load\nload 1\nstatus\n");
     let text = String::from_utf8(output.stdout).unwrap();
     for passage in [
         "Save 2 could not be loaded",
         "Type load <number> to restore an older save:\n  1. auto-save",
-        "Starting a new game; your saves are unchanged.",
+        "Starting a new game; older saves stay available with load.",
+        // The fresh start is auto-saved, so death recovery cannot hit the bad save.
+        "  3. auto-save",
         "Loaded save 1.",
         "HP 24/24",
     ] {

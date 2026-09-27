@@ -341,6 +341,17 @@ fn mismatched_or_corrupt_saves_are_rejected() {
             s.state.flags.insert("undeclared".into());
         },
         |s| {
+            s.state.player.inventory.insert("ash_pelt".into(), u64::MAX);
+        },
+        |s| {
+            s.state
+                .quests
+                .insert("quiet_the_track".into(), QuestStatus::Ready);
+        },
+        |s| {
+            s.state.monster_hp.insert("wolf".into(), 0);
+        },
+        |s| {
             s.state.dialogue = Some(DialogueState {
                 npc: "elder".into(),
                 node: "missing".into(),

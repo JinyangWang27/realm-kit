@@ -48,6 +48,21 @@ pub(super) fn check(
         player.inventory.keys().all(|id| world.item(id).is_some()),
         "unknown inventory item",
     )?;
+    // Format 1 grants each loot and reward stack at most once, so no quantity
+    // can exceed the world's total; this also keeps later grants from overflowing.
+    let mut grantable: BTreeMap<&str, u64> = BTreeMap::new();
+    let stacks = world.monsters.iter().flat_map(|m| &m.loot);
+    for stack in stacks.chain(world.quests.iter().flat_map(|q| &q.reward_items)) {
+        let total = grantable.entry(&stack.item).or_default();
+        *total = total.saturating_add(stack.quantity);
+    }
+    ensure(
+        player
+            .inventory
+            .iter()
+            .all(|(id, count)| *count <= grantable.get(id.as_str()).copied().unwrap_or(0)),
+        "inventory holds more than this world can grant",
+    )?;
     ensure(
         state.monster_hp.keys().eq(fresh.monster_hp.keys())
             && state
@@ -57,7 +72,16 @@ pub(super) fn check(
         "invalid monster state",
     )?;
     ensure(
-        state.quests.keys().eq(fresh.quests.keys()),
+        state.quests.keys().eq(fresh.quests.keys())
+            && world.quests.iter().all(|quest| {
+                let QuestObjective::Defeat { monster } = &quest.objective;
+                let defeated = state.monster_hp.get(monster) == Some(&0);
+                match state.quests[&quest.id] {
+                    QuestStatus::Available => true,
+                    QuestStatus::Active => !defeated,
+                    QuestStatus::Ready | QuestStatus::Completed => defeated,
+                }
+            }),
         "invalid quest state",
     )?;
     ensure(

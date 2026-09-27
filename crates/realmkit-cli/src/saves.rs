@@ -64,7 +64,12 @@ impl Saves {
     /// earlier save and the chain untouched.
     pub fn write(&self, kind: Kind, snapshot: &SaveSnapshot) -> Result<(), Box<dyn Error>> {
         let mut lineage = self.lineage()?;
-        let id = lineage.next;
+        let mut id = lineage.next;
+        // A stale counter (say, lineage.json restored from a backup) must not
+        // overwrite an existing save.
+        while self.file(id).exists() {
+            id = id.checked_add(1).ok_or("save counter exhausted")?;
+        }
         lineage.next = id.checked_add(1).ok_or("save counter exhausted")?;
         write_atomic(&self.file(id), &serde_json::to_vec_pretty(snapshot)?)?;
         lineage.entries.push(Entry { id, kind });
@@ -131,6 +136,13 @@ mod tests {
         saves.write(Kind::Auto, &snapshot).unwrap();
         let ids: Vec<_> = saves.entries().unwrap().iter().map(|e| e.id).collect();
         assert_eq!(ids, [0, 3]);
+        let stale = fs::read_to_string(dir.join(LINEAGE))
+            .unwrap()
+            .replace("\"next\": 4", "\"next\": 1");
+        fs::write(dir.join(LINEAGE), stale).unwrap();
+        saves.write(Kind::Manual, &snapshot).unwrap();
+        let ids: Vec<_> = saves.entries().unwrap().iter().map(|e| e.id).collect();
+        assert_eq!(ids, [0, 3, 4], "a stale counter skips existing files");
         assert!(dir.join("2.json").exists(), "abandoned saves are retained");
         assert_eq!(saves.read(3).unwrap(), snapshot);
         assert!(!fs::read_dir(&dir)

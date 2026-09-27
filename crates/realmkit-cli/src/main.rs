@@ -165,15 +165,15 @@ fn restore(
         .and_then(|snapshot| Ok(Engine::restore(engine.world(), snapshot)?));
     match loaded {
         Ok(restored) => {
-            *engine = restored;
+            // Fork first: if the chain cannot be updated, keep playing where
+            // we were rather than resume a branch the saves do not record.
             if index + 1 < entries.len() {
                 if let Err(error) = saves.fork(index) {
-                    writeln!(
-                        output,
-                        "Saving failed; earlier saves are unchanged: {error}"
-                    )?;
+                    writeln!(output, "Save {} could not be loaded: {error}", index + 1)?;
+                    return Ok(false);
                 }
             }
+            *engine = restored;
             writeln!(output, "Loaded save {}.\n", index + 1)?;
             let events = engine
                 .execute(Command::Look)
@@ -246,13 +246,19 @@ fn start<'w>(
     };
     writeln!(output, "{}\n{note}\n", world.world.name)?;
     if let Some(saves) = saves {
-        if saves.entries().is_ok_and(|e| e.is_empty()) {
-            save(&engine, saves, Kind::Auto, output)?;
-        } else if restore(&mut engine, saves, None, output)? {
+        let resumable = !saves.entries().is_ok_and(|e| e.is_empty());
+        if resumable && restore(&mut engine, saves, None, output)? {
             return Ok(engine);
-        } else {
-            writeln!(output, "Starting a new game; your saves are unchanged.\n")?;
         }
+        if resumable {
+            writeln!(
+                output,
+                "Starting a new game; older saves stay available with load.\n"
+            )?;
+        }
+        // The new start becomes the newest save, so death recovery never
+        // falls back to the save that just failed.
+        save(&engine, saves, Kind::Auto, output)?;
     }
     let events = engine.execute(Command::Look)?;
     render::events(output, &engine, &events)?;
