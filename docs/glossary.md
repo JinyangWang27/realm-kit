@@ -18,9 +18,10 @@ A world contains one or more player routes.
 
 One independently playable way of entering and experiencing a world.
 
-A player route has its own player-controlled character definition
-(`PlayerSpec`-like authored data), starting state/location, exactly one main
-questline, one or more outcomes, and an independent mutable save/playthrough.
+A player route has its own player-control binding (`PlayerSpec`-like authored
+data) referencing a shared `Character`, plus starting state/location, exactly one
+main questline, one or more outcomes, and an independent mutable
+save/playthrough.
 
 Canonical and original-character routes may reuse the same world definitions and
 canonical timeline.
