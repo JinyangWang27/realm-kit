@@ -8,8 +8,9 @@ prefer these terms consistently.
 
 The shared fictional environment and authored setting. A world owns shared
 locations, characters/NPCs, factions/organizations, reusable entities and lore,
-the location graph and spatial layout, story-phase definitions, shared narrative
-content, and other world-level state/definitions.
+the location graph, story-phase definitions, shared narrative content, and other
+world-level state/definitions. It may also provide optional Areas/spatial layouts
+for map presentation where useful.
 
 A world contains one or more player routes.
 
