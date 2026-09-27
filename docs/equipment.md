@@ -37,7 +37,7 @@ player crafting is absent.
 | --- | --- |
 | Item definition | Authored identity, name, description and base equipment properties |
 | Item instance | One owned piece of equipment, with a unique instance ID, improvement tier and enchantment |
-| Material item | Ordinary inventory ingredient, such as an ingot or leather strip |
+| Material resource | Crafting input such as an ingot or leather strip; owned by Crafting when craft-specific, or referenced from Inventory when it is a general carried item |
 | Recipe | Inputs, station, requirements and a specified output or transformation |
 | Improvement tier | Bounded, authored modifiers applied to an item's base properties |
 | Enchantment definition | Authored effect, allowed equipment and display text |
@@ -46,8 +46,13 @@ Two iron swords share a definition but have different instance IDs. Improving
 one changes that instance only. Equipment owns each equipment instance's
 ownership/possession state whether equipped or unequipped, so Equipment does not
 require the general Inventory capability. Equipment slots, improvement commands
-and saves refer to instance IDs. Stack interchangeable ingredients when Inventory
-is present; keep modified equipment individually addressable. The existing
+and saves refer to instance IDs.
+
+Crafting-specific interchangeable materials may be stored as Crafting-owned
+definition + quantity state when Inventory is absent. When Inventory is present,
+recipes may instead consume Inventory-owned ordinary carried items through
+explicit typed references; the same resource quantity is never owned by both
+capabilities. Keep modified equipment individually addressable. The existing
 Format 1 item-count inventory will need a deliberate migration when equipment
 instances arrive.
 
