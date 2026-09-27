@@ -7,7 +7,8 @@ A small, deterministic text-RPG engine for authored or generated worlds.
 plus source-grounded capabilities: a detective story may use interviews, clues,
 deductions and accusations while omitting combat completely. The current demo and
 format are the first combat-enabled slice, not a requirement for every world.
-See the [optional capability catalog](docs/capabilities.md).
+See the [architecture glossary](docs/glossary.md) and
+[optional capability catalog](docs/capabilities.md).
 
 The first playable world, *The Bell in the Pines*, is hand-authored. Talk to
 Elder Mara, choose dialogue, accept her quest, defeat the ash wolf, collect loot
@@ -34,9 +35,10 @@ Building initially downloads Rust dependencies. Playing requires only the
 compiled `realmkit` binary and the world directory: no network, account, API key,
 model, worldgen crate, or source material.
 
-In a terminal, each scene shows a menu: use ↑/↓ and Enter, or press the
-number. Esc steps back out of a conversation, `n/s/e/w/u/d` (or `h/j/k/l`) move
-directly, and `:` opens a typed command such as `:talk elder`. Ctrl-C quits.
+In a terminal, each scene shows a context-sensitive menu: use ↑/↓ and Enter,
+or press the number. Esc steps back out of a conversation,
+`n/s/e/w/u/d` (or `h/j/k/l`) move directly, and `:` opens a typed command
+such as `:talk elder`. Ctrl-C quits.
 
 Piped input, scripts and `realmkit play <world> --line` use line mode: type a
 menu number or a command and press Enter. Type `help` for the command list.
@@ -62,10 +64,11 @@ down
 quit
 ```
 
-Choices are numbered from one among the currently visible choices; entering a
-number alone also selects it. `accept <quest-id>` and `complete <quest-id>` work
-at the available quest giver. Entity IDs appear in the interface and are case
-sensitive. Progress exists only for the current session; restarting starts over.
+Choices and scene actions are numbered from one among the currently visible
+options. Normal menu play uses authored display names rather than requiring entity
+IDs; typed commands such as `accept <quest-id>` and `complete <quest-id>` still
+use stable machine IDs. Progress exists only for the current session; restarting
+starts over.
 
 The same journey is available as a scripted smoke test:
 
@@ -95,9 +98,12 @@ thresholds and fully restore HP. Quests remember earlier defeats, so accepting
 after a kill does not strand the quest. Death stops actions; inspection remains
 available, and a new session starts a fresh game.
 
-All story prose comes from the world package. The engine chooses combat
-template variants using the successful-command count; presentation only
-substitutes event values. Nothing generates new prose or branches during play.
+All story prose comes from the world package. Format 1 currently chooses combat
+template variants from deterministic engine progression; M1 makes `look`,
+inventory, status and quest-panel inspection spend no turn, so presentation-only
+browsing no longer perturbs later combat prose. The exact variant-selection key is
+still an implementation detail rather than a content contract. Nothing generates
+new prose or branches during play.
 
 ## World authoring
 
@@ -110,12 +116,18 @@ directional links, structured validation, and export. External agents can
 construct `realmkit-spec` values and drive this core. It does not own an LLM
 or implement a source compiler yet. See [the authoring guide](docs/authoring.md).
 
-**Every piece of player-facing content generated from a source must use the
-source's language**, including names, descriptions, dialogue, choices, quest
-text and templates. World metadata declares that language. Source-backed
-drafts check the declared source and world languages match; this is a metadata
-check, not linguistic verification. Authors must also review the actual text.
-The hand-authored demo and the CLI's fixed interface labels are English.
+**Everything displayed to a player in a source-backed world must use the
+source's language.** World-authored names, descriptions, dialogue, choices,
+quest text and templates are generated in that language, and RealmKit clients
+must localize their own fixed labels, help, prompts and runtime messages to the
+world's declared language. Machine-facing schema keys, IDs, enum values and
+stable typed-command tokens may remain language-neutral ASCII.
+
+Source-backed drafts check that the declared source and world languages match;
+this is a metadata check, not linguistic verification. Authors must also review
+the actual text. The hand-authored demo is English. The current CLI still has
+English-only fixed interface labels; full package-language UI localization remains
+future presentation work and is not an exception to the language invariant.
 
 ## Verify
 
@@ -137,8 +149,9 @@ metadata, and Unicode template interpolation.
 
 See [the milestone roadmap](ROADMAP.md) for proposed menu interaction, saves,
 combat stats and timing, character builds, and source-grounded authoring.
-Unresolved design questions and their decision points are tracked in the
-[open-decisions register](docs/open-decisions.md).
+Normative architecture terms are defined in the
+[glossary](docs/glossary.md). Unresolved design questions and their decision
+points are tracked in the [open-decisions register](docs/open-decisions.md).
 
 This is a playable scaffold, not a complete RPG system. Equipment, skills/MP,
 multi-target kill counts, encounters, independent dungeon instances, factions,

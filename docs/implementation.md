@@ -25,7 +25,8 @@ proves the complete single-player loop with authored content.
 
 `realmkit-spec` owns serializable content and package validation; engine and
 worldgen depend only on spec. CLI depends on engine and spec. Only serde,
-serde_json and thiserror are needed; the CLI adds crossterm for raw key input.
+serde_json and thiserror are needed by the core crates; the CLI adds crossterm
+for raw terminal key input.
 
 The package uses fixed JSON filenames, with world metadata, locations, NPCs,
 monsters, items, quests, dialogues and narrative in separate files. IDs are
@@ -55,10 +56,21 @@ from playable runtime types; future provenance can live in an optional package
 sidecar keyed by runtime entity IDs. A simulator can consume WorldSpec and replay
 engine Commands, with no need to put generation into the engine.
 
-All generated player-facing content must be in the same language as its source:
-names, descriptions, dialogue, choices, quests, story passages, and templates.
-World metadata declares the content language; a source-backed draft checks it
-against the declared source language. This checks metadata only: the author must
-review language and literary fidelity. The hand-authored English demo has no
-source input. The CLI's fixed interface labels are English and kept in one table in
-`realmkit-cli/src/menu.rs`, apart from authored world text.
+All player-facing text in a source-backed world must be in the same language
+as its source. This includes authored names, descriptions, dialogue, choices,
+quests, story passages and templates, plus client-owned labels, help, prompts,
+status text and runtime errors shown during play. World metadata declares the
+content language; a source-backed draft checks it against the declared source
+language. This checks metadata only: the author must review language and literary
+fidelity. Machine-facing schema keys, IDs, enum values and stable typed-command
+tokens may remain language-neutral ASCII.
+
+The hand-authored English demo has no source input. The current CLI still contains
+English-only fixed interface labels (centralized in its menu/presentation code).
+Full package-language UI localization remains future presentation work, not an
+exception to the source-language invariant.
+
+Format 1's combat prose selection remains an implementation detail. M1 ensures
+presentation-only inspection commands do not advance the turn, so browsing no
+longer perturbs later combat prose. Future formats may use more semantically local
+event/encounter counters when needed.

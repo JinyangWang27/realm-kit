@@ -12,13 +12,29 @@ and when they must be settled.
   credentials, source material or network access.
 - The engine owns all state and rules. Menus, typed commands and future clients
   invoke the same structured commands.
-- All generated player-facing content retains its source's language. Narrative,
-  dialogue and branches are authored before play.
-- Rules, scheduling, template selection and any future randomness are replayable.
+- All player-facing text in a source-backed world uses the source's language.
+  This includes authored narrative/dialogue and client-owned labels, help, prompts
+  and runtime messages. Machine-facing identifiers and stable command tokens may
+  remain language-neutral. Narrative and branches are authored before play.
+- Rules, scheduling, template selection and stochastic mechanics are replayable.
+  Randomness, when used, comes from explicit saved RNG state and only selects among
+  authored possibilities.
 - External agents use a typed authoring core; serialization and MCP are adapters.
-- Gameplay capabilities are source-grounded and composable. Combat, crafting,
-  investigation, equipment and similar systems are optional; absent capabilities
-  contribute no required data, runtime state or player actions. The
+- The shared world owns the location graph, characters/entities and story-phase
+  definitions. Every world has one or more player routes; each route owns a
+  PlayerSpec-like player-control binding to a shared Character, start
+  state/location, exactly one main questline and one or more authored outcomes.
+  Side questlines are optional, but
+  main-story progress unlocks them in bounded waves so exploration remains open
+  without making the main story irrelevant.
+- Time models stay separate: story phase is core narrative progression; an
+  in-world clock/calendar is optional; encounter timelines are local schedulers;
+  real-world thinking time advances none of them.
+- Gameplay capabilities are source-grounded and composable. Inventory, combat,
+  crafting, investigation, equipment and similar systems are optional; absent
+  capabilities contribute no required data, runtime state or player actions.
+  Evidence belongs to investigation state; a physical item may be linked to
+  evidence through a typed relation without making inventory universal. The
   [capability catalog](docs/capabilities.md) guides selection without defining a
   mandatory feature list.
 - Add a system when a milestone needs it. No empty future crates or generic ECS.
@@ -39,7 +55,10 @@ state.
 
 ## M1 — Play without memorizing commands · complete
 
-Provide a context-sensitive action list for each scene:
+Delivered: context-sensitive engine actions plus a terminal menu that supports
+arrow/Enter/Esc navigation, numbered shortcuts, direct movement keys and typed
+commands. Pipes/scripts retain line mode, and the engine rechecks legality when a
+selected action executes.
 
 ```text
 Ashbell Village
@@ -54,40 +73,65 @@ Ashbell Village
 ↑/↓ select · Enter confirm · number choose · Esc back
 ```
 
-- Offer both arrow selection and numbered shortcuts for location actions,
-  dialogue, targets and combat actions when present. Players never need to type
-  an entity ID.
-- Keep selection numbering stable while a menu is displayed. Explain unavailable
-  actions and recheck legality in the engine when an action is submitted.
-- Use explicit menu focus: arrows navigate the active list. Retain directional
-  movement shortcuts outside menus; vertical travel remains a distinct action.
-- Preserve the line-oriented interface for pipes, scripts and terminals without
-  interactive input. There, numbered selections are followed by Enter.
-- Keep typed commands available. Menu browsing, inspecting panels and reading
-  dialogue choices must not spend combat time.
-- Select authored action labels in the world's language; localize fixed interface
-  labels separately. Avoid introducing English-only generated menu sentences.
-- Build the smallest terminal menu that serves this loop; a full-screen layout
-  can follow if needed. No engine rewrite to accommodate keyboard events.
+M1 also makes `look`, inventory, status and quest-panel inspection
+presentation-only: they do not advance the engine turn. The complete demo is
+tested through numbered menus as well as scripted typed input.
 
-**Done when:** a new player can finish the demo using only menus, with both
-arrow/Enter and numbered selection paths tested. Scripted play still works;
-terminal settings are restored on normal exit and handled errors.
+The later architecture discussion added richer presentation goals that were not
+part of the merged M1 implementation: optional Area-based spatial layouts,
+full-map or client-sized viewport rendering, discovery-aware map disclosure, and
+full fixed-interface localization to the package language. Those remain future
+presentation work tracked in
+[Section 14](docs/open-decisions.md#14-presentation-and-information-disclosure);
+they are not retroactively part of M1 acceptance.
 
 ## M2 — Continue an adventure across sessions
 
-- Save/load location, flags, dialogue and the state of capabilities enabled by
-  that world—for example inventory, quests, stats or defeated monsters. Keep
-  authored content separate from mutable saves.
-- Version saves and identify the world package they belong to. Reject incompatible
+Treat saves as storage-neutral `SaveSnapshot` data. The engine serializes and
+validates deterministic state; CLI/mobile/server layers choose files, SQLite,
+databases or other durable storage.
+
+- Save/load the selected player route's core mutable state, including location,
+  main-quest progress and other authored story/world state, plus only optional
+  capability state that exists for that route/playthrough, including any relevant
+  shared world-scoped capability state—for example investigation evidence,
+  inventory, combat stats or defeated enemies. A capability present elsewhere in
+  the package does not require placeholder state in a route that never uses it.
+  Keep authored definitions separate from mutable saves.
+- Version saves and identify the world package they belong to. M2 treats the
+  current Format 1 single playable route as an explicit logical route with stable
+  ID `default` for save/API identity, even though Format 1 does not yet serialize
+  a route collection. SaveSnapshot records that `player_route_id`; later formats
+  with explicit PlayerRoutes use their authored route IDs. Reject incompatible
   saves clearly; add migrations when an actual format change requires them.
 - Write saves atomically and keep the previous save safe if writing fails.
+- Support manual saves and deterministic auto-saves in one active chronological
+  recovery lineage. Loading an older snapshot forks the active lineage at that
+  snapshot: saves from the abandoned future are no longer automatic-recovery
+  candidates, though a client may retain them for explicit manual branch
+  selection. For M2, auto-save at route start and at stable progression
+  boundaries the current format actually exposes (for example quest completion).
+  As richer story phases are implemented, their major transitions become default
+  checkpoint boundaries too. Allow additional authored/capability checkpoints
+  where useful, but do not auto-save on every ordinary movement step or
+  presentation command.
+- Ordinary recoverable death attempts to restore the newest manual/auto-save
+  recovery snapshot. If that snapshot fails load validation, surface the failure
+  and let the client explicitly offer an older snapshot; never silently skip a
+  corrupt newest entry. Restoring replaces the current playthrough state with the
+  saved deterministic snapshot rather than "undoing" commands piecemeal. Explicit
+  authored terminal death/failure outcomes bypass this recovery behavior.
+- Save creation consumes no story/world/encounter time and must not perturb
+  narrative variant selection.
 - Preserve every deterministic counter; later combat scheduling must also survive
   save/load. Treat loaded saves as input that needs validation.
 
 **Done when:** saving mid-quest, quitting and resuming produces the same subsequent
-events as uninterrupted play. A broken or mismatched save cannot corrupt a world
-or silently reset progress.
+events as uninterrupted play; ordinary death attempts the newest recovery entry
+and surfaces validation failure before any explicit older-snapshot fallback;
+route-start and currently supported progression-boundary auto-saves are
+reproducible; and a broken or mismatched save cannot corrupt a world or silently
+reset progress.
 
 ## M3 — Optional combat capability: stats and meaningful speed
 
@@ -124,8 +168,13 @@ resistance, accuracy and critical chance can come later when builds need them.
   parameters, never executable formula strings.
 - Specify rounding, minimum damage, resource costs, death and action cancellation.
   Use checked integer arithmetic and reject invalid stats or parameters.
-- Keep initial hit outcomes certain. If randomness arrives later, use an explicit,
-  versioned PRNG algorithm with saved state and a defined draw order.
+- Keep the first combat slice simple, but support stochastic combat mechanics such
+  as critical hits through RealmKit's explicit seeded RNG facility. Basic attacks
+  may remain certain initially; randomness is an authored rule rather than a
+  requirement for every combat action.
+- When stochastic mechanics are implemented, use explicit/versioned PRNG behavior
+  with saved RNG state. Keep semantically unrelated random domains independent
+  where incidental draw coupling would produce surprising gameplay changes.
 
 **Done when:** a small duel demonstrates distinct physical/magical builds, MP
 expenditure and recovery, and a measurable benefit from increased speed. Tests
@@ -139,10 +188,16 @@ Its limitation is that extra speed does nothing after an actor already outranks
 all opponents. Our discussion has reopened that choice; a timeline is the current
 recommendation, pending agreement on its practical rules.
 
-On a timeline, each actor has a next-action timestamp in **virtual engine time**.
-The engine advances directly to the next actor. It pauses for player input;
-thinking for five minutes takes no game time. Enemy turns can resolve automatically
-until the player is ready again. This is still turn-based play, not a reflex game.
+On a timeline, each actor has a next-action timestamp in **encounter timeline
+units**. The engine advances directly to the next actor. It pauses for player
+input; thinking for five minutes advances neither encounter time, optional world
+time nor story phase. Enemy turns can resolve automatically until the player is
+ready again. This is still turn-based play, not a reflex game.
+
+Encounter timeline units have no intrinsic conversion to wall-clock seconds or
+optional world time. If an authored encounter should consume world time, that
+must be an explicit effect; never derive calendar progression by summing combat
+ticks.
 
 A starting proposal is:
 
@@ -326,7 +381,9 @@ when grounded in the source material; otherwise their data and UI are absent.
 The M4 demonstration world proves the reusable systems without enabling them in
 every package.
 
-- Add a small equipment slot set, equip/unequip, consumables and learned skills.
+- Add explicit authored equipment slots, equip/unequip, consumables and learned
+  skills. Items may occupy multiple slots; do not require a universal global slot
+  list before representative worlds need one.
 - Derive effective stats from base progression plus equipment; prevent repeated
   equip/unequip from permanently accumulating bonuses.
 - Give skills authored descriptions, MP costs, damage channels and power.
@@ -335,8 +392,13 @@ every package.
   wall-clock seconds, actor turns and timeline units.
 - Show why stats changed and what an action costs before confirming it.
 - Deliver in slices: M4a equipment instances and equip/unequip; M4b stations,
-  forging and improvements; M4c one compatible enchantment per item. Preserve
-  authored source-language names and prose throughout crafting.
+  deterministic forging and authored improvement-state transitions; M4c one
+  compatible learned enchantment per item. Runtime instances use deterministic
+  saved IDs only when distinguishable copies need independent state; unique
+  legendary equipment may still have one mutable instance, while fungible
+  identical resources remain definition + quantity. Materials/quality are concrete
+  authored data rather than a universal runtime hierarchy. Preserve authored
+  source-language names and prose throughout crafting.
 - Keep recipe knowledge separate from proficiency: authored teachers, plans,
   quests or discoveries grant recipes, while smithing determines whether a known
   recipe can be used. Proficiency alone does not reveal recipes initially.
@@ -349,34 +411,62 @@ item identity and consumes resources atomically without duplicating bonuses.
 ## M5 — Longer authored adventures and source-specific mechanics
 
 - Separate monster definitions from encounter instances; support multiple enemies
-  without reusing one global HP record.
-- Add multi-target quest objectives, quest prerequisites and chains, richer story
-  conditions, and explicit dungeon/encounter completion state.
+  without reusing one global HP record. Use instances only where distinguishable
+  copies require independent mutable state; do not instance every authored entity.
+- Generalize the core quest model into main and side questlines with typed
+  multi-target objectives, prerequisites and chains. Side questlines are unlocked
+  by explicit main-story/story-phase conditions and may feed explicit state back
+  into later main quests.
 - Define encounter reset/respawn and retreat rules before relying on repeatable
   combat. Preserve quest progress and prevent duplicate completion rewards.
 - Expand authored dialogue and branches, with consistent NPC availability and
   understandable journal entries.
+- Make Inventory genuinely optional in runtime/spec/presentation rather than
+  retaining Format 1 placeholders. An inventory-free world has no inventory state,
+  no Inventory command/action/panel, and no required inventory/item definitions
+  merely to satisfy the engine.
 - Add source-specific capabilities only with a representative world. For example,
-  a detective story may use clues, evidence, interviews, contradictions,
-  deductions and a final accusation while omitting combat entirely. Its success
-  and failure paths remain deterministic and pre-authored.
-- Establish first-class authored endings and campaign completion state, rather
+  a detective story may use a main investigation questline with clues, evidence,
+  interviews, contradictions, deductions and a final accusation while omitting
+  combat and inventory entirely. Add a physical evidence item only when the story
+  needs one; link it to investigation evidence through a typed reference rather
+  than treating evidence as inventory. Its success and failure paths remain
+  deterministic and pre-authored.
+- Establish first-class authored endings and route completion state, rather
   than treating player death as the only terminal outcome.
+- Keep story-phase transitions event-driven. Add optional World Time only when a
+  representative world needs travel durations, schedules, day/night, rest tied to
+  elapsed time, appointments or deadlines. Represent it as minutes from an
+  authored epoch that are monotonic within one forward committed history, advance
+  it only explicitly, and restore the saved value exactly when rewinding to an
+  older snapshot. Resolve crossed scheduled events chronologically with stable
+  authored order for ties. Do not assign universal durations to ordinary
+  commands.
+- Support authored stochastic world-event opportunities when a representative
+  world needs rare encounters/discoveries. Trigger rolls only at explicit gameplay
+  transitions and select only among pre-authored outcomes.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
-and at least one non-combat interaction path, can be saved/resumed, and have
-tested paths to completion. A dungeon is useful only for a world that needs one.
+and tested paths to completion, can be saved/resumed, and include at least one
+inventory-free non-combat fixture that loads and plays with no inventory state,
+definitions/placeholders, Inventory command or inventory UI. A dungeon is useful
+only for a world that needs one.
 
 ## M6 — Authoring feedback and deterministic simulation
 
 - Extend typed authoring operations where real content workflows need them.
 - Add structured diagnostics for unreachable objectives, unavailable required
   items, unsatisfied prerequisites and invalid story/dialogue links.
-- Expose deterministic progression simulation with explicit starting state and
-  player policy. Add combat simulation only for combat-enabled worlds. Report
-  outcomes, costs and blocking conditions.
-- Distinguish a failed simulation under one policy from proof that a quest is
-  impossible. Report the scenario and assumptions with the result.
+- Keep structural validation, bounded reachability analysis and executable
+  simulation distinct. Hard structural/invariant failures are errors; apparently
+  unreachable optional/secret content is normally a warning, while required
+  progression that the available analyzer proves unreachable is an error.
+- Expose deterministic progression simulation through the real engine with
+  explicit starting state, route, player policy, RNG seed/state and assumptions.
+  Add combat simulation only for combat-enabled worlds. Report outcomes, costs
+  and blocking conditions.
+- Treat simulation as evidence, not a theorem: one failed policy/seed is not proof
+  of impossibility, and one successful path does not prove every branch.
 - Add an authoring CLI or MCP adapter over the same core when there is a consumer.
 
 **Done when:** an external agent can author, validate, simulate, read structured
@@ -390,14 +480,25 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 - Introduce canon IR only as source adaptation needs it: identities, chronology,
   relationships and evidence, separate from runtime NPCs and quests.
 - Retain source references for reviewing fidelity and regenerating selected content.
-- Ask the user to choose a canonical protagonist, an original character, or a
-  canonical-then-original package. In the last mode, completing the canonical
-  campaign unlocks a fully pre-generated original-character campaign.
-- Let the user choose whether that second campaign is a concurrent perspective,
-  post-canon continuation or bounded alternate branch. Keep campaign saves
-  separate and carry only explicitly authored facts between them.
-- Derive gameplay from source events and preserve characterization and atmosphere.
-  Do not turn every named character into a monster.
+- Ask the user to choose a canonical protagonist route, an original-character
+  route, or both. In `both` mode, New Game offers the choice immediately; one
+  route does not have to unlock the other.
+- Reuse the same shared world and canonical timeline across routes where possible.
+  Keep player-route-specific main questlines, starting state and saves separate.
+  In the original route, canonical protagonists remain world entities/NPCs and
+  continue through protected canon anchors.
+- For each PlayerRoute, author exactly one route-owned main questline. A
+  canonical route derives its main questline from the relevant canonical story
+  while preserving characterization and atmosphere; an original-character route
+  receives its own authored main questline within the same canon constraints and
+  shared story phases. Generate side-story seeds from canonical NPCs, locations,
+  factions, relationships, occupations, conflicts and unresolved details; expand
+  those seeds into shared or route-gated side questlines before inventing
+  unrelated generic content.
+- Gate side questlines by explicit main-story/story-phase progress. Side quest
+  outcomes may alter later main dialogue, routes, assistance, objectives and
+  bounded outcomes through authored state, but never through runtime generation.
+- Do not turn every named character into a monster.
 - Select the game's capabilities from the source. A detective novel may compile
   to exploration, interviews, evidence, deductions and accusation branches with
   no combat system. Do not add fights merely to satisfy an RPG convention.
@@ -410,16 +511,33 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 **Done when:** a short source produces an inspectable world whose provenance,
 language and fidelity can be reviewed, whose main progression is tested, and
 which remains playable after removing all generation tools and source files.
-For a two-campaign fixture, runtime completion unlocks already-packaged content
-without calling worldgen, and both campaigns validate from independent starts.
+Normal source-backed play is available through at least one client whose generic
+UI text supports the package/source language, or through explicit package-provided
+setting-specific UI overrides; missing fixed-interface translations must not
+silently fall back to English. Every packaged PlayerRoute has at least one
+successful real-engine simulation to a completion outcome. For a two-route
+fixture, both routes are selectable from New Game, share the intended world/canon
+data, and validate and simulate independently from their own starts.
 
 ## M8 — Additional clients and shared play · optional later
 
 Add a richer TUI or web/mobile client over the same command model when useful.
 Introduce an authoritative server and party play as a separate milestone once
-the single-player rules are stable. Shared combat needs an explicit policy for
-waiting on several players; a paused single-player timeline does not answer that
-question automatically. Add storage/networking crates only at that point.
+the single-player rules are stable. The server owns canonical state, RNG
+resolution, authoritative command ordering and durable persistence; clients submit
+commands rather than outcomes.
+
+Serialize commands that touch the same mutable scope, while allowing independent
+world/player/session/encounter scopes to progress concurrently. A pending human
+turn pauses only its relevant encounter/session scope, not the whole server.
+Timeouts/disconnect handling may submit predefined fallback commands but wall-clock
+waiting does not itself advance gameplay time. Reconnect from current server
+state; never rewind a persistent shared world from a client snapshot.
+
+Single-player checkpoint rewind does not imply rewinding a persistent shared
+world—multiplayer recovery remains scoped to state exclusively owned by the
+relevant player/session/instance. Add storage/networking crates only when this
+milestone becomes active work.
 
 **Done when:** clients cannot bypass engine rules, and the chosen multiplayer
 scheduling and persistence policies have reproducible tests. No runtime AI.

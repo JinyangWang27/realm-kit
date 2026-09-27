@@ -7,11 +7,30 @@ version must allow combat data and combat state to be wholly absent; authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
 combat and other genre mechanics as source-grounded capabilities.
 
-Format 1 also represents one fixed protagonist and one campaign. Future
-multi-campaign support may package a canonical campaign and an unlockable
-original-character campaign together. Each will require its own start state and
-endings, plus explicit cross-campaign facts; runtime unlocking must never require
-source material or generation tools.
+Format 1 also represents one fixed player-controlled character and one playable
+route. For persistence/API identity, RealmKit exposes this implicit route under the
+stable logical route ID `default`; Format 1 does not serialize a route collection
+or route field. Future formats may package a canonical route, an
+original-character route, or both over the same shared world and canonical
+timeline. When both are
+present, New Game selects between them directly; one route does not unlock the
+other. Each route has its own player binding, start state, main questline, outcomes and
+mutable save while reusing shared locations, NPCs, factions and other world
+definitions where appropriate. Future formats should evolve toward shared `Character` definitions plus a small
+`PlayerSpec` route binding that identifies which character the human controls.
+Do not duplicate a canonical person as separate player and NPC entities merely
+because control differs by route.
+
+In an original-character route, the canonical protagonist remains in the package
+as a canonical world character/NPC rather than being replaced by the player.
+
+Format 1 also requires item and quest tables because they serve the current demo.
+Inventory is not a long-term universal requirement, but quest progression is:
+future formats should generalize quests into main and optional side questlines
+rather than remove them. A non-combat player route still has a main questline whose objectives may use
+dialogue, exploration, investigation or other capabilities instead of combat. Investigation evidence is independent state and may optionally
+reference a physical entity/item without being stored "inside" inventory or
+inferred from possession.
 
 A package is a directory containing these required UTF-8 JSON files:
 
@@ -38,10 +57,37 @@ names and prose are unrestricted Unicode and retain the source language.
 `language` is the author-declared language tag, for example `en` or `zh-Hans`.
 The validator requires a nonempty value; it is not a BCP 47 registry validator.
 
+The package language is also the presentation language for play. A client loading
+a source-backed world must display its own fixed labels, help, prompts, status
+messages and player-visible errors in that language rather than falling back to
+English. Stable schema keys, IDs, enum values and typed-command aliases are
+machine-facing and may remain language-neutral ASCII. Format 1 does not yet carry
+client locale strings; the M0 CLI therefore only fully satisfies this requirement
+for English worlds.
+
 ## Locations and conditions
 
 Exits are directed. To return along a path, author a separate reverse exit.
 Directions are `north`, `south`, `east`, `west`, `up`, `down`.
+
+The long-term presentation model distinguishes **spatial placement** from
+**traversal connectivity**. The explicit exit graph is authoritative movement
+state. Future formats may optionally group locations into Areas (for example a
+city, one building floor or a wilderness region) and give locations area-local
+integer `(x, y)` positions for map presentation.
+
+Coordinates never create exits: adjacent cells need not be traversable, and an
+explicit exit may connect locations that are not adjacent in the layout. For an
+initial grid layout, one coordinate should identify at most one location.
+
+Clients decide how much of an area to show. A compact 5×5 city or building may be
+shown in full; a larger area may use a scrolling viewport/minimap; a graph-only
+area needs no grid at all. Viewport size is not package semantics. Opening a map
+must not be required for ordinary movement through explicit exits.
+
+An enterable building may be represented as a location on a city area whose exit
+leads into another Area for the interior. Vertical `up`/`down` traversal remains
+explicit and does not require a universal z-axis.
 
 ```json
 {
@@ -68,14 +114,26 @@ quest state:
 
 Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags
-are monotonic in this version. Conditions govern availability/choice visibility;
-general prerequisite expressions, negation and quest chains are not implemented.
+are monotonic in this version. Conditions govern availability/choice visibility.
+
+This flat conjunctive representation is a Format 1 limitation. The long-term
+condition model uses pure typed predicates composed with `All / Any / Not`;
+predicates remain domain-specific and typed rather than becoming arbitrary
+expressions/property paths. Typed effects execute in authored order as part of the
+engine's atomic state transition.
 
 Each monster ID can appear at most once across all locations. This version has
 no separate monster templates/spawns and no respawns. Quest targets must be
 placed. NPCs may appear at several locations; conditions determine availability.
 
 ## Dialogue and quests
+
+Format 1 has a single flat quest collection. The long-term model should retain
+quests as core story progression but organize them into a main questline plus
+optional side questlines. Questlines share world entities rather than owning
+private copies of NPCs or locations. Side quest availability should be gated by
+explicit main-story/story-phase conditions, and side outcomes may feed typed
+state into later main-quest conditions.
 
 Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 `text` and optional `choices`. Each choice has authored `text`, optional
@@ -118,10 +176,17 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-The engine selects variant `successful_command_count % variant_count` using
-the count before the current attack. Failed commands do not advance it.
-Inspection commands count as successful commands, so the complete command
-sequence determines narrative variants. No runtime randomness is involved.
+Format 1 currently selects combat prose variants from the current
+`state.turn % variant_count` value using the turn before the attack. Failed
+commands do not advance `state.turn`, and presentation-only inspection commands
+(`look`, inventory, status and quests) also do not advance it. Other successful
+gameplay commands may therefore affect which variant a later attack selects. No
+runtime randomness is involved.
+
+This remains a current implementation detail, not a content contract authors
+should depend on. A later combat implementation may keep deterministic selection
+while keying variants to a more local gameplay/narrative sequence (for example an
+encounter-local attack sequence) if stronger semantic independence is useful.
 
 ## Validation feedback
 

@@ -72,61 +72,130 @@ Every generated player-facing string **must be in the same language as the
 source input**: names, location/NPC/monster/item/skill descriptions, dialogue,
 choices, quest introductions/progress/completion, story branches, encounter
 text, combat templates, ambient passages, victory and death text. Internal
-IDs and schema keys remain machine-oriented. A language tag does not prove
-that prose obeys this rule; author review must check the text itself. Do not
-silently fall back to English or generic fantasy prose.
+IDs, schema keys, enum values and stable typed-command tokens remain
+machine-oriented.
 
-## Protagonist and campaign choice
+The same-language rule applies to the final play experience, not only generated
+world content. RealmKit clients must localize their own fixed labels, help,
+prompts, status messages and player-visible errors to the world's declared
+language. Those strings need not be generated from the source, but they must not
+silently fall back to English. The current M0 CLI is English-only and therefore
+requires presentation-layer localization before a non-English source-backed
+world fully satisfies this invariant.
 
-World generation asks the user how they want to enter the source story. The
-initial authoring model should support three explicit choices:
+A language tag does not prove that prose obeys this rule; author review must
+check the text itself. Do not silently fall back to English or generic fantasy
+prose.
+
+## Player entry mode
+
+World generation asks how the player wants to enter the source world. The
+authoring model supports three product-level choices:
 
 ```text
 canonical
 original
-canonical_then_original
+both
 ```
 
-In canonical mode, the user selects or approves a character extracted from the
-source. Worldgen preserves that character's knowledge, relationships, voice and
-plausible choices. In original mode, the user supplies or approves a new role and
-its insertion point; worldgen must integrate it without casually replacing a
-canonical character or granting knowledge the new character could not possess.
+In `canonical` mode, the player controls an extracted canonical protagonist.
+For a *The Return of the Condor Heroes* world this could be Yang Guo. Worldgen
+preserves that character's identity, knowledge, relationships, voice and major
+canonical anchors while allowing exploration, side questlines and bounded
+variation in how events are reached.
 
-`canonical_then_original` compiles two campaigns into the same static package.
-The original-character campaign unlocks after an authored completion outcome in
-the canonical campaign. This is package-local meta-progression, not generation at
-runtime: all locations, dialogue, branches and prose for both campaigns already
-exist before the first session begins.
+In `original` mode, the player controls a newly authored character inserted
+into the same shared world and canonical timeline. Canonical protagonists do not
+disappear or get replaced: Yang Guo, Xiaolongnü, Guo Jing, Huang Rong and other
+canonical characters remain world entities/NPCs and continue through their
+pre-authored canonical story. The original player has a separate main questline
+that intersects with, observes and locally influences that timeline without
+invalidating its required canon anchors.
 
-The user also chooses what the second campaign represents:
+In `both` mode, the static package contains both independently playable routes.
+New Game offers the choice immediately; one route does not have to unlock the
+other. They reuse the same world definitions and canonical timeline where
+possible but keep player-route-specific main questlines, starting state and saves
+separate. There is no implicit transfer of inventory, injuries, relationships,
+flags or quest state between routes.
 
-- Another perspective during the same chronology.
-- A continuation after the canonical campaign.
-- A bounded alternate branch from an authored point.
+The route choice controls who is player-controlled, not who exists in the world:
 
-Campaigns have separate mutable saves. Completing the first campaign unlocks the
-second but does not implicitly copy inventory, injuries, relationships or flags.
-The package declares any facts that carry across—for example which canonical
-ending occurred, an NPC's survival, or a public event. This prevents accidental
-state leakage and lets validation analyze each starting state.
+```text
+shared world / canon timeline
+├── canonical route: player = Yang Guo
+└── original route:  Yang Guo = canonical NPC
+                     player = original player character
+```
 
-Conceptually, a campaign has an ID, protagonist definition, start location/state,
-enabled capabilities, endings, and an optional unlock condition. The current
-format supports one fixed campaign; add this typed structure when the first
-multi-campaign world is implemented. Multiple simultaneously controlled
-protagonists remain a separate future design.
+Do not introduce a dedicated runtime `Campaign` abstraction merely to express
+this before a concrete multi-route package needs one. For now, treat "route" as
+the conceptual unit for an independently playable player-controlled entry and
+storyline. The current Format 1 supports one fixed route. Multiple simultaneously
+controlled characters remain a separate future design.
+
+World character identity and player control are separate concerns:
+
+```text
+Character   = who exists in the world
+PlayerSpec  = which Character the human controls
+PlayerRoute = how that player experiences the world
+```
+
+Future shared character identity should live on a `CharacterSpec`-like world
+entity. `PlayerSpec` should primarily reference that character rather than
+duplicate name/background/identity. A canonical route binds control to a canonical
+character; an original route binds control to a worldgen-authored original
+character while canonical protagonists remain ordinary world characters/NPCs.
+
+Original-character generation is constraint/override driven. Resolve the final
+identity before generating dependent route prose, quests, relationships and
+dialogue. Starting location/phase belong to the route; mutable relationships,
+faction state and capability data belong to route/game/capability state rather
+than `PlayerSpec`.
+
+Worldgen must maintain a player-knowledge boundary distinct from omniscient Canon
+IR knowledge. Compile only gameplay-relevant knowledge distinctions into runtime
+state. Original starting history/relationships must satisfy canon constraints and
+must not manufacture major retroactive canonical relationships.
+
+The existing engine `PlayerState` stores mutable state intrinsic to the
+controlled character. Run-wide quest, dialogue, NPC and world state belongs to
+`GameState` or typed state owned beneath it. Runtime identity customization is
+opt-in and typed rather than a universal right to rewrite authored identity.
 
 A future world-builder skill should teach the author to:
 
 1. Extract canon, chronology, relationships and source references before gameplay.
-2. Build a coherent location graph and distinguish characters from combat enemies.
-3. Derive quests and encounters from source events with narrative justification.
-4. Preserve characterization, vocabulary, rhythm, tone and the source language.
-5. Prewrite all runtime prose, dialogue choices and supported alternate branches.
-6. Validate references and simulate progression, then repair problems before export.
-7. Apply the user's protagonist/campaign choice and validate each campaign from
-   its own starting state.
+2. Resolve the player's entry choice (`canonical`, `original`, or `both`) and
+   therefore which PlayerRoutes will be packaged. Bind canonical routes to their
+   controlled canonical characters; for original routes, resolve the original
+   player's identity/constraints before generating route-dependent prose, quests,
+   relationships or dialogue.
+3. Propose the smallest source-grounded capability set, apply any author/user
+   include/exclude overrides, and finalize the package capability set before
+   detailed quests, prose or mechanics are generated.
+4. Build a coherent shared location/traversal graph. Add optional Areas and
+   spatial placement only where the world benefits from map presentation; keep
+   placement separate from traversal, and leave full-map versus viewport size to
+   clients. Keep NPCs/locations/factions as world entities rather than nesting
+   them inside quests.
+5. Compile shared canonical chronology into story phases. For each selected
+   PlayerRoute, author exactly one route-owned main questline using only available
+   core mechanics and finalized capabilities: canonical routes derive theirs
+   directly from the canonical story, while original-character routes receive
+   their own main questline within the same canon constraints and story phases.
+6. Extract side-story seeds from canonical people, places, factions, conflicts,
+   occupations and unresolved details, then expand those seeds into side
+   questlines before inventing generic filler.
+7. Gate side questlines by explicit main-story/story-phase progress. Let their
+   outcomes feed typed state back into later main quests where authored.
+8. Preserve characterization, vocabulary, rhythm, tone and the source language,
+   and prewrite all runtime prose, dialogue choices and supported alternate
+   branches.
+9. Validate references and simulate main/side progression for every packaged
+   route from its own starting state, including unlock and feedback paths, then
+   repair problems before export.
 
 Optional mechanics also require source grounding. Equipment may exist without a
 player crafting system. Add forging, improvement, enchanting, alchemy or similar
@@ -152,6 +221,120 @@ and state, so absent systems leave no empty screens or disabled global commands.
 These are authoring instructions, distinct from the Rust definitions of valid
 and executable content. There is no skill framework in this scaffold.
 
+## Open-world quest authoring
+
+RealmKit's intended source-adaptation shape is one shared open world containing
+one or more independently playable PlayerRoutes. Each route owns exactly one main
+questline. Side questlines are world content that may be shared across routes or
+route-gated as authored, while reusing the same shared NPCs, locations, factions,
+story phases and world state.
+
+For a canonical route, the main questline adapts the relevant canonical character's
+story directly. For an original-character route, the player receives a distinct
+authored main questline that operates within the same canon constraints and shared
+chronology while canonical protagonists continue through authored world/NPC
+progression.
+
+Main progress for a route establishes or triggers shared `story_phase` (or
+equivalent typed progression) transitions. A phase exposes a bounded set of side
+questlines. Players can explore and finish those stories in any supported order,
+but later side content remains locked until that route's main progression advances
+the authored chronology. This provides Skyrim-like freedom within the source
+timeline without conflating separate PlayerRoute main questlines.
+
+Side quests may influence the main questline, but only through explicit
+pre-authored state and conditions. Valid effects include changing dialogue,
+relationships/reputation, NPC availability or survival, evidence/knowledge,
+available routes, assistance/resources, or substituting/skipping authored main
+objectives. Any larger canonical divergence must be permitted by the world's
+adaptation policy and compiled before play.
+
+Generation should prefer side stories in this order:
+
+1. reuse canonical NPCs, locations and conflicts
+2. expand minor canonical characters/events
+3. infer plausible events strongly supported by the setting
+4. introduce implied/background characters when needed
+5. create new minor material only when the source leaves a genuine gameplay gap
+
+Track whether generated material is sourced, inferred or expanded so reviewers
+can distinguish adaptation from invention.
+
+## Canon fidelity
+
+Source-backed generation uses bounded fidelity rather than an unrestricted
+adaptation mode. Worldgen extracts and maintains authoring-side Canon IR with
+protected canon anchors, broader canon constraints and provenance.
+
+Canon anchors are major source facts/events that supported branches preserve
+according to the branch/outcome they are authored to support. A continuing branch
+may explore, add side stories, change local consequences or take alternate routes
+between anchors, but it must still be able to reach every downstream anchor
+required for that branch/outcome in a canon-compatible state. Making such an
+anchor permanently unreachable is a validation error.
+
+An explicitly authored terminal divergence may end before later anchors only when
+the adaptation policy permits that endpoint; anchors after it are then not
+required for that branch. This exception does not permit contradicting canon facts
+or constraints already established before the terminal outcome.
+
+Broader constraints also preserve established identity, relationships, chronology,
+character knowledge, core characterization, world facts and causal consistency.
+Do not leak omniscient worldgen knowledge into player/NPC knowledge before an
+authored discovery path exists.
+
+Use authoring-side provenance:
+
+```text
+SOURCE    directly represented in the source
+INFERRED  strongly supported by the source but not explicitly narrated
+EXPANDED  new gameplay material constrained by canon
+```
+
+Retain source references/rationale in an authoring report or optional provenance
+sidecar. The same authoring artifact may record the proposed/final capability set,
+meaningful omissions and explicit author/user overrides. Capability selection is
+finalized after canon extraction and before detailed gameplay generation. Runtime
+does not require source text, Canon IR, selection rationale, or provenance
+analysis.
+
+## Time authoring
+
+Treat canonical/narrative progression as **story phases**, not as a continuously
+running clock. Main-quest milestones or other explicit authored transitions move
+the world between phases. Free exploration and side content inside a phase do not
+silently advance the source chronology.
+
+An in-world clock/calendar is optional. When a world needs it, author world time
+as a minute count from a world/route-defined epoch that is monotonic within one
+forward committed history. Loading or recovering an older snapshot restores its
+saved value exactly. Presentation may map that scalar to clock times, dates, day
+counts or setting-specific periods; the runtime does not need to understand the
+display calendar.
+
+Advance world time only through explicit authored/capability actions such as
+travel, waiting, rest or appointments. Do not assign generic durations to every
+command. Presentation-only actions consume zero world time.
+
+When advancement crosses scheduled events, resolve them chronologically and use
+stable authored declaration order for equal timestamps. Capabilities define what
+elapsed time means to them; the core time model does not hard-code hunger,
+recovery, crafting or NPC-schedule semantics.
+
+Deadlines may use exact runtime timestamps while being described narratively to
+the player.
+
+Encounter timelines remain separate local schedulers. Their units exist to order
+actors deterministically and do not represent seconds, minutes or calendar time.
+If an encounter should consume world time, author that consequence explicitly
+rather than deriving it from encounter ticks.
+
+Story phase and world time remain independent. A story-phase transition may also
+explicitly advance world time for a canonical time skip, but elapsed world time
+never silently advances the source story.
+
+Real-world time spent reading or choosing never changes any gameplay state.
+
 ## Deliberately open extensions
 
 Canon IR belongs to worldgen: source identities, aliases, chronology,
@@ -167,10 +350,12 @@ The current deterministic replay tests demonstrate the execution seam; there
 is no `simulate_quest` API or automatic balance analysis yet.
 
 The playable spec can grow through explicit optional capability sections. Core
-state should contain only universally needed identity/location/flags; combat,
-investigation and crafting own their data and mutable state. This is ordinary
-typed composition, not a dynamic plugin system. Cross-capability effects must be
-explicit—for example, combat may set the same story flags used by dialogue.
+state should contain universally needed route/playthrough state such as controlled
+identity, location, main-quest/objective progress and shared authored story flags.
+Combat, investigation, crafting and other optional capabilities own their own data
+and mutable state. This is ordinary typed composition, not a dynamic plugin
+system. Cross-capability effects must be explicit—for example, combat may set the
+same story flags used by dialogue.
 
 Future agents can iterate on `validate_world()` diagnostics instead of scraping
 CLI text. Graph/quest reachability analysis, richer provenance, source extraction,
