@@ -98,7 +98,11 @@ databases or other durable storage.
   inventory, combat stats or defeated enemies. A capability present elsewhere in
   the package does not require placeholder state in a route that never uses it.
   Keep authored definitions separate from mutable saves.
-- Version saves and identify the world package they belong to. Reject incompatible
+- Version saves and identify the world package they belong to. M2 treats the
+  current Format 1 single playable route as an explicit logical route with stable
+  ID `default` for save/API identity, even though Format 1 does not yet serialize
+  a route collection. SaveSnapshot records that `player_route_id`; later formats
+  with explicit PlayerRoutes use their authored route IDs. Reject incompatible
   saves clearly; add migrations when an actual format change requires them.
 - Write saves atomically and keep the previous save safe if writing fails.
 - Support manual saves and deterministic auto-saves in one active chronological
@@ -417,6 +421,10 @@ item identity and consumes resources atomically without duplicating bonuses.
   combat. Preserve quest progress and prevent duplicate completion rewards.
 - Expand authored dialogue and branches, with consistent NPC availability and
   understandable journal entries.
+- Make Inventory genuinely optional in runtime/spec/presentation rather than
+  retaining Format 1 placeholders. An inventory-free world has no inventory state,
+  no Inventory command/action/panel, and no required inventory/item definitions
+  merely to satisfy the engine.
 - Add source-specific capabilities only with a representative world. For example,
   a detective story may use a main investigation questline with clues, evidence,
   interviews, contradictions, deductions and a final accusation while omitting
@@ -439,8 +447,10 @@ item identity and consumes resources atomically without duplicating bonuses.
   transitions and select only among pre-authored outcomes.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
-and at least one non-combat interaction path, can be saved/resumed, and have
-tested paths to completion. A dungeon is useful only for a world that needs one.
+and tested paths to completion, can be saved/resumed, and include at least one
+inventory-free non-combat fixture that loads and plays with no inventory state,
+definitions/placeholders, Inventory command or inventory UI. A dungeon is useful
+only for a world that needs one.
 
 ## M6 — Authoring feedback and deterministic simulation
 
