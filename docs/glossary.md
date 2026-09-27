@@ -115,8 +115,14 @@ units have no implicit conversion to real time or optional World Time.
 
 A protected major source fact or event that a source-backed adaptation must not
 invalidate. Routes and side content may vary the path, context and local
-consequences around an anchor, but every supported branch must preserve
-reachability of required downstream anchors in a canon-compatible state.
+consequences around an anchor. Every continuing supported branch must preserve
+reachability of the downstream anchors required for that branch/outcome in a
+canon-compatible state.
+
+An explicitly permitted terminal divergence may end that branch before later
+anchors, in which case anchors after the authored endpoint are not required for
+that branch. Terminality alone does not waive already-established canon facts or
+constraints.
 
 Canon anchors are primarily authoring/worldgen concepts rather than runtime
 gameplay entities.
