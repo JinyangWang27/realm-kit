@@ -83,13 +83,14 @@ fn run() -> Result<(), Box<dyn Error>> {
 }
 
 /// Runs one engine command and prints its events or the reason it was refused.
-/// With saves on, completing a quest auto-saves and death restores the newest save.
+/// With saves on, completing a quest auto-saves and death restores the newest
+/// save. Returns whether a save replaced the playthrough.
 fn apply(
     engine: &mut Engine<'_>,
     saves: Option<&Saves>,
     command: Command,
     output: &mut impl Write,
-) -> io::Result<()> {
+) -> io::Result<bool> {
     let events = match engine.execute(command) {
         Ok(events) => events,
         Err(EngineError::ExitLocked {
@@ -101,8 +102,9 @@ fn apply(
                 "{}",
                 engine.world().location(&location).unwrap().exits[&direction].blocked_text
             )
+            .map(|()| false)
         }
-        Err(error) => return writeln!(output, "{error}"),
+        Err(error) => return writeln!(output, "{error}").map(|()| false),
     };
     // Checkpoint before printing, so a closed terminal cannot lose the progress.
     let completed = events
@@ -114,9 +116,9 @@ fn apply(
     render::events(output, engine, &events)?;
     if let (Some(saves), true) = (saves, events.contains(&realmkit_engine::Event::PlayerDied)) {
         writeln!(output, "\nRestoring your most recent save…")?;
-        restore(engine, saves, None, output)?;
+        return restore(engine, saves, None, output);
     }
-    Ok(())
+    Ok(false)
 }
 
 fn save(engine: &Engine<'_>, saves: &Saves, kind: Kind, output: &mut impl Write) -> io::Result<()> {
@@ -444,7 +446,10 @@ fn play_keys(
             };
             // Stepping back from a conversation lasts until the player speaks again.
             leave_dialogue &= !matches!(command, Command::Talk(_) | Command::ChooseDialogue(_));
-            apply(&mut engine, saves, command, output)?;
+            // A restored save may be mid-conversation; show its choices again.
+            if apply(&mut engine, saves, command, output)? {
+                leave_dialogue = false;
+            }
             continue 'scene;
         }
     }

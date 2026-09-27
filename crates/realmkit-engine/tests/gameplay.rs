@@ -355,6 +355,7 @@ fn mismatched_or_corrupt_saves_are_rejected() {
         },
         |s| s.state.player.xp += 1,
         |s| s.state.turn = u64::MAX,
+        |s| s.state.player.hp = 0,
         |s| {
             s.state.player.inventory.insert("ash_pelt".into(), 1);
         },

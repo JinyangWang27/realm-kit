@@ -41,6 +41,8 @@ pub(super) fn check(
         player.xp >= stats.xp && next.is_none_or(|next| player.xp < next.xp),
         "experience does not match level",
     )?;
+    // Clients restore saves on death, so a dead save could never be recovered from.
+    ensure(player.hp > 0, "the player is dead in this save")?;
     ensure(
         player.max_hp == stats.hp && player.attack == stats.attack && player.hp <= player.max_hp,
         "player stats do not match level",

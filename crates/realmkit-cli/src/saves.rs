@@ -92,6 +92,7 @@ impl Saves {
     /// step leaves earlier saves and the chain untouched; at worst an unlisted
     /// file remains below the counter, like an abandoned save.
     pub fn write(&self, kind: Kind, snapshot: &SaveSnapshot) -> Result<(), Box<dyn Error>> {
+        let _lock = self.lock()?;
         let mut lineage = self.lineage()?;
         let id = lineage.next;
         lineage.next = id.checked_add(1).ok_or("save counter exhausted")?;
@@ -116,6 +117,7 @@ impl Saves {
 
     /// Makes the save at `index` the newest in the chain.
     pub fn fork(&self, index: usize) -> Result<(), Box<dyn Error>> {
+        let _lock = self.lock()?;
         let mut lineage = self.lineage()?;
         lineage.entries.truncate(index + 1);
         write_atomic(
@@ -123,6 +125,13 @@ impl Saves {
             &serde_json::to_vec_pretty(&lineage)?,
         )?;
         Ok(())
+    }
+
+    /// Serializes updates from every game sharing this directory; released on drop.
+    fn lock(&self) -> io::Result<fs::File> {
+        let file = fs::File::create(self.dir.join("lock"))?;
+        file.lock()?;
+        Ok(file)
     }
 
     fn file(&self, id: u64) -> PathBuf {
@@ -208,9 +217,42 @@ mod tests {
             .to_string()
             .contains("does not list every save"));
         assert!(saves.write(Kind::Manual, &snapshot).is_err());
-        assert!(!fs::read_dir(&dir)
+        assert!(!fs::read_dir(&dir).unwrap().any(|f| f
             .unwrap()
-            .any(|f| f.unwrap().path().extension().unwrap() == "tmp"));
+            .path()
+            .extension()
+            .is_some_and(|x| x == "tmp")));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn concurrent_games_never_lose_or_share_a_save() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/demo-world"
+        ))
+        .unwrap();
+        let snapshot = Engine::new(&world).unwrap().snapshot();
+        let dir = std::env::temp_dir().join(format!("realmkit-race-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        std::thread::scope(|scope| {
+            for _ in 0..4 {
+                scope.spawn(|| {
+                    let saves = Saves::open(&dir).unwrap();
+                    for _ in 0..10 {
+                        saves.write(Kind::Manual, &snapshot).unwrap();
+                    }
+                });
+            }
+        });
+        let ids: Vec<_> = Saves::open(&dir)
+            .unwrap()
+            .entries()
+            .unwrap()
+            .iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(ids, (0..40).collect::<Vec<_>>());
         fs::remove_dir_all(dir).unwrap();
     }
 }
