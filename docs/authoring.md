@@ -172,23 +172,27 @@ A future world-builder skill should teach the author to:
    controlled canonical characters; for original routes, resolve the original
    player's identity/constraints before generating route-dependent prose, quests,
    relationships or dialogue.
-3. Build a coherent shared location/traversal graph. Add optional Areas and
+3. Propose the smallest source-grounded capability set, apply any author/user
+   include/exclude overrides, and finalize the package capability set before
+   detailed quests, prose or mechanics are generated.
+4. Build a coherent shared location/traversal graph. Add optional Areas and
    spatial placement only where the world benefits from map presentation; keep
    placement separate from traversal, and leave full-map versus viewport size to
    clients. Keep NPCs/locations/factions as world entities rather than nesting
    them inside quests.
-4. Compile shared canonical chronology into story phases. For each selected
-   PlayerRoute, author exactly one route-owned main questline: canonical routes
-   derive theirs directly from the canonical story, while original-character
-   routes receive their own main questline within the same canon constraints and
-   story phases.
-5. Extract side-story seeds from canonical people, places, factions, conflicts,
+5. Compile shared canonical chronology into story phases. For each selected
+   PlayerRoute, author exactly one route-owned main questline using only available
+   core mechanics and finalized capabilities: canonical routes derive theirs
+   directly from the canonical story, while original-character routes receive
+   their own main questline within the same canon constraints and story phases.
+6. Extract side-story seeds from canonical people, places, factions, conflicts,
    occupations and unresolved details, then expand those seeds into side
    questlines before inventing generic filler.
-6. Gate side questlines by explicit main-story/story-phase progress. Let their
+7. Gate side questlines by explicit main-story/story-phase progress. Let their
    outcomes feed typed state back into later main quests where authored.
-7. Preserve characterization, vocabulary, rhythm, tone and the source language.
-8. Prewrite all runtime prose, dialogue choices and supported alternate branches.
+8. Preserve characterization, vocabulary, rhythm, tone and the source language,
+   and prewrite all runtime prose, dialogue choices and supported alternate
+   branches.
 9. Validate references and simulate main/side progression for every packaged
    route from its own starting state, including unlock and feedback paths, then
    repair problems before export.
