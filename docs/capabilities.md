@@ -47,7 +47,7 @@ capability is present.
 | Economy and trade | Currency, prices, merchant stock, debts | Buy, sell, bargain, borrow, repay |
 | Inventory | Carried fungible/non-equipment items and their quantities/possession | Take, drop, give, transfer |
 | Equipment | Equipment instances, their ownership/possession, equipped slots and effective modifiers | Acquire, equip, compare, unequip, transfer |
-| Crafting | Recipes, materials, proficiency, stations | Forge, improve, enchant, brew |
+| Crafting | Recipes, crafting-resource quantities, proficiency, stations | Forge, improve, enchant, brew |
 | Combat | HP/MP, stats, initiative, effects, opponents | Attack, use skill, defend, flee |
 | Magic and rituals | Known rites, costs, preparation, curses | Cast, prepare, dispel, perform a ritual |
 | Puzzles and mechanisms | Mechanism state, known facts, attempts | Inspect, manipulate, combine, answer |
@@ -65,9 +65,17 @@ capability is present.
 Equipment does not require the general Inventory capability merely to keep an
 unequipped weapon or armour piece. Equipment owns the identity and
 ownership/possession state of equipment instances, including unequipped ones.
-Inventory owns general carried/fungible item state. When both are present, a client
-may present a unified carried-items view without duplicating authoritative
-ownership state.
+Inventory owns general carried/fungible item state.
+
+Crafting likewise does not require Inventory merely to model material-consuming
+recipes. If Inventory is absent, Crafting may own the quantities of
+crafting-specific resources it consumes. If Inventory is present and a recipe
+uses ordinary carried items, those inputs remain Inventory-owned and Crafting
+references/consumes them explicitly. A given resource has one authoritative state
+owner; capabilities must not duplicate the same quantity/ownership state.
+
+When capabilities share presentation, a client may show one unified carried-items
+or resources view without merging their authoritative state models.
 
 Names in this table describe design areas, not compulsory Rust modules. Closely
 related capabilities can share domain types where that makes the actual code
