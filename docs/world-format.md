@@ -173,18 +173,17 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 1 currently selects variant
-`successful_command_count % variant_count` using the count before the current
-attack. Failed commands do not advance it. Inspection commands count as
-successful commands, so the complete command sequence determines narrative
-variants. No runtime randomness is involved.
+Format 1 currently selects combat prose variants from the current
+`state.turn % variant_count` value using the turn before the attack. Failed
+commands do not advance `state.turn`, and presentation-only inspection commands
+(`look`, inventory, status and quests) also do not advance it. Other successful
+gameplay commands may therefore affect which variant a later attack selects. No
+runtime randomness is involved.
 
-This is a current implementation detail, not a content contract authors should
-depend on. It couples unrelated browsing/inspection actions to later combat prose.
-A later runtime revision should keep selection deterministic while keying it to
-the relevant gameplay/narrative event sequence (for example an encounter-local
-attack sequence) so presentation-only actions cannot change which prose variant
-appears.
+This remains a current implementation detail, not a content contract authors
+should depend on. A later combat implementation may keep deterministic selection
+while keying variants to a more local gameplay/narrative sequence (for example an
+encounter-local attack sequence) if stronger semantic independence is useful.
 
 ## Validation feedback
 
