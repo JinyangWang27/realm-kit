@@ -96,9 +96,12 @@ milestones, rather than by real-world time or ordinary exploration.
 
 ## World Time
 
-Optional simulated in-world time represented as a monotonic minute count from an
-authored epoch. It advances only through explicit gameplay actions/effects and is
-independent of story-phase progression and encounter scheduling.
+Optional simulated in-world time represented as a minute count from an authored
+epoch. It is monotonic within one forward committed history and advances only
+through explicit gameplay actions/effects. Loading or recovering an older snapshot
+restores its saved WorldTime exactly, so discarded-future values may be traversed
+again on the new branch. WorldTime is independent of story-phase progression and
+encounter scheduling.
 
 Presentation may render the same scalar using setting-appropriate clocks, dates or
 qualitative periods.
