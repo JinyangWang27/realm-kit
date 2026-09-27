@@ -93,8 +93,9 @@ Decisions:
   inside a route or quest.
 - Every world has at least one `PlayerRoute`. A route is one independently
   playable way of entering and experiencing that world.
-- Every route has one player-controlled character definition (`PlayerSpec`),
-  initial state/location, exactly one main questline, and one or more outcomes.
+- Every route has one player-control binding (`PlayerSpec`) referencing a
+  shared `Character`, plus initial state/location, exactly one main questline, and
+  one or more outcomes.
 - A questline contains quests; quests contain one or more typed objectives.
 - Story phases belong to the shared world/canonical chronology. Route progression
   can trigger authored phase transitions.
@@ -701,10 +702,16 @@ rather than weakening ordinary time semantics.
 
 ### Scheduled world-time events
 
-When advancing world time crosses scheduled events, process due events in
-chronological order. Events with the same timestamp resolve in stable authored
-declaration order. Do not add a generic priority framework unless a concrete
-world requires one.
+A scheduled event timestamp must be strictly greater than the current world time
+when that schedule becomes active. Initial schedules at or before the route's
+initial world time are invalid, and a runtime effect may not schedule an event for
+the current or a past minute. This avoids a separate initialization/current-time
+dispatch path and prevents same-timestamp self-scheduling loops.
+
+Advancing world time from `old_time` to `new_time` processes exactly the events
+whose timestamps fall in `(old_time, new_time]`, in chronological order. Events
+with the same timestamp resolve in stable authored declaration order. Do not add a
+generic priority framework unless a concrete world requires one.
 
 The engine owns current world time, explicit advancement and deterministic
 ordering of due authored events. Capabilities own the consequences of elapsed time,
