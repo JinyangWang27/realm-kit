@@ -234,8 +234,10 @@ Decisions:
   the immutable outcome and emitting its event are part of the same atomic
   transition. An explicit choice that should cause an ending does so by changing
   typed state that makes the authored outcome condition true; there is no separate
-  `ReachOutcome` effect. The runtime never invents endings or resolves ambiguous
-  simultaneous outcome matches by arbitrary declaration order.
+  `ReachOutcome` effect. If more than one unreached outcome condition matches the
+  same staged state, the transition fails with an explicit outcome-ambiguity error
+  and none of its state changes are committed. The runtime never invents endings
+  or resolves ambiguity by arbitrary declaration order.
 - No universal cross-save profile/meta-progression is required. A client may later
   track discovered endings or achievements outside the route save, but the core
   engine does not depend on such metadata.
@@ -251,13 +253,21 @@ quests / relationships / flags / NPC state / side consequences
 
 ordinary recoverable death
             ↓
- latest valid manual/auto-save snapshot
+   newest recovery snapshot
             ↓
-       restored GameState
+       load validation
+        ↙        ↘
+    valid       invalid
+      ↓            ↓
+ restored      surface error;
+ GameState     client may explicitly
+               offer older snapshot
 ```
 
-Validation should eventually reject impossible required outcomes and ambiguous
-states in which mutually exclusive outcomes can become true simultaneously.
+Validation should diagnose impossible required outcomes and overlapping mutually
+exclusive outcome conditions where the available analyzers can prove them.
+Runtime ambiguity checking remains the deterministic backstop for reachable
+overlaps that static/bounded analysis does not prove.
 
 ## 4. Canon fidelity and divergence
 
@@ -788,9 +798,11 @@ between characters does not change its `InstanceId`.
 ### Removal and durable consequences
 
 Removed/destroyed/consumed instances do not require universal permanent
-tombstones. Instance IDs are not reused. Gameplay facts that must survive removal
-belong to the relevant durable state, such as quest/objective state, evidence,
-flags or another capability-owned record.
+tombstones. Within one forward committed history, an InstanceId is not assigned
+again after removal. Restoring an older snapshot may reuse IDs that existed only
+in the discarded future, as described above. Gameplay facts that must survive
+removal belong to the relevant durable state, such as quest/objective state,
+evidence, flags or another capability-owned record.
 
 Do not build a universal runtime provenance/history graph. An instance's
 `definition_id` supplies its basic authored origin; capabilities may retain
