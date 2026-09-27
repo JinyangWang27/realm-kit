@@ -463,11 +463,14 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
   Keep player-route-specific main questlines, starting state and saves separate.
   In the original route, canonical protagonists remain world entities/NPCs and
   continue through protected canon anchors.
-- Derive the main questline from the source's canonical story and preserve
-  characterization and atmosphere. Generate side-story seeds from canonical NPCs,
-  locations, factions, relationships, occupations, conflicts and unresolved
-  details; expand those seeds into side questlines before inventing unrelated
-  generic content.
+- For each PlayerRoute, author exactly one route-owned main questline. A
+  canonical route derives its main questline from the relevant canonical story
+  while preserving characterization and atmosphere; an original-character route
+  receives its own authored main questline within the same canon constraints and
+  shared story phases. Generate side-story seeds from canonical NPCs, locations,
+  factions, relationships, occupations, conflicts and unresolved details; expand
+  those seeds into shared or route-gated side questlines before inventing
+  unrelated generic content.
 - Gate side questlines by explicit main-story/story-phase progress. Side quest
   outcomes may alter later main dialogue, routes, assistance, objectives and
   bounded outcomes through authored state, but never through runtime generation.
@@ -484,8 +487,10 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 **Done when:** a short source produces an inspectable world whose provenance,
 language and fidelity can be reviewed, whose main progression is tested, and
 which remains playable after removing all generation tools and source files.
-For a two-route fixture, both routes are selectable from New Game, share the
-intended world/canon data, and validate independently from their own starts.
+Every packaged PlayerRoute has at least one successful real-engine simulation to a
+completion outcome. For a two-route fixture, both routes are selectable from New
+Game, share the intended world/canon data, and validate and simulate independently
+from their own starts.
 
 ## M8 — Additional clients and shared play · optional later
 
