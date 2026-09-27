@@ -225,6 +225,10 @@ Decisions:
   own isolated state when appropriate.
 - Recovery is an explicit restore of a saved deterministic state, not an implicit
   reversal of engine commands. Unsaved changes after that snapshot are discarded.
+  If ordinary recoverable death occurs while an engine command is still executing
+  against staged state, that enclosing transition is abandoned: none of its
+  staged state changes or staged gameplay events commit before the recovery
+  snapshot is restored.
 - Auto-saves occur at meaningful stable boundaries rather than on every command or
   map step. Required/default triggers should include route start and major
   authored progression boundaries such as story-phase transitions; authors or
@@ -726,10 +730,13 @@ Advancing world time from `old_time` to `new_time` uses a deterministic
 dispatch cursor. Start with current world time at `old_time`; repeatedly take the
 earliest scheduled event with timestamp `<= new_time`, set current world time to
 that event's timestamp, and resolve its effects against the staged state. Each
-scheduled-event resolution is an outcome-evaluation point. If it records a
-terminal outcome, stop dispatch immediately and commit the enclosing transition
-with WorldTime left at that event timestamp; later due events and the remaining
-requested advance do not occur. A non-terminal outcome may allow dispatch/play to
+scheduled-event resolution is an outcome-evaluation/death-check point. If it
+records a terminal outcome, stop dispatch immediately and commit the enclosing
+transition with WorldTime left at that event timestamp; later due events and the
+remaining requested advance do not occur. If it causes ordinary recoverable death,
+stop dispatch, abandon the entire still-staged enclosing time-advance transition,
+discard its staged effects/events, and restore the active recovery snapshot under
+the Section 3 recovery rules. A non-terminal outcome may allow dispatch/play to
 continue, but no further route outcomes are evaluated for that playthrough.
 
 An event may schedule a later event using the cursor time as "current"; if the new
