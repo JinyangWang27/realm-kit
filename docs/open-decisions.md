@@ -310,9 +310,17 @@ Canon anchors belong to Canon IR / worldgen authoring metadata, not necessarily
 to the runtime playable format. Their concrete schema should be introduced only
 when source-grounded generation needs it.
 
-Every supported generated branch must preserve reachability of required
-downstream anchors in a state consistent with their prerequisites. A branch that
-permanently invalidates a required anchor is an authoring/validation error.
+Every continuing supported branch must preserve reachability of the canon
+anchors required for that branch/outcome in a state consistent with their
+prerequisites. A branch that permanently invalidates one of its required anchors
+is an authoring/validation error.
+
+An explicitly authored terminal outcome may end the branch before later anchors
+only when the source-adaptation policy explicitly permits that terminal divergence;
+anchors after that endpoint are then not required for that branch. This exemption
+does not permit contradicting protected facts/constraints already established, and
+worldgen must not infer it merely because an outcome is terminal. Canonical
+completion paths continue to preserve all anchors required by the adaptation.
 
 ### Canon constraints
 
@@ -717,16 +725,22 @@ dispatch path and prevents same-timestamp self-scheduling loops.
 Advancing world time from `old_time` to `new_time` uses a deterministic
 dispatch cursor. Start with current world time at `old_time`; repeatedly take the
 earliest scheduled event with timestamp `<= new_time`, set current world time to
-that event's timestamp, and resolve it. An event may schedule a later event using
-that cursor time as "current"; if the new timestamp is still `<= new_time`, it is
-processed during the same advancement. Because scheduling for the current or a
-past minute is invalid, an event cannot recursively schedule another event at its
-own timestamp.
+that event's timestamp, and resolve its effects against the staged state. Each
+scheduled-event resolution is an outcome-evaluation point. If it records a
+terminal outcome, stop dispatch immediately and commit the enclosing transition
+with WorldTime left at that event timestamp; later due events and the remaining
+requested advance do not occur. A non-terminal outcome may allow dispatch/play to
+continue, but no further route outcomes are evaluated for that playthrough.
 
-After no due events remain, set current world time to `new_time`. Events with the
-same timestamp that were already scheduled resolve in stable authored declaration
-order. Do not add a generic priority framework unless a concrete world requires
-one.
+An event may schedule a later event using the cursor time as "current"; if the new
+timestamp is still `<= new_time`, it is processed during the same advancement.
+Because scheduling for the current or a past minute is invalid, an event cannot
+recursively schedule another event at its own timestamp.
+
+If no terminal outcome stops the advance, after no due events remain set current
+world time to `new_time`. Events with the same timestamp that were already
+scheduled resolve in stable authored declaration order. Do not add a generic
+priority framework unless a concrete world requires one.
 
 The engine owns current world time, explicit advancement and deterministic
 ordering of due authored events. Capabilities own the consequences of elapsed time,
