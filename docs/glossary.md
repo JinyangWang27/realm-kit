@@ -249,10 +249,11 @@ referenced cannot collide.
 
 An instance retains an immutable `definition_id` while ownership, location,
 damage, improvement, enchantment and other mutable state may change. Instance IDs
-and allocator state are saved for rewindable domains. An ID is not reused within
-one forward committed history; restoring an older snapshot may reuse IDs that
-existed only in the discarded future branch. Instances are created only where
-distinct copy identity is actually needed.
+and allocator state are saved only when their authoritative identity domain is
+fully inside the same recovery scope. An ID is not reused within one forward
+committed history; restoring an older snapshot may reuse IDs that existed only in
+the discarded future branch. Instances are created only where distinct copy
+identity is actually needed.
 
 ## Unique Definition
 
@@ -263,11 +264,11 @@ mutable state; a legendary weapon is the typical example.
 ## Outcome
 
 An authored route-level result/end state selected from explicit deterministic
-conditions. While a playthrough has no recorded outcome, the engine evaluates
-those conditions at route initialization and after successful state-changing
-transitions; outcomes are derived from state rather than triggered by a separate
-outcome effect. If multiple outcomes match the same staged state, the transition
-fails atomically with an ambiguity error.
+conditions. A valid route initial state matches no outcome. While a playthrough
+has no recorded outcome, the engine evaluates outcome conditions after successful
+state-changing transitions; outcomes are derived from state rather than triggered
+by a separate outcome effect. If multiple outcomes match the same staged state,
+the transition fails atomically with an ambiguity error.
 
 A playthrough records at most one immutable route outcome. Once recorded, outcome
 evaluation stops for that playthrough even if a non-terminal outcome allows play
@@ -293,10 +294,12 @@ player dies.
 ## Recovery Save
 
 A saved deterministic playthrough snapshot eligible for death recovery.
-Manual saves and auto-saves share one chronological recovery history. Ordinary
-recoverable death attempts the newest snapshot; if it fails load validation, the
-client may explicitly offer an older snapshot, but recovery never silently skips
-the corrupt entry.
+Manual saves and auto-saves share one active chronological recovery lineage.
+Loading an older snapshot starts a new active lineage from that point; snapshots
+from the abandoned future are not automatic-recovery candidates. Ordinary
+recoverable death attempts the newest active snapshot; if it fails load
+validation, the client may explicitly offer an older snapshot from that lineage,
+but recovery never silently skips the corrupt entry.
 
 Auto-saves are created at stable boundaries such as route start and story-phase
 transitions rather than on every command or movement step.
