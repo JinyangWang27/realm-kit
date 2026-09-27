@@ -25,6 +25,7 @@ pub(super) fn check(
         "unknown player route",
     )?;
     let state = &snapshot.state;
+    ensure(state.turn < u64::MAX, "turn counter exhausted")?;
     let player = &state.player;
     ensure(
         world.location(&player.location).is_some(),

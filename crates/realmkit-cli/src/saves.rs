@@ -49,8 +49,19 @@ impl Saves {
     fn lineage(&self) -> Result<Lineage, Box<dyn Error>> {
         let path = self.dir.join(LINEAGE);
         match fs::read(&path) {
-            Ok(bytes) => serde_json::from_slice(&bytes)
-                .map_err(|e| format!("{}: {e}", path.display()).into()),
+            Ok(bytes) => {
+                let lineage: Lineage = serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("{}: {e}", path.display()))?;
+                // Chronological order decides the newest save; never guess past damage.
+                let ids: Vec<_> = lineage.entries.iter().map(|e| e.id).collect();
+                if ids.windows(2).all(|w| w[0] < w[1])
+                    && ids.last().is_none_or(|id| *id < lineage.next)
+                {
+                    Ok(lineage)
+                } else {
+                    Err(format!("{} lists saves out of order", path.display()).into())
+                }
+            }
             // A missing index is a new directory only if it holds no saves;
             // otherwise report it rather than hide existing progress.
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
@@ -127,7 +138,13 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut file = fs::File::create(&temporary)?;
     file.write_all(bytes)?;
     file.sync_all()?;
-    fs::rename(temporary, path)
+    fs::rename(temporary, path)?;
+    // The rename lives in the directory; sync it so a crash cannot publish the
+    // lineage while losing the snapshot it names.
+    // ponytail: Unix only; Windows cannot open a directory as a file for syncing.
+    #[cfg(unix)]
+    fs::File::open(path.parent().unwrap_or(Path::new(".")))?.sync_all()?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -155,15 +172,23 @@ mod tests {
         saves.write(Kind::Auto, &snapshot).unwrap();
         let ids: Vec<_> = saves.entries().unwrap().iter().map(|e| e.id).collect();
         assert_eq!(ids, [0, 3]);
-        let stale = fs::read_to_string(dir.join(LINEAGE))
-            .unwrap()
-            .replace("\"next\": 4", "\"next\": 1");
+        // An older, self-consistent index (say, from a backup) must not
+        // overwrite saves written after it.
+        let stale = r#"{"next": 1, "entries": [{"id": 0, "kind": "auto"}]}"#;
         fs::write(dir.join(LINEAGE), stale).unwrap();
         saves.write(Kind::Manual, &snapshot).unwrap();
         let ids: Vec<_> = saves.entries().unwrap().iter().map(|e| e.id).collect();
-        assert_eq!(ids, [0, 3, 4], "a stale counter skips existing files");
+        assert_eq!(ids, [0, 4], "a stale counter skips existing files");
         assert!(dir.join("2.json").exists(), "abandoned saves are retained");
         assert_eq!(saves.read(3).unwrap(), snapshot);
+        let lineage = fs::read_to_string(dir.join(LINEAGE)).unwrap();
+        let reordered = lineage.replacen("\"id\": 0", "\"id\": 9", 1);
+        fs::write(dir.join(LINEAGE), reordered).unwrap();
+        assert!(saves
+            .entries()
+            .unwrap_err()
+            .to_string()
+            .contains("out of order"));
         fs::remove_file(dir.join(LINEAGE)).unwrap();
         assert!(saves.entries().unwrap_err().to_string().contains("missing"));
         assert!(saves.write(Kind::Manual, &snapshot).is_err());
