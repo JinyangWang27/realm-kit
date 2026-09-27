@@ -1,7 +1,7 @@
 use realmkit_engine::Command;
 use realmkit_spec::Direction;
 
-pub const HELP: &str = "<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\nattack <monster-id>\ntalk <npc-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nhelp\nquit";
+pub const HELP: &str = "<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\nattack <monster-id>\ntalk <npc-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nsave\nload [number] — list saves, or restore one\nhelp\nquit";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Input {
@@ -10,6 +10,9 @@ pub enum Input {
     Select(usize),
     Help,
     Quit,
+    Save,
+    /// List saves, or restore the one-based save shown in that list.
+    Load(Option<usize>),
     Blank,
 }
 
@@ -34,6 +37,13 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
     let command = match (verb.as_str(), &words[1..]) {
         ("help" | "?", []) => return Ok(Input::Help),
         ("quit" | "exit", []) => return Ok(Input::Quit),
+        ("save", []) => return Ok(Input::Save),
+        ("load", []) => return Ok(Input::Load(None)),
+        ("load", [number]) => {
+            return Ok(Input::Load(Some(
+                number.parse().map_err(|_| "expected a save number")?,
+            )))
+        }
         ("look", []) => Command::Look,
         ("inventory" | "i", []) => Command::Inventory,
         ("status" | "c", []) => Command::Status,
@@ -81,5 +91,9 @@ mod tests {
             Ok(Input::Command(Command::ChooseDialogue(2)))
         );
         assert!(parse("north extra").is_err());
+        assert_eq!(parse("save"), Ok(Input::Save));
+        assert_eq!(parse("load"), Ok(Input::Load(None)));
+        assert_eq!(parse("load 2"), Ok(Input::Load(Some(2))));
+        assert!(parse("load two").is_err());
     }
 }
