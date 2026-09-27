@@ -132,3 +132,12 @@ fn diagnostics_identify_entities_and_stable_codes_for_repair() {
     let json = serde_json::to_value(&diagnostics).unwrap();
     assert_eq!(json[0]["severity"], "error");
 }
+
+#[test]
+fn revision_is_stable_for_equal_content_and_changes_with_any_edit() {
+    let world = demo();
+    assert_eq!(world.revision(), demo().revision());
+    let mut edited = demo();
+    edited.items[0].description.push('.');
+    assert_ne!(world.revision(), edited.revision());
+}
