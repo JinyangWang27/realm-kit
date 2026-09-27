@@ -22,8 +22,9 @@ and when they must be settled.
 - External agents use a typed authoring core; serialization and MCP are adapters.
 - The shared world owns the location graph, characters/entities and story-phase
   definitions. Every world has one or more player routes; each route owns a
-  PlayerSpec-like player definition, start state/location, exactly one main
-  questline and one or more authored outcomes. Side questlines are optional, but
+  PlayerSpec-like player-control binding to a shared Character, start
+  state/location, exactly one main questline and one or more authored outcomes.
+  Side questlines are optional, but
   main-story progress unlocks them in bounded waves so exploration remains open
   without making the main story irrelevant.
 - Time models stay separate: story phase is core narrative progression; an
@@ -427,10 +428,12 @@ item identity and consumes resources atomically without duplicating bonuses.
   than treating player death as the only terminal outcome.
 - Keep story-phase transitions event-driven. Add optional World Time only when a
   representative world needs travel durations, schedules, day/night, rest tied to
-  elapsed time, appointments or deadlines. Represent it as monotonic minutes from
-  an authored epoch, advance it only explicitly, and resolve crossed scheduled
-  events chronologically with stable authored order for ties. Do not assign
-  universal durations to ordinary commands.
+  elapsed time, appointments or deadlines. Represent it as minutes from an
+  authored epoch that are monotonic within one forward committed history, advance
+  it only explicitly, and restore the saved value exactly when rewinding to an
+  older snapshot. Resolve crossed scheduled events chronologically with stable
+  authored order for ties. Do not assign universal durations to ordinary
+  commands.
 - Support authored stochastic world-event opportunities when a representative
   world needs rare encounters/discoveries. Trigger rolls only at explicit gameplay
   transitions and select only among pre-authored outcomes.
