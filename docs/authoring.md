@@ -266,11 +266,17 @@ Source-backed generation uses bounded fidelity rather than an unrestricted
 adaptation mode. Worldgen extracts and maintains authoring-side Canon IR with
 protected canon anchors, broader canon constraints and provenance.
 
-Canon anchors are major source facts/events that supported branches must preserve.
-A generated branch may explore, add side stories, change local consequences or
-take alternate routes between anchors, but it must still be able to reach every
-required downstream anchor in a canon-compatible state. Making a required anchor
-permanently unreachable is a validation error.
+Canon anchors are major source facts/events that supported branches preserve
+according to the branch/outcome they are authored to support. A continuing branch
+may explore, add side stories, change local consequences or take alternate routes
+between anchors, but it must still be able to reach every downstream anchor
+required for that branch/outcome in a canon-compatible state. Making such an
+anchor permanently unreachable is a validation error.
+
+An explicitly authored terminal divergence may end before later anchors only when
+the adaptation policy permits that endpoint; anchors after it are then not
+required for that branch. This exception does not permit contradicting canon facts
+or constraints already established before the terminal outcome.
 
 Broader constraints also preserve established identity, relationships, chronology,
 character knowledge, core characterization, world facts and causal consistency.
