@@ -43,10 +43,13 @@ player crafting is absent.
 | Enchantment definition | Authored effect, allowed equipment and display text |
 
 Two iron swords share a definition but have different instance IDs. Improving
-one changes that instance only. Equipment slots, improvement commands and saves
-refer to instance IDs. Stack interchangeable ingredients; keep modified equipment
-individually addressable. The existing item-count inventory will need a deliberate
-migration when equipment instances arrive.
+one changes that instance only. Equipment owns each equipment instance's
+ownership/possession state whether equipped or unequipped, so Equipment does not
+require the general Inventory capability. Equipment slots, improvement commands
+and saves refer to instance IDs. Stack interchangeable ingredients when Inventory
+is present; keep modified equipment individually addressable. The existing
+Format 1 item-count inventory will need a deliberate migration when equipment
+instances arrive.
 
 ## Authoring equipment
 
