@@ -203,6 +203,8 @@ name = "realmkit-engine"
 version = "0.1.0"
 dependencies = [
  "realmkit-spec",
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 

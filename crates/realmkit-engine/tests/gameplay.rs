@@ -269,3 +269,100 @@ fn viewing_panels_does_not_spend_time() {
     }
     assert_eq!(engine.state(), &before);
 }
+
+#[test]
+fn saving_mid_quest_and_resuming_matches_uninterrupted_play() {
+    let world = demo();
+    let before = [
+        Talk("elder".into()),
+        ChooseDialogue(1),
+        ChooseDialogue(1),
+        Move(North),
+        Attack("wolf".into()),
+    ];
+    let after = [
+        Attack("wolf".into()),
+        Attack("wolf".into()),
+        Move(South),
+        Talk("elder".into()),
+        ChooseDialogue(1),
+    ];
+    let mut uninterrupted = Engine::new(&world).unwrap();
+    for command in before.clone() {
+        uninterrupted.execute(command).unwrap();
+    }
+    let json = serde_json::to_string(&uninterrupted.snapshot()).unwrap();
+    assert_eq!(
+        uninterrupted.snapshot(),
+        uninterrupted.snapshot(),
+        "saving must not change state"
+    );
+    let mut resumed = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
+    assert_eq!(resumed.state(), uninterrupted.state());
+    for command in after {
+        assert_eq!(
+            resumed.execute(command.clone()).unwrap(),
+            uninterrupted.execute(command).unwrap()
+        );
+    }
+    assert_eq!(resumed.state(), uninterrupted.state());
+}
+
+#[test]
+fn mismatched_or_corrupt_saves_are_rejected() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    accept(&mut engine);
+    let good = engine.snapshot();
+    assert_eq!(good.player_route_id, "default");
+    let broken: Vec<fn(&mut SaveSnapshot)> = vec![
+        |s| s.save_format_version = 99,
+        |s| s.package_id = "other".into(),
+        |s| s.package_revision = "fnv1a64:0".into(),
+        |s| s.player_route_id = "other".into(),
+        |s| s.state.player.location = "nowhere".into(),
+        |s| s.state.player.hp = s.state.player.max_hp + 1,
+        |s| s.state.player.max_hp += 1,
+        |s| s.state.player.level = 0,
+        |s| s.state.player.xp = 10,
+        |s| {
+            s.state.player.inventory.insert("ghost".into(), 1);
+        },
+        |s| {
+            s.state.monster_hp.remove("wolf");
+        },
+        |s| {
+            s.state.monster_hp.insert("wolf".into(), 99);
+        },
+        |s| {
+            s.state.quests.insert("extra".into(), QuestStatus::Active);
+        },
+        |s| {
+            s.state.flags.insert("undeclared".into());
+        },
+        |s| {
+            s.state.dialogue = Some(DialogueState {
+                npc: "elder".into(),
+                node: "missing".into(),
+            })
+        },
+    ];
+    for (i, corrupt) in broken.into_iter().enumerate() {
+        let mut snapshot = good.clone();
+        corrupt(&mut snapshot);
+        assert!(
+            matches!(
+                Engine::restore(&world, snapshot),
+                Err(EngineError::InvalidSave(_))
+            ),
+            "corruption {i} was accepted"
+        );
+    }
+    let mut edited = demo();
+    edited.items[0].description.push('.');
+    assert!(Engine::restore(&edited, good.clone()).is_err());
+    let mut json: serde_json::Value = serde_json::to_value(&good).unwrap();
+    json["state"]["surprise"] = true.into();
+    assert!(serde_json::from_value::<SaveSnapshot>(json).is_err());
+    assert!(Engine::restore(&world, good).is_ok());
+}

@@ -7,7 +7,7 @@ pub(super) fn conditions_met(state: &GameState, conditions: &[Condition]) -> boo
     })
 }
 
-fn npc_here(world: &WorldSpec, state: &GameState, id: &str) -> bool {
+pub(super) fn npc_here(world: &WorldSpec, state: &GameState, id: &str) -> bool {
     world
         .location(&state.player.location)
         .unwrap()
