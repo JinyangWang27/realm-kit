@@ -490,10 +490,13 @@ as its primary API. A small combat simulator may be brought forward to tune M3.
 **Done when:** a short source produces an inspectable world whose provenance,
 language and fidelity can be reviewed, whose main progression is tested, and
 which remains playable after removing all generation tools and source files.
-Every packaged PlayerRoute has at least one successful real-engine simulation to a
-completion outcome. For a two-route fixture, both routes are selectable from New
-Game, share the intended world/canon data, and validate and simulate independently
-from their own starts.
+Normal source-backed play is available through at least one client whose generic
+UI text supports the package/source language, or through explicit package-provided
+setting-specific UI overrides; missing fixed-interface translations must not
+silently fall back to English. Every packaged PlayerRoute has at least one
+successful real-engine simulation to a completion outcome. For a two-route
+fixture, both routes are selectable from New Game, share the intended world/canon
+data, and validate and simulate independently from their own starts.
 
 ## M8 — Additional clients and shared play · optional later
 
