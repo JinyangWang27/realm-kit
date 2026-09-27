@@ -103,10 +103,12 @@ databases or other durable storage.
   boundaries such as story-phase transitions; allow additional authored/capability
   checkpoints where useful, but do not auto-save on every ordinary movement step
   or presentation command.
-- Ordinary recoverable death restores the newest valid manual/auto-save snapshot.
-  Restoring replaces the current playthrough state with the saved deterministic
-  snapshot; it does not "undo" commands piecemeal. Explicit authored terminal
-  death/failure outcomes bypass this recovery behavior.
+- Ordinary recoverable death attempts to restore the newest manual/auto-save
+  recovery snapshot. If that snapshot fails load validation, surface the failure
+  and let the client explicitly offer an older snapshot; never silently skip a
+  corrupt newest entry. Restoring replaces the current playthrough state with the
+  saved deterministic snapshot rather than "undoing" commands piecemeal. Explicit
+  authored terminal death/failure outcomes bypass this recovery behavior.
 - Save creation consumes no story/world/encounter time and must not perturb
   narrative variant selection.
 - Preserve every deterministic counter; later combat scheduling must also survive
