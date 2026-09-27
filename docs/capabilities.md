@@ -45,7 +45,8 @@ capability is present.
 | Survival | Hunger, fatigue, temperature, injury, supplies | Eat, rest, shelter, forage, treat injury |
 | Travel and time | Calendar, journey progress, schedules, deadlines | Travel, wait, camp, choose a route |
 | Economy and trade | Currency, prices, merchant stock, debts | Buy, sell, bargain, borrow, repay |
-| Equipment | Individual items, slots, effective modifiers | Equip, compare, unequip |
+| Inventory | Carried item quantities and possession/ownership references | Take, drop, give, transfer |
+| Equipment | Equipped item instances, slots, effective modifiers | Equip, compare, unequip |
 | Crafting | Recipes, materials, proficiency, stations | Forge, improve, enchant, brew |
 | Combat | HP/MP, stats, initiative, effects, opponents | Attack, use skill, defend, flee |
 | Magic and rituals | Known rites, costs, preparation, curses | Cast, prepare, dispel, perform a ritual |
