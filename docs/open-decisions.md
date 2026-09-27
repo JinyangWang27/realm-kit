@@ -721,8 +721,9 @@ Use three representations:
 
 The deciding rule is:
 
-> Create a runtime instance only when several distinguishable copies of the same
-> authored definition may exist and carry independent mutable state.
+> Create a runtime instance when a concrete object needs persistent mutable
+> identity distinct from its authored definition—whether the definition permits
+> one live object or many distinguishable copies.
 
 Examples:
 
@@ -731,8 +732,10 @@ Examples:
   inherently unique authored identities such as Yang Guo.
 - Fungible resources such as coins, arrows or identical herbs use a definition
   plus quantity when individual copies have no meaningful state.
-- Equipment, spawned enemies, containers or other repeatable mutable objects use
-  runtime instances when individual copies can differ.
+- Equipment, spawned enemies, containers or other mutable physical objects use
+  runtime instances when the concrete object needs persistent identity/state.
+  This includes a unique legendary item when ownership, improvement, enchantment
+  or other mutable state belongs to that physical object.
 
 ### Instance identity
 
