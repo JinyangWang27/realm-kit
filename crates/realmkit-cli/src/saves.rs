@@ -115,15 +115,23 @@ impl Saves {
         serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()).into())
     }
 
-    /// Makes the save at `index` the newest in the chain.
-    pub fn fork(&self, index: usize) -> Result<(), Box<dyn Error>> {
+    /// Makes save `id` the newest in the chain. Checked under the lock, so a
+    /// save another game has since dropped from the chain is refused.
+    pub fn fork(&self, id: u64) -> Result<(), Box<dyn Error>> {
         let _lock = self.lock()?;
         let mut lineage = self.lineage()?;
-        lineage.entries.truncate(index + 1);
-        write_atomic(
-            &self.dir.join(LINEAGE),
-            &serde_json::to_vec_pretty(&lineage)?,
-        )?;
+        let index = lineage
+            .entries
+            .iter()
+            .position(|e| e.id == id)
+            .ok_or("that save is no longer in the recovery chain")?;
+        if index + 1 < lineage.entries.len() {
+            lineage.entries.truncate(index + 1);
+            write_atomic(
+                &self.dir.join(LINEAGE),
+                &serde_json::to_vec_pretty(&lineage)?,
+            )?;
+        }
         Ok(())
     }
 
@@ -180,6 +188,10 @@ mod tests {
         saves.write(Kind::Auto, &snapshot).unwrap();
         let ids: Vec<_> = saves.entries().unwrap().iter().map(|e| e.id).collect();
         assert_eq!(ids, [0, 3]);
+        assert!(
+            saves.fork(1).is_err(),
+            "abandoned saves cannot be forked to"
+        );
         assert!(dir.join("2.json").exists(), "abandoned saves are retained");
         let good = fs::read_to_string(dir.join(LINEAGE)).unwrap();
         // A snapshot written before its listing is just an unlisted save.

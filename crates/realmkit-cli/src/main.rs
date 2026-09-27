@@ -163,19 +163,20 @@ fn restore(
         writeln!(output, "There are no saves yet.")?;
         return Ok(false);
     };
-    let loaded = saves
-        .read(entries[index].id)
-        .and_then(|snapshot| Ok(Engine::restore(engine.world(), snapshot)?));
+    let id = entries[index].id;
+    let loaded = saves.read(id).and_then(|snapshot| {
+        let restored = Engine::restore(engine.world(), snapshot)?;
+        // Recovery resumes a living player; a dead save could never recover.
+        if restored.state().player.hp == 0 {
+            return Err("the player is dead in this save".into());
+        }
+        // Fork before switching: if the chain cannot record this branch
+        // (or another game changed it), keep playing where we were.
+        saves.fork(id)?;
+        Ok(restored)
+    });
     match loaded {
         Ok(restored) => {
-            // Fork first: if the chain cannot be updated, keep playing where
-            // we were rather than resume a branch the saves do not record.
-            if index + 1 < entries.len() {
-                if let Err(error) = saves.fork(index) {
-                    writeln!(output, "Save {} could not be loaded: {error}", index + 1)?;
-                    return Ok(false);
-                }
-            }
             *engine = restored;
             writeln!(output, "Loaded save {}.\n", index + 1)?;
             let events = engine
@@ -593,6 +594,16 @@ mod tests {
         assert!(after.contains("The Pine Track"), "{after}");
         assert!(after.contains("HP 24/24"), "{after}");
         assert!(!after.contains("You cannot save now"), "{after}");
+
+        let mut dead = Engine::new(&world).unwrap();
+        dead.execute(Command::Move(realmkit_spec::Direction::North))
+            .unwrap();
+        dead.execute(Command::Attack("wolf".into())).unwrap();
+        saves.write(Kind::Manual, &dead.snapshot()).unwrap();
+        let mut output = Vec::new();
+        play(&world, Some(&saves), "".as_bytes(), &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains("the player is dead in this save"), "{text}");
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
