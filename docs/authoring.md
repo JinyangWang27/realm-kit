@@ -216,8 +216,9 @@ and executable content. There is no skill framework in this scaffold.
 
 RealmKit's intended source-adaptation shape is one shared open world containing
 one or more independently playable PlayerRoutes. Each route owns exactly one main
-questline plus optional side questlines, while reusing the same shared NPCs,
-locations, factions, story phases and world state.
+questline. Side questlines are world content that may be shared across routes or
+route-gated as authored, while reusing the same shared NPCs, locations, factions,
+story phases and world state.
 
 For a canonical route, the main questline adapts the relevant canonical character's
 story directly. For an original-character route, the player receives a distinct
@@ -332,10 +333,12 @@ The current deterministic replay tests demonstrate the execution seam; there
 is no `simulate_quest` API or automatic balance analysis yet.
 
 The playable spec can grow through explicit optional capability sections. Core
-state should contain only universally needed identity/location/flags; combat,
-investigation and crafting own their data and mutable state. This is ordinary
-typed composition, not a dynamic plugin system. Cross-capability effects must be
-explicit—for example, combat may set the same story flags used by dialogue.
+state should contain universally needed route/playthrough state such as controlled
+identity, location, main-quest/objective progress and shared authored story flags.
+Combat, investigation, crafting and other optional capabilities own their own data
+and mutable state. This is ordinary typed composition, not a dynamic plugin
+system. Cross-capability effects must be explicit—for example, combat may set the
+same story flags used by dialogue.
 
 Future agents can iterate on `validate_world()` diagnostics instead of scraping
 CLI text. Graph/quest reachability analysis, richer provenance, source extraction,
