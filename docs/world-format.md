@@ -8,8 +8,11 @@ should not insert dummy combat content into non-combat worlds. The roadmap treat
 combat and other genre mechanics as source-grounded capabilities.
 
 Format 1 also represents one fixed player-controlled character and one playable
-route. Future formats may package a canonical route, an original-character
-route, or both over the same shared world and canonical timeline. When both are
+route. For persistence/API identity, RealmKit exposes this implicit route under the
+stable logical route ID `default`; Format 1 does not serialize a route collection
+or route field. Future formats may package a canonical route, an
+original-character route, or both over the same shared world and canonical
+timeline. When both are
 present, New Game selects between them directly; one route does not unlock the
 other. Each route has its own player binding, start state, main questline, outcomes and
 mutable save while reusing shared locations, NPCs, factions and other world
