@@ -130,9 +130,9 @@ shared world / canon timeline
 
 Do not introduce a dedicated runtime `Campaign` abstraction merely to express
 this before a concrete multi-route package needs one. For now, treat "route" as
-the conceptual unit for an independently playable protagonist/storyline. The
-current Format 1 supports one fixed route. Multiple simultaneously controlled
-protagonists remain a separate future design.
+the conceptual unit for an independently playable player-controlled entry and
+storyline. The current Format 1 supports one fixed route. Multiple simultaneously
+controlled characters remain a separate future design.
 
 World character identity and player control are separate concerns:
 
@@ -167,12 +167,15 @@ opt-in and typed rather than a universal right to rewrite authored identity.
 A future world-builder skill should teach the author to:
 
 1. Extract canon, chronology, relationships and source references before gameplay.
-2. Build a coherent shared location graph and a readable spatial layout. Keep
-   traversal exits separate from presentation placement: the 3×3 local map may
-   show diagonal nearby locations, while actual movement remains through explicit
-   cardinal exits. Keep NPCs/locations/factions as world entities rather than
-   nesting them inside quests.
-3. Compile the canonical story into a main questline and major story phases.
+2. Build a coherent shared location/traversal graph. Add optional Areas and
+   spatial placement only where the world benefits from map presentation; keep
+   placement separate from traversal, and leave full-map versus viewport size to
+   clients. Keep NPCs/locations/factions as world entities rather than nesting
+   them inside quests.
+3. Compile shared canonical chronology into story phases. For each PlayerRoute,
+   author exactly one route-owned main questline: canonical routes derive theirs
+   directly from the canonical story, while original-character routes receive
+   their own main questline within the same canon constraints and story phases.
 4. Extract side-story seeds from canonical people, places, factions, conflicts,
    occupations and unresolved details, then expand those seeds into side
    questlines before inventing generic filler.
@@ -211,16 +214,23 @@ and executable content. There is no skill framework in this scaffold.
 
 ## Open-world quest authoring
 
-RealmKit's intended source-adaptation shape is one shared open world with a
-canonical main questline plus optional side questlines. Side content should not
-form disconnected mini-worlds: it reuses and changes the same NPCs, locations,
-factions and world state as the main story.
+RealmKit's intended source-adaptation shape is one shared open world containing
+one or more independently playable PlayerRoutes. Each route owns exactly one main
+questline plus optional side questlines, while reusing the same shared NPCs,
+locations, factions, story phases and world state.
 
-Main progress establishes a `story_phase` (or equivalent typed progression
-state). A phase exposes a bounded set of side questlines. Players can explore and
-finish those stories in any supported order, but later side content remains
-locked until the main story advances. This provides Skyrim-like freedom within
-the source chronology without making the canonical story permanently optional.
+For a canonical route, the main questline adapts the relevant canonical character's
+story directly. For an original-character route, the player receives a distinct
+authored main questline that operates within the same canon constraints and shared
+chronology while canonical protagonists continue through authored world/NPC
+progression.
+
+Main progress for a route establishes or triggers shared `story_phase` (or
+equivalent typed progression) transitions. A phase exposes a bounded set of side
+questlines. Players can explore and finish those stories in any supported order,
+but later side content remains locked until that route's main progression advances
+the authored chronology. This provides Skyrim-like freedom within the source
+timeline without conflating separate PlayerRoute main questlines.
 
 Side quests may influence the main questline, but only through explicit
 pre-authored state and conditions. Valid effects include changing dialogue,
