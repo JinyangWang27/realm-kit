@@ -1002,8 +1002,8 @@ Worldgen may call a package complete only when:
 3. every required main-progression target is reachable as far as the available
    analyzers can determine;
 4. required canon anchors remain reachable;
-5. every required route has at least one successful real-engine simulation to a
-   completion outcome;
+5. every packaged PlayerRoute has at least one successful real-engine simulation
+   to a completion outcome;
 6. each explicit stochastic result used by required progression has a valid
    authored continuation, recovery path or outcome; and
 7. capability-specific completion checks pass.
