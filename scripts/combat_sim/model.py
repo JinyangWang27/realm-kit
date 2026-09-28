@@ -41,6 +41,10 @@ class Skill:
     level: int = 1  # minimum character level to use it; later skills are stronger or cheaper
 
 
+# Proposed engine validation bounds (ROADMAP.md, "Engine bounds").
+STAT_BOUND = 9_999
+POWER_BOUNDS = (1, 1_000)
+
 BASIC_ATTACK = Skill("attack", power=100, channel=Channel.PHYSICAL)
 SPECIAL_BASIC_ATTACK = Skill("touch", power=100, channel=Channel.SPECIAL)  # e.g. a spirit or a 内力 palm
 

@@ -337,9 +337,12 @@ Encounter           active local state; at most one per playthrough
   The player-controlled character reaching 0 HP is ordinary death, handled by
   M2's recovery, whatever allies survive. Downed/revive rules wait for a world
   that needs them.
-- **Fleeing.** `Flee` is a player action with the normal action time: the player
-  escapes when their next turn arrives, if still alive, so opponents act in
-  between and a faster player escapes sooner. An authored group may forbid
+- **Fleeing.** `Flee` is the one explicit exception to actions resolving
+  immediately: it has a wind-up. Declaring it on the player's turn schedules the
+  escape for that participant's next turn with the normal action time, during
+  which the player takes no other action, opponents act as usual and damage
+  applies. The escape resolves when that turn arrives if the player is still
+  alive, so a faster player escapes sooner. Other actions keep resolving at once. An authored group may forbid
   fleeing, as a boss or canonical duel might. Fleeing grants nothing and records
   no defeats.
 - **Yielding.** A group may be authored to yield: whichever side falls to the
@@ -377,9 +380,10 @@ a weaker minion tier.
 
 ### Stat ranges and caps · proposed
 
-The absolute numbers are arbitrary. What matters is where they sit relative to
-the defence scale K and the baseline speed, and how many meaningful steps lie
-between starting and final values. Stats are not stored in 8 bits, so a cap of
+The absolute numbers are arbitrary. What matters is how attack and defence
+compare, since defence equal to the attacker's combined attack halves damage;
+where speeds sit relative to the baseline of 100; and how many meaningful steps
+lie between starting and final values. Stats are not stored in 8 bits, so a cap of
 255 would only be a convention borrowed from older games.
 
 - **Engine bounds.** Validation rejects any authored or derived combat stat,
@@ -398,9 +402,11 @@ between starting and final values. Stats are not stored in 8 bits, so a cap of
   bound player stats. Add optional authored caps for other stats in M4 if
   equipment stacking needs them, applied after all modifiers as speed is.
 - **Design scale.** Baseline speed is 100. A uniform stat cap of 100 would leave
-  speed no room to rise. With 10% growth per level, a 200-HP character reaches the
-  9,999 bound at about level 42, so a world with more levels needs a higher bound
-  or slower growth.
+  speed no room to rise. With 10% growth per level, a 200-HP character passes the
+  9,999 bound at level 43, and a boss with four times the HP of an 80-HP opponent
+  at level 38, so a world with more levels needs a higher bound or
+  slower growth. The sample content therefore stops at level 35, and `check`
+  validates every sample character and tier against the bounds up to there.
 - **Timeline resolution.** With action cost 10,000, speeds 100–200 produce only
   51 distinct delays; near the cap about four speed points share one delay. Action
   cost 100,000 gives every integer speed from 1 to 255 its own delay, so use
@@ -511,18 +517,23 @@ same-level fights steady as players unlock theirs: without them, the mage's
 level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
-`tune` nudges every tuned value, including player stats, tier multipliers and the
-growth rate, and 69 of 118 nudges keep every target. It reports the first target
-each nudge breaks. Half of the 49 breaks (24) are boss parity against beasts,
-each a two-level gap where one is allowed; allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`)
-is a design choice, not a tuning fix. Not every break is a near miss, though:
-lowering the warrior's physical attack from 24 to 20 or its HP from 200 to 170,
-or raising the mage's HP to 195, leaves the warrior winning only 1 to 4 of 15 or
-16 comparisons, so the trade-off collapses toward the mage. Those three values
-need the tightest control when balancing resumes, along with rage per action,
-which stops the warrior's later skills from mattering when changed from 1 in
-either direction, and the growth rate, which breaks boss parity at 8.5% a level. The remaining breaks are fights that become too short, later skills
-that stop mattering enough, or too many fights between rests.
+`tune` nudges player and opponent stats, skill power, cost and action time, tier
+multipliers, the growth rate and the resource rules, and 88 of 144 nudges keep
+every target. It reports the first target each nudge breaks. Nearly half of the
+56 breaks (27) are boss parity against beasts, each a two-level gap where one is
+allowed; allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`) is a design
+choice, not a tuning fix. Not every break is a near miss, though: lowering the
+warrior's physical attack from 24 to 20 or its HP from 200 to 170, or raising the
+mage's HP to 195, leaves the warrior winning only 1 to 4 of 15 or 16
+comparisons, so the trade-off collapses toward the mage. Those three values need
+the tightest control when balancing resumes, along with rage per action, which
+stops the warrior's later skills from mattering when changed from 1 in either
+direction, and the growth rate, which breaks boss parity at 8.5% a level. Action
+time matters too: making a skill 15% quicker acts like a power increase, and 6 of
+the 26 action-time nudges break a target, such as a quicker fireball making
+level-10 beast fights cost only 12% HP. The remaining breaks are fights that
+become too short, later skills that stop mattering enough, or too many fights
+between rests.
 
 The grinding figures assume that levelling up restores HP and MP fully, as the
 Format 1 engine does; the roadmap leaves that open for M3b. Without it, kills

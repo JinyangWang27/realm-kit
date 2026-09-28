@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .encounter import Encounter
-from .model import Channel, Combatant, Formula, Kind, Resource, Rules, Skill
+from .model import POWER_BOUNDS, STAT_BOUND, Channel, Combatant, Formula, Kind, Resource, Rules, Skill
 from .simulator import Simulator
 
 class TargetMissed(Exception):
@@ -55,7 +55,25 @@ def check_resource_timing(sim: Simulator) -> None:
             "rage from the current action must not be spendable in the same action")
 
 
+def check_bounds(sim: Simulator) -> None:
+    """Sample content must itself pass the proposed engine validation: every derived stat of
+    every character and tier stays within the stat bound up to the maximum level, and every
+    skill's power is in range."""
+    top = sim.content.max_level
+    characters = [sim.player(build, top) for build in sim.content.builds]
+    characters += [sim.content.scaled(foe, kind).at_level(sim.rules, top)
+                   for foe in sim.content.monsters for kind in Kind]
+    for c in characters:
+        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef"):
+            require(getattr(c, stat) <= STAT_BOUND,
+                    f"{c.name} {stat} {getattr(c, stat)} exceeds {STAT_BOUND} at level {top}")
+        for skill in (*c.skills, c.basic):
+            require(POWER_BOUNDS[0] <= skill.power <= POWER_BOUNDS[1],
+                    f"{c.name} {skill.name} power {skill.power} is outside {POWER_BOUNDS}")
+
+
 def check(sim: Simulator) -> None:
+    check_bounds(sim)
     check_formula(sim.rules)
     check_resource_timing(sim)
     for foe in sim.content.monsters:

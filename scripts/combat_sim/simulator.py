@@ -89,7 +89,7 @@ class Simulator:
 
     def boss_level_needed(self, build: Profile, boss_level: int) -> int | None:
         boss = self.monster(boss_level, Kind.BOSS)
-        return next((p for p in range(1, 60) if self.fight(self.player(build, p), [boss]).won), None)
+        return next((p for p in range(1, self.content.max_level + 1) if self.fight(self.player(build, p), [boss]).won), None)
 
     def grind(self, build: Profile, target: int, xp: XpRules = XpRules(),
               farm: int | None = None) -> GrindResult:
@@ -103,7 +103,7 @@ class Simulator:
             if farm is not None:
                 monster_level = farm
             else:
-                safe = [m for m in range(1, 60)
+                safe = [m for m in range(1, self.content.max_level + 1)
                         if (o := self.outcome(build, level, [self.monster(m)])) and o.hp_lost <= 35]
                 if not safe:
                     break

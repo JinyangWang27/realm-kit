@@ -133,6 +133,7 @@ def knobs(content: Content) -> dict[str, Knob]:
     for name, slot in all_slots.items():
         for skill in slot[0](content).skills:
             found[f"{name} {skill.name} power"] = _skill_knob(slot, skill.name, "power")
+            found[f"{name} {skill.name} time"] = _skill_knob(slot, skill.name, "time")
             if skill.cost:
                 found[f"{name} {skill.name} cost"] = _skill_knob(slot, skill.name, "cost")
     for kind in content.tiers:
