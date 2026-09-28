@@ -149,10 +149,14 @@ class Rules:
         """Encounter time of one basic action at speed 100, scheduled exactly as `delay` does."""
         return self.delay(100)
 
+    def grown(self, value: Amount, level: int, growth: float | None = None) -> Fraction:
+        """A level-1 value at `level`, exactly, before rounding."""
+        rate = exact(self.growth if growth is None else growth)
+        return exact(value) * rate ** (level - 1)
+
     def grow(self, value: Amount, level: int, growth: float | None = None) -> int:
         """A level-1 value at `level`, generated exactly and rounded half up."""
-        rate = exact(self.growth if growth is None else growth)
-        return round_half_up(exact(value) * rate ** (level - 1))
+        return round_half_up(self.grown(value, level, growth))
 
     def k_for(self, level: int) -> int:
         return self.base_k if self.formula is Formula.K_FIXED else self.grow(self.base_k, level)

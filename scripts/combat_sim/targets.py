@@ -45,18 +45,14 @@ def check_formula(rules: Rules) -> None:
 def check_resource_timing(sim: Simulator) -> None:
     """Action rage is credited after the action resolves, so rage one short of a skill's
     cost cannot pay for it that turn. Runs one real action through the encounter."""
-    rager = next((b for b in sim.content.builds
-                  if any(s.resource is Resource.RAGE for s in b.skills)), None)
-    if rager is None:
+    # The cheapest paid rage skill within the table; free rage skills have no shortfall.
+    candidates = [(s.cost, max(1, s.level), b, s) for b in sim.content.builds for s in b.skills
+                  if s.resource is Resource.RAGE and s.cost > 0 and s.level <= sim.content.max_level]
+    if not candidates:
         return
-    # Test where the cheapest-to-reach rage skill exists: its unlock level, if within the table.
-    level = max(1, min(s.level for s in rager.skills if s.resource is Resource.RAGE))
-    if level > sim.content.max_level:
-        return
-    player = sim.player(rager, level)
-    cost = min(s.cost for s in player.skills if s.resource is Resource.RAGE)
-    if cost == 0:
-        return  # a free rage skill has no shortfall to test
+    cost, level, rager, paid = min(candidates, key=lambda c: (c[0], c[1]))
+    # Probe that skill alone, so no other skill can be chosen in its place.
+    player = sim.player(replace(rager, skills=(paid,)), level)
     encounter = Encounter(sim.rules, player, [sim.monster(level)])
     encounter.player.rage = cost - 1
     encounter._act(encounter.player)
@@ -175,6 +171,14 @@ def check_bounds(sim: Simulator) -> None:
                 require(low <= getattr(c, stat) <= STAT_BOUND,
                         f"{c.name} {stat} {getattr(c, stat)} is outside {low}-{STAT_BOUND} at level {level}")
             require(c.xp >= 0, f"{c.name} grants negative XP ({c.xp}) at level {level}")
+    # The exact grown values at the top level, before rounding could pull them back in bounds.
+    top = sim.content.max_level
+    for profile in (*sim.content.builds,
+                    *(sim.content.scaled(foe, kind) for foe in sim.content.monsters for kind in Kind)):
+        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef"):
+            value = sim.rules.grown(getattr(profile, stat), top, profile.growth)
+            require(value <= STAT_BOUND,
+                    f"{profile.name} {stat} grows to {float(value):g} at level {top}, above {STAT_BOUND}")
     # Each skill at its unlock level: attack only rises with level (growth >= 1), so that is
     # where rounding could leave a newly unlocked skill with no attack.
     check_unlocks(sim, [*sim.content.builds,
