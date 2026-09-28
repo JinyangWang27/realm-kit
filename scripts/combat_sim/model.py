@@ -1,7 +1,6 @@
 """The proposed M3 combat model: rules and formulas, skills and characters."""
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from enum import Enum
 
@@ -153,5 +152,6 @@ class Rules:
 
     def delay(self, speed: int, time: int = 100) -> int:
         """Recovery before the actor's next turn; `time` is the action's cost in percent.
-        Effective speed is clamped to [1, speed_cap]."""
-        return math.ceil(self.action_cost * time // 100 / max(1, min(speed, self.speed_cap)))
+        Effective speed is clamped to [1, speed_cap]; the delay is rounded up once, minimum 1."""
+        speed = max(1, min(speed, self.speed_cap))
+        return max(1, -(-self.action_cost * time // (100 * speed)))

@@ -11,6 +11,9 @@ from .model import Combatant, Kind, Profile, Rules
 @dataclass(frozen=True)
 class XpRules:
     decay: bool = True  # scale XP by level difference; nothing from monsters 5+ levels below
+    # Whether levelling up restores HP and MP fully, as the Format 1 engine does. The
+    # roadmap leaves this open for M3b; grinding rest counts depend on it.
+    level_up_restores: bool = True
 
     @staticmethod
     def to_next(level: int) -> int:
@@ -96,6 +99,8 @@ class Simulator:
         """Grind from level 1 to `target`. Fights the highest monster costing <= 35% HP
         (or always `farm`) and rests when the next fight would be lost."""
         level, earned, kills, rests = 1, 0, 0, 0
+        hp: int | None = None
+        mp: int | None = None
         while level < target:
             player = self.player(build, level)
             if farm is not None:
@@ -109,7 +114,8 @@ class Simulator:
             gain = xp.for_kill(level, monster_level)
             if gain == 0:
                 break
-            hp, mp = player.hp, player.mp
+            if xp.level_up_restores or hp is None or mp is None:
+                hp, mp = player.hp, player.mp
             while earned < xp.to_next(level):
                 result = self.fight(player, [self.monster(monster_level)], hp, mp)
                 if not result.won:

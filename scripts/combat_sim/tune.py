@@ -131,7 +131,7 @@ def knobs(content: Content) -> dict[str, Knob]:
     for kind in content.tiers:
         for tier_field in ("hp", "attack"):
             found[f"{kind.value} tier {tier_field}"] = _tier_knob(kind, tier_field)
-    for field in ("cross_share", "mp_regen_percent", "rage_per_max_hp"):
+    for field in ("cross_share", "mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
         found[field] = _rules_knob(field)
     return found
 

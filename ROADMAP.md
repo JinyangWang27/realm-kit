@@ -505,16 +505,23 @@ level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
 `tune` nudges every tuned value, player stats and tier multipliers included, and
-68 of 114 nudges keep every target. It reports the first target each nudge
-breaks. Half of the 46 breaks are boss parity against beasts, each a two-level
+68 of 116 nudges keep every target. It reports the first target each nudge
+breaks. Nearly half of the 48 breaks (23) are boss parity against beasts, each a two-level
 gap where one is allowed; allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`)
 is a design choice, not a tuning fix. Not every break is a near miss, though:
 lowering the warrior's physical attack from 24 to 20 or its HP from 200 to 170,
 or raising the mage's HP to 195, leaves the warrior winning only 1 to 4 of 15 or
 16 comparisons, so the trade-off collapses toward the mage. Those three values
-need the tightest control when balancing resumes. The remaining breaks are
-fights that become too short, later skills that stop mattering enough, or too
-many fights between rests.
+need the tightest control when balancing resumes, along with rage per action:
+changing it from 1 in either direction stops the warrior's later skills from
+mattering. The remaining breaks are fights that become too short, later skills
+that stop mattering enough, or too many fights between rests.
+
+The grinding figures assume that levelling up restores HP and MP fully, as the
+Format 1 engine does; the roadmap leaves that open for M3b. Without it, kills
+stay the same but every build needs 5 or 6 more rests to reach level 10, for
+example 15 instead of 10 for the warrior against beasts. `XpRules` in
+`simulator.py` makes the rule explicit.
 
 #### Choosing skill power
 
