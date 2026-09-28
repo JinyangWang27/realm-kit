@@ -80,7 +80,8 @@ The game auto-saves at the start and whenever a quest is completed. Type `save`
 to save now, `load` to list saves and `load <number>` to restore one. Loading an
 older save abandons the saves made after it. If you die, your newest save is
 restored. A save that fails to load is reported, not skipped; the game then
-offers older saves for you to choose.
+offers older saves for you to choose. Only one game at a time can use a saves
+directory; a second is refused.
 
 The same journey is available as a scripted smoke test:
 

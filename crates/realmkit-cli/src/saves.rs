@@ -38,15 +38,26 @@ struct Lineage {
 /// Why a load failed, with the chosen save's position when one was chosen.
 pub type LoadError = (Option<usize>, Box<dyn Error>);
 
+/// One game's exclusive hold on a saves directory. Two games playing
+/// different branches of one recovery chain cannot both be right, so a second
+/// game is refused rather than allowed to interleave its saves.
 pub struct Saves {
     dir: PathBuf,
+    _lock: fs::File,
 }
 
 impl Saves {
-    pub fn open(dir: impl Into<PathBuf>) -> io::Result<Self> {
+    pub fn open(dir: impl Into<PathBuf>) -> Result<Self, Box<dyn Error>> {
         let dir = dir.into();
         fs::create_dir_all(&dir)?;
-        Ok(Self { dir })
+        let lock = fs::File::create(dir.join("lock"))?;
+        lock.try_lock().map_err(|e| match e {
+            fs::TryLockError::WouldBlock => {
+                format!("another game is using the saves in {}", dir.display()).into()
+            }
+            fs::TryLockError::Error(e) => Box::<dyn Error>::from(e),
+        })?;
+        Ok(Self { dir, _lock: lock })
     }
 
     /// Reads the index and rejects one that cannot be trusted: saves listed
@@ -87,9 +98,7 @@ impl Saves {
         Ok(lineage)
     }
 
-    /// Locked, so a save another game is publishing is never mistaken for damage.
     pub fn entries(&self) -> Result<Vec<Entry>, Box<dyn Error>> {
-        let _lock = self.lock()?;
         Ok(self.lineage()?.entries)
     }
 
@@ -97,7 +106,6 @@ impl Saves {
     /// step leaves earlier saves and the chain untouched; at worst an unlisted
     /// file remains below the counter, like an abandoned save.
     pub fn write(&self, kind: Kind, snapshot: &SaveSnapshot) -> Result<(), Box<dyn Error>> {
-        let _lock = self.lock()?;
         let mut lineage = self.lineage()?;
         let id = lineage.next;
         lineage.next = id.checked_add(1).ok_or("save counter exhausted")?;
@@ -121,15 +129,13 @@ impl Saves {
     }
 
     /// Loads the save at one-based-minus-one `index` (the newest when `None`)
-    /// and, once `check` accepts it, makes it the newest. Choosing, reading,
-    /// checking and forking are one locked step, so no other game's change can
-    /// slip between them. On failure, the position is given when one was chosen.
+    /// and, once `check` accepts it, makes it the newest. On failure, the
+    /// position is given when one was chosen.
     pub fn load<T>(
         &self,
         index: Option<usize>,
         check: impl FnOnce(SaveSnapshot) -> Result<T, Box<dyn Error>>,
     ) -> Result<(usize, T), LoadError> {
-        let _lock = self.lock().map_err(|e| (None, e.into()))?;
         let mut lineage = self
             .lineage()
             .map_err(|e| (None, format!("Saves could not be read: {e}").into()))?;
@@ -150,13 +156,6 @@ impl Saves {
             write_atomic(&self.dir.join(LINEAGE), &bytes).map_err(|e| (Some(index), e.into()))?;
         }
         Ok((index, value))
-    }
-
-    /// Serializes updates from every game sharing this directory; released on drop.
-    fn lock(&self) -> io::Result<fs::File> {
-        let file = fs::File::create(self.dir.join("lock"))?;
-        file.lock()?;
-        Ok(file)
     }
 
     fn file(&self, id: u64) -> PathBuf {
@@ -255,39 +254,14 @@ mod tests {
     }
 
     #[test]
-    fn concurrent_games_never_lose_or_share_a_save() {
-        let world = WorldSpec::load(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/demo-world"
-        ))
-        .unwrap();
-        let snapshot = Engine::new(&world).unwrap().snapshot();
-        let dir = std::env::temp_dir().join(format!("realmkit-race-{}", std::process::id()));
+    fn only_one_game_uses_a_saves_directory_at_a_time() {
+        let dir = std::env::temp_dir().join(format!("realmkit-exclusive-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
-        std::thread::scope(|scope| {
-            scope.spawn(|| {
-                let saves = Saves::open(&dir).unwrap();
-                for _ in 0..100 {
-                    saves.entries().expect("a save in progress is not damage");
-                }
-            });
-            for _ in 0..4 {
-                scope.spawn(|| {
-                    let saves = Saves::open(&dir).unwrap();
-                    for _ in 0..10 {
-                        saves.write(Kind::Manual, &snapshot).unwrap();
-                    }
-                });
-            }
-        });
-        let ids: Vec<_> = Saves::open(&dir)
-            .unwrap()
-            .entries()
-            .unwrap()
-            .iter()
-            .map(|e| e.id)
-            .collect();
-        assert_eq!(ids, (0..40).collect::<Vec<_>>());
+        let first = Saves::open(&dir).unwrap();
+        let refused = Saves::open(&dir).err().unwrap().to_string();
+        assert!(refused.contains("another game is using"), "{refused}");
+        drop(first);
+        Saves::open(&dir).unwrap();
         fs::remove_dir_all(dir).unwrap();
     }
 }
