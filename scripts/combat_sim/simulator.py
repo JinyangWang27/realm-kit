@@ -49,15 +49,21 @@ def hp_lost_percent(player: Combatant, hp: int) -> int:
 
 
 class Simulator:
-    def __init__(self, rules: Rules = Rules(), content: Content = DEFAULT) -> None:
+    """Experiments against one opponent, `foe`; `against` switches to another."""
+
+    def __init__(self, rules: Rules = Rules(), content: Content = DEFAULT, foe: Profile | None = None) -> None:
         self.rules = rules
         self.content = content
+        self.foe = content.monsters[0] if foe is None else foe
+
+    def against(self, foe: Profile) -> Simulator:
+        return Simulator(self.rules, self.content, foe)
 
     def player(self, build: Profile, level: int, speed: int | None = None) -> Combatant:
         return build.at_level(self.rules, level, speed)
 
     def monster(self, level: int, kind: Kind = Kind.NORMAL) -> Combatant:
-        return self.content.monster_of(kind).at_level(self.rules, level)
+        return self.content.scaled(self.foe, kind).at_level(self.rules, level)
 
     def fight(self, player: Combatant, enemies: list[Combatant],
               hp: int | None = None, mp: int | None = None) -> FightResult:

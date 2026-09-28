@@ -43,6 +43,7 @@ class Skill:
 
 
 BASIC_ATTACK = Skill("attack", power=100, channel=Channel.PHYSICAL)
+SPECIAL_BASIC_ATTACK = Skill("touch", power=100, channel=Channel.SPECIAL)  # e.g. a spirit or a 内力 palm
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,7 @@ class Combatant:
     sdef: int
     speed: int
     skills: tuple[Skill, ...]
+    basic: Skill = BASIC_ATTACK  # free fallback action; its channel belongs to the character
 
 
 @dataclass(frozen=True)
@@ -74,6 +76,7 @@ class Profile:
     sdef: float
     speed: int
     skills: tuple[Skill, ...] = ()
+    basic: Skill = BASIC_ATTACK  # free fallback action; its channel belongs to the character
     growth: float | None = None  # overrides the world's per-level growth for this profile
 
     def at_level(self, rules: Rules, level: int, speed: int | None = None) -> Combatant:
@@ -93,6 +96,7 @@ class Profile:
             sdef=grow(self.sdef),
             speed=self.speed if speed is None else speed,  # speed does not grow
             skills=tuple(s for s in self.skills if s.level <= level),
+            basic=self.basic,
         )
 
 

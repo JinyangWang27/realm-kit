@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .model import BASIC_ATTACK, Combatant, Resource, Rules, Skill
+from .model import Combatant, Resource, Rules, Skill
 
 
 @dataclass
@@ -36,7 +36,7 @@ class Fighter:
         """The strongest affordable skill, falling back to a basic attack."""
         level = self.combatant.level
         affordable = [s for s in self.combatant.skills if self.can_afford(s, rules.skill_cost(s, level))]
-        return max(affordable, key=lambda s: s.power, default=BASIC_ATTACK)
+        return max(affordable, key=lambda s: s.power, default=self.combatant.basic)
 
     def pay(self, skill: Skill, cost: int) -> None:
         if skill.resource is Resource.MP:

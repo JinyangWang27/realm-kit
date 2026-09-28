@@ -10,8 +10,14 @@ def show(outcome: Outcome | None) -> str:
 
 
 def report(sim: Simulator) -> None:
-    warrior, mage = sim.content.warrior, sim.content.mage
     print(f"formula: {sim.rules.formula.value}, cross share {sim.rules.cross_share}%; actions/HP lost per fight")
+    for foe in sim.content.monsters:
+        print(f"\n======== against {foe.name} ========")
+        report_against(sim.against(foe))
+
+
+def report_against(sim: Simulator) -> None:
+    warrior, mage = sim.content.warrior, sim.content.mage
     for build in sim.content.builds:
         print(f"\n{build.name} vs monster level offset" + " " * 18 + "fights/rest")
         print("  lvl " + "".join(f"{d:>+9} " for d in (-3, 0, 1, 2, 4)))

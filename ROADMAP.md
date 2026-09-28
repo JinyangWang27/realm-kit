@@ -172,7 +172,9 @@ resistance, accuracy and critical chance can come later when builds need them.
 - Apply the same stat and damage rules to players and monsters.
 - Add a basic physical attack, one rage-costing physical skill, one MP-costing
   special skill and one free special skill, sufficient to test both damage
-  channels and both [skill resources](#skill-resources). Costly skills come in
+  channels and both [skill resources](#skill-resources). Each character's basic
+  attack has an authored channel, physical by default; M4 weapons may set it.
+  Costly skills come in
   tiers unlocked by character level, and monsters get level-gated skills under
   the same rules; see [Tuned values](#tuned-values). Define safe-location HP/MP
   recovery explicitly.
@@ -403,8 +405,11 @@ the repository root, `python3 -m scripts.combat_sim` prints a report, `check`
 asserts the balance targets, `tune` nudges each tuned value by about 15% to show
 which targets break, and `--formula` compares the K formulas. Tuned values live
 in `content.py`, separate from the rules in `model.py`, so a prototype swaps
-content without editing the model. It tunes against these targets, which suit a
-game where grinding for levels (打怪练级) matters:
+content without editing the model. Every target is checked against each sample
+opponent in `content.py`: a physical-attacking beast and a special-attacking
+spirit. They are ordinary characters with different numbers, not monster types;
+testing against only one would favour whichever build defends against its
+channel. The targets suit a game where grinding for levels (打怪练级) matters:
 
 - A same-level ordinary monster takes 3–6 player actions and costs 15–35% of HP,
   allowing two to five fights between rests.
@@ -412,9 +417,10 @@ game where grinding for levels (打怪练级) matters:
 - A chapter boss needs zero to three levels above its own, so grinding pays off.
 - Farming monsters far below the player's level stops giving XP.
 
-- Builds keep distinct identities without either dominating: the mage finishes
-  fights in fewer actions, the warrior fights more times between rests, and
-  neither needs more than one extra level to beat a boss.
+- Builds trade off rather than one leading: across both opponents and levels 5,
+  10 and 20, each build must win at least a third of the comparisons where they
+  differ (actions, HP lost with a 3-point tie band, fights per rest, boss
+  level). Neither may need more than one extra level to beat the same boss.
 - Skills unlocked at higher levels clearly matter: at level 20, a build limited
   to its level-1 skills loses at least 5 more percentage points of HP.
 
@@ -451,41 +457,49 @@ players and monsters alike:
 | | HP | MP | P.Atk | P.Def | S.Atk | S.Def | Spd |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Warrior fixture | 200 | — | 24 | 15 | 5 | 10 | 100 |
-| Mage fixture | 160 | 75 | 8 | 8 | 20 | 15 | 100 |
-| Ordinary monster | 80 | — | 16 | 10 | 0 | 10 | 110 |
+| Mage fixture | 170 | 75 | 8 | 10 | 20 | 15 | 100 |
+| Beast (sample opponent) | 80 | — | 16 | 10 | 0 | 10 | 110 |
+| Spirit (sample opponent) | 80 | — | 0 | 10 | 16 | 10 | 110 |
 
 Skills unlock at a character level, and each later tier trades up: more power
-for the same cost. Monsters follow the same rules with their own tiers.
+for the same cost. Opponents follow the same rules with their own tiers. Each
+character also has its own basic attack, so its channel belongs to the
+character: the spirit's touch is special, which a creature without physical
+attack needs to hurt anyone.
 
 | Skill | Who | Channel | From level | Power | Cost |
 | --- | --- | --- | --- | --- | --- |
-| Basic attack | Everyone | Physical | 1 | 100 | — |
+| Basic attack | Everyone | Physical, or special for the spirit | 1 | 100 | — |
 | Spark | Mage | Special | 1 | 80 | — |
 | Bolt / fireball / starfall | Mage | Special | 1 / 10 / 20 | 170 / 210 / 250 | 12 MP at level 1 |
 | Rage strike / cleave / execute | Warrior | Physical | 1 / 10 / 20 | 150 / 185 / 220 | 5 rage |
-| Rend / maul / savage | Monster | Physical | 1 / 10 / 20 | 130 / 155 / 180 | 5 rage |
+| Rend / maul / savage | Beast | Physical | 1 / 10 / 20 | 130 / 155 / 180 | 5 rage |
+| Hex / curse / wither | Spirit | Special | 1 / 10 / 20 | 130 / 155 / 180 | 5 rage |
 
 The cross share is 25%. Minions have half HP and 60% attack; bosses have four
-times the HP and 130% attack. The sim uses the strongest affordable skill on
-every turn. Results at level 10, within a few points at every level from 1 to 30:
+times the HP and 130% attack, both physical and special. The sim uses the
+strongest affordable skill on every turn. Results at level 10, within a few
+points at every level from 1 to 30:
 
-| | Warrior | Mage |
-| --- | --- | --- |
-| Same-level fight | 4 actions, 22% HP lost | 3 actions, 24% HP lost |
-| Fights per rest | 4 | 3 |
-| Level needed for a level-5 / 10 / 20 boss | 6 / 11 / 21 | 7 / 12 / 22 |
-| Grinding from level 1 to 10 | 39 kills, 8 rests | 43 kills, 15 rests |
-| At level 20, level-1 skills only | 5 actions, 32% (instead of 25%) | 4 actions, 37% (instead of 27%) |
+| | Warrior vs beast | Mage vs beast | Warrior vs spirit | Mage vs spirit |
+| --- | --- | --- | --- | --- |
+| Same-level fight | 4 actions, 22% HP | 3 actions, 21% HP | 4 actions, 24% HP | 3 actions, 19% HP |
+| Fights per rest | 4 | 3 | 4 | 3 |
+| Level for a level-5 / 10 / 20 boss | 6 / 11 / 21 | 7 / 12 / 22 | 6 / 11 / 21 | 7 / 11 / 21 |
+| Grinding from level 1 to 10 | 39 kills, 8 rests | 42 kills, 15 rests | 43 kills, 10 rests | 38 kills, 9 rests |
+| Level 20 with level-1 skills only | 32% HP instead of 25% | 33% instead of 24% | 35% instead of 28% | 29% instead of 21% |
 
-The last row is a target: later skills must clearly matter. Monster skill tiers
-keep same-level fights steady as players unlock theirs. Without them, the mage's
-level-20 fights fell to 3 actions and 18% HP, and monsters four levels higher
+Each build wins 9 of the 18 comparisons where they differ. The warrior lasts
+longer between rests and handles beast bosses a level earlier; the mage finishes
+faster everywhere and takes less damage from spirits. Opponent skill tiers keep
+same-level fights steady as players unlock theirs: without them, the mage's
+level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
-`tune` shows 26 of 54 single-value nudges keep every target. Nearly every break is
-the boss-parity target, which allows the builds to differ by at most one level
-on the same boss. Allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`) raises
-this to 42 of 54; it is a design choice, not a tuning fix.
+`tune` shows 60 of 76 single-value nudges keep every target. Most breaks are the
+boss-parity target against beasts, where the warrior already needs one level
+less than the mage. Allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`) is a
+design choice, not a tuning fix.
 
 #### Choosing skill power
 
@@ -531,6 +545,18 @@ computes it. Rules of thumb for authors, to be verified with `check` and `tune`:
   earlier values, with 4-action fights, speeds 110, 120 and 140 gave identical
   results. With the current values, 100, 110, 140 and 200 give 23%, 18%, 13%
   and 9% HP lost for a level-5 warrior; 110 and 120 still tie.
+- **Balance must be judged against more than one opponent.** With only
+  physical attackers, the mage's special defence barely counted and the warrior
+  looked sturdier than it is. The same comparison against a special attacker
+  reversed several results.
+- **A weak identity target misleads a search.** "Neither build dominates" passed
+  when the mage won 13 comparisons to the warrior's 4, because a single edge was
+  enough. Searching for robustness under that target drifted towards one build
+  leading everywhere. Requiring each build to win a share of the comparisons
+  fixed it.
+- **The basic attack's channel belongs to the character.** With a universal
+  physical basic attack, a spirit without physical attack did 1 damage per basic
+  attack and its bosses were trivial.
 - **Packs need a minion tier.** Two same-level ordinary monsters cost a level-5
   warrior 64% of its HP; two minions cost 16%.
 - **Grinding needs XP that falls off with level difference.** With ±10% XP per

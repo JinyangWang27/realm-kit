@@ -48,23 +48,50 @@ def step(value: float, factor: float) -> int:
     return max(0, scaled)
 
 
-def _profile_knob(role: str, stat: str) -> Knob:
+# A slot reads one profile out of the content and writes a replacement back.
+Slot = tuple[Callable[[Content], Profile], Callable[[Content, Profile], Content]]
+
+
+def _opponent_slot(i: int) -> Slot:
+    def get(content: Content) -> Profile:
+        return content.monsters[i]
+
+    def put(content: Content, profile: Profile) -> Content:
+        return replace(content, monsters=content.monsters[:i] + (profile,) + content.monsters[i + 1:])
+    return get, put
+
+
+def slots(content: Content) -> dict[str, Slot]:
+    found: dict[str, Slot] = {
+        "warrior": (lambda c: c.warrior, lambda c, p: replace(c, warrior=p)),
+        "mage": (lambda c: c.mage, lambda c, p: replace(c, mage=p)),
+    }
+    for i, foe in enumerate(content.monsters):
+        found[foe.name] = _opponent_slot(i)
+    return found
+
+
+def _profile_knob(slot: Slot, stat: str) -> Knob:
+    get, put = slot
+
     def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
-        profile: Profile = getattr(content, role)
+        profile = get(content)
         before = getattr(profile, stat)
         after = step(before, factor)
-        return rules, with_field(content, role, with_field(profile, stat, after)), before, after
+        return rules, put(content, with_field(profile, stat, after)), before, after
     return apply
 
 
-def _skill_knob(role: str, skill_name: str, field: str) -> Knob:
+def _skill_knob(slot: Slot, skill_name: str, field: str) -> Knob:
+    get, put = slot
+
     def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
-        profile: Profile = getattr(content, role)
+        profile = get(content)
         skill = next(s for s in profile.skills if s.name == skill_name)
         before = getattr(skill, field)
         after = step(before, factor)
         skills = tuple(with_field(s, field, after) if s is skill else s for s in profile.skills)
-        return rules, with_field(content, role, replace(profile, skills=skills)), before, after
+        return rules, put(content, replace(profile, skills=skills)), before, after
     return apply
 
 
@@ -77,15 +104,18 @@ def _rules_knob(field: str) -> Knob:
 
 
 def knobs(content: Content) -> dict[str, Knob]:
-    """Every tuned value worth nudging: monster stats, skill power and cost, world rules."""
+    """Every tuned value worth nudging: opponent stats, skill power and cost, world rules."""
     found: dict[str, Knob] = {}
-    for stat in ("hp", "patk", "pdef", "sdef", "speed"):
-        found[f"monster {stat}"] = _profile_knob("monster", stat)
-    for role in ("warrior", "mage", "monster"):
-        for skill in getattr(content, role).skills:
-            found[f"{skill.name} power"] = _skill_knob(role, skill.name, "power")
+    all_slots = slots(content)
+    for foe in content.monsters:
+        for stat in ("hp", "patk", "pdef", "satk", "sdef", "speed"):
+            if getattr(foe, stat):
+                found[f"{foe.name} {stat}"] = _profile_knob(all_slots[foe.name], stat)
+    for name, slot in all_slots.items():
+        for skill in slot[0](content).skills:
+            found[f"{name} {skill.name} power"] = _skill_knob(slot, skill.name, "power")
             if skill.cost:
-                found[f"{skill.name} cost"] = _skill_knob(role, skill.name, "cost")
+                found[f"{name} {skill.name} cost"] = _skill_knob(slot, skill.name, "cost")
     for field in ("cross_share", "mp_regen_percent", "rage_per_max_hp"):
         found[field] = _rules_knob(field)
     return found

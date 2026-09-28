@@ -27,40 +27,71 @@ def check_formula(rules: Rules) -> None:
 
 def check(sim: Simulator) -> None:
     check_formula(sim.rules)
-    warrior, mage = sim.content.warrior, sim.content.mage
+    for foe in sim.content.monsters:
+        check_against(sim.against(foe))
+    check_identity(sim)
+
+
+def check_against(sim: Simulator) -> None:
+    """Hard targets against one opponent: every build can win, grind and rest sensibly."""
+    foe = sim.foe.name
     for build in sim.content.builds:
+        who = f"{build.name} vs {foe}"
         for p in (1, 5, 10, 20, 30):
             same = sim.outcome(build, p, [sim.monster(p)])
             assert same and SAME_LEVEL_ACTIONS[0] <= same.actions <= SAME_LEVEL_ACTIONS[1] \
-                and 15 <= same.hp_lost <= 35, f"{build.name} L{p} same-level: {same}"
+                and 15 <= same.hp_lost <= 35, f"{who} L{p} same-level: {same}"
             harder = sim.outcome(build, p, [sim.monster(p + 4)])
-            assert harder is None or harder.hp_lost >= 40, f"{build.name} L{p} +4 levels too easy: {harder}"
-            assert 2 <= sim.fights_per_rest(build, p, p) <= 5, f"{build.name} L{p} fights per rest"
-            assert sim.outcome(build, p, [sim.monster(p, Kind.MINION)] * 2), f"{build.name} L{p} loses to 2 minions"
+            assert harder is None or harder.hp_lost >= 40, f"{who} L{p} +4 levels too easy: {harder}"
+            assert 2 <= sim.fights_per_rest(build, p, p) <= 5, f"{who} L{p} fights per rest"
+            assert sim.outcome(build, p, [sim.monster(p, Kind.MINION)] * 2), f"{who} L{p} loses to 2 minions"
         for b in (5, 10, 20):
             need = sim.boss_level_needed(build, b)
-            assert need is not None and b <= need <= b + 3, f"{build.name} L{b} boss needs L{need}"
-        assert sim.grind(build, 10).level == 10, f"{build.name} cannot grind to L10"
-        assert sim.grind(build, 10, farm=1).level < 10, f"{build.name} can farm L1 monsters to L10"
-    # Build identity: the mage bursts, the warrior sustains; neither dominates.
-    for p in (5, 10, 20):
-        w, m = sim.outcome(warrior, p, [sim.monster(p)]), sim.outcome(mage, p, [sim.monster(p)])
-        assert w and m and m.actions < w.actions, f"L{p}: mage should finish faster (mage {m}, warrior {w})"
-        assert sim.fights_per_rest(warrior, p, p) > sim.fights_per_rest(mage, p, p), \
-            f"L{p}: warrior should fight longer between rests"
-    for b in (5, 10, 20):
-        needs = [sim.boss_level_needed(build, b) or 99 for build in sim.content.builds]
-        assert max(needs) - min(needs) <= BOSS_LEVEL_GAP, f"L{b} boss: builds need levels {needs}"
-    # Later skills must matter: at level 20, a build limited to its level-1 skills does clearly worse.
-    for build in sim.content.builds:
+            assert need is not None and b <= need <= b + 3, f"{who} L{b} boss needs L{need}"
+        assert sim.grind(build, 10).level == 10, f"{who} cannot grind to L10"
+        assert sim.grind(build, 10, farm=1).level < 10, f"{who} can farm L1 opponents to L10"
+        # Later skills must matter: at level 20, a build limited to its level-1 skills does clearly worse.
         full = sim.outcome(build, 20, [sim.monster(20)])
         basic = sim.outcome(replace(build, skills=tuple(s for s in build.skills if s.level == 1)),
                             20, [sim.monster(20)])
         assert full and (basic is None or basic.hp_lost >= full.hp_lost + 5), \
-            f"{build.name} L20: later skills barely help (with {full}, level-1 skills only {basic})"
+            f"{who} L20: later skills barely help (with {full}, level-1 skills only {basic})"
+    for b in (5, 10, 20):
+        needs = [sim.boss_level_needed(build, b) or 99 for build in sim.content.builds]
+        assert max(needs) - min(needs) <= BOSS_LEVEL_GAP, f"L{b} {foe} boss: builds need levels {needs}"
     boss = sim.monster(5, Kind.BOSS)
-    boss_hp = [sim.fight(sim.player(warrior, 5, s), [boss]).hp for s in (100, 160, 200)]
-    assert boss_hp[0] < boss_hp[1] <= boss_hp[2], f"speed gives no boss-fight benefit: {boss_hp}"
+    boss_hp = [sim.fight(sim.player(sim.content.warrior, 5, s), [boss]).hp for s in (100, 160, 200)]
+    assert boss_hp[0] < boss_hp[1] <= boss_hp[2], f"speed gives no benefit against a {foe} boss: {boss_hp}"
+
+
+IDENTITY_LEVELS = (5, 10, 20)
+HP_TIE = 3  # HP-lost differences within this many percentage points count as a tie
+MIN_WIN_SHARE = 33  # % of the comparisons where the builds differ that each build must win
+
+
+def check_identity(sim: Simulator) -> None:
+    """Each build must win a real share of the comparisons where the builds differ, across
+    every sample opponent and level: a trade-off, not one build ahead with a token edge."""
+    warrior, mage = sim.content.warrior, sim.content.mage
+    edges: list[tuple[str, int]] = []  # positive: the warrior is better; negative: the mage is
+    for foe in sim.content.monsters:
+        s = sim.against(foe)
+        for p in IDENTITY_LEVELS:
+            w, m = s.outcome(warrior, p, [s.monster(p)]), s.outcome(mage, p, [s.monster(p)])
+            assert w and m, f"L{p} vs {foe.name}: a build loses a same-level fight"
+            hp = m.hp_lost - w.hp_lost
+            edges += [
+                (f"{foe.name} L{p} actions", m.actions - w.actions),
+                (f"{foe.name} L{p} HP lost", hp if abs(hp) > HP_TIE else 0),
+                (f"{foe.name} L{p} fights/rest", s.fights_per_rest(warrior, p, p) - s.fights_per_rest(mage, p, p)),
+                (f"{foe.name} L{p} boss level", (s.boss_level_needed(mage, p) or 99)
+                 - (s.boss_level_needed(warrior, p) or 99)),
+            ]
+    decisive = [edge for _, edge in edges if edge]
+    for name, sign in ((warrior.name, 1), (mage.name, -1)):
+        won = sum(1 for edge in decisive if edge * sign > 0)
+        assert 100 * won >= MIN_WIN_SHARE * len(decisive), \
+            f"{name} wins only {won} of {len(decisive)} comparisons where the builds differ"
 
 
 def failure(sim: Simulator) -> str | None:
