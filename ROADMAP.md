@@ -372,7 +372,7 @@ Encounter           active local state; at most one per playthrough
 
 Group size needs balancing as a unit: each extra opponent acts as often as a lone
 one would. In the balance simulation below, two same-level ordinary monsters
-cost a level-5 warrior about 64% of its HP, so packs should mostly be built from
+cost a level-5 warrior about 63% of its HP, so packs should mostly be built from
 a weaker minion tier.
 
 ### Stat ranges and caps · proposed
@@ -491,11 +491,11 @@ points at every level from 1 to 30:
 
 | | Warrior vs beast | Mage vs beast | Warrior vs spirit | Mage vs spirit |
 | --- | --- | --- | --- | --- |
-| Same-level fight | 4 actions, 22% HP | 3 actions, 21% HP | 4 actions, 24% HP | 3 actions, 19% HP |
+| Same-level fight | 4 actions, 21% HP | 3 actions, 20% HP | 4 actions, 23% HP | 3 actions, 18% HP |
 | Fights per rest | 4 | 3 | 4 | 3 |
 | Level for a level-5 / 10 / 20 boss | 6 / 11 / 21 | 7 / 12 / 22 | 6 / 11 / 21 | 7 / 11 / 21 |
-| Grinding from level 1 to 10 | 39 kills, 8 rests | 42 kills, 15 rests | 43 kills, 10 rests | 38 kills, 9 rests |
-| Level 20 with level-1 skills only | 32% HP instead of 25% | 33% instead of 24% | 35% instead of 28% | 29% instead of 21% |
+| Grinding from level 1 to 10 | 35 kills, 10 rests | 42 kills, 15 rests | 42 kills, 9 rests | 35 kills, 10 rests |
+| Level 20 with level-1 skills only | 31% HP instead of 24% | 32% instead of 23% | 34% instead of 27% | 28% instead of 20% |
 
 Each build wins 9 of the 18 comparisons where they differ. The warrior lasts
 longer between rests and handles beast bosses a level earlier; the mage finishes
@@ -505,11 +505,16 @@ level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
 `tune` nudges every tuned value, player stats and tier multipliers included, and
-68 of 114 nudges keep every target. Every break is a one-step miss rather than a collapse. Most are the
-boss-parity target against beasts, where the warrior already needs one level
-less than the mage; the player stats most likely to tip the trade-off are the
-warrior's HP and attack and the mage's HP and MP. Allowing two levels
-(`BOSS_LEVEL_GAP` in `targets.py`) is a design choice, not a tuning fix.
+68 of 114 nudges keep every target. It reports the first target each nudge
+breaks. Half of the 46 breaks are boss parity against beasts, each a two-level
+gap where one is allowed; allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`)
+is a design choice, not a tuning fix. Not every break is a near miss, though:
+lowering the warrior's physical attack from 24 to 20 or its HP from 200 to 170,
+or raising the mage's HP to 195, leaves the warrior winning only 1 to 4 of 15 or
+16 comparisons, so the trade-off collapses toward the mage. Those three values
+need the tightest control when balancing resumes. The remaining breaks are
+fights that become too short, later skills that stop mattering enough, or too
+many fights between rests.
 
 #### Choosing skill power
 
@@ -553,8 +558,8 @@ computes it. Rules of thumb for authors, to be verified with `check` and `tune`:
   got half as many turns. Tune skills against hits-to-kill, not only damage rate.
 - **Speed helps unevenly in short fights for the same reason.** Under the
   earlier values, with 4-action fights, speeds 110, 120 and 140 gave identical
-  results. With the current values, 100, 110, 140 and 200 give 23%, 18%, 13%
-  and 9% HP lost for a level-5 warrior; 110 and 120 still tie.
+  results. With the current values, 100, 110, 140 and 200 give 22%, 17%, 12%
+  and 8% HP lost for a level-5 warrior against a beast; 110 and 120 still tie.
 - **Balance must be judged against more than one opponent.** With only
   physical attackers, the mage's special defence barely counted and the warrior
   looked sturdier than it is. The same comparison against a special attacker
@@ -568,7 +573,7 @@ computes it. Rules of thumb for authors, to be verified with `check` and `tune`:
   physical basic attack, a spirit without physical attack did 1 damage per basic
   attack and its bosses were trivial.
 - **Packs need a minion tier.** Two same-level ordinary monsters cost a level-5
-  warrior 64% of its HP; two minions cost 16%.
+  warrior 63% of its HP; two minions cost 12%.
 - **Grinding needs XP that falls off with level difference.** With ±10% XP per
   level of difference and nothing from monsters five or more levels below,
   farming level-1 monsters stalls at level 6. Without the falloff it reaches

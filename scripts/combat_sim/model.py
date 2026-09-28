@@ -118,8 +118,8 @@ class Rules:
 
     @property
     def baseline_turn(self) -> int:
-        """Encounter time of one basic action at speed 100."""
-        return self.action_cost // 100
+        """Encounter time of one basic action at speed 100, scheduled exactly as `delay` does."""
+        return self.delay(100)
 
     def grow(self, value: float, level: int) -> int:
         return round(value * self.growth ** (level - 1))

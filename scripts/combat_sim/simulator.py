@@ -45,7 +45,8 @@ class GrindResult:
 
 
 def hp_lost_percent(player: Combatant, hp: int) -> int:
-    return 100 - 100 * hp // player.hp
+    """Rounded down from the HP actually lost, so a survivor never shows 100%."""
+    return 100 * (player.hp - hp) // player.hp
 
 
 class Simulator:
