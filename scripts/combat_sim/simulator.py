@@ -111,7 +111,7 @@ class Simulator:
                     break
                 monster_level = max(safe)
             gain = xp.for_kill(self.monster(monster_level).xp, level, monster_level)
-            if gain == 0:
+            if gain <= 0:
                 break
             if xp.level_up_restores or hp is None or mp is None:
                 hp, mp = player.hp, player.mp

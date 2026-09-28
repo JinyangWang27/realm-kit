@@ -68,15 +68,22 @@ def check_bounds(sim: Simulator) -> None:
                     f"{profile.name} {skill.name} power {skill.power} is outside {POWER_BOUNDS}")
             require(skill.cross_share is None or 0 <= skill.cross_share <= 100,
                     f"{profile.name} {skill.name} cross share {skill.cross_share} is outside 0-100")
+            require(skill.cost >= 0 and skill.time >= 1,
+                    f"{profile.name} {skill.name} needs a nonnegative cost and positive action time")
     require(0 <= sim.rules.cross_share <= 100, f"world cross share {sim.rules.cross_share} is outside 0-100")
-    top = sim.content.max_level
-    characters = [sim.player(build, top) for build in sim.content.builds]
-    characters += [sim.content.scaled(foe, kind).at_level(sim.rules, top)
-                   for foe in sim.content.monsters for kind in Kind]
-    for c in characters:
-        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
-            require(getattr(c, stat) <= STAT_BOUND,
-                    f"{c.name} {stat} {getattr(c, stat)} exceeds {STAT_BOUND} at level {top}")
+    for level in (1, sim.content.max_level):  # stats are monotonic in level: both ends suffice
+        characters = [sim.player(build, level) for build in sim.content.builds]
+        characters += [sim.content.scaled(foe, kind).at_level(sim.rules, level)
+                       for foe in sim.content.monsters for kind in Kind]
+        for c in characters:
+            for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
+                low = 1 if stat in ("hp", "speed") else 0
+                require(low <= getattr(c, stat) <= STAT_BOUND,
+                        f"{c.name} {stat} {getattr(c, stat)} is outside {low}-{STAT_BOUND} at level {level}")
+            require(c.xp >= 0, f"{c.name} grants negative XP ({c.xp}) at level {level}")
+            for skill in (*c.skills, c.basic):
+                require(sim.rules.combined(c, skill) > 0,
+                        f"{c.name} has no attack for {skill.name} at level {level}")
 
 
 def check(sim: Simulator) -> None:

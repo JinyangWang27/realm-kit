@@ -83,15 +83,15 @@ def _profile_knob(slot: Slot, stat: str) -> Knob:
     return apply
 
 
-def _skill_knob(slot: Slot, skill_name: str, field: str) -> Knob:
+def _skill_knob(slot: Slot, index: int, field: str) -> Knob:
+    """Selects the skill by its position, so same-named tiers are nudged independently."""
     get, put = slot
 
     def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
         profile = get(content)
-        skill = next(s for s in profile.skills if s.name == skill_name)
-        before = getattr(skill, field)
+        before = getattr(profile.skills[index], field)
         after = step(before, factor)
-        skills = tuple(with_field(s, field, after) if s is skill else s for s in profile.skills)
+        skills = tuple(with_field(s, field, after) if i == index else s for i, s in enumerate(profile.skills))
         return rules, put(content, replace(profile, skills=skills)), before, after
     return apply
 
@@ -139,14 +139,18 @@ def knobs(content: Content) -> dict[str, Knob]:
     all_slots = slots(content)
     for name, slot in all_slots.items():
         for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
-            if getattr(slot[0](content), stat):
+            # Zero attacks are nudged too (upward only; see neighbourhood): 0 → 1 can matter.
+            if getattr(slot[0](content), stat) or stat in ("patk", "satk"):
                 found[f"{name} {stat}"] = _profile_knob(slot, stat)
     for name, slot in all_slots.items():
-        for skill in slot[0](content).skills:
-            found[f"{name} {skill.name} power"] = _skill_knob(slot, skill.name, "power")
-            found[f"{name} {skill.name} time"] = _skill_knob(slot, skill.name, "time")
+        skills = slot[0](content).skills
+        for i, skill in enumerate(skills):
+            shared = sum(s.name == skill.name for s in skills) > 1
+            label = f"{name} {skill.name}" + (f" [{i}]" if shared else "")
+            found[f"{label} power"] = _skill_knob(slot, i, "power")
+            found[f"{label} time"] = _skill_knob(slot, i, "time")
             if skill.cost:
-                found[f"{name} {skill.name} cost"] = _skill_knob(slot, skill.name, "cost")
+                found[f"{label} cost"] = _skill_knob(slot, i, "cost")
         for basic_field in ("power", "time"):
             found[f"{name} basic attack {basic_field}"] = _basic_knob(slot, basic_field)
     for kind in content.tiers:
@@ -162,7 +166,8 @@ def neighbourhood(rules: Rules, content: Content, factors: tuple[float, ...] = (
     for label, knob in knobs(content).items():
         for factor in factors:
             new_rules, new_content, before, after = knob(rules, content, factor)
-            yield f"{label} {before:g} → {after:g}", new_rules, new_content
+            if after != before:  # a zero value has no downward nudge
+                yield f"{label} {before:g} → {after:g}", new_rules, new_content
 
 
 def robustness(rules: Rules, content: Content) -> None:

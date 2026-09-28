@@ -407,7 +407,10 @@ lie between starting and final values. Stats are not stored in 8 bits, so a cap 
   a 100% cross share. The stat bound alone is not
   enough, because power is part of the product. Arithmetic stays checked anyway.
   These are safety bounds, not balance targets, and the stat bound also keeps
-  displays narrow.
+  displays narrow. Lower bounds apply too: HP and speed at least 1; MP, attack,
+  defence and XP rewards at least 0; skill costs at least 0 and action times at
+  least 1. Every skill a character can use needs a positive combined attack for
+  its channel, so zero attack is rejected rather than dealing minimum damage.
 - **Speed cap.** A required world-level parameter because it governs scheduling.
   The starting candidate is 200 with baseline 100.
 - **Other stat caps.** None in M3: the level table is authored, so authors already
@@ -537,9 +540,11 @@ level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
 `tune` nudges player and opponent stats, skill and basic-attack power, cost and
-action time, tier multipliers, the growth rate and the resource rules, and 100 of
-160 nudges keep every target. It reports the first target each nudge breaks.
-Nearly half of the 60 breaks (29) are boss parity against beasts, each a two-level gap where one is
+action time, tier multipliers, the growth rate and the resource rules, and 101 of
+162 nudges keep every target. Zero attack stats are nudged upward only, since
+0 → 1 can matter: a beast with 1 special attack already breaks boss parity. It
+reports the first target each nudge breaks. Half of the 61 breaks (30) are boss
+parity against beasts, each a two-level gap where one is
 allowed; allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`) is a design
 choice, not a tuning fix. Not every break is a near miss, though: lowering the
 warrior's physical attack from 24 to 20 or its HP from 200 to 170, or raising the

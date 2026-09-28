@@ -157,18 +157,23 @@ class Rules:
     def k_for(self, level: int) -> int:
         return self.base_k if self.formula is Formula.K_FIXED else self.grow(self.base_k, level)
 
-    def damage(self, attacker: Combatant, defender: Combatant, skill: Skill) -> int:
-        """Matching stats dominate; the other channel adds `cross_share` percent.
-        Everything is kept scaled by 100 so the result rounds once, minimum 1."""
+    def combined(self, character: Combatant, skill: Skill, defence: bool = False) -> int:
+        """The skill's matching attack (or defence) plus the other channel's share, scaled by 100."""
         share = self.cross_share if skill.cross_share is None else skill.cross_share
         if skill.channel is Channel.PHYSICAL:
-            a = 100 * attacker.patk + share * attacker.satk
-            d = 100 * defender.pdef + share * defender.sdef
+            main, other = (character.pdef, character.sdef) if defence else (character.patk, character.satk)
         else:
-            a = 100 * attacker.satk + share * attacker.patk
-            d = 100 * defender.sdef + share * defender.pdef
-        if a == 0:
-            return 1
+            main, other = (character.sdef, character.pdef) if defence else (character.satk, character.patk)
+        return 100 * main + share * other
+
+    def damage(self, attacker: Combatant, defender: Combatant, skill: Skill) -> int:
+        """Matching stats dominate; the other channel adds `cross_share` percent.
+        Everything is kept scaled by 100 so the result rounds once, minimum 1. A skill needs a
+        positive combined attack; content without one is invalid, as validation reports."""
+        a = self.combined(attacker, skill)
+        d = self.combined(defender, skill, defence=True)
+        if a <= 0:
+            raise ValueError(f"{attacker.name} has no attack for {skill.name}")
         if self.formula is Formula.RATIO:
             return max(1, (a * skill.power * a) // (100 * 100 * (a + d)))
         k = self.k_for(attacker.level)
