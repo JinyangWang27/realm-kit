@@ -78,21 +78,29 @@ def check_bounds(sim: Simulator) -> None:
             require(skill.cost >= 0 and skill.time >= 1,
                     f"{profile.name} {skill.name} needs a nonnegative cost and positive action time")
             require(skill.level >= 1, f"{profile.name} {skill.name} unlocks below level 1")
+        if sim.rules.grow(profile.mp, 1, profile.growth) == 0:
+            paid = [s.name for s in profile.skills if s.resource is Resource.MP and s.cost > 0]
+            require(not paid, f"{profile.name} has MP-costing {', '.join(paid)} but no MP at level 1 to scale costs from")
         require(profile.basic.cost == 0 and profile.basic.level == 1,
                 f"{profile.name}'s basic attack must be free and available from level 1")
         # The authored amounts themselves, before generation rounds them.
         for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
             low = 1 if stat in ("hp", "speed") else 0
-            require(exact(getattr(profile, stat)) >= low,
-                    f"{profile.name} authored {stat} {getattr(profile, stat)} is below {low}")
+            require(low <= exact(getattr(profile, stat)) <= STAT_BOUND,
+                    f"{profile.name} authored {stat} {getattr(profile, stat)} is outside {low}-{STAT_BOUND}")
         require(profile.growth is None or profile.growth >= 1,
                 f"{profile.name} growth {profile.growth} would lower stats as levels rise")
+    missing = [kind.value for kind in Kind if kind not in sim.content.tiers]
+    require(not missing, f"content has no tier for {', '.join(missing)}")
     for kind, tier in sim.content.tiers.items():
         require(exact(tier.hp) > 0 and exact(tier.attack) >= 0,
                 f"{kind.value} tier multipliers must be positive for HP and nonnegative for attack")
     require(sim.rules.growth >= 1, f"world growth {sim.rules.growth} would lower stats as levels rise")
-    require(sim.rules.action_cost >= 1 and sim.rules.speed_cap >= 1,
-            "the action cost and speed cap must be positive integers")
+    for name in ("action_cost", "speed_cap"):
+        value = getattr(sim.rules, name)
+        require(type(value) is int and value >= 1, f"{name} {value} must be a positive integer")
+    for name in ("mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
+        require(getattr(sim.rules, name) >= 0, f"{name} {getattr(sim.rules, name)} must not be negative")
     require(0 <= sim.rules.cross_share <= 100, f"world cross share {sim.rules.cross_share} is outside 0-100")
     for level in (1, sim.content.max_level):  # growth >= 1 keeps stats monotonic: both ends suffice
         characters = [sim.player(build, level) for build in sim.content.builds]
@@ -121,7 +129,14 @@ def check_unlocks(sim: Simulator, profiles: list[Profile]) -> None:
                     f"{character.name} has no attack for {skill.name} when it unlocks at level {level}")
 
 
+PROBE_LEVELS = (1, 5, 10, 20, 30)  # levels the hard targets test at
+HARDER_BY = 4  # the "much stronger opponent" probe is this many levels above the player
+
+
 def check(sim: Simulator) -> None:
+    top = max(PROBE_LEVELS) + HARDER_BY
+    require(sim.content.max_level >= top,
+            f"the level table must reach level {top}, the highest level the targets probe")
     check_bounds(sim)
     check_formula(sim.rules)
     check_resource_timing(sim)
@@ -135,13 +150,13 @@ def check_against(sim: Simulator) -> None:
     foe = sim.foe.name
     for build in sim.content.builds:
         who = f"{build.name} vs {foe}"
-        for p in (1, 5, 10, 20, 30):
+        for p in PROBE_LEVELS:
             same = sim.outcome(build, p, [sim.monster(p)])
             require(same and SAME_LEVEL_ACTIONS[0] <= same.actions <= SAME_LEVEL_ACTIONS[1] and 15 <= same.hp_lost <= 35,
                     f"{who} L{p} same-level: {same}")
-            harder = sim.outcome(build, p, [sim.monster(p + 4)])
+            harder = sim.outcome(build, p, [sim.monster(p + HARDER_BY)])
             require(harder is None or harder.hp_lost >= 40,
-                    f"{who} L{p} +4 levels too easy: {harder}")
+                    f"{who} L{p} +{HARDER_BY} levels too easy: {harder}")
             require(2 <= sim.fights_per_rest(build, p, p) <= 5,
                     f"{who} L{p} fights per rest")
             require(sim.outcome(build, p, [sim.monster(p, Kind.MINION)] * 2),

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import replace
 from typing import Any, TypeVar
 
@@ -62,15 +62,23 @@ def _opponent_slot(i: int) -> Slot:
     return get, put
 
 
+def unique(taken: Mapping[str, object], label: str) -> str:
+    """`label`, or `label #2`, `label #3`… — the first not already taken. Labels are display
+    only, so any repeat gets a suffix rather than replacing an entry."""
+    candidate, n = label, 2
+    while candidate in taken:
+        candidate, n = f"{label} #{n}", n + 1
+    return candidate
+
+
 def slots(content: Content) -> dict[str, Slot]:
     found: dict[str, Slot] = {
         "warrior": (lambda c: c.warrior, lambda c, p: replace(c, warrior=p)),
         "mage": (lambda c: c.mage, lambda c, p: replace(c, mage=p)),
     }
     for i, foe in enumerate(content.monsters):
-        # Keyed by position; the name is only a label, disambiguated if it repeats.
-        label = foe.name if foe.name not in found else f"{foe.name} [opponent {i}]"
-        found[label] = _opponent_slot(i)
+        # Keyed by position; the name is only a label, made unique if it repeats.
+        found[unique(found, foe.name)] = _opponent_slot(i)
     return found
 
 
@@ -136,12 +144,9 @@ def _rules_knob(field: str) -> Knob:
 
 
 def add(found: dict[str, Knob], label: str, knob: Knob) -> None:
-    """Store a knob under a unique label: labels are for display, so a clash (such as a skill
-    named "basic attack") gets a numbered suffix instead of replacing another knob."""
-    unique, n = label, 2
-    while unique in found:
-        unique, n = f"{label} #{n}", n + 1
-    found[unique] = knob
+    """Store a knob under a unique label, so a clash (such as a skill named "basic attack")
+    cannot replace another knob."""
+    found[unique(found, label)] = knob
 
 
 def knobs(content: Content) -> dict[str, Knob]:
