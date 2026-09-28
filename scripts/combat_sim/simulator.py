@@ -56,7 +56,16 @@ class Simulator:
     def __init__(self, rules: Rules = Rules(), content: Content = DEFAULT, foe: Profile | None = None) -> None:
         self.rules = rules
         self.content = content
-        self.foe = content.monsters[0] if foe is None else foe
+        self._foe = foe
+
+    @property
+    def foe(self) -> Profile:
+        """The opponent experiments run against: the chosen one, else the first sample."""
+        if self._foe is not None:
+            return self._foe
+        if not self.content.monsters:
+            raise ValueError("content has no sample opponents")
+        return self.content.monsters[0]
 
     def against(self, foe: Profile) -> Simulator:
         return Simulator(self.rules, self.content, foe)
@@ -109,7 +118,8 @@ class Simulator:
                 monster_level = farm
             else:
                 safe = [m for m in range(1, self.content.max_level + 1)
-                        if (o := self.outcome(build, level, [self.monster(m)])) and o.hp_lost <= 35]
+                        if xp.for_kill(self.monster(m).xp, level, m) > 0
+                        and (o := self.outcome(build, level, [self.monster(m)])) and o.hp_lost <= 35]
                 if not safe:
                     break
                 monster_level = max(safe)

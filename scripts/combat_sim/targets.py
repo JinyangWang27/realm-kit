@@ -62,10 +62,35 @@ def check_resource_timing(sim: Simulator) -> None:
             "rage from the current action must not be spendable in the same action")
 
 
+def whole(value: object) -> bool:
+    """An integer in the engine's sense: not a float, fraction or bool."""
+    return type(value) is int
+
+
+def check_integers(sim: Simulator) -> None:
+    """Every value the engine stores as an integer must be one: world rules, the level table,
+    XP rewards and every skill field. Stats may be decimals; generation rounds them."""
+    rules = sim.rules
+    for name in ("action_cost", "speed_cap", "cross_share", "mp_regen_percent",
+                 "rage_per_action", "rage_per_max_hp"):
+        require(whole(getattr(rules, name)), f"world {name} {getattr(rules, name)} must be an integer")
+    require(all(whole(xp) for xp in sim.content.level_table), "level-table thresholds must be integers")
+    for profile in (*sim.content.builds, *sim.content.monsters):
+        require(whole(profile.xp) and whole(profile.xp_per_level), f"{profile.name} XP must be integers")
+        for skill in (*profile.skills, profile.basic):
+            for field in ("power", "cost", "time", "level"):
+                require(whole(getattr(skill, field)),
+                        f"{profile.name} {skill.name} {field} {getattr(skill, field)} must be an integer")
+            require(skill.cross_share is None or whole(skill.cross_share),
+                    f"{profile.name} {skill.name} cross share {skill.cross_share} must be an integer")
+
+
 def check_bounds(sim: Simulator) -> None:
     """Sample content must itself pass the proposed engine validation: every derived stat of
     every character and tier stays within the stat bound up to the maximum level, and every
     skill's power is in range."""
+    require(sim.content.monsters, "content needs at least one sample opponent")
+    check_integers(sim)
     table = sim.content.level_table
     require(table[:1] == (0,) and all(a < b for a, b in zip(table, table[1:])),
             "the level table must start at 0 XP and rise strictly, as the engine requires")
@@ -98,7 +123,7 @@ def check_bounds(sim: Simulator) -> None:
     require(sim.rules.growth >= 1, f"world growth {sim.rules.growth} would lower stats as levels rise")
     for name in ("action_cost", "speed_cap"):
         value = getattr(sim.rules, name)
-        require(type(value) is int and value >= 1, f"{name} {value} must be a positive integer")
+        require(value >= 1, f"{name} {value} must be positive")
     for name in ("mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
         require(getattr(sim.rules, name) >= 0, f"{name} {getattr(sim.rules, name)} must not be negative")
     require(0 <= sim.rules.cross_share <= 100, f"world cross share {sim.rules.cross_share} is outside 0-100")
