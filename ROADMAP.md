@@ -464,9 +464,11 @@ different limits:
 - **MP regeneration follows encounter time, not actions.** A baseline turn is one
   basic action at speed 100. A faster actor regenerates at the same rate per unit
   of time, as the speed rules require, but gets more actions to spend it on.
-- **In worlds with character levels, MP costs grow with the user's level at the
-  same rate as the MP pool.** With flat costs, a uniformly growing pool lets
-  casters cast more per rest at every level, and sustain drifts upward.
+- **In worlds with character levels, MP costs scale with the user's MP pool:**
+  the authored level-1 cost × maximum MP at the current level ÷ maximum MP at
+  level 1, computed exactly and rounded half up. The engine needs only the
+  authored level table for this. With flat costs, a growing pool lets casters
+  cast more per rest at every level, and sustain drifts upward.
   Technique ranks (M4) author their own costs instead, so a deep 内力 pool from
   a high-rank internal art genuinely means more casts.
 - **Rage never persists outside an encounter** and is not saved between fights.
@@ -482,8 +484,12 @@ different limits:
 
 #### Tuned values
 
-Level-1 values that meet every target, with every stat growing 10% per level for
-players and monsters alike:
+Level-1 values that meet every target. HP, MP, attack and defence grow 10% per
+level for players and opponents alike; speed does not grow. Growth is only how
+the sample per-level tables are generated: the engine reads authored per-level
+values and computes no growth. Generated values are exact and rounded half up,
+since Python's `round()` rounds halves to even and Rust's `f64::round` rounds
+them away from zero:
 
 | | HP | MP | P.Atk | P.Def | S.Atk | S.Def | Spd |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -527,10 +533,10 @@ same-level fights steady as players unlock theirs: without them, the mage's
 level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
-`tune` nudges player and opponent stats, skill power, cost and action time, tier
-multipliers, the growth rate and the resource rules, and 88 of 144 nudges keep
-every target. It reports the first target each nudge breaks. Nearly half of the
-56 breaks (27) are boss parity against beasts, each a two-level gap where one is
+`tune` nudges player and opponent stats, skill and basic-attack power, cost and
+action time, tier multipliers, the growth rate and the resource rules, and 100 of
+160 nudges keep every target. It reports the first target each nudge breaks.
+Nearly half of the 60 breaks (29) are boss parity against beasts, each a two-level gap where one is
 allowed; allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`) is a design
 choice, not a tuning fix. Not every break is a near miss, though: lowering the
 warrior's physical attack from 24 to 20 or its HP from 200 to 170, or raising the
@@ -540,7 +546,7 @@ the tightest control when balancing resumes, along with rage per action, which
 stops the warrior's later skills from mattering when changed from 1 in either
 direction, and the growth rate, which breaks boss parity at 8.5% a level. Action
 time matters too: making a skill 15% quicker acts like a power increase, and 6 of
-the 26 action-time nudges break a target, such as a quicker fireball making
+the 26 skill action-time nudges break a target, such as a quicker fireball making
 level-10 beast fights cost only 12% HP. The remaining breaks are fights that
 become too short, later skills that stop mattering enough, or too many fights
 between rests.

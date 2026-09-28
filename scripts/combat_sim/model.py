@@ -1,8 +1,10 @@
 """The proposed M3 combat model: rules and formulas, skills and characters."""
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum
+from fractions import Fraction
 
 
 class Formula(Enum):
@@ -41,6 +43,17 @@ class Skill:
     level: int = 1  # minimum character level to use it; later skills are stronger or cheaper
 
 
+def round_half_up(value: Fraction) -> int:
+    """The one rounding rule for stats and costs: exact, halves round up. Python's round()
+    rounds halves to even and Rust's f64::round rounds them up, so neither is used."""
+    return math.floor(value + Fraction(1, 2))
+
+
+def exact(value: float) -> Fraction:
+    """An authored decimal (such as a 0.6 tier multiplier times 16) as an exact fraction."""
+    return Fraction(str(value))
+
+
 # Proposed engine validation bounds (ROADMAP.md, "Engine bounds").
 STAT_BOUND = 9_999
 POWER_BOUNDS = (1, 1_000)
@@ -66,6 +79,7 @@ class Combatant:
     basic: Skill = BASIC_ATTACK  # free fallback action; its channel belongs to the character
     growth: float | None = None  # this character's per-level growth; None means the world's
     xp: int = 0  # XP granted when defeated, authored on the combat profile
+    base_mp: int = 0  # maximum MP at level 1, which MP costs scale from
 
 
 @dataclass(frozen=True)
@@ -88,10 +102,10 @@ class Profile:
     xp_per_level: int = 0
 
     def at_level(self, rules: Rules, level: int, speed: int | None = None) -> Combatant:
-        growth = rules.growth if self.growth is None else self.growth
-
+        # Sample content generation, not an engine rule: the engine reads authored
+        # per-level stats. Speed does not grow.
         def grow(value: float) -> int:
-            return round(value * growth ** (level - 1))
+            return rules.grow(value, level, self.growth)
 
         return Combatant(
             name=self.name,
@@ -107,6 +121,7 @@ class Profile:
             basic=self.basic,
             growth=self.growth,
             xp=self.xp + self.xp_per_level * (level - 1),
+            base_mp=rules.grow(self.mp, 1, self.growth),
         )
 
 
@@ -129,8 +144,10 @@ class Rules:
         """Encounter time of one basic action at speed 100, scheduled exactly as `delay` does."""
         return self.delay(100)
 
-    def grow(self, value: float, level: int) -> int:
-        return round(value * self.growth ** (level - 1))
+    def grow(self, value: float, level: int, growth: float | None = None) -> int:
+        """A level-1 value at `level`, generated exactly and rounded half up."""
+        rate = exact(self.growth if growth is None else growth)
+        return round_half_up(exact(value) * rate ** (level - 1))
 
     def k_for(self, level: int) -> int:
         return self.base_k if self.formula is Formula.K_FIXED else self.grow(self.base_k, level)
@@ -153,11 +170,12 @@ class Rules:
         return max(1, (a * skill.power * k) // (100 * (100 * k + d)))
 
     def skill_cost(self, skill: Skill, user: Combatant) -> int:
-        """MP costs grow at the same rate as the user's MP pool, so casts per rest stay level."""
-        if skill.resource is not Resource.MP:
+        """MP costs scale with the user's MP pool, so casts per rest stay level: the level-1
+        cost × maximum MP now ÷ maximum MP at level 1, rounded half up. The engine can compute
+        this from the authored level table alone."""
+        if skill.resource is not Resource.MP or user.base_mp == 0:
             return skill.cost
-        growth = self.growth if user.growth is None else user.growth
-        return round(skill.cost * growth ** (user.level - 1))
+        return round_half_up(Fraction(skill.cost * user.mp, user.base_mp))
 
     def delay(self, speed: int, time: int = 100) -> int:
         """Recovery before the actor's next turn; `time` is the action's cost in percent.

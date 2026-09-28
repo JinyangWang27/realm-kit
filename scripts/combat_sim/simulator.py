@@ -96,6 +96,7 @@ class Simulator:
         """Grind from level 1 to `target`. Fights the highest monster costing <= 35% HP
         (or always `farm`) and rests when the next fight would be lost."""
         table = self.content.level_table  # cumulative: table[L - 1] is the total XP for level L
+        target = min(target, self.content.max_level)  # grinding stops at the authored maximum
         level, total, kills, rests = 1, 0, 0, 0
         hp: int | None = None
         mp: int | None = None

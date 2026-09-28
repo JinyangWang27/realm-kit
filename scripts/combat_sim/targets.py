@@ -66,6 +66,9 @@ def check_bounds(sim: Simulator) -> None:
         for skill in (*profile.skills, profile.basic):  # every authored skill, reachable or not
             require(POWER_BOUNDS[0] <= skill.power <= POWER_BOUNDS[1],
                     f"{profile.name} {skill.name} power {skill.power} is outside {POWER_BOUNDS}")
+            require(skill.cross_share is None or 0 <= skill.cross_share <= 100,
+                    f"{profile.name} {skill.name} cross share {skill.cross_share} is outside 0-100")
+    require(0 <= sim.rules.cross_share <= 100, f"world cross share {sim.rules.cross_share} is outside 0-100")
     top = sim.content.max_level
     characters = [sim.player(build, top) for build in sim.content.builds]
     characters += [sim.content.scaled(foe, kind).at_level(sim.rules, top)

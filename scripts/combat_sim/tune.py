@@ -114,6 +114,17 @@ def _growth_knob(rules: Rules, content: Content, factor: float) -> tuple[Rules, 
     return replace(rules, growth=after), content, before, after
 
 
+def _basic_knob(slot: Slot, field: str) -> Knob:
+    get, put = slot
+
+    def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
+        profile = get(content)
+        before = getattr(profile.basic, field)
+        after = step(before, factor)
+        return rules, put(content, replace(profile, basic=with_field(profile.basic, field, after))), before, after
+    return apply
+
+
 def _rules_knob(field: str) -> Knob:
     def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
         before = getattr(rules, field)
@@ -136,6 +147,8 @@ def knobs(content: Content) -> dict[str, Knob]:
             found[f"{name} {skill.name} time"] = _skill_knob(slot, skill.name, "time")
             if skill.cost:
                 found[f"{name} {skill.name} cost"] = _skill_knob(slot, skill.name, "cost")
+        for basic_field in ("power", "time"):
+            found[f"{name} basic attack {basic_field}"] = _basic_knob(slot, basic_field)
     for kind in content.tiers:
         for tier_field in ("hp", "attack"):
             found[f"{kind.value} tier {tier_field}"] = _tier_knob(kind, tier_field)
