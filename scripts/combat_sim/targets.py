@@ -122,6 +122,8 @@ def check_bounds(sim: Simulator) -> None:
                     f"{profile.name} authored {stat} {getattr(profile, stat)} is outside {low}-{STAT_BOUND}")
         require(profile.growth is None or profile.growth >= 1,
                 f"{profile.name} growth {profile.growth} would lower stats as levels rise")
+    unknown = [key for key in sim.content.tiers if not isinstance(key, Kind)]
+    require(not unknown, f"unknown tier keys {unknown!r}")
     missing = [kind.value for kind in Kind if kind not in sim.content.tiers]
     require(not missing, f"content has no tier for {', '.join(missing)}")
     for kind, tier in sim.content.tiers.items():

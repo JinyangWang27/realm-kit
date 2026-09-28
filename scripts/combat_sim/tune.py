@@ -155,9 +155,9 @@ def knobs(content: Content) -> dict[str, Knob]:
     all_slots = slots(content)
     for name, slot in all_slots.items():
         for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
-            # Zero attacks are nudged too (upward only; see neighbourhood): 0 → 1 can matter.
-            if getattr(slot[0](content), stat) or stat in ("patk", "satk"):
-                add(found, f"{name} {stat}", _profile_knob(slot, stat))
+            # Every stat, zeros included: a zero is nudged upward only (see neighbourhood),
+            # since 0 → 1 can matter for attack and defence alike.
+            add(found, f"{name} {stat}", _profile_knob(slot, stat))
     for name, slot in all_slots.items():
         skills = slot[0](content).skills
         for i, skill in enumerate(skills):
