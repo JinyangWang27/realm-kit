@@ -159,7 +159,7 @@ fn restore(
             return Ok(false);
         }
     };
-    let automatic = index.is_none();
+    let chosen = index.is_some();
     let Some(index) = index.or(entries.len().checked_sub(1)) else {
         writeln!(output, "There are no saves yet.")?;
         return Ok(false);
@@ -171,10 +171,13 @@ fn restore(
         if restored.state().player.hp == 0 {
             return Err("the player is dead in this save".into());
         }
-        // Fork before switching: if the chain cannot record this branch
-        // (or another game changed it), keep playing where we were.
-        // An automatic restore promised the newest save; recheck under the lock.
-        saves.fork(id, automatic)?;
+        // A chosen save becomes the newest before switching; if the chain cannot
+        // record that (or another game dropped it), keep playing where we were.
+        // Automatic restores load the newest and never fork, so they cannot cut
+        // off a save another game just made.
+        if chosen {
+            saves.fork(id)?;
+        }
         Ok(restored)
     });
     match loaded {

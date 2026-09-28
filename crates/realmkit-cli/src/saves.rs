@@ -84,7 +84,9 @@ impl Saves {
         Ok(lineage)
     }
 
+    /// Locked, so a save another game is publishing is never mistaken for damage.
     pub fn entries(&self) -> Result<Vec<Entry>, Box<dyn Error>> {
+        let _lock = self.lock()?;
         Ok(self.lineage()?.entries)
     }
 
@@ -116,9 +118,8 @@ impl Saves {
     }
 
     /// Makes save `id` the newest in the chain. Checked under the lock, so a
-    /// save another game has since dropped from the chain is refused, and with
-    /// `newest`, so is one another game has since saved past.
-    pub fn fork(&self, id: u64, newest: bool) -> Result<(), Box<dyn Error>> {
+    /// save another game has since dropped from the chain is refused.
+    pub fn fork(&self, id: u64) -> Result<(), Box<dyn Error>> {
         let _lock = self.lock()?;
         let mut lineage = self.lineage()?;
         let index = lineage
@@ -126,9 +127,6 @@ impl Saves {
             .iter()
             .position(|e| e.id == id)
             .ok_or("that save is no longer in the recovery chain")?;
-        if newest && index + 1 < lineage.entries.len() {
-            return Err("a newer save appeared; try again".into());
-        }
         if index + 1 < lineage.entries.len() {
             lineage.entries.truncate(index + 1);
             write_atomic(
@@ -188,15 +186,14 @@ mod tests {
         for kind in [Kind::Auto, Kind::Manual, Kind::Manual] {
             saves.write(kind, &snapshot).unwrap();
         }
-        saves.fork(0, false).unwrap();
+        saves.fork(0).unwrap();
         saves.write(Kind::Auto, &snapshot).unwrap();
         let ids: Vec<_> = saves.entries().unwrap().iter().map(|e| e.id).collect();
         assert_eq!(ids, [0, 3]);
         assert!(
-            saves.fork(1, false).is_err(),
+            saves.fork(1).is_err(),
             "abandoned saves cannot be forked to"
         );
-        assert!(saves.fork(0, true).is_err(), "0 is no longer the newest");
         assert!(dir.join("2.json").exists(), "abandoned saves are retained");
         let good = fs::read_to_string(dir.join(LINEAGE)).unwrap();
         // A snapshot written before its listing is just an unlisted save.
@@ -253,6 +250,12 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("realmkit-race-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let saves = Saves::open(&dir).unwrap();
+                for _ in 0..100 {
+                    saves.entries().expect("a save in progress is not damage");
+                }
+            });
             for _ in 0..4 {
                 scope.spawn(|| {
                     let saves = Saves::open(&dir).unwrap();
