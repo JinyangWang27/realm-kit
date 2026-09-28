@@ -68,16 +68,23 @@ def whole(value: object) -> bool:
 
 
 def check_integers(sim: Simulator) -> None:
-    """Every value the engine stores as an integer must be one: world rules, the level table,
-    XP rewards and every skill field. Stats may be decimals; generation rounds them."""
+    """Every value the engine stores as an integer must be one, and every closed-set field must
+    hold a known member: world rules, the level table, XP rewards, speed and every skill field.
+    Other stats may be decimals; generation rounds them, but speed is used as authored."""
     rules = sim.rules
+    require(isinstance(rules.formula, Formula), f"unknown damage formula {rules.formula!r}")
     for name in ("action_cost", "speed_cap", "cross_share", "mp_regen_percent",
                  "rage_per_action", "rage_per_max_hp"):
         require(whole(getattr(rules, name)), f"world {name} {getattr(rules, name)} must be an integer")
+    if rules.formula is not Formula.RATIO:
+        require(whole(rules.base_k) and rules.base_k >= 1, f"base_k {rules.base_k} must be a positive integer")
     require(all(whole(xp) for xp in sim.content.level_table), "level-table thresholds must be integers")
     for profile in (*sim.content.builds, *sim.content.monsters):
         require(whole(profile.xp) and whole(profile.xp_per_level), f"{profile.name} XP must be integers")
+        require(whole(profile.speed), f"{profile.name} speed {profile.speed} must be an integer")
         for skill in (*profile.skills, profile.basic):
+            require(isinstance(skill.resource, Resource) and isinstance(skill.channel, Channel),
+                    f"{profile.name} {skill.name} has an unknown resource or channel")
             for field in ("power", "cost", "time", "level"):
                 require(whole(getattr(skill, field)),
                         f"{profile.name} {skill.name} {field} {getattr(skill, field)} must be an integer")
