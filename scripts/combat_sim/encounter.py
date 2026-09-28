@@ -18,10 +18,17 @@ class Fighter:
     next_time: int
     rage: int = 0
     mp_remainder: int = 0  # regeneration carried between ticks so rounding loses nothing
+    rage_remainder: int = 0  # damage-rage carried between hits, for the same reason
 
     @property
     def alive(self) -> bool:
         return self.hp > 0
+
+    def take_hit(self, rules: Rules, damage: int) -> None:
+        """Rage proportional to damage taken: `rage_per_max_hp` for a full HP bar, cumulatively."""
+        self.rage_remainder += rules.rage_per_max_hp * damage
+        gained, self.rage_remainder = divmod(self.rage_remainder, self.combatant.hp)
+        self.rage += gained
 
     def regenerate(self, rules: Rules, elapsed: int) -> None:
         """MP regained over encounter time; speed does not change the rate."""
@@ -34,8 +41,7 @@ class Fighter:
 
     def choose_skill(self, rules: Rules) -> Skill:
         """The strongest affordable skill, falling back to a basic attack."""
-        level = self.combatant.level
-        affordable = [s for s in self.combatant.skills if self.can_afford(s, rules.skill_cost(s, level))]
+        affordable = [s for s in self.combatant.skills if self.can_afford(s, rules.skill_cost(s, self.combatant))]
         return max(affordable, key=lambda s: s.power, default=self.combatant.basic)
 
     def pay(self, skill: Skill, cost: int) -> None:
@@ -88,11 +94,11 @@ class Encounter:
         target = next(f for f in self.fighters if f.alive and f.side != actor.side)
         attacker, defender = actor.combatant, target.combatant
         skill = actor.choose_skill(self.rules)
-        actor.pay(skill, self.rules.skill_cost(skill, attacker.level))
+        actor.pay(skill, self.rules.skill_cost(skill, attacker))
         dealt = self.rules.damage(attacker, defender, skill)
         target.hp -= min(dealt, target.hp)
         actor.rage += self.rules.rage_per_action
-        target.rage += self.rules.rage_per_max_hp * dealt // defender.hp
+        target.take_hit(self.rules, dealt)
         if actor is self.player:
             self.player_actions += 1
         actor.next_time += self.rules.delay(attacker.speed, skill.time)

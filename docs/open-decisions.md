@@ -1434,7 +1434,8 @@ summary:
   content exercises one player against one or more opponents; allies (XvY) reuse
   the same state when a world needs companions or party play.
 - Each participant is controlled by the player, which pauses the timeline, or by
-  an authored policy enum. M3's only policy attacks the first living opponent.
+  an authored policy enum. M3's only policy uses the strongest affordable skill,
+  or the basic attack, on the first living opponent.
 - Ties resolve by `(next_time, side order, participant order)`. MP is checked at
   validation and spent on resolution. A speed change applies from the actor's next
   action. Dead participants lose pending actions.

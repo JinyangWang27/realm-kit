@@ -114,6 +114,8 @@ class Simulator:
                 if not result.won:
                     rests += 1
                     result = self.fight(player, [self.monster(monster_level)])
+                    if not result.won:  # unbeatable even from full health: grinding stops here
+                        return GrindResult(level, kills, rests)
                 hp, mp = result.hp, result.mp
                 kills += 1
                 earned += gain

@@ -9,8 +9,9 @@ build yourself, for example:
     from scripts.combat_sim.model import Rules
     from scripts.combat_sim.tune import search
 
-    search((f"HP {hp}, share {s}", Rules(cross_share=s),
-            replace(DEFAULT, monster=replace(DEFAULT.monster, hp=hp)))
+    beast, *others = DEFAULT.monsters
+    search((f"beast HP {hp}, share {s}", Rules(cross_share=s),
+            replace(DEFAULT, monsters=(replace(beast, hp=hp), *others)))
            for hp, s in product((60, 80, 100), (0, 25, 50)))
 """
 from __future__ import annotations
@@ -104,13 +105,13 @@ def _rules_knob(field: str) -> Knob:
 
 
 def knobs(content: Content) -> dict[str, Knob]:
-    """Every tuned value worth nudging: opponent stats, skill power and cost, world rules."""
+    """Every tuned value worth nudging: player and opponent stats, skill power and cost, world rules."""
     found: dict[str, Knob] = {}
     all_slots = slots(content)
-    for foe in content.monsters:
-        for stat in ("hp", "patk", "pdef", "satk", "sdef", "speed"):
-            if getattr(foe, stat):
-                found[f"{foe.name} {stat}"] = _profile_knob(all_slots[foe.name], stat)
+    for name, slot in all_slots.items():
+        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
+            if getattr(slot[0](content), stat):
+                found[f"{name} {stat}"] = _profile_knob(slot, stat)
     for name, slot in all_slots.items():
         for skill in slot[0](content).skills:
             found[f"{name} {skill.name} power"] = _skill_knob(slot, skill.name, "power")

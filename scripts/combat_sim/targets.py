@@ -1,10 +1,20 @@
-"""The balance targets as assertions; each failure names the broken target."""
+"""The balance targets as explicit checks; each failure names the broken target."""
 from __future__ import annotations
 
 from dataclasses import replace
 
 from .model import Channel, Combatant, Formula, Kind, Rules, Skill
 from .simulator import Simulator
+
+class TargetMissed(Exception):
+    """A balance target does not hold."""
+
+
+def require(condition: object, message: str) -> None:
+    """Explicit failure rather than `assert`, which `python -O` would strip."""
+    if not condition:
+        raise TargetMissed(message)
+
 
 SAME_LEVEL_ACTIONS = (3, 6)  # player actions to beat a same-level ordinary monster
 BOSS_LEVEL_GAP = 1  # most levels one build may need beyond another to beat the same boss
@@ -18,11 +28,14 @@ def check_formula(rules: Rules) -> None:
         return rules.damage(a, d, Skill("hit", 100, channel))
     if rules.formula is Formula.RATIO and rules.cross_share == 25:
         # physical: attack 40 + 25% of 20 = 45; no defence -> 45; defence 45 halves it
-        assert hit(0, 0, Channel.PHYSICAL) == 45 and hit(45, 0, Channel.PHYSICAL) == 22
+        require(hit(0, 0, Channel.PHYSICAL) == 45 and hit(45, 0, Channel.PHYSICAL) == 22,
+                "formula example: combined physical attack 45, halved by defence 45")
         # high 内力 (special defence 80) blocks a physical hit like 20 physical defence
-        assert hit(0, 80, Channel.PHYSICAL) == hit(20, 0, Channel.PHYSICAL) == 31
+        require(hit(0, 80, Channel.PHYSICAL) == hit(20, 0, Channel.PHYSICAL) == 31,
+                "formula example: special defence 80 should block like physical defence 20")
         # special: 20 + 25% of 40 = 30
-        assert hit(0, 0, Channel.SPECIAL) == 30
+        require(hit(0, 0, Channel.SPECIAL) == 30,
+                "formula example: combined special attack 30")
 
 
 def check(sim: Simulator) -> None:
@@ -39,29 +52,37 @@ def check_against(sim: Simulator) -> None:
         who = f"{build.name} vs {foe}"
         for p in (1, 5, 10, 20, 30):
             same = sim.outcome(build, p, [sim.monster(p)])
-            assert same and SAME_LEVEL_ACTIONS[0] <= same.actions <= SAME_LEVEL_ACTIONS[1] \
-                and 15 <= same.hp_lost <= 35, f"{who} L{p} same-level: {same}"
+            require(same and SAME_LEVEL_ACTIONS[0] <= same.actions <= SAME_LEVEL_ACTIONS[1] and 15 <= same.hp_lost <= 35,
+                    f"{who} L{p} same-level: {same}")
             harder = sim.outcome(build, p, [sim.monster(p + 4)])
-            assert harder is None or harder.hp_lost >= 40, f"{who} L{p} +4 levels too easy: {harder}"
-            assert 2 <= sim.fights_per_rest(build, p, p) <= 5, f"{who} L{p} fights per rest"
-            assert sim.outcome(build, p, [sim.monster(p, Kind.MINION)] * 2), f"{who} L{p} loses to 2 minions"
+            require(harder is None or harder.hp_lost >= 40,
+                    f"{who} L{p} +4 levels too easy: {harder}")
+            require(2 <= sim.fights_per_rest(build, p, p) <= 5,
+                    f"{who} L{p} fights per rest")
+            require(sim.outcome(build, p, [sim.monster(p, Kind.MINION)] * 2),
+                    f"{who} L{p} loses to 2 minions")
         for b in (5, 10, 20):
             need = sim.boss_level_needed(build, b)
-            assert need is not None and b <= need <= b + 3, f"{who} L{b} boss needs L{need}"
-        assert sim.grind(build, 10).level == 10, f"{who} cannot grind to L10"
-        assert sim.grind(build, 10, farm=1).level < 10, f"{who} can farm L1 opponents to L10"
+            require(need is not None and b <= need <= b + 3,
+                    f"{who} L{b} boss needs L{need}")
+        require(sim.grind(build, 10).level == 10,
+                f"{who} cannot grind to L10")
+        require(sim.grind(build, 10, farm=1).level < 10,
+                f"{who} can farm L1 opponents to L10")
         # Later skills must matter: at level 20, a build limited to its level-1 skills does clearly worse.
         full = sim.outcome(build, 20, [sim.monster(20)])
         basic = sim.outcome(replace(build, skills=tuple(s for s in build.skills if s.level == 1)),
                             20, [sim.monster(20)])
-        assert full and (basic is None or basic.hp_lost >= full.hp_lost + 5), \
-            f"{who} L20: later skills barely help (with {full}, level-1 skills only {basic})"
+        require(full and (basic is None or basic.hp_lost >= full.hp_lost + 5),
+                f"{who} L20: later skills barely help (with {full}, level-1 skills only {basic})")
     for b in (5, 10, 20):
         needs = [sim.boss_level_needed(build, b) or 99 for build in sim.content.builds]
-        assert max(needs) - min(needs) <= BOSS_LEVEL_GAP, f"L{b} {foe} boss: builds need levels {needs}"
+        require(max(needs) - min(needs) <= BOSS_LEVEL_GAP,
+                f"L{b} {foe} boss: builds need levels {needs}")
     boss = sim.monster(5, Kind.BOSS)
     boss_hp = [sim.fight(sim.player(sim.content.warrior, 5, s), [boss]).hp for s in (100, 160, 200)]
-    assert boss_hp[0] < boss_hp[1] <= boss_hp[2], f"speed gives no benefit against a {foe} boss: {boss_hp}"
+    require(boss_hp[0] < boss_hp[1] <= boss_hp[2],
+            f"speed gives no benefit against a {foe} boss: {boss_hp}")
 
 
 IDENTITY_LEVELS = (5, 10, 20)
@@ -78,7 +99,8 @@ def check_identity(sim: Simulator) -> None:
         s = sim.against(foe)
         for p in IDENTITY_LEVELS:
             w, m = s.outcome(warrior, p, [s.monster(p)]), s.outcome(mage, p, [s.monster(p)])
-            assert w and m, f"L{p} vs {foe.name}: a build loses a same-level fight"
+            if w is None or m is None:
+                raise TargetMissed(f"L{p} vs {foe.name}: a build loses a same-level fight")
             hp = m.hp_lost - w.hp_lost
             edges += [
                 (f"{foe.name} L{p} actions", m.actions - w.actions),
@@ -88,16 +110,17 @@ def check_identity(sim: Simulator) -> None:
                  - (s.boss_level_needed(warrior, p) or 99)),
             ]
     decisive = [edge for _, edge in edges if edge]
+    require(decisive, "the builds never differ: there is no trade-off to judge")
     for name, sign in ((warrior.name, 1), (mage.name, -1)):
         won = sum(1 for edge in decisive if edge * sign > 0)
-        assert 100 * won >= MIN_WIN_SHARE * len(decisive), \
-            f"{name} wins only {won} of {len(decisive)} comparisons where the builds differ"
+        require(100 * won >= MIN_WIN_SHARE * len(decisive),
+                f"{name} wins only {won} of {len(decisive)} comparisons where the builds differ")
 
 
 def failure(sim: Simulator) -> str | None:
     """The first broken target, or None when every target holds."""
     try:
         check(sim)
-    except AssertionError as error:
+    except TargetMissed as error:
         return str(error)
     return None

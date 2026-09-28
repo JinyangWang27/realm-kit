@@ -306,10 +306,12 @@ Encounter           active local state; at most one per playthrough
   relationships between three or more sides are decided when a world needs them.
 - **Control.** A participant is controlled by the player, in which case the
   timeline pauses for a command, or by an authored policy that the engine resolves
-  immediately. M3's only policy is a basic attack on the first living opponent in
-  participant order. Richer policies, such as targeting lowest HP, using skills or
-  random targeting through the RNG, are authored enum variants added with content
-  that needs them, never scripts. Multiplayer adds more player controllers; each
+  immediately. M3's only policy targets the first living opponent in participant
+  order with the strongest skill it can afford, falling back to its basic attack.
+  Opponents follow the same skill rules as players, so their level-gated skills
+  matter; the balance simulation depends on this. Richer policies, such as
+  targeting lowest HP, saving resources or random targeting through the RNG, are
+  authored enum variants added with content that needs them, never scripts. Multiplayer adds more player controllers; each
   pending human turn pauses only its own encounter (M8).
 - **Commands.** One player command resolves that participant's action, then every
   policy-controlled action until a player-controlled participant is next or the
@@ -432,7 +434,7 @@ different limits:
 | Resource | Starts at | Refills | Limits |
 | --- | --- | --- | --- |
 | MP | Saved value, up to maximum | 3% of maximum per baseline turn of encounter time; fully by resting | Sustained spending across fights |
-| Rage | 0 in every encounter | +1 per own action; +20 for taking damage equal to maximum HP, proportionally | Spending early in a fight |
+| Rage | 0 in every encounter | +1 per own action; +20 for taking damage equal to maximum HP, proportionally and cumulatively across hits | Spending early in a fight |
 
 - **MP regeneration follows encounter time, not actions.** A baseline turn is one
   basic action at speed 100. A faster actor regenerates at the same rate per unit
@@ -496,10 +498,12 @@ same-level fights steady as players unlock theirs: without them, the mage's
 level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
-`tune` shows 60 of 76 single-value nudges keep every target. Most breaks are the
+`tune` nudges every tuned value, player stats included, and 61 of 102 nudges keep
+every target. Every break is a one-step miss rather than a collapse. Most are the
 boss-parity target against beasts, where the warrior already needs one level
-less than the mage. Allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`) is a
-design choice, not a tuning fix.
+less than the mage; the player stats most likely to tip the trade-off are the
+warrior's HP and attack and the mage's HP and MP. Allowing two levels
+(`BOSS_LEVEL_GAP` in `targets.py`) is a design choice, not a tuning fix.
 
 #### Choosing skill power
 

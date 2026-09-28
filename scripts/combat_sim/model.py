@@ -61,6 +61,7 @@ class Combatant:
     speed: int
     skills: tuple[Skill, ...]
     basic: Skill = BASIC_ATTACK  # free fallback action; its channel belongs to the character
+    growth: float | None = None  # this character's per-level growth; None means the world's
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,7 @@ class Profile:
             speed=self.speed if speed is None else speed,  # speed does not grow
             skills=tuple(s for s in self.skills if s.level <= level),
             basic=self.basic,
+            growth=self.growth,
         )
 
 
@@ -142,10 +144,14 @@ class Rules:
         k = self.k_for(attacker.level)
         return max(1, (a * skill.power * k) // (100 * (100 * k + d)))
 
-    def skill_cost(self, skill: Skill, level: int) -> int:
-        """MP costs grow with the user's level like the MP pool, so casts per rest stay level."""
-        return self.grow(skill.cost, level) if skill.resource is Resource.MP else skill.cost
+    def skill_cost(self, skill: Skill, user: Combatant) -> int:
+        """MP costs grow at the same rate as the user's MP pool, so casts per rest stay level."""
+        if skill.resource is not Resource.MP:
+            return skill.cost
+        growth = self.growth if user.growth is None else user.growth
+        return round(skill.cost * growth ** (user.level - 1))
 
     def delay(self, speed: int, time: int = 100) -> int:
-        """Recovery before the actor's next turn; `time` is the action's cost in percent."""
-        return math.ceil(self.action_cost * time // 100 / min(speed, self.speed_cap))
+        """Recovery before the actor's next turn; `time` is the action's cost in percent.
+        Effective speed is clamped to [1, speed_cap]."""
+        return math.ceil(self.action_cost * time // 100 / max(1, min(speed, self.speed_cap)))

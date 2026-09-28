@@ -8,7 +8,7 @@ from .content import DEFAULT
 from .model import Formula, Rules
 from .report import report
 from .simulator import Simulator
-from .targets import check
+from .targets import TargetMissed, check
 from .tune import robustness
 
 
@@ -29,7 +29,7 @@ def main() -> None:
         return
     try:
         check(sim)
-    except AssertionError as error:
+    except TargetMissed as error:
         sys.exit(f"balance target failed: {error}")
     print("all balance targets hold")
 
