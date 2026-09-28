@@ -170,8 +170,10 @@ Use these direct combat stats first. Strength, intelligence, dexterity, elementa
 resistance, accuracy and critical chance can come later when builds need them.
 
 - Apply the same stat and damage rules to players and monsters.
-- Add a basic physical attack and one MP-consuming magical skill, sufficient to
-  test both damage channels. Define safe-location HP/MP recovery explicitly.
+- Add a basic physical attack, one rage-costing physical skill, one MP-costing
+  magical skill and one free magical skill, sufficient to test both damage
+  channels and both [skill resources](#skill-resources). Define safe-location
+  HP/MP recovery explicitly.
 - Select physical attack/defence for physical skills and magical attack/defence
   for magical skills. Keep skill power separate from the character's attack stat.
 - Centralize damage calculation in the engine; content supplies bounded numeric
@@ -181,15 +183,284 @@ resistance, accuracy and critical chance can come later when builds need them.
 - Keep the first combat slice simple, but support stochastic combat mechanics such
   as critical hits through RealmKit's explicit seeded RNG facility. Basic attacks
   may remain certain initially; randomness is an authored rule rather than a
-  requirement for every combat action.
+  requirement for every combat action. This is the optional final slice, M3d.
 - When stochastic mechanics are implemented, use explicit/versioned PRNG behavior
   with saved RNG state. Keep semantically unrelated random domains independent
   where incidental draw coupling would produce surprising gameplay changes.
 
 **Done when:** a small duel demonstrates distinct physical/magical builds, MP
-expenditure and recovery, and a measurable benefit from increased speed. Tests
-cover formulas, scheduling, ties, death, resource rejection, replay and save/load.
-A combat-free fixture also validates and plays without combat data or menus.
+and rage expenditure and recovery, and a measurable benefit from increased speed. In M3,
+builds are fixture stat blocks; player-chosen builds arrive with equipment in M4.
+A one-against-two fixture exercises several opponents, explicit targeting and
+tie order. Tests cover formulas, scheduling, ties, death, resource rejection,
+replay and save/load, including a save made mid-encounter. A combat-free fixture
+validates and plays through a main quest without combat data, levels or menus.
+
+### Delivery slices · proposed
+
+Each slice ships and is tested on its own. M3a depends on none of the open
+balance decisions.
+
+1. **M3a — combat becomes optional (Format 2).** Merge `npcs.json` and
+   `monsters.json` into one character list whose dialogue and combat profile are
+   optional components, matching the glossary's shared Character model. The
+   player-controlled character becomes an entry in that list, named by the world
+   in place of `player_name`, as a first step toward PlayerSpec. Move the
+   level table and the attack/hurt narrative templates into an optional world
+   `combat` block; for now XP and levels belong to combat, so a combat-free world
+   has neither. Replace the persistent `monster_hp` map with a set of defeated
+   characters. Add a flag-based quest objective so a combat-free fixture can have
+   a main quest. Reject Format 1 packages and saves clearly rather than migrating
+   them: every content edit already invalidates saves through the package
+   revision. The demo plays as before.
+2. **M3b — stats, damage and skills.** The seven-stat block, gradual defence
+   reduction with level-scaled K, the skills and MP costs listed under
+   [Tuned values](#tuned-values), and a `Rest` command at authored safe locations
+   that restores HP and MP outside encounters. Rage and MP regeneration during
+   encounters need encounter time, so they arrive with M3c. Save only current HP/MP,
+   level and XP; derive maximums and attack/defence values from the level so no
+   bonus can be saved twice. Decide explicitly whether level-up still restores
+   HP/MP fully, as it does today. Enemies keep counterattacking immediately.
+3. **M3c — encounters on the timeline.** `Engage`, participants and sides,
+   timeline scheduling, the projected turn order, and mid-encounter save/load, as
+   described in [Combatants and encounters](#combatants-and-encounters--proposed).
+   Grinding arrives here too: repeatable encounter groups and `Flee`, along with
+   authored yielding. Fixtures cover a 1v1 duel, a 1v2 pack, a repeatable hunting
+   ground, a fled fight and a sparring match that ends in a yield.
+4. **M3d — seeded RNG and critical hits (optional).** A small hand-written,
+   versioned PRNG such as SplitMix64 or PCG32 with saved state. Do not use
+   `rand`'s `StdRng`: its output is not guaranteed stable across versions, which
+   would break replay and saves.
+
+### Combatants and encounters · proposed
+
+Combat is not monster-specific. Any character — the player-controlled one, an
+NPC or a creature — can take part in an encounter when it has a combat profile.
+Encounter state holds any number of participants and sides from the start. M3
+content exercises one player against one or more opponents; allied participants
+(XvY) arrive when a world needs companions or party play, without changing the
+encounter state shape.
+
+```text
+CombatProfile       optional component of a Character definition:
+                    stats, plus loot/XP granted when defeated
+Encounter           active local state; at most one per playthrough
+├── now             current timeline time
+└── participants    in fixed order
+    ├── character   CharacterId (M3); InstanceId once duplicate copies exist (M5)
+    ├── side        SideId
+    ├── control     player | policy
+    ├── hp, mp
+    └── next_time
+```
+
+- **Starting.** `Engage(character)` names any character at the current location
+  whose combat profile is engageable under its authored conditions, so an NPC can
+  become fightable after a story flag without being a separate monster type. A
+  profile may name an authored group: engaging any member brings in every
+  undefeated member present at the location, in authored order. Later triggers,
+  such as an ambush on entering a location or a dialogue effect that turns an NPC
+  hostile, start encounters through the same rule. M3 needs only `Engage`.
+- **Sides and victory.** Every participant belongs to a side. The player's side
+  comes first, and an engaged group joins the opposing side. An encounter ends in
+  victory when no opposing participant is alive. Sides are IDs rather than a
+  boolean so allies, and later more than two sides, reuse the same state;
+  relationships between three or more sides are decided when a world needs them.
+- **Control.** A participant is controlled by the player, in which case the
+  timeline pauses for a command, or by an authored policy that the engine resolves
+  immediately. M3's only policy is a basic attack on the first living opponent in
+  participant order. Richer policies, such as targeting lowest HP, using skills or
+  random targeting through the RNG, are authored enum variants added with content
+  that needs them, never scripts. Multiplayer adds more player controllers; each
+  pending human turn pauses only its own encounter (M8).
+- **Commands.** One player command resolves that participant's action, then every
+  policy-controlled action until a player-controlled participant is next or the
+  encounter ends. Actions name targets explicitly, as in `Attack(target)` and
+  `UseSkill(skill, target)`. The engine rejects dead targets, characters outside
+  the encounter and, for damaging actions, allies. During an encounter only
+  combat actions, `Flee` and presentation panels are available: no moving or
+  talking.
+- **Order.** Every participant's first action comes after one opening delay, so
+  a faster opponent may act before the player's first command. Ties resolve by
+  `(next_time, side order, participant order)`, which puts the player's side
+  first. A participant at 0 HP leaves the schedule immediately and loses pending
+  actions. Rejected commands consume no time, MP or RNG state.
+- **MP.** Checked when the command is validated and deducted as the action
+  resolves, in the same atomic transition. There is no wind-up, so choosing an
+  action and resolving it are one step.
+- **Speed changes.** Delay is computed when an actor acts, so a changed speed
+  applies from that actor's next action. M3 has no speed buffs and no equipping
+  during an encounter.
+- **Ending.** Victory grants each defeated opponent's authored loot and XP once,
+  records defeated authored characters, advances quests and clears the encounter.
+  The player-controlled character reaching 0 HP is ordinary death, handled by
+  M2's recovery, whatever allies survive. Downed/revive rules wait for a world
+  that needs them.
+- **Fleeing.** `Flee` is a player action with the normal action time: the player
+  escapes when their next turn arrives, if still alive, so opponents act in
+  between and a faster player escapes sooner. An authored group may forbid
+  fleeing, as a boss or canonical duel might. Fleeing grants nothing and records
+  no defeats.
+- **Yielding.** A group may be authored to yield: whichever side falls to the
+  authored share of maximum HP gives up instead of dying, as in 比武 that stops
+  short (点到为止), a joust or a canonical duel. The encounter ends with its
+  authored victory or defeat effects, such as flags, and nobody is recorded as
+  defeated or dead. A yielding player keeps the remaining HP and play continues,
+  so losing a sparring match is not M2 death recovery. Yielding also lets a
+  canonical character protected by a canon anchor lose without being killed.
+- **Vitals ownership.** While an encounter is active it is the only owner of every
+  participant's HP and MP. The player's persistent vitals move in when it starts
+  and back when it ends, so a save never holds two copies. Opponent HP and all
+  rage exist only inside the encounter: after a flight, the opponents are whole
+  again next time.
+- **Repeatable groups.** An authored group may be repeatable, like a hunting
+  ground. Defeating it records nothing as defeated, so it can be engaged again
+  immediately, and grants its loot and XP each time, with XP falling off by
+  level difference. A defeat objective counts the first qualifying victory only,
+  and quest completion rewards stay one-time. Respawn delays measured in World
+  Time wait for M5.
+- **Identity.** Participants that are authored singleton characters use their
+  character IDs. Copies of one definition within an encounter, such as three
+  wolves, are told apart by their participant position, shown as "Wolf 2" and so
+  on. They never outlive the encounter, so they need no
+  [Section 10](docs/open-decisions.md#10-definitions-instances-and-identity)
+  runtime instance IDs; those are only for copies with persistent state.
+- **Preview.** The engine exposes the next few scheduled actions, projected with
+  the common action cost. Clients show that projection and label it as one.
+
+Group size needs balancing as a unit: each extra opponent acts as often as a lone
+one would. In the balance simulation below, two same-level ordinary monsters
+cost a level-5 warrior about 62% of its HP, so packs should mostly be built from
+a weaker minion tier.
+
+### Stat ranges and caps · proposed
+
+The absolute numbers are arbitrary. What matters is where they sit relative to
+the defence scale K and the baseline speed, and how many meaningful steps lie
+between starting and final values. Stats are not stored in 8 bits, so a cap of
+255 would only be a convention borrowed from older games.
+
+- **Engine bound.** Validation rejects any authored or derived combat stat,
+  including HP and MP, above 9,999. This keeps every intermediate of the damage
+  formula far inside `u64` and keeps displays narrow. It is a safety bound, not a
+  balance target.
+- **Speed cap.** A required world-level parameter because it governs scheduling.
+  The starting candidate is 200 with baseline 100.
+- **Other stat caps.** None in M3: the level table is authored, so authors already
+  bound player stats. Add optional authored caps for other stats in M4 if
+  equipment stacking needs them, applied after all modifiers as speed is.
+- **Design scale.** Baseline speed is 100. A uniform stat cap of 100 would leave
+  speed no room to rise. With 10% growth per level, a 200-HP character reaches the
+  9,999 bound at about level 42, so a world with more levels needs a higher bound
+  or slower growth.
+- **Timeline resolution.** With action cost 10,000, speeds 100–200 produce only
+  51 distinct delays; near the cap about four speed points share one delay. Action
+  cost 100,000 gives every integer speed from 1 to 255 its own delay, so use
+  100,000 as the starting value. The timeline examples below use 10,000 for
+  readability.
+
+### Balance simulation · proposed
+
+`scripts/combat_sim.py` models these rules: the damage formula, the timeline,
+tie order and the basic enemy behaviour, not the engine itself. Run it without
+arguments for a report, with `--check` to assert the balance targets, or with
+`--k fixed` to compare against a constant K. It tunes against these targets,
+which suit a game where grinding for levels (打怪练级) matters:
+
+- A same-level ordinary monster takes 3–6 player actions and costs 15–35% of HP,
+  allowing two to five fights between rests.
+- A monster four levels higher is usually a loss or costs at least 40% of HP.
+- A chapter boss needs zero to three levels above its own, so grinding pays off.
+- Farming monsters far below the player's level stops giving XP.
+
+- Builds keep distinct identities without either dominating: the mage finishes
+  fights in fewer actions, the warrior fights more times between rests, and
+  neither needs more than one extra level to beat a boss.
+
+#### Skill resources
+
+Each skill names the resource it spends. Two resources give the builds
+different limits:
+
+| Resource | Starts at | Refills | Limits |
+| --- | --- | --- | --- |
+| MP | Saved value, up to maximum | 3% of maximum per baseline turn of encounter time; fully by resting | Sustained spending across fights |
+| Rage | 0 in every encounter | +1 per own action; +20 for taking damage equal to maximum HP, proportionally | Spending early in a fight |
+
+- **MP regeneration follows encounter time, not actions.** A baseline turn is one
+  basic action at speed 100. A faster actor regenerates at the same rate per unit
+  of time, as the speed rules require, but gets more actions to spend it on.
+- **MP costs grow with the user's level at the same rate as the MP pool.** With
+  flat costs, a growing pool lets casters cast more per rest at every level, and
+  sustain drifts upward.
+- **Rage never persists outside an encounter** and is not saved between fights.
+  It is part of the saved encounter state during one.
+- **Outside encounters,** MP refills only by resting in M3. Regeneration over
+  World Time can follow when a world enables it (M5).
+- Resources are authored per skill as one of a closed set. Do not build a
+  general resource framework before a world needs a third resource.
+
+#### Tuned values
+
+Level-1 values that meet every target, with every stat growing 10% per level for
+players and monsters alike:
+
+| | HP | MP | P.Atk | P.Def | M.Atk | M.Def | Spd |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Warrior fixture | 200 | — | 20 | 15 | 5 | 10 | 100 |
+| Mage fixture | 160 | 60 | 8 | 8 | 20 | 15 | 100 |
+| Ordinary monster | 80 | — | 12 | 10 | 0 | 5 | 110 |
+
+| Skill | Channel | Power | Cost |
+| --- | --- | --- | --- |
+| Basic attack | Physical | 100 | — |
+| Rage strike (warrior) | Physical | 175 | 5 rage |
+| Bolt (mage) | Magical | 170 | 12 MP at level 1 |
+| Spark (mage) | Magical | 80 | — |
+
+Minions have half HP and 60% attack; bosses have four times the HP and 130%
+attack. The sim uses the strongest affordable skill on every turn. Results:
+
+| | Warrior | Mage |
+| --- | --- | --- |
+| Same-level fight | 4 actions, 21% HP lost | 3 actions, 20% HP lost |
+| Fights per rest | 4 | 3 |
+| Level needed for a level-5 / 10 / 20 boss | 6 / 11 / 21 | 7 / 12 / 22 |
+| Grinding from level 1 to 10 | 33 kills, 6 rests | 33 kills, 9 rests |
+
+These values sit inside a stable region of the search: 2% or 3% MP regeneration
+and each of the tested bolt variants (150/10, 170/12 and 200/15 MP) also pass.
+
+#### Findings
+
+- **K should grow with the attacker's level.** With a constant K, defence
+  outgrows it and fights lengthen: a level-30 warrior needs 10 actions per
+  ordinary fight instead of 4. Scaling K with level (here by the same 10% per
+  level, as WoW does with armour) keeps fights similar in length at every level.
+  K becomes a per-level value, still authored data rather than a formula string.
+  A K-free alternative, `attack × power × attack / (attack + defence)`, is also
+  level-consistent; it trades the parameter for defence that depends on the
+  attacker.
+- **Each resource favours a fight length; combining them balances.** With MP
+  refilled only by resting, long boss fights starved the mage, which needed three
+  to five extra levels. Rage alone made the warrior the only viable boss build,
+  because it grows with fight length. MP regeneration during fights and rage from
+  damage taken bring both builds within one level of each other.
+- **A free fallback spell matters.** A mage with no MP and only a physical attack
+  needed 12 actions for an ordinary fight.
+- **Short fights change at hits-to-kill breakpoints.** A zero-MP heavy strike
+  with power 170 and 160% action time adds only about 6% damage per unit of
+  time, but it halved fight length: the monster died in 2 hits instead of 4 and
+  got half as many turns. Tune skills against hits-to-kill, not only damage rate.
+- **Speed helps unevenly in short fights for the same reason.** Speeds 110, 120
+  and 140 give the same result against an ordinary monster. In longer boss fights,
+  every speed increase helps.
+- **Packs need a minion tier.** Two same-level ordinary monsters cost a level-5
+  warrior 62% of its HP; two minions cost 28%.
+- **Grinding needs XP that falls off with level difference.** With ±10% XP per
+  level of difference and nothing from monsters five or more levels below,
+  farming level-1 monsters stalls at level 6. Without the falloff it reaches
+  level 10 in 225 safe kills.
 
 ### Speed: current recommendation is a paused initiative timeline
 
@@ -243,10 +514,10 @@ resolution to avoid unintended plateaus. A hard effective-speed cap is agreed;
 its numeric value must be chosen through combat balancing. Diminishing returns
 are not currently required.
 
-Before implementation, settle deterministic tie-breaking, when MP is consumed,
-and how later speed changes affect already-scheduled turns. Dead actors must lose
-pending actions, rejected commands must not advance time, and save/load must
-preserve the schedule exactly. The initial version need not include speed buffs.
+Tie-breaking, MP timing, later speed changes and dead actors have proposed
+answers in [Combatants and encounters](#combatants-and-encounters--proposed).
+Rejected commands must not advance time, and save/load must preserve the schedule
+exactly. The initial version need not include speed buffs.
 
 #### Speed effects to discuss
 
@@ -352,6 +623,10 @@ At defence K, incoming damage is approximately halved. K should be an explicit
 balance parameter, not a hidden constant or a scripting language. Select it using
 expected stat ranges and target battle lengths; these numbers are examples.
 
+M3 needs only the physical and magical channels with a fixed 1/1 multiplier.
+Immunity, vulnerability, the "special" channel and modifier stacking described
+below arrive in M4 with the equipment that needs them.
+
 #### Exceptional armour: immunity and vulnerability
 
 An armour can combine ordinary defence with explicit damage-type modifiers:
@@ -396,8 +671,13 @@ every package.
   list before representative worlds need one.
 - Derive effective stats from base progression plus equipment; prevent repeated
   equip/unequip from permanently accumulating bonuses.
-- Give skills authored descriptions, MP costs, damage channels and power.
-  Introduce cooldowns/status effects only alongside skills that require them.
+- Give skills authored descriptions, costs, damage channels, power and
+  [technique ranks](#technique-ranks--proposed). Introduce cooldowns/status
+  effects only alongside skills that require them.
+- Add immunity/vulnerability multipliers, settle the "special" damage channel,
+  specify modifier stacking and immunity precedence, choose armour speed
+  penalties, and add optional caps for stats other than speed if stacking needs
+  them.
 - Define durations in terms of the chosen combat clock; do not casually mix
   wall-clock seconds, actor turns and timeline units.
 - Show why stats changed and what an action costs before confirming it.
@@ -413,6 +693,41 @@ every package.
   quests or discoveries grant recipes, while smithing determines whether a known
   recipe can be used. Proficiency alone does not reveal recipes initially.
 
+### Technique ranks · proposed
+
+Wuxia sources measure power by how deeply a technique is mastered: 龙象般若功 has
+ten layers, 九阴真经 is learned layer by layer, and 郭靖 learns 降龙十八掌 one
+move at a time. Instead of a separate realm-tier system, each learned technique
+has a rank.
+
+- **Rank tables.** Each technique authors one entry per rank: power, cost, action
+  time, and optionally passive stat grants and a changed weapon requirement.
+  Internal arts (内功/心法) are passive techniques whose ranks grant stats such as
+  maximum MP or magical attack. A sword art's top rank may drop its weapon
+  requirement, as 独孤求败 moves from 木剑 to 无剑. Authored rank costs still grow
+  with the user's level as M3's MP costs do.
+- **Rising through use.** Using a technique in an encounter earns technique XP,
+  with the same falloff by level difference as character XP, so practising on
+  weak opponents stops paying. Nothing is earned outside encounters.
+- **Rising through teaching.** Authored effects from masters, manuals and
+  奇遇 grant a technique or set its rank directly.
+- **Breakthrough gates.** Reaching a rank may require authored conditions such as
+  a flag, quest state or story phase: 九阴真经's later layers need the second
+  volume. Technique XP stops at the gated threshold until the gate opens, so the
+  per-chapter level cap becomes a per-technique cap.
+- **Realms.** A world may name one technique as the character's core internal
+  art. Its rank is then displayed as the realm (境界) under the world's own names,
+  and conditions can test it. No separate tier system exists.
+- **Roles.** Character level supplies base body stats (HP, attack and defence
+  growth) and remains the level used for K and XP falloff. Techniques supply
+  skill power and passives. Two progression axes double the balance surface, so
+  the balance simulation must model ranks before their numbers are chosen.
+- **Saves** hold each learned technique's rank and technique XP. Derived stats
+  are recomputed from level, technique passives and equipment, never saved.
+- A technique rank is not a proficiency in the
+  [Section 8](docs/open-decisions.md#8-checks-and-proficiencies) sense: it belongs
+  to the learned technique, and RealmKit still has no universal skill table.
+
 **Done when:** at least two meaningfully different builds can finish a short
 adventure, with tested equipment/resource rules and readable combat feedback.
 The forge → equip → improve → enchant → save/load journey preserves individual
@@ -420,15 +735,17 @@ item identity and consumes resources atomically without duplicating bonuses.
 
 ## M5 — Longer authored adventures and source-specific mechanics
 
-- Separate monster definitions from encounter instances; support multiple enemies
-  without reusing one global HP record. Use instances only where distinguishable
-  copies require independent mutable state; do not instance every authored entity.
+- Add runtime instances for combatant copies whose state outlives an encounter,
+  such as a wounded creature that roams. M3 already supports several copies within
+  one encounter and keeps opponent HP there rather than in one global record. Use
+  instances only where distinguishable copies require independent mutable state;
+  do not instance every authored entity.
 - Generalize the core quest model into main and side questlines with typed
   multi-target objectives, prerequisites and chains. Side questlines are unlocked
   by explicit main-story/story-phase conditions and may feed explicit state back
   into later main quests.
-- Define encounter reset/respawn and retreat rules before relying on repeatable
-  combat. Preserve quest progress and prevent duplicate completion rewards.
+- Add respawn delays measured in World Time for worlds that enable it. M3
+  already provides immediately repeatable groups and fleeing.
 - Expand authored dialogue and branches, with consistent NPC availability and
   understandable journal entries.
 - Make Inventory genuinely optional in runtime/spec/presentation rather than
@@ -563,14 +880,26 @@ scheduling and persistence policies have reproducible tests. No runtime AI.
 This is the immediate combat-oriented subset. The complete cross-project list is
 maintained in the [open-decisions register](docs/open-decisions.md).
 
-1. Confirm the paused timeline, including whether very fast actors can take
-   several consecutive turns as in the example above. Choose the speed cap and
-   armour penalties; the need for both a cap and the armour trade-off is agreed.
-2. With gradual defence selected, establish starter stat ranges, the defence
-   scale and a target number of actions for an ordinary fight.
-3. Define "special" damage and its matching defence, then specify how equipment
-   modifiers stack.
-4. Decide how much to show in the combat menu: exact damage/turn previews, or
-   simpler qualitative descriptions backed by an optional detailed log.
+1. Confirm the [encounter model](#combatants-and-encounters--proposed): `Engage`
+   on any character with a combat profile, authored groups, sides, player or
+   policy control, tie order and vitals ownership. Confirm that very fast actors
+   can take several consecutive turns as in the timeline example.
+2. Confirm speed cap 200 at baseline 100 and action cost 100,000. Armour speed
+   penalties move to M4 with equipment.
+3. Confirm the [stat ranges](#stat-ranges-and-caps--proposed): the 9,999 engine
+   bound and no other stat caps in M3. Confirm the
+   [balance targets](#balance-simulation--proposed), K growing with the
+   attacker's level, and XP that falls off with level difference. Confirm
+   repeatable groups and `Flee` in M3c for grinding.
+4. Confirm the [skill resources](#skill-resources): MP regenerating over
+   encounter time and by resting, rage built from actions and damage taken, and
+   MP costs that grow with level.
+5. "Special" damage and modifier stacking are deferred to M4.
+6. The M3 combat menu shows exact damage after each action and the projected turn
+   order. Qualitative previews wait for a client that needs them.
+7. For M4, confirm [technique ranks](#technique-ranks--proposed) in place of
+   realm tiers, and extend the balance simulation to ranks before choosing their
+   numbers.
 
-Recommended next step: settle the combat decisions above before M3.
+Recommended next step: start M3a, which needs none of these decisions. Settle 2
+and 3 before M3b, and 1 and 4 before M3c.
