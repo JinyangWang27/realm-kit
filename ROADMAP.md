@@ -411,6 +411,8 @@ lie between starting and final values. Stats are not stored in 8 bits, so a cap 
   defence and XP rewards at least 0; skill costs at least 0 and action times at
   least 1. Every skill a character can use needs a positive combined attack for
   its channel, so zero attack is rejected rather than dealing minimum damage.
+  Basic attacks are free, skills unlock at level 1 or later, and per-level stats
+  never fall as levels rise, as the Format 1 level table already requires.
 - **Speed cap.** A required world-level parameter because it governs scheduling.
   The starting candidate is 200 with baseline 100.
 - **Other stat caps.** None in M3: the level table is authored, so authors already
@@ -540,8 +542,8 @@ level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
 `tune` nudges player and opponent stats, skill and basic-attack power, cost and
-action time, tier multipliers, the growth rate and the resource rules, and 101 of
-162 nudges keep every target. Zero attack stats are nudged upward only, since
+action time, tier multipliers, the growth rate and the resource rules, and 102 of
+163 nudges keep every target. Zero attack stats and costs are nudged upward only, since
 0 → 1 can matter: a beast with 1 special attack already breaks boss parity. It
 reports the first target each nudge breaks. Half of the 61 breaks (30) are boss
 parity against beasts, each a two-level gap where one is
@@ -624,7 +626,8 @@ computes it. Rules of thumb for authors, to be verified with `check` and `tune`:
 - **Packs need a minion tier.** Two same-level ordinary monsters cost a level-5
   warrior 63% of its HP; two minions cost 12%.
 - **Grinding needs XP that falls off with level difference.** With ±10% XP per
-  level of difference and nothing from monsters five or more levels below,
+  level of difference, capped at ±40% and rounded down, and nothing from monsters
+  five or more levels below,
   farming level-1 monsters stalls at level 6. Without the falloff it reaches
   level 10 in 225 safe kills.
 

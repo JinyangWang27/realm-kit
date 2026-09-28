@@ -68,7 +68,9 @@ def slots(content: Content) -> dict[str, Slot]:
         "mage": (lambda c: c.mage, lambda c, p: replace(c, mage=p)),
     }
     for i, foe in enumerate(content.monsters):
-        found[foe.name] = _opponent_slot(i)
+        # Keyed by position; the name is only a label, disambiguated if it repeats.
+        label = foe.name if foe.name not in found else f"{foe.name} [opponent {i}]"
+        found[label] = _opponent_slot(i)
     return found
 
 
@@ -149,8 +151,7 @@ def knobs(content: Content) -> dict[str, Knob]:
             label = f"{name} {skill.name}" + (f" [{i}]" if shared else "")
             found[f"{label} power"] = _skill_knob(slot, i, "power")
             found[f"{label} time"] = _skill_knob(slot, i, "time")
-            if skill.cost:
-                found[f"{label} cost"] = _skill_knob(slot, i, "cost")
+            found[f"{label} cost"] = _skill_knob(slot, i, "cost")  # a free skill is nudged 0 → 1
         for basic_field in ("power", "time"):
             found[f"{name} basic attack {basic_field}"] = _basic_knob(slot, basic_field)
     for kind in content.tiers:

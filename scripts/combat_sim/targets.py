@@ -70,8 +70,13 @@ def check_bounds(sim: Simulator) -> None:
                     f"{profile.name} {skill.name} cross share {skill.cross_share} is outside 0-100")
             require(skill.cost >= 0 and skill.time >= 1,
                     f"{profile.name} {skill.name} needs a nonnegative cost and positive action time")
+            require(skill.level >= 1, f"{profile.name} {skill.name} unlocks below level 1")
+        require(profile.basic.cost == 0, f"{profile.name}'s basic attack must be free")
+        require(profile.growth is None or profile.growth >= 1,
+                f"{profile.name} growth {profile.growth} would lower stats as levels rise")
+    require(sim.rules.growth >= 1, f"world growth {sim.rules.growth} would lower stats as levels rise")
     require(0 <= sim.rules.cross_share <= 100, f"world cross share {sim.rules.cross_share} is outside 0-100")
-    for level in (1, sim.content.max_level):  # stats are monotonic in level: both ends suffice
+    for level in (1, sim.content.max_level):  # growth >= 1 keeps stats monotonic: both ends suffice
         characters = [sim.player(build, level) for build in sim.content.builds]
         characters += [sim.content.scaled(foe, kind).at_level(sim.rules, level)
                        for foe in sim.content.monsters for kind in Kind]

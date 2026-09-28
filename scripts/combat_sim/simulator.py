@@ -18,7 +18,8 @@ class XpRules:
     level_up_restores: bool = True
 
     def for_kill(self, authored: int, player_level: int, monster_level: int) -> int:
-        """The opponent's authored XP, ±10% per level of difference (capped at ±4)."""
+        """The opponent's authored XP, ±10% per level of difference (capped at ±4), rounded
+        down: a scaled reward never exceeds its exact value."""
         if not self.decay:
             return authored
         diff = monster_level - player_level
