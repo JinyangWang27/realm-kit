@@ -389,3 +389,23 @@ fn mismatched_or_corrupt_saves_are_rejected() {
     assert!(serde_json::from_value::<SaveSnapshot>(json).is_err());
     assert!(Engine::restore(&world, good).is_ok());
 }
+
+#[test]
+fn a_choice_that_makes_the_speaker_unavailable_ends_the_conversation() {
+    let mut world = demo();
+    world.npcs[0].requires = vec![Condition::Quest {
+        quest: "quiet_the_track".into(),
+        status: QuestStatus::Available,
+    }];
+    let accepted = &mut world.dialogues[0].nodes[2];
+    accepted.choices.push(DialogueChoice {
+        text: "Farewell.".into(),
+        next: None,
+        requires: Vec::new(),
+        effect: None,
+    });
+    let mut engine = Engine::new(&world).unwrap();
+    accept(&mut engine);
+    assert_eq!(engine.state().dialogue, None);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}

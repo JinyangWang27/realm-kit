@@ -159,6 +159,7 @@ fn restore(
             return Ok(false);
         }
     };
+    let automatic = index.is_none();
     let Some(index) = index.or(entries.len().checked_sub(1)) else {
         writeln!(output, "There are no saves yet.")?;
         return Ok(false);
@@ -172,7 +173,8 @@ fn restore(
         }
         // Fork before switching: if the chain cannot record this branch
         // (or another game changed it), keep playing where we were.
-        saves.fork(id)?;
+        // An automatic restore promised the newest save; recheck under the lock.
+        saves.fork(id, automatic)?;
         Ok(restored)
     });
     match loaded {
