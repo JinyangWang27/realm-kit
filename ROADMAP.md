@@ -445,6 +445,12 @@ item identity and consumes resources atomically without duplicating bonuses.
 - Support authored stochastic world-event opportunities when a representative
   world needs rare encounters/discoveries. Trigger rolls only at explicit gameplay
   transitions and select only among pre-authored outcomes.
+- Treat spatial navigation as a current-format assumption rather than a permanent
+  universal. Do not generalize it away until a representative non-spatial world
+  needs that change. A later career/life/institution simulation should be able to
+  use calendar, economy, relationships, reputation, authored events and
+  progression without fake rooms or directional traversal merely to satisfy the
+  engine. See [the non-spatial simulation note](docs/simulation-worlds.md).
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and tested paths to completion, can be saved/resumed, and include at least one
