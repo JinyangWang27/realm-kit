@@ -107,6 +107,13 @@ def _tier_knob(kind: Kind, field: str) -> Knob:
     return apply
 
 
+def _growth_knob(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
+    """Scale the per-level growth rate (1.10 → 1.085), not the multiplier itself."""
+    before = rules.growth
+    after = round(1 + (before - 1) * factor, 4)
+    return replace(rules, growth=after), content, before, after
+
+
 def _rules_knob(field: str) -> Knob:
     def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
         before = getattr(rules, field)
@@ -133,6 +140,7 @@ def knobs(content: Content) -> dict[str, Knob]:
             found[f"{kind.value} tier {tier_field}"] = _tier_knob(kind, tier_field)
     for field in ("cross_share", "mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
         found[field] = _rules_knob(field)
+    found["growth"] = _growth_knob
     return found
 
 

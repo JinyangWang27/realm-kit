@@ -309,7 +309,7 @@ Encounter           active local state; at most one per playthrough
   timeline pauses for a command, or by an authored policy that the engine resolves
   immediately. M3's only policy targets the first living opponent in participant
   order with the strongest skill it can afford, falling back to its basic attack.
-  Opponents follow the same skill rules as players, so their level-gated skills
+  Equal power prefers the cheaper skill, then the later tier. Opponents follow the same skill rules as players, so their level-gated skills
   matter; the balance simulation depends on this. Richer policies, such as
   targeting lowest HP, saving resources or random targeting through the RNG, are
   authored enum variants added with content that needs them, never scripts. Multiplayer adds more player controllers; each
@@ -384,9 +384,11 @@ between starting and final values. Stats are not stored in 8 bits, so a cap of
 
 - **Engine bounds.** Validation rejects any authored or derived combat stat,
   including HP and MP, above 9,999; skill power outside 1–1,000; and, from M4, a
-  damage-multiplier numerator above 10. Together they keep the damage numerator
-  `A × P × A × M_num` below 4 × 10^16, far inside `u64`: the combined attack `A`
-  is at most 1,999,800 even at a 100% cross share. The stat bound alone is not
+  damage multiplier whose numerator is outside 0–10 or denominator outside 1–10.
+  Together they keep the damage numerator `A × P × A × M_num` below 4 × 10^16
+  and the denominator `100 × 100 × (A + D) × M_den` below 4 × 10^11, far inside
+  `u64`: the combined attack `A`, and likewise `D`, is at most 1,999,800 even at
+  a 100% cross share. The stat bound alone is not
   enough, because power is part of the product. Arithmetic stays checked anyway.
   These are safety bounds, not balance targets, and the stat bound also keeps
   displays narrow.
@@ -417,7 +419,8 @@ content without editing the model. Every target is checked against each sample
 opponent in `content.py`: a physical-attacking beast and a special-attacking
 spirit. They are ordinary characters with different numbers, not monster types;
 testing against only one would favour whichever build defends against its
-channel. The targets suit a game where grinding for levels (打怪练级) matters:
+channel. The level table and each opponent's XP are sample authored data there
+too; only the falloff by level difference is a proposed rule. The targets suit a game where grinding for levels (打怪练级) matters:
 
 - A same-level ordinary monster takes 3–6 player actions and costs 15–35% of HP,
   allowing two to five fights between rests.
@@ -452,6 +455,10 @@ different limits:
   a high-rank internal art genuinely means more casts.
 - **Rage never persists outside an encounter** and is not saved between fights.
   It is part of the saved encounter state during one.
+- **Rage from an action is credited after the action resolves.** A skill's cost
+  is checked before it resolves, so an actor one point short cannot spend the
+  point its own action is about to earn. Damage rage is credited when the hit
+  lands. The ordering changes balance, so `check` tests it through a real action.
 - **Outside encounters,** MP refills only by resting in M3. Regeneration over
   World Time can follow when a world enables it (M5).
 - Resources are authored per skill as one of a closed set. Do not build a
@@ -504,17 +511,17 @@ same-level fights steady as players unlock theirs: without them, the mage's
 level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
-`tune` nudges every tuned value, player stats and tier multipliers included, and
-68 of 116 nudges keep every target. It reports the first target each nudge
-breaks. Nearly half of the 48 breaks (23) are boss parity against beasts, each a two-level
-gap where one is allowed; allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`)
+`tune` nudges every tuned value, including player stats, tier multipliers and the
+growth rate, and 69 of 118 nudges keep every target. It reports the first target
+each nudge breaks. Half of the 49 breaks (24) are boss parity against beasts,
+each a two-level gap where one is allowed; allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`)
 is a design choice, not a tuning fix. Not every break is a near miss, though:
 lowering the warrior's physical attack from 24 to 20 or its HP from 200 to 170,
 or raising the mage's HP to 195, leaves the warrior winning only 1 to 4 of 15 or
 16 comparisons, so the trade-off collapses toward the mage. Those three values
-need the tightest control when balancing resumes, along with rage per action:
-changing it from 1 in either direction stops the warrior's later skills from
-mattering. The remaining breaks are fights that become too short, later skills
+need the tightest control when balancing resumes, along with rage per action,
+which stops the warrior's later skills from mattering when changed from 1 in
+either direction, and the growth rate, which breaks boss parity at 8.5% a level. The remaining breaks are fights that become too short, later skills
 that stop mattering enough, or too many fights between rests.
 
 The grinding figures assume that levelling up restores HP and MP fully, as the
@@ -733,8 +740,8 @@ else:
 ```
 
 A and D carry a factor of 100 so the cross share adds no rounding step. Require
-nonnegative defence/multiplier numerators, a positive multiplier denominator, a
-share from 0 to 100, and valid positive attack/power for this damaging-hit
+nonnegative defence, a multiplier numerator from 0 to 10 and denominator from
+1 to 10 (see [Engine bounds](#stat-ranges-and-caps--proposed)), a share from 0 to 100, and valid positive attack/power for this damaging-hit
 calculation. Round once, at the end, with checked wide intermediate arithmetic.
 Cap actual HP loss at remaining HP. Healing, non-damaging skills and any future
 misses use separate rules. **Immunity overrides minimum damage:** an immune

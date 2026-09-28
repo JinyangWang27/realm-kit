@@ -19,6 +19,10 @@ class Content:
     # Sample opponents. They are ordinary characters with different numbers, not
     # types; every target runs against each so no build is judged on one matchup.
     monsters: tuple[Profile, ...]
+    # Authored XP, as a world and its opponents would author it (sample values, not rules):
+    # XP needed to advance from each level, and XP an opponent of each level grants.
+    level_table: tuple[int, ...] = tuple(100 * level for level in range(1, 60))
+    opponent_xp: tuple[int, ...] = tuple(15 * level + 5 for level in range(1, 61))
     # Normal, minion and boss are the same character scaled: a sim shortcut, not an engine concept.
     tiers: dict[Kind, Tier] = field(default_factory=lambda: {
         Kind.NORMAL: Tier(1.0, 1.0),

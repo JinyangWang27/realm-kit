@@ -10,22 +10,19 @@ from .model import Combatant, Kind, Profile, Rules
 
 @dataclass(frozen=True)
 class XpRules:
+    """The proposed XP rules. The amounts themselves are authored content (`Content`)."""
+
     decay: bool = True  # scale XP by level difference; nothing from monsters 5+ levels below
     # Whether levelling up restores HP and MP fully, as the Format 1 engine does. The
     # roadmap leaves this open for M3b; grinding rest counts depend on it.
     level_up_restores: bool = True
 
-    @staticmethod
-    def to_next(level: int) -> int:
-        return 100 * level
-
-    def for_kill(self, player_level: int, monster_level: int) -> int:
-        """Base 15 per monster level + 5, then ±10% per level of difference (capped at ±4)."""
-        base = 15 * monster_level + 5
+    def for_kill(self, authored: int, player_level: int, monster_level: int) -> int:
+        """The opponent's authored XP, ±10% per level of difference (capped at ±4)."""
         if not self.decay:
-            return base
+            return authored
         diff = monster_level - player_level
-        return 0 if diff <= -5 else base * (10 + max(-4, min(4, diff))) // 10
+        return 0 if diff <= -5 else authored * (10 + max(-4, min(4, diff))) // 10
 
 
 @dataclass(frozen=True)
@@ -111,12 +108,12 @@ class Simulator:
                 if not safe:
                     break
                 monster_level = max(safe)
-            gain = xp.for_kill(level, monster_level)
+            gain = xp.for_kill(self.content.opponent_xp[monster_level - 1], level, monster_level)
             if gain == 0:
                 break
             if xp.level_up_restores or hp is None or mp is None:
                 hp, mp = player.hp, player.mp
-            while earned < xp.to_next(level):
+            while earned < self.content.level_table[level - 1]:
                 result = self.fight(player, [self.monster(monster_level)], hp, mp)
                 if not result.won:
                     rests += 1
@@ -126,6 +123,6 @@ class Simulator:
                 hp, mp = result.hp, result.mp
                 kills += 1
                 earned += gain
-            earned -= xp.to_next(level)
+            earned -= self.content.level_table[level - 1]
             level += 1
         return GrindResult(level, kills, rests)

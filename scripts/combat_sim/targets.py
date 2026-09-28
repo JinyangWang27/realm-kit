@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .model import Channel, Combatant, Formula, Kind, Rules, Skill
+from .encounter import Encounter
+from .model import Channel, Combatant, Formula, Kind, Resource, Rules, Skill
 from .simulator import Simulator
 
 class TargetMissed(Exception):
@@ -38,8 +39,25 @@ def check_formula(rules: Rules) -> None:
                 "formula example: combined special attack 30")
 
 
+def check_resource_timing(sim: Simulator) -> None:
+    """Action rage is credited after the action resolves, so rage one short of a skill's
+    cost cannot pay for it that turn. Runs one real action through the encounter."""
+    rager = next((b for b in sim.content.builds
+                  if any(s.resource is Resource.RAGE for s in b.skills)), None)
+    if rager is None:
+        return
+    player = sim.player(rager, 1)
+    cost = min(s.cost for s in player.skills if s.resource is Resource.RAGE)
+    encounter = Encounter(sim.rules, player, [sim.monster(1)])
+    encounter.player.rage = cost - 1
+    encounter._act(encounter.player)
+    require(encounter.player.rage == cost - 1 + sim.rules.rage_per_action,
+            "rage from the current action must not be spendable in the same action")
+
+
 def check(sim: Simulator) -> None:
     check_formula(sim.rules)
+    check_resource_timing(sim)
     for foe in sim.content.monsters:
         check_against(sim.against(foe))
     check_identity(sim)
