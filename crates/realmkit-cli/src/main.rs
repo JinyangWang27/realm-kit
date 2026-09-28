@@ -152,36 +152,17 @@ fn restore(
     index: Option<usize>,
     output: &mut impl Write,
 ) -> io::Result<bool> {
-    let entries = match saves.entries() {
-        Ok(entries) => entries,
-        Err(error) => {
-            writeln!(output, "Saves could not be read: {error}")?;
-            return Ok(false);
-        }
-    };
-    let chosen = index.is_some();
-    let Some(index) = index.or(entries.len().checked_sub(1)) else {
-        writeln!(output, "There are no saves yet.")?;
-        return Ok(false);
-    };
-    let id = entries[index].id;
-    let loaded = saves.read(id).and_then(|snapshot| {
-        let restored = Engine::restore(engine.world(), snapshot)?;
+    let world = engine.world();
+    let loaded = saves.load(index, |snapshot| {
+        let restored = Engine::restore(world, snapshot)?;
         // Recovery resumes a living player; a dead save could never recover.
         if restored.state().player.hp == 0 {
             return Err("the player is dead in this save".into());
         }
-        // A chosen save becomes the newest before switching; if the chain cannot
-        // record that (or another game dropped it), keep playing where we were.
-        // Automatic restores load the newest and never fork, so they cannot cut
-        // off a save another game just made.
-        if chosen {
-            saves.fork(id)?;
-        }
         Ok(restored)
     });
     match loaded {
-        Ok(restored) => {
+        Ok((index, restored)) => {
             *engine = restored;
             writeln!(output, "Loaded save {}.\n", index + 1)?;
             let events = engine
@@ -199,11 +180,14 @@ fn restore(
             }
             Ok(true)
         }
-        Err(error) => {
+        Err((None, error)) => writeln!(output, "{error}").map(|()| false),
+        Err((Some(index), error)) => {
             writeln!(output, "Save {} could not be loaded: {error}", index + 1)?;
-            if index > 0 {
+            let entries = saves.entries().unwrap_or_default();
+            let older = &entries[..index.min(entries.len())];
+            if !older.is_empty() {
                 writeln!(output, "Type load <number> to restore an older save:")?;
-                list(&entries[..index], output)?;
+                list(older, output)?;
             }
             Ok(false)
         }

@@ -35,6 +35,9 @@ struct Lineage {
     entries: Vec<Entry>,
 }
 
+/// Why a load failed, with the chosen save's position when one was chosen.
+pub type LoadError = (Option<usize>, Box<dyn Error>);
+
 pub struct Saves {
     dir: PathBuf,
 }
@@ -117,24 +120,36 @@ impl Saves {
         serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()).into())
     }
 
-    /// Makes save `id` the newest in the chain. Checked under the lock, so a
-    /// save another game has since dropped from the chain is refused.
-    pub fn fork(&self, id: u64) -> Result<(), Box<dyn Error>> {
-        let _lock = self.lock()?;
-        let mut lineage = self.lineage()?;
-        let index = lineage
+    /// Loads the save at one-based-minus-one `index` (the newest when `None`)
+    /// and, once `check` accepts it, makes it the newest. Choosing, reading,
+    /// checking and forking are one locked step, so no other game's change can
+    /// slip between them. On failure, the position is given when one was chosen.
+    pub fn load<T>(
+        &self,
+        index: Option<usize>,
+        check: impl FnOnce(SaveSnapshot) -> Result<T, Box<dyn Error>>,
+    ) -> Result<(usize, T), LoadError> {
+        let _lock = self.lock().map_err(|e| (None, e.into()))?;
+        let mut lineage = self
+            .lineage()
+            .map_err(|e| (None, format!("Saves could not be read: {e}").into()))?;
+        let index = index
+            .or(lineage.entries.len().checked_sub(1))
+            .ok_or((None, "There are no saves yet.".into()))?;
+        let entry = lineage
             .entries
-            .iter()
-            .position(|e| e.id == id)
-            .ok_or("that save is no longer in the recovery chain")?;
+            .get(index)
+            .ok_or((None, "That save is no longer in the recovery chain.".into()))?;
+        let value = self
+            .read(entry.id)
+            .and_then(check)
+            .map_err(|e| (Some(index), e))?;
         if index + 1 < lineage.entries.len() {
             lineage.entries.truncate(index + 1);
-            write_atomic(
-                &self.dir.join(LINEAGE),
-                &serde_json::to_vec_pretty(&lineage)?,
-            )?;
+            let bytes = serde_json::to_vec_pretty(&lineage).map_err(|e| (Some(index), e.into()))?;
+            write_atomic(&self.dir.join(LINEAGE), &bytes).map_err(|e| (Some(index), e.into()))?;
         }
-        Ok(())
+        Ok((index, value))
     }
 
     /// Serializes updates from every game sharing this directory; released on drop.
@@ -186,13 +201,13 @@ mod tests {
         for kind in [Kind::Auto, Kind::Manual, Kind::Manual] {
             saves.write(kind, &snapshot).unwrap();
         }
-        saves.fork(0).unwrap();
+        saves.load(Some(0), Ok).unwrap();
         saves.write(Kind::Auto, &snapshot).unwrap();
         let ids: Vec<_> = saves.entries().unwrap().iter().map(|e| e.id).collect();
         assert_eq!(ids, [0, 3]);
         assert!(
-            saves.fork(1).is_err(),
-            "abandoned saves cannot be forked to"
+            saves.load(Some(2), Ok).is_err(),
+            "abandoned saves are no longer offered"
         );
         assert!(dir.join("2.json").exists(), "abandoned saves are retained");
         let good = fs::read_to_string(dir.join(LINEAGE)).unwrap();
