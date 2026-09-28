@@ -149,9 +149,12 @@ metadata, and Unicode template interpolation.
 
 See [the milestone roadmap](ROADMAP.md) for proposed menu interaction, saves,
 combat stats and timing, character builds, and source-grounded authoring.
-Normative architecture terms are defined in the
-[glossary](docs/glossary.md). Unresolved design questions and their decision
-points are tracked in the [open-decisions register](docs/open-decisions.md).
+The [non-spatial simulation note](docs/simulation-worlds.md) records the
+long-term architecture pressure test for career/life/institution simulations
+without making that work part of the current milestone. Normative architecture
+terms are defined in the [glossary](docs/glossary.md). Unresolved design questions
+and their decision points are tracked in the
+[open-decisions register](docs/open-decisions.md).
 
 This is a playable scaffold, not a complete RPG system. Equipment, skills/MP,
 multi-target kill counts, encounters, independent dungeon instances, factions,
