@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
+from decimal import Decimal
 from fractions import Fraction
 
 from .encounter import Encounter
@@ -60,6 +61,11 @@ def check_resource_timing(sim: Simulator) -> None:
             "rage from the current action must not be spendable in the same action")
 
 
+def decimal(value: Fraction) -> str:
+    """An exact value for a message, in decimal, without float's range limit."""
+    return format(Decimal(value.numerator) / Decimal(value.denominator), ".6g")
+
+
 def whole(value: object) -> bool:
     """An integer in the engine's sense: not a float, fraction or bool."""
     return type(value) is int
@@ -96,7 +102,7 @@ def check_exact_stats(profile: Profile, source: str) -> None:
         low = 1 if stat in ("hp", "speed") else 0
         value = exact(getattr(profile, stat))
         require(low <= value <= STAT_BOUND,
-                f"{profile.name} {source} {stat} {float(value):g} is outside {low}-{STAT_BOUND}")
+                f"{profile.name} {source} {stat} {decimal(value)} is outside {low}-{STAT_BOUND}")
 
 
 def check_finite(sim: Simulator) -> None:
@@ -178,7 +184,7 @@ def check_bounds(sim: Simulator) -> None:
         for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef"):
             value = sim.rules.grown(getattr(profile, stat), top, profile.growth)
             require(value <= STAT_BOUND,
-                    f"{profile.name} {stat} grows to {float(value):g} at level {top}, above {STAT_BOUND}")
+                    f"{profile.name} {stat} grows to {decimal(value)} at level {top}, above {STAT_BOUND}")
     # Each skill at its unlock level: attack only rises with level (growth >= 1), so that is
     # where rounding could leave a newly unlocked skill with no attack.
     check_unlocks(sim, [*sim.content.builds,

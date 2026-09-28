@@ -234,7 +234,12 @@ def neighbourhood(rules: Rules, content: Content, factors: tuple[float, ...] = (
 
 
 def robustness(rules: Rules, content: Content) -> None:
-    """Print which single-value nudges keep every target and which target breaks."""
+    """Print which single-value nudges keep every target and which target breaks. The
+    baseline is validated first, so invalid content is reported before knobs are built."""
+    baseline = failure(Simulator(rules, content))
+    if baseline is not None:
+        print(f"baseline content already misses a target: {baseline}")
+        return
     variants = list(neighbourhood(rules, content))
     held = 0
     for label, variant_rules, variant_content in variants:
