@@ -59,6 +59,13 @@ def check_bounds(sim: Simulator) -> None:
     """Sample content must itself pass the proposed engine validation: every derived stat of
     every character and tier stays within the stat bound up to the maximum level, and every
     skill's power is in range."""
+    table = sim.content.level_table
+    require(table[:1] == (0,) and all(a < b for a, b in zip(table, table[1:])),
+            "the level table must start at 0 XP and rise strictly, as the engine requires")
+    for profile in (*sim.content.builds, *sim.content.monsters):
+        for skill in (*profile.skills, profile.basic):  # every authored skill, reachable or not
+            require(POWER_BOUNDS[0] <= skill.power <= POWER_BOUNDS[1],
+                    f"{profile.name} {skill.name} power {skill.power} is outside {POWER_BOUNDS}")
     top = sim.content.max_level
     characters = [sim.player(build, top) for build in sim.content.builds]
     characters += [sim.content.scaled(foe, kind).at_level(sim.rules, top)
@@ -67,9 +74,6 @@ def check_bounds(sim: Simulator) -> None:
         for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef"):
             require(getattr(c, stat) <= STAT_BOUND,
                     f"{c.name} {stat} {getattr(c, stat)} exceeds {STAT_BOUND} at level {top}")
-        for skill in (*c.skills, c.basic):
-            require(POWER_BOUNDS[0] <= skill.power <= POWER_BOUNDS[1],
-                    f"{c.name} {skill.name} power {skill.power} is outside {POWER_BOUNDS}")
 
 
 def check(sim: Simulator) -> None:

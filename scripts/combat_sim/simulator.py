@@ -95,7 +95,8 @@ class Simulator:
               farm: int | None = None) -> GrindResult:
         """Grind from level 1 to `target`. Fights the highest monster costing <= 35% HP
         (or always `farm`) and rests when the next fight would be lost."""
-        level, earned, kills, rests = 1, 0, 0, 0
+        table = self.content.level_table  # cumulative: table[L - 1] is the total XP for level L
+        level, total, kills, rests = 1, 0, 0, 0
         hp: int | None = None
         mp: int | None = None
         while level < target:
@@ -108,12 +109,12 @@ class Simulator:
                 if not safe:
                     break
                 monster_level = max(safe)
-            gain = xp.for_kill(self.content.opponent_xp[monster_level - 1], level, monster_level)
+            gain = xp.for_kill(self.monster(monster_level).xp, level, monster_level)
             if gain == 0:
                 break
             if xp.level_up_restores or hp is None or mp is None:
                 hp, mp = player.hp, player.mp
-            while earned < self.content.level_table[level - 1]:
+            while total < table[level]:
                 result = self.fight(player, [self.monster(monster_level)], hp, mp)
                 if not result.won:
                     rests += 1
@@ -122,7 +123,6 @@ class Simulator:
                         return GrindResult(level, kills, rests)
                 hp, mp = result.hp, result.mp
                 kills += 1
-                earned += gain
-            earned -= self.content.level_table[level - 1]
+                total += gain
             level += 1
         return GrindResult(level, kills, rests)

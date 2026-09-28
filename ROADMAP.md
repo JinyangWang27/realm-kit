@@ -345,13 +345,22 @@ Encounter           active local state; at most one per playthrough
   alive, so a faster player escapes sooner. Other actions keep resolving at once. An authored group may forbid
   fleeing, as a boss or canonical duel might. Fleeing grants nothing and records
   no defeats.
-- **Yielding.** A group may be authored to yield: whichever side falls to the
-  authored share of maximum HP gives up instead of dying, as in 比武 that stops
-  short (点到为止), a joust or a canonical duel. The encounter ends with its
-  authored victory or defeat effects, such as flags, and nobody is recorded as
-  defeated or dead. A yielding player keeps the remaining HP and play continues,
-  so losing a sparring match is not M2 death recovery. Yielding also lets a
-  canonical character protected by a canon anchor lose without being killed.
+- **Yielding.** A group may be authored to yield at a share of maximum HP, as in
+  比武 that stops short (点到为止), a joust or a canonical duel. The rule applies
+  to every participant in the encounter, one at a time:
+  - Each participant's threshold is `max(1, ⌊max HP × share ÷ 100⌋)`.
+  - A hit never takes a participant below 1 HP; one that ends at or below its
+    threshold yields at once and leaves the schedule alive, like a defeated
+    participant that did not die.
+  - A side has yielded when none of its members is still fighting. The player's
+    own character yielding ends the encounter as the player side's yield,
+    whatever allies remain, just as the player's death does.
+
+  The encounter then ends with its authored victory or defeat effects, such as
+  flags, and nobody is recorded as defeated or dead. A yielding player keeps the
+  remaining HP and play continues, so losing a sparring match is not M2 death
+  recovery. Yielding also lets a canonical character protected by a canon anchor
+  lose without being killed.
 - **Vitals ownership.** While an encounter is active it is the only owner of every
   participant's HP and MP. The player's persistent vitals move in when it starts
   and back when it ends, so a save never holds two copies. Opponent HP and all
@@ -425,8 +434,9 @@ content without editing the model. Every target is checked against each sample
 opponent in `content.py`: a physical-attacking beast and a special-attacking
 spirit. They are ordinary characters with different numbers, not monster types;
 testing against only one would favour whichever build defends against its
-channel. The level table and each opponent's XP are sample authored data there
-too; only the falloff by level difference is a proposed rule. The targets suit a game where grinding for levels (打怪练级) matters:
+channel. The level table, stored as cumulative thresholds from 0 exactly as the
+engine stores it, and each opponent's XP, authored on its profile, are sample
+data there too; only the falloff by level difference is a proposed rule. The targets suit a game where grinding for levels (打怪练级) matters:
 
 - A same-level ordinary monster takes 3–6 player actions and costs 15–35% of HP,
   allowing two to five fights between rests.

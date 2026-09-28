@@ -19,12 +19,11 @@ class Content:
     # Sample opponents. They are ordinary characters with different numbers, not
     # types; every target runs against each so no build is judged on one matchup.
     monsters: tuple[Profile, ...]
-    # Authored XP, as a world and its opponents would author it (sample values, not rules):
-    # XP needed to advance from each level, and XP an opponent of each level grants. The
-    # table ends at level 35, where the largest sample stat (a boss's HP) stays within the
-    # proposed 9,999 bound at 10% growth per level.
-    level_table: tuple[int, ...] = tuple(100 * level for level in range(1, 35))
-    opponent_xp: tuple[int, ...] = tuple(15 * level + 5 for level in range(1, 36))
+    # The world's authored level table, in the engine's format: the cumulative XP needed to
+    # reach each level, starting at 0 for level 1 (100 × L to advance from level L). It ends
+    # at level 35, where the largest sample stat (a boss's HP) stays within the proposed
+    # 9,999 bound at 10% growth per level. Opponents author their own XP on their profiles.
+    level_table: tuple[int, ...] = tuple(50 * (level - 1) * level for level in range(1, 36))
     # Normal, minion and boss are the same character scaled: a sim shortcut, not an engine concept.
     tiers: dict[Kind, Tier] = field(default_factory=lambda: {
         Kind.NORMAL: Tier(1.0, 1.0),
@@ -39,7 +38,7 @@ class Content:
     @property
     def max_level(self) -> int:
         """The highest level the level table reaches."""
-        return len(self.level_table) + 1
+        return len(self.level_table)
 
     def scaled(self, opponent: Profile, kind: Kind) -> Profile:
         tier = self.tiers[kind]
@@ -70,8 +69,8 @@ DEFAULT = Content(
                  skills=(SPARK, BOLT, FIREBALL, STARFALL)),
     monsters=(
         Profile("beast", hp=80, mp=0, patk=16, pdef=10, satk=0, sdef=10, speed=110,
-                skills=(REND, MAUL, SAVAGE)),
+                skills=(REND, MAUL, SAVAGE), xp=20, xp_per_level=15),
         Profile("spirit", hp=80, mp=0, patk=0, pdef=10, satk=16, sdef=10, speed=110,
-                skills=(HEX, CURSE, WITHER), basic=SPECIAL_BASIC_ATTACK),
+                skills=(HEX, CURSE, WITHER), basic=SPECIAL_BASIC_ATTACK, xp=20, xp_per_level=15),
     ),
 )
