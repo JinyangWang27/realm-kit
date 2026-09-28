@@ -411,8 +411,10 @@ lie between starting and final values. Stats are not stored in 8 bits, so a cap 
   defence and XP rewards at least 0; skill costs at least 0 and action times at
   least 1. Every skill a character can use needs a positive combined attack for
   its channel, so zero attack is rejected rather than dealing minimum damage.
-  Basic attacks are free, skills unlock at level 1 or later, and per-level stats
-  never fall as levels rise, as the Format 1 level table already requires.
+  Basic attacks are free and available from level 1, since they are the fallback
+  action; other skills unlock at level 1 or later; authored stats are checked
+  before any rounding; and per-level stats never fall as levels rise, as the
+  Format 1 level table already requires.
 - **Speed cap.** A required world-level parameter because it governs scheduling.
   The starting candidate is 200 with baseline 100.
 - **Other stat caps.** None in M3: the level table is authored, so authors already

@@ -4,7 +4,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .encounter import Encounter
-from .model import POWER_BOUNDS, STAT_BOUND, Channel, Combatant, Formula, Kind, Profile, Resource, Rules, Skill
+from .model import (POWER_BOUNDS, STAT_BOUND, Channel, Combatant, Formula, Kind, Profile, Resource, Rules,
+                    Skill, exact)
 from .simulator import Simulator
 
 class TargetMissed(Exception):
@@ -46,9 +47,15 @@ def check_resource_timing(sim: Simulator) -> None:
                   if any(s.resource is Resource.RAGE for s in b.skills)), None)
     if rager is None:
         return
-    player = sim.player(rager, 1)
+    # Test where the cheapest-to-reach rage skill exists: its unlock level, if within the table.
+    level = max(1, min(s.level for s in rager.skills if s.resource is Resource.RAGE))
+    if level > sim.content.max_level:
+        return
+    player = sim.player(rager, level)
     cost = min(s.cost for s in player.skills if s.resource is Resource.RAGE)
-    encounter = Encounter(sim.rules, player, [sim.monster(1)])
+    if cost == 0:
+        return  # a free rage skill has no shortfall to test
+    encounter = Encounter(sim.rules, player, [sim.monster(level)])
     encounter.player.rage = cost - 1
     encounter._act(encounter.player)
     require(encounter.player.rage == cost - 1 + sim.rules.rage_per_action,
@@ -71,10 +78,21 @@ def check_bounds(sim: Simulator) -> None:
             require(skill.cost >= 0 and skill.time >= 1,
                     f"{profile.name} {skill.name} needs a nonnegative cost and positive action time")
             require(skill.level >= 1, f"{profile.name} {skill.name} unlocks below level 1")
-        require(profile.basic.cost == 0, f"{profile.name}'s basic attack must be free")
+        require(profile.basic.cost == 0 and profile.basic.level == 1,
+                f"{profile.name}'s basic attack must be free and available from level 1")
+        # The authored amounts themselves, before generation rounds them.
+        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
+            low = 1 if stat in ("hp", "speed") else 0
+            require(exact(getattr(profile, stat)) >= low,
+                    f"{profile.name} authored {stat} {getattr(profile, stat)} is below {low}")
         require(profile.growth is None or profile.growth >= 1,
                 f"{profile.name} growth {profile.growth} would lower stats as levels rise")
+    for kind, tier in sim.content.tiers.items():
+        require(exact(tier.hp) > 0 and exact(tier.attack) >= 0,
+                f"{kind.value} tier multipliers must be positive for HP and nonnegative for attack")
     require(sim.rules.growth >= 1, f"world growth {sim.rules.growth} would lower stats as levels rise")
+    require(sim.rules.action_cost >= 1 and sim.rules.speed_cap >= 1,
+            "the action cost and speed cap must be positive integers")
     require(0 <= sim.rules.cross_share <= 100, f"world cross share {sim.rules.cross_share} is outside 0-100")
     for level in (1, sim.content.max_level):  # growth >= 1 keeps stats monotonic: both ends suffice
         characters = [sim.player(build, level) for build in sim.content.builds]
