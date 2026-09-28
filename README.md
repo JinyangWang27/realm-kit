@@ -67,8 +67,21 @@ quit
 Choices and scene actions are numbered from one among the currently visible
 options. Normal menu play uses authored display names rather than requiring entity
 IDs; typed commands such as `accept <quest-id>` and `complete <quest-id>` still
-use stable machine IDs. Progress exists only for the current session; restarting
-starts over.
+use stable machine IDs.
+
+Without a saves directory, progress lasts only for the session. With one, play
+resumes where you left off:
+
+```sh
+realmkit play examples/demo-world/ --saves ~/.local/share/realmkit/bell
+```
+
+The game auto-saves at the start and whenever a quest is completed. Type `save`
+to save now, `load` to list saves and `load <number>` to restore one. Loading an
+older save abandons the saves made after it. If you die, your newest save is
+restored. A save that fails to load is reported, not skipped; the game then
+offers older saves for you to choose. Only one game at a time can use a saves
+directory; a second is refused.
 
 The same journey is available as a scripted smoke test:
 
@@ -81,13 +94,16 @@ cargo run -p realmkit-cli -- play examples/demo-world/ < examples/demo-world/wal
 | Crate | Owns | Local dependencies |
 | --- | --- | --- |
 | `realmkit-spec` | Serializable playable content, package loading, structured validation | None |
-| `realmkit-engine` | Commands, events, explicit in-memory state, deterministic rules | `realmkit-spec` |
+| `realmkit-engine` | Commands, events, explicit state, save snapshots, deterministic rules | `realmkit-spec` |
 | `realmkit-worldgen` | Typed authoring operations, validation feedback, package export | `realmkit-spec` |
-| `realmkit-cli` | Input parsing, terminal I/O, stored-text rendering | `realmkit-engine`, `realmkit-spec` |
+| `realmkit-cli` | Input parsing, terminal I/O, stored-text rendering, save files | `realmkit-engine`, `realmkit-spec` |
 
 The engine is synchronous. `Engine::new(&world)` validates its input;
 `execute(Command)` returns structured events and commits the resulting state.
 `state()` exposes an immutable view. Failed commands leave state unchanged.
+`snapshot()` captures a storage-neutral `SaveSnapshot` without changing state;
+`Engine::restore(&world, snapshot)` resumes it or rejects it whole when it
+belongs to another package, revision or route, or holds impossible state.
 Given the same world and command sequence, state and events are identical.
 There are no clocks, random generators, network clients, or AI SDKs in gameplay.
 
@@ -96,7 +112,7 @@ Damage is capped at remaining HP. Each monster is a unique, non-respawning
 instance; defeat rewards happen once. Levels use authored cumulative XP
 thresholds and fully restore HP. Quests remember earlier defeats, so accepting
 after a kill does not strand the quest. Death stops actions; inspection remains
-available, and a new session starts a fresh game.
+available. With saves on, the CLI restores the newest save.
 
 All story prose comes from the world package. Format 1 currently chooses combat
 template variants from deterministic engine progression; M1 makes `look`,
@@ -142,7 +158,7 @@ cargo tree -p realmkit-cli
 After dependencies are cached, add `--offline` to build/test commands. The CLI
 dependency tree contains no worldgen or AI dependency. Tests cover the full
 terminal journey, deterministic replay, rejected commands, reward idempotence,
-overflow rollback, death, validation, authoring/export, source-language
+overflow rollback, death, save/resume equivalence, corrupt-save handling, validation, authoring/export, source-language
 metadata, and Unicode template interpolation.
 
 ## Scope
@@ -158,7 +174,7 @@ and their decision points are tracked in the
 
 This is a playable scaffold, not a complete RPG system. Equipment, skills/MP,
 multi-target kill counts, encounters, independent dungeon instances, factions,
-save files, TUI, multiplayer, and source compilation are deferred. The crypt is
+TUI, multiplayer, and source compilation are deferred. The crypt is
 an ordinary graph location. No empty crates or placeholder runtime systems
 are created for those features.
 

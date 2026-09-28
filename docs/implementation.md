@@ -18,6 +18,11 @@ proves the complete single-player loop with authored content.
 - [x] Menus (M1): the engine lists context-sensitive actions with availability;
   the CLI numbers them, supports arrows/Enter/Esc via crossterm in a terminal
   and numbered lines elsewhere. Viewing panels does not advance the turn.
+- [x] Saves (M2): the engine produces and validates storage-neutral
+  `SaveSnapshot`s bound to the package ID, content revision and the implicit
+  `default` route. The CLI stores them in a `--saves` directory with a lineage
+  index, auto-saves at route start and quest completion, and restores the newest
+  save on death.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
@@ -38,8 +43,16 @@ Combat uses fixed integer damage, one monster instance per authored monster ID,
 and no respawns. Defeats grant fixed loot/XP exactly once; active kill quests
 advance on defeat. Quest completion is an explicit dialogue choice at the giver
 and sets an authored flag that unlocks a ruins exit. Dialogue choices can require
-flags or quest states. A lethal enemy response ends play; start a new session to
-retry. Progress is intentionally in memory. Level thresholds are cumulative.
+flags or quest states. A lethal enemy response ends play; with saves on, the
+CLI restores the newest save. Level thresholds are cumulative.
+
+A package revision is a 64-bit FNV-1a digest of the package's canonical JSON, so
+any content edit makes older saves incompatible; there are no migrations yet.
+Loading checks the format version, package, revision and route, then the state
+invariants the rules maintain (known IDs, stats matching the level, monster HP
+within authored limits, a valid conversation). The CLI writes each save to a new
+file, then updates `lineage.json`; both writes go to a temporary file first and
+are then renamed into place.
 
 Tests must catch dangling references, duplicate IDs, invalid stats and templates,
 remote interactions, invalid/hidden dialogue choices, early quest completion,

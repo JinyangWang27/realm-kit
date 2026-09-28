@@ -4,6 +4,7 @@ use realmkit_spec::{
     Condition, DialogueChoice, DialogueEffect, Direction, Id, ItemStack, QuestObjective,
     QuestStatus, SpecError, WorldSpec,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,7 +78,8 @@ pub enum Event {
     QuestsViewed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PlayerState {
     pub location: Id,
     pub hp: u32,
@@ -88,13 +90,15 @@ pub struct PlayerState {
     pub inventory: BTreeMap<Id, u64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DialogueState {
     pub npc: Id,
     pub node: Id,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GameState {
     pub player: PlayerState,
     pub monster_hp: BTreeMap<Id, u32>,
@@ -102,6 +106,22 @@ pub struct GameState {
     pub flags: BTreeSet<Id>,
     pub dialogue: Option<DialogueState>,
     pub turn: u64,
+}
+
+pub const SAVE_FORMAT_VERSION: u32 = 1;
+/// Format 1 has one implicit player route; saves name it explicitly.
+pub const DEFAULT_ROUTE: &str = "default";
+
+/// Storage-neutral save: deterministic mutable state plus the exact package it
+/// belongs to. Clients decide where it is stored.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SaveSnapshot {
+    pub save_format_version: u32,
+    pub package_id: Id,
+    pub package_revision: String,
+    pub player_route_id: Id,
+    pub state: GameState,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -128,6 +148,8 @@ pub enum EngineError {
     PlayerDead,
     #[error("numeric limit exceeded; command was not applied")]
     NumericLimit,
+    #[error("save cannot be loaded: {0}")]
+    InvalidSave(String),
 }
 
 /// A command a client may offer in the current scene. Unavailable actions are
@@ -145,6 +167,7 @@ pub struct Engine<'w> {
 }
 
 mod rules;
+mod save;
 
 impl<'w> Engine<'w> {
     pub fn new(world: &'w WorldSpec) -> Result<Self, EngineError> {
@@ -182,8 +205,28 @@ impl<'w> Engine<'w> {
     pub fn state(&self) -> &GameState {
         &self.state
     }
-    pub fn world(&self) -> &WorldSpec {
+    pub fn world(&self) -> &'w WorldSpec {
         self.world
+    }
+
+    /// Captures the playthrough without changing it, so saving spends no time.
+    pub fn snapshot(&self) -> SaveSnapshot {
+        SaveSnapshot {
+            save_format_version: SAVE_FORMAT_VERSION,
+            package_id: self.world.world.id.clone(),
+            package_revision: self.world.revision(),
+            player_route_id: DEFAULT_ROUTE.into(),
+            state: self.state.clone(),
+        }
+    }
+
+    /// Resumes a snapshot, or rejects it whole: a save for another package,
+    /// revision or route, or with state this world could not produce, never loads.
+    pub fn restore(world: &'w WorldSpec, snapshot: SaveSnapshot) -> Result<Self, EngineError> {
+        let mut engine = Self::new(world)?;
+        save::check(world, &engine.state, &snapshot).map_err(EngineError::InvalidSave)?;
+        engine.state = snapshot.state;
+        Ok(engine)
     }
 
     pub fn execute(&mut self, command: Command) -> Result<Vec<Event>, EngineError> {

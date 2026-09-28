@@ -12,3 +12,5 @@ path = "src/main.rs"
 realmkit-spec.workspace = true
 realmkit-engine.workspace = true
 crossterm = "0.29"
+serde.workspace = true
+serde_json.workspace = true

@@ -1,7 +1,7 @@
 # RealmKit roadmap
 
 Status: discussion draft. Milestones describe playable outcomes, not release
-dates. M0 and M1 are implemented; later milestones are proposed. Combat pacing and
+dates. M0, M1 and M2 are implemented; later milestones are proposed. Combat pacing and
 balance formulas remain design decisions, not promises about current behavior.
 The [open-decisions register](docs/open-decisions.md) records unresolved choices
 and when they must be settled.
@@ -85,7 +85,17 @@ presentation work tracked in
 [Section 14](docs/open-decisions.md#14-presentation-and-information-disclosure);
 they are not retroactively part of M1 acceptance.
 
-## M2 — Continue an adventure across sessions
+## M2 — Continue an adventure across sessions · complete
+
+Delivered: engine `SaveSnapshot` export and all-or-nothing validated restore
+bound to package ID, content-digest revision and the `default` route; CLI
+`--saves <directory>` with atomic JSON files, a lineage index that forks when an
+older save is loaded, `save`/`load` commands, auto-saves at route start and
+quest completion, and newest-save recovery on death that reports invalid saves
+instead of skipping them. Save and load are typed commands; they are not yet
+entries in the numbered menu.
+
+The original scope:
 
 Treat saves as storage-neutral `SaveSnapshot` data. The engine serializes and
 validates deterministic state; CLI/mobile/server layers choose files, SQLite,
@@ -563,5 +573,4 @@ maintained in the [open-decisions register](docs/open-decisions.md).
 4. Decide how much to show in the combat menu: exact damage/turn previews, or
    simpler qualitative descriptions backed by an optional detailed log.
 
-Recommended next implementation: M2 save/load, while these combat choices are
-discussed.
+Recommended next step: settle the combat decisions above before M3.

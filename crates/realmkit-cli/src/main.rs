@@ -16,8 +16,11 @@ use std::{
 mod input;
 mod menu;
 mod render;
+mod saves;
 
-const USAGE: &str = "RealmKit — static worlds, deterministic adventures\n\n  realmkit play <world-directory> [--line]\n  realmkit validate <world-directory>\n  realmkit inspect <world-directory>";
+use saves::{Entry, Kind, Saves};
+
+const USAGE: &str = "RealmKit — static worlds, deterministic adventures\n\n  realmkit play <world-directory> [--line] [--saves <directory>]\n  realmkit validate <world-directory>\n  realmkit inspect <world-directory>";
 
 fn main() {
     if let Err(error) = run() {
@@ -50,50 +53,215 @@ fn run() -> Result<(), Box<dyn Error>> {
         writeln!(output, "{USAGE}")?;
         return Ok(());
     }
-    let line_mode = args.len() == 3 && args[0] == "play" && args[2] == "--line";
-    if args.len() != 2 && !line_mode {
-        return Err(USAGE.into());
-    }
     let action = args[0].to_str().ok_or(USAGE)?;
-    if !matches!(action, "play" | "validate" | "inspect") {
+    if args.len() < 2 || !matches!(action, "play" | "validate" | "inspect") {
         return Err(USAGE.into());
     }
+    let (mut line_mode, mut saves) = (false, None);
+    let mut options = args[2..].iter();
+    while let Some(option) = options.next() {
+        match option.to_str() {
+            Some("--line") if action == "play" => line_mode = true,
+            Some("--saves") if action == "play" => {
+                saves = Some(Saves::open(options.next().ok_or(USAGE)?)?)
+            }
+            _ => return Err(USAGE.into()),
+        }
+    }
+    let saves = saves.as_ref();
     let world = WorldSpec::load(Path::new(&args[1]))?;
     match action {
         "validate" => writeln!(output, "{}: valid (format {})", world.world.name, world.world.format_version)?,
         "inspect" => writeln!(output, "{} [{}]\nLanguage: {}\n{} locations, {} NPCs, {} monsters, {} items, {} quests, {} dialogues\nStart: {}", world.world.name, world.world.id, world.world.language, world.locations.len(), world.npcs.len(), world.monsters.len(), world.items.len(), world.quests.len(), world.dialogues.len(), world.world.start)?,
         "play" if !line_mode && io::stdin().is_terminal() && output.is_terminal() => {
-            play_keys(&world, terminal_keys(), &mut output)?
+            play_keys(&world, saves, terminal_keys(), &mut output)?
         }
-        "play" => play(&world, io::stdin().lock(), &mut output)?,
+        "play" => play(&world, saves, io::stdin().lock(), &mut output)?,
         _ => unreachable!(),
     }
     Ok(())
 }
 
 /// Runs one engine command and prints its events or the reason it was refused.
-fn apply(engine: &mut Engine<'_>, command: Command, output: &mut impl Write) -> io::Result<()> {
-    match engine.execute(command) {
-        Ok(events) => render::events(output, engine, &events),
+/// With saves on, completing a quest auto-saves and death restores the newest
+/// save. Returns whether a save replaced the playthrough.
+fn apply(
+    engine: &mut Engine<'_>,
+    saves: Option<&Saves>,
+    command: Command,
+    output: &mut impl Write,
+) -> io::Result<bool> {
+    let events = match engine.execute(command) {
+        Ok(events) => events,
         Err(EngineError::ExitLocked {
             location,
             direction,
-        }) => writeln!(
+        }) => {
+            return writeln!(
+                output,
+                "{}",
+                engine.world().location(&location).unwrap().exits[&direction].blocked_text
+            )
+            .map(|()| false)
+        }
+        Err(error) => return writeln!(output, "{error}").map(|()| false),
+    };
+    // Checkpoint before printing, so a closed terminal cannot lose the progress.
+    let completed = events
+        .iter()
+        .any(|e| matches!(e, realmkit_engine::Event::QuestCompleted { .. }));
+    if let (Some(saves), true) = (saves, completed) {
+        save(engine, saves, Kind::Auto, output)?;
+    }
+    render::events(output, engine, &events)?;
+    if let (Some(saves), true) = (saves, events.contains(&realmkit_engine::Event::PlayerDied)) {
+        writeln!(output, "\nRestoring your most recent save…")?;
+        return restore(engine, saves, None, output);
+    }
+    Ok(false)
+}
+
+fn save(engine: &Engine<'_>, saves: &Saves, kind: Kind, output: &mut impl Write) -> io::Result<()> {
+    match saves.write(kind, &engine.snapshot()) {
+        Ok(()) if kind == Kind::Manual => writeln!(output, "Saved."),
+        Ok(()) => Ok(()),
+        Err(error) => writeln!(
             output,
-            "{}",
-            engine.world().location(&location).unwrap().exits[&direction].blocked_text
+            "Saving failed; earlier saves are unchanged: {error}"
         ),
-        Err(error) => writeln!(output, "{error}"),
     }
 }
 
-fn start<'w>(world: &'w WorldSpec, output: &mut impl Write) -> Result<Engine<'w>, Box<dyn Error>> {
+fn list(entries: &[Entry], output: &mut impl Write) -> io::Result<()> {
+    for (i, entry) in entries.iter().enumerate() {
+        let kind = match entry.kind {
+            Kind::Auto => "auto-save",
+            Kind::Manual => "save",
+        };
+        writeln!(output, "  {}. {kind}", i + 1)?;
+    }
+    Ok(())
+}
+
+/// Loads the save at `index` (the newest when `None`) and shows where play
+/// resumes. A save that fails to load is reported, never skipped; older saves
+/// are offered for the player to choose. Returns whether play resumed.
+fn restore(
+    engine: &mut Engine<'_>,
+    saves: &Saves,
+    index: Option<usize>,
+    output: &mut impl Write,
+) -> io::Result<bool> {
+    let world = engine.world();
+    let loaded = saves.load(index, |snapshot| {
+        let restored = Engine::restore(world, snapshot)?;
+        // Recovery resumes a living player; a dead save could never recover.
+        if restored.state().player.hp == 0 {
+            return Err("the player is dead in this save".into());
+        }
+        Ok(restored)
+    });
+    match loaded {
+        Ok((index, restored)) => {
+            *engine = restored;
+            writeln!(output, "Loaded save {}.\n", index + 1)?;
+            let events = engine
+                .execute(Command::Look)
+                .expect("looking is always allowed");
+            render::events(output, engine, &events)?;
+            // Resume a conversation with the line its choices answer.
+            if let Some(dialogue) = engine.state().dialogue.clone() {
+                let event = realmkit_engine::Event::Dialogue {
+                    npc: dialogue.npc,
+                    node: dialogue.node,
+                    choices: Vec::new(),
+                };
+                render::events(output, engine, &[event])?;
+            }
+            Ok(true)
+        }
+        Err((None, error)) => writeln!(output, "{error}").map(|()| false),
+        Err((Some(index), error)) => {
+            writeln!(output, "Save {} could not be loaded: {error}", index + 1)?;
+            let entries = saves.entries().unwrap_or_default();
+            let older = &entries[..index.min(entries.len())];
+            if !older.is_empty() {
+                writeln!(output, "Type load <number> to restore an older save:")?;
+                list(older, output)?;
+            }
+            Ok(false)
+        }
+    }
+}
+
+/// Save commands belong to the client; the engine only captures and checks snapshots.
+fn persist(
+    engine: &mut Engine<'_>,
+    saves: Option<&Saves>,
+    request: input::Input,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    let Some(saves) = saves else {
+        return writeln!(
+            output,
+            "Saving is off. Start with --saves <directory> to keep progress."
+        );
+    };
+    let entries = match saves.entries() {
+        Ok(entries) => entries,
+        Err(error) => return writeln!(output, "Saves could not be read: {error}"),
+    };
+    match request {
+        input::Input::Save if engine.state().player.hp == 0 => {
+            writeln!(output, "You cannot save now.")
+        }
+        input::Input::Save => save(engine, saves, Kind::Manual, output),
+        input::Input::Load(None) if entries.is_empty() => {
+            writeln!(output, "There are no saves yet.")
+        }
+        input::Input::Load(None) => {
+            writeln!(output, "Type load <number> to restore a save:")?;
+            list(&entries, output)
+        }
+        input::Input::Load(Some(number)) => {
+            match number.checked_sub(1).filter(|i| *i < entries.len()) {
+                Some(index) => restore(engine, saves, Some(index), output).map(drop),
+                None => writeln!(output, "Choose one of the listed saves."),
+            }
+        }
+        _ => unreachable!("only save commands are persisted"),
+    }
+}
+
+/// Resumes the newest save when there is one; otherwise starts the route and
+/// auto-saves its start.
+fn start<'w>(
+    world: &'w WorldSpec,
+    saves: Option<&Saves>,
+    output: &mut impl Write,
+) -> Result<Engine<'w>, Box<dyn Error>> {
     let mut engine = Engine::new(world)?;
-    writeln!(
-        output,
-        "{}\nProgress lasts for this session.\n",
-        world.world.name
-    )?;
+    let note = if saves.is_some() {
+        "Progress is saved when you complete a quest; type save to save now."
+    } else {
+        "Progress lasts for this session."
+    };
+    writeln!(output, "{}\n{note}\n", world.world.name)?;
+    if let Some(saves) = saves {
+        let resumable = !saves.entries().is_ok_and(|e| e.is_empty());
+        if resumable && restore(&mut engine, saves, None, output)? {
+            return Ok(engine);
+        }
+        if resumable {
+            writeln!(
+                output,
+                "Starting a new game; older saves stay available with load.\n"
+            )?;
+        }
+        // The new start becomes the newest save, so death recovery never
+        // falls back to the save that just failed.
+        save(&engine, saves, Kind::Auto, output)?;
+    }
     let events = engine.execute(Command::Look)?;
     render::events(output, &engine, &events)?;
     Ok(engine)
@@ -102,10 +270,11 @@ fn start<'w>(world: &'w WorldSpec, output: &mut impl Write) -> Result<Engine<'w>
 /// Line-oriented play for pipes, scripts and terminals without raw input.
 fn play(
     world: &WorldSpec,
+    saves: Option<&Saves>,
     mut input: impl BufRead,
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
-    let mut engine = start(world, output)?;
+    let mut engine = start(world, saves, output)?;
     let mut menu = Menu::new(&engine, false);
     menu.write(output, false)?;
     writeln!(output, "{}", menu::LINE_HINT)?;
@@ -125,6 +294,12 @@ fn play(
                 writeln!(output, "{}", input::HELP)?;
                 continue;
             }
+            Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
+                persist(&mut engine, saves, request, output)?;
+                menu = Menu::new(&engine, false);
+                menu.write(output, false)?;
+                continue;
+            }
             Ok(input::Input::Select(number)) => match menu.select(number) {
                 Some(entry) => entry.command.clone(),
                 None => {
@@ -141,7 +316,7 @@ fn play(
                 continue;
             }
         };
-        apply(&mut engine, command, output)?;
+        apply(&mut engine, saves, command, output)?;
         menu = Menu::new(&engine, false);
         menu.write(output, false)?;
     }
@@ -189,10 +364,11 @@ fn read_typed(
 /// Menu-driven play from key presses. The engine never sees keys, only commands.
 fn play_keys(
     world: &WorldSpec,
+    saves: Option<&Saves>,
     mut keys: impl Iterator<Item = io::Result<Key>>,
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
-    let mut engine = start(world, output)?;
+    let mut engine = start(world, saves, output)?;
     let mut leave_dialogue = false;
     'scene: loop {
         let mut menu = Menu::new(&engine, leave_dialogue);
@@ -246,6 +422,11 @@ fn play_keys(
                             continue 'scene;
                         }
                         Ok(input::Input::Blank) => continue 'scene,
+                        Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
+                            persist(&mut engine, saves, request, output)?;
+                            leave_dialogue = false;
+                            continue 'scene;
+                        }
                         Err(message) => {
                             writeln!(output, "Invalid command: {message}.")?;
                             continue 'scene;
@@ -255,7 +436,10 @@ fn play_keys(
             };
             // Stepping back from a conversation lasts until the player speaks again.
             leave_dialogue &= !matches!(command, Command::Talk(_) | Command::ChooseDialogue(_));
-            apply(&mut engine, command, output)?;
+            // A restored save may be mid-conversation; show its choices again.
+            if apply(&mut engine, saves, command, output)? {
+                leave_dialogue = false;
+            }
             continue 'scene;
         }
     }
@@ -335,7 +519,7 @@ mod tests {
             Down, Enter, // down
         ]);
         let mut output = Vec::new();
-        play_keys(&world, keys.into_iter().map(Ok), &mut output).unwrap();
+        play_keys(&world, None, keys.into_iter().map(Ok), &mut output).unwrap();
         let text = String::from_utf8(output).unwrap();
         for passage in [
             "> 1. Talk to Elder Mara",
@@ -360,7 +544,7 @@ mod tests {
         .unwrap();
         let mut output = Vec::new();
         let keys = [Char(':'), Char('x'), Quit, Enter];
-        play_keys(&world, keys.into_iter().map(Ok), &mut output).unwrap();
+        play_keys(&world, None, keys.into_iter().map(Ok), &mut output).unwrap();
         assert!(!String::from_utf8(output)
             .unwrap()
             .contains("looking at the bell"));
@@ -374,7 +558,41 @@ mod tests {
         ))
         .unwrap();
         let keys = [Ok(Down), Err(io::Error::other("tty lost"))];
-        let error = play_keys(&world, keys.into_iter(), &mut Vec::new()).unwrap_err();
+        let error = play_keys(&world, None, keys.into_iter(), &mut Vec::new()).unwrap_err();
         assert_eq!(error.to_string(), "tty lost");
+    }
+
+    #[test]
+    fn death_restores_the_newest_save() {
+        let mut world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/demo-world"
+        ))
+        .unwrap();
+        world.monsters[0].attack = 100;
+        let dir = std::env::temp_dir().join(format!("realmkit-death-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let saves = Saves::open(&dir).unwrap();
+        let mut output = Vec::new();
+        let input = "north\nsave\nattack wolf\nsave\nstatus\n".as_bytes();
+        play(&world, Some(&saves), input, &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        let died = text.find("Your journey has ended").expect(&text);
+        let after = &text[died..];
+        assert!(after.contains("Loaded save 2."), "{after}");
+        assert!(after.contains("The Pine Track"), "{after}");
+        assert!(after.contains("HP 24/24"), "{after}");
+        assert!(!after.contains("You cannot save now"), "{after}");
+
+        let mut dead = Engine::new(&world).unwrap();
+        dead.execute(Command::Move(realmkit_spec::Direction::North))
+            .unwrap();
+        dead.execute(Command::Attack("wolf".into())).unwrap();
+        saves.write(Kind::Manual, &dead.snapshot()).unwrap();
+        let mut output = Vec::new();
+        play(&world, Some(&saves), "".as_bytes(), &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains("the player is dead in this save"), "{text}");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

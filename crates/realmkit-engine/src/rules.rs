@@ -7,7 +7,7 @@ pub(super) fn conditions_met(state: &GameState, conditions: &[Condition]) -> boo
     })
 }
 
-fn npc_here(world: &WorldSpec, state: &GameState, id: &str) -> bool {
+pub(super) fn npc_here(world: &WorldSpec, state: &GameState, id: &str) -> bool {
     world
         .location(&state.player.location)
         .unwrap()
@@ -259,11 +259,15 @@ pub(super) fn execute(
                 Some(DialogueEffect::SetFlag { flag }) => set_flag(state, flag, &mut events),
                 None => {}
             }
-            if let Some(next) = &choice.next {
-                dialogue(world, state, active.npc, next.clone(), &mut events);
-            } else {
-                state.dialogue = None;
-                events.push(Event::DialogueEnded);
+            // An effect can make the speaker unavailable; the conversation ends then.
+            match &choice.next {
+                Some(next) if npc_here(world, state, &active.npc) => {
+                    dialogue(world, state, active.npc, next.clone(), &mut events)
+                }
+                _ => {
+                    state.dialogue = None;
+                    events.push(Event::DialogueEnded);
+                }
             }
         }
         Command::AcceptQuest(id) => {
