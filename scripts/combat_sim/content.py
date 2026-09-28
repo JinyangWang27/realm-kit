@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
-from .model import SPECIAL_BASIC_ATTACK, Channel, Kind, Profile, Resource, Skill
+from .model import SPECIAL_BASIC_ATTACK, Channel, Kind, Profile, Resource, Skill, exact
 
 
 @dataclass(frozen=True)
@@ -42,8 +42,10 @@ class Content:
 
     def scaled(self, opponent: Profile, kind: Kind) -> Profile:
         tier = self.tiers[kind]
-        return replace(opponent, hp=opponent.hp * tier.hp, patk=opponent.patk * tier.attack,
-                       satk=opponent.satk * tier.attack)
+        # Exact decimal arithmetic, so a half-integer result rounds half up as documented.
+        return replace(opponent, hp=exact(opponent.hp) * exact(tier.hp),
+                       patk=exact(opponent.patk) * exact(tier.attack),
+                       satk=exact(opponent.satk) * exact(tier.attack))
 
 
 # Each later skill trades up: more power for the same cost, so damage per MP or rage rises.

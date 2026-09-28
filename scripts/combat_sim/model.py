@@ -49,9 +49,14 @@ def round_half_up(value: Fraction) -> int:
     return math.floor(value + Fraction(1, 2))
 
 
-def exact(value: float) -> Fraction:
-    """An authored decimal (such as a 0.6 tier multiplier times 16) as an exact fraction."""
-    return Fraction(str(value))
+# An authored amount: a decimal as written, or an exact fraction from scaling one.
+Amount = float | Fraction
+
+
+def exact(value: Amount) -> Fraction:
+    """An authored decimal as the exact fraction it was written as (0.6 is 3/5, not the
+    nearest binary float); fractions pass through unchanged."""
+    return value if isinstance(value, Fraction) else Fraction(str(value))
 
 
 # Proposed engine validation bounds (ROADMAP.md, "Engine bounds").
@@ -87,12 +92,12 @@ class Profile:
     """Level-1 stats. Floats are allowed because monster tiers scale them."""
 
     name: str
-    hp: float
-    mp: float
-    patk: float
-    pdef: float
-    satk: float
-    sdef: float
+    hp: Amount
+    mp: Amount
+    patk: Amount
+    pdef: Amount
+    satk: Amount
+    sdef: Amount
     speed: int
     skills: tuple[Skill, ...] = ()
     basic: Skill = BASIC_ATTACK  # free fallback action; its channel belongs to the character
@@ -104,7 +109,7 @@ class Profile:
     def at_level(self, rules: Rules, level: int, speed: int | None = None) -> Combatant:
         # Sample content generation, not an engine rule: the engine reads authored
         # per-level stats. Speed does not grow.
-        def grow(value: float) -> int:
+        def grow(value: Amount) -> int:
             return rules.grow(value, level, self.growth)
 
         return Combatant(
@@ -144,7 +149,7 @@ class Rules:
         """Encounter time of one basic action at speed 100, scheduled exactly as `delay` does."""
         return self.delay(100)
 
-    def grow(self, value: float, level: int, growth: float | None = None) -> int:
+    def grow(self, value: Amount, level: int, growth: float | None = None) -> int:
         """A level-1 value at `level`, generated exactly and rounded half up."""
         rate = exact(self.growth if growth is None else growth)
         return round_half_up(exact(value) * rate ** (level - 1))

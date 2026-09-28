@@ -74,7 +74,7 @@ def check_bounds(sim: Simulator) -> None:
     characters += [sim.content.scaled(foe, kind).at_level(sim.rules, top)
                    for foe in sim.content.monsters for kind in Kind]
     for c in characters:
-        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef"):
+        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
             require(getattr(c, stat) <= STAT_BOUND,
                     f"{c.name} {stat} {getattr(c, stat)} exceeds {STAT_BOUND} at level {top}")
 

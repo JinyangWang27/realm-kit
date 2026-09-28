@@ -290,6 +290,7 @@ Encounter           active local state; at most one per playthrough
     ├── control     player | policy
     ├── hp, mp, rage
     ├── remainders  fractional progress toward the next MP and rage point
+    ├── pending     none, or a declared flee awaiting its turn
     └── next_time
 ```
 
@@ -342,7 +343,9 @@ Encounter           active local state; at most one per playthrough
   escape for that participant's next turn with the normal action time, during
   which the player takes no other action, opponents act as usual and damage
   applies. The escape resolves when that turn arrives if the player is still
-  alive, so a faster player escapes sooner. Other actions keep resolving at once. An authored group may forbid
+  alive, so a faster player escapes sooner. The pending flee is part of the
+  participant's saved state, so a save taken during the wind-up still escapes on
+  load instead of asking for a new action. Other actions keep resolving at once. An authored group may forbid
   fleeing, as a boss or canonical duel might. Fleeing grants nothing and records
   no defeats.
 - **Yielding.** A group may be authored to yield at a share of maximum HP, as in

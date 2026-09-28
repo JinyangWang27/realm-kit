@@ -118,6 +118,8 @@ class Simulator:
             while total < table[level]:
                 result = self.fight(player, [self.monster(monster_level)], hp, mp)
                 if not result.won:
+                    if (hp, mp) == (player.hp, player.mp):  # lost at full: resting cannot help
+                        return GrindResult(level, kills, rests)
                     rests += 1
                     result = self.fight(player, [self.monster(monster_level)])
                     if not result.won:  # unbeatable even from full health: grinding stops here

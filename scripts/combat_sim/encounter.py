@@ -46,9 +46,10 @@ class Fighter:
     def choose_skill(self, rules: Rules) -> Skill:
         """The strongest affordable skill, falling back to a basic attack. Equal power prefers
         the cheaper skill, then the later tier, so a cheaper later tier is actually used."""
-        costs = {s.name: rules.skill_cost(s, self.combatant) for s in self.combatant.skills}
-        affordable = [s for s in self.combatant.skills if self.can_afford(s, costs[s.name])]
-        return max(affordable, key=lambda s: (s.power, -costs[s.name], s.level), default=self.combatant.basic)
+        priced = [(s, rules.skill_cost(s, self.combatant)) for s in self.combatant.skills]
+        affordable = [(s, cost) for s, cost in priced if self.can_afford(s, cost)]
+        best = max(affordable, key=lambda pair: (pair[0].power, -pair[1], pair[0].level), default=None)
+        return self.combatant.basic if best is None else best[0]
 
     def pay(self, skill: Skill, cost: int) -> None:
         if skill.resource is Resource.MP:
