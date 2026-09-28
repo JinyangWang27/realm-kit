@@ -117,6 +117,17 @@ A wilderness story might use:
 travel + time + survival + weather + injury
 ```
 
+A non-spatial academic-career simulation might use:
+
+```text
+time + economy/funding + relationships + reputation + scholarship + authored events
+```
+
+It should not acquire combat, inventory or fake spatial traversal merely because
+the first RealmKit fixture uses them. Repeated domain rules may justify one small
+typed institution/career capability later; isolated cases should remain authored
+events. See [non-spatial simulation worlds](simulation-worlds.md).
+
 Crafting belongs only if the source supports characters making or improving
 things. Combat belongs only if physical or magical conflict is an important
 playable part of the source.
