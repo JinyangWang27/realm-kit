@@ -117,11 +117,45 @@ def _tier_knob(kind: Kind, field: str) -> Knob:
     return apply
 
 
-def _growth_knob(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
+def scale_rate(growth: float, factor: float) -> float:
     """Scale the per-level growth rate (1.10 → 1.085), not the multiplier itself."""
+    return round(1 + (growth - 1) * factor, 4)
+
+
+def _growth_knob(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
     before = rules.growth
-    after = round(1 + (before - 1) * factor, 4)
+    after = scale_rate(before, factor)
     return replace(rules, growth=after), content, before, after
+
+
+def _profile_growth_knob(slot: Slot) -> Knob:
+    """A profile's own growth override, which shadows the world's."""
+    get, put = slot
+
+    def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
+        profile = get(content)
+        before = profile.growth if profile.growth is not None else rules.growth
+        after = scale_rate(before, factor)
+        return rules, put(content, replace(profile, growth=after)), before, after
+    return apply
+
+
+def _share_knob(slot: Slot, index: int | None) -> Knob:
+    """A skill's cross-share override (the basic attack when `index` is None), kept in 0-100."""
+    get, put = slot
+
+    def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
+        profile = get(content)
+        skill = profile.basic if index is None else profile.skills[index]
+        before = skill.cross_share if skill.cross_share is not None else 0
+        after = min(100, step(before, factor))
+        changed = replace(skill, cross_share=after)
+        if index is None:
+            profile = replace(profile, basic=changed)
+        else:
+            profile = replace(profile, skills=tuple(changed if i == index else s for i, s in enumerate(profile.skills)))
+        return rules, put(content, profile), before, after
+    return apply
 
 
 def _basic_knob(slot: Slot, field: str) -> Knob:
@@ -171,9 +205,23 @@ def knobs(content: Content) -> dict[str, Knob]:
     for kind in content.tiers:
         for tier_field in ("hp", "attack"):
             add(found, f"{kind.value} tier {tier_field}", _tier_knob(kind, tier_field))
-    for field in ("cross_share", "mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
+    # Overrides shadow the world defaults: nudge each override, and a default only if used.
+    profiles = [slot[0](content) for slot in all_slots.values()]
+    for name, slot in all_slots.items():
+        profile = slot[0](content)
+        if profile.growth is not None:
+            add(found, f"{name} growth", _profile_growth_knob(slot))
+        for i, skill in enumerate(profile.skills):
+            if skill.cross_share is not None:
+                add(found, f"{name} {skill.name} cross_share", _share_knob(slot, i))
+        if profile.basic.cross_share is not None:
+            add(found, f"{name} basic attack cross_share", _share_knob(slot, None))
+    if any(s.cross_share is None for p in profiles for s in (*p.skills, p.basic)):
+        add(found, "cross_share", _rules_knob("cross_share"))
+    for field in ("mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
         add(found, field, _rules_knob(field))
-    add(found, "growth", _growth_knob)
+    if any(p.growth is None for p in profiles):
+        add(found, "growth", _growth_knob)
     return found
 
 

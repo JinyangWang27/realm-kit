@@ -1,7 +1,9 @@
 """The balance targets as explicit checks; each failure names the broken target."""
 from __future__ import annotations
 
+import math
 from dataclasses import replace
+from fractions import Fraction
 
 from .encounter import Encounter
 from .model import (POWER_BOUNDS, STAT_BOUND, Channel, Combatant, Formula, Kind, Profile, Resource, Rules,
@@ -92,12 +94,39 @@ def check_integers(sim: Simulator) -> None:
                     f"{profile.name} {skill.name} cross share {skill.cross_share} must be an integer")
 
 
+def check_exact_stats(profile: Profile, source: str) -> None:
+    """A profile's level-1 amounts, exactly, before generation rounds them."""
+    for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
+        low = 1 if stat in ("hp", "speed") else 0
+        value = exact(getattr(profile, stat))
+        require(low <= value <= STAT_BOUND,
+                f"{profile.name} {source} {stat} {float(value):g} is outside {low}-{STAT_BOUND}")
+
+
+def check_finite(sim: Simulator) -> None:
+    """Decimal amounts must be finite numbers before they are converted exactly."""
+    def finite(value: object) -> bool:
+        return isinstance(value, (int, Fraction)) or (isinstance(value, float) and math.isfinite(value))
+    amounts: list[tuple[str, object]] = [("world growth", sim.rules.growth)]
+    for profile in (*sim.content.builds, *sim.content.monsters):
+        amounts += [(f"{profile.name} {stat}", getattr(profile, stat))
+                    for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef")]
+        if profile.growth is not None:
+            amounts.append((f"{profile.name} growth", profile.growth))
+    for key, tier in sim.content.tiers.items():
+        label = key.value if isinstance(key, Kind) else key
+        amounts += [(f"{label} tier hp", tier.hp), (f"{label} tier attack", tier.attack)]
+    for name, value in amounts:
+        require(finite(value), f"{name} {value!r} must be a finite number")
+
+
 def check_bounds(sim: Simulator) -> None:
     """Sample content must itself pass the proposed engine validation: every derived stat of
     every character and tier stays within the stat bound up to the maximum level, and every
     skill's power is in range."""
     require(sim.content.monsters, "content needs at least one sample opponent")
     check_integers(sim)
+    check_finite(sim)
     table = sim.content.level_table
     require(table[:1] == (0,) and all(a < b for a, b in zip(table, table[1:])),
             "the level table must start at 0 XP and rise strictly, as the engine requires")
@@ -115,11 +144,7 @@ def check_bounds(sim: Simulator) -> None:
             require(not paid, f"{profile.name} has MP-costing {', '.join(paid)} but no MP at level 1 to scale costs from")
         require(profile.basic.cost == 0 and profile.basic.level == 1,
                 f"{profile.name}'s basic attack must be free and available from level 1")
-        # The authored amounts themselves, before generation rounds them.
-        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
-            low = 1 if stat in ("hp", "speed") else 0
-            require(low <= exact(getattr(profile, stat)) <= STAT_BOUND,
-                    f"{profile.name} authored {stat} {getattr(profile, stat)} is outside {low}-{STAT_BOUND}")
+        check_exact_stats(profile, "authored")
         require(profile.growth is None or profile.growth >= 1,
                 f"{profile.name} growth {profile.growth} would lower stats as levels rise")
     unknown = [key for key in sim.content.tiers if not isinstance(key, Kind)]
@@ -129,6 +154,9 @@ def check_bounds(sim: Simulator) -> None:
     for kind, tier in sim.content.tiers.items():
         require(exact(tier.hp) > 0 and exact(tier.attack) >= 0,
                 f"{kind.value} tier multipliers must be positive for HP and nonnegative for attack")
+    for foe in sim.content.monsters:
+        for kind in Kind:
+            check_exact_stats(sim.content.scaled(foe, kind), f"{kind.value}-tier")
     require(sim.rules.growth >= 1, f"world growth {sim.rules.growth} would lower stats as levels rise")
     for name in ("action_cost", "speed_cap"):
         value = getattr(sim.rules, name)
