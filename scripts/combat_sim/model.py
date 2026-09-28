@@ -56,7 +56,9 @@ Amount = float | Fraction
 def exact(value: Amount) -> Fraction:
     """An authored decimal as the exact fraction it was written as (0.6 is 3/5, not the
     nearest binary float); fractions pass through unchanged."""
-    return value if isinstance(value, Fraction) else Fraction(str(value))
+    if isinstance(value, (Fraction, int)):
+        return Fraction(value)  # exact already; no str() round trip, which limits digits
+    return Fraction(str(value))
 
 
 # Proposed engine validation bounds (ROADMAP.md, "Engine bounds").

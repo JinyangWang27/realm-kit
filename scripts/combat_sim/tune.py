@@ -118,7 +118,10 @@ def _tier_knob(kind: Kind, field: str) -> Knob:
 
 
 def scale_rate(growth: float, factor: float) -> float:
-    """Scale the per-level growth rate (1.10 → 1.085), not the multiplier itself."""
+    """Scale the per-level growth rate (1.10 → 1.085), not the multiplier itself. A zero
+    rate is nudged upward only, to 1% a level, like other zero values."""
+    if growth == 1:
+        return 1.01 if factor > 1 else 1.0
     return round(1 + (growth - 1) * factor, 4)
 
 

@@ -62,13 +62,42 @@ def check_resource_timing(sim: Simulator) -> None:
 
 
 def decimal(value: Fraction) -> str:
-    """An exact value for a message, in decimal, without float's range limit."""
+    """An exact value for a message, in decimal. Huge values are shown by order of
+    magnitude from their bit length, since float overflows and str() limits digits."""
+    if abs(value) >= 10**15:
+        digits = (abs(value.numerator).bit_length() - value.denominator.bit_length()) * 0.30103
+        return f"{'-' if value < 0 else ''}about 1e{int(digits)}"
     return format(Decimal(value.numerator) / Decimal(value.denominator), ".6g")
 
 
 def whole(value: object) -> bool:
     """An integer in the engine's sense: not a float, fraction or bool."""
     return type(value) is int
+
+
+def check_sizes(sim: Simulator) -> None:
+    """Reject absurdly large numbers first, without printing them: every later message may
+    format a value, and Python limits how many digits an int may convert to a string.
+    Every legitimate value is far below 64 bits."""
+    def too_big(value: object) -> bool:
+        if isinstance(value, int):
+            return value.bit_length() > 64
+        if isinstance(value, Fraction):
+            return value.numerator.bit_length() > 64 or value.denominator.bit_length() > 64
+        return False
+    fields: list[tuple[str, object]] = [(f"world {name}", getattr(sim.rules, name))
+                                        for name in sim.rules.__dataclass_fields__]
+    fields += [("a level-table threshold", xp) for xp in sim.content.level_table]
+    for tier in sim.content.tiers.values():
+        fields += [("a tier multiplier", tier.hp), ("a tier multiplier", tier.attack)]
+    for profile in (*sim.content.builds, *sim.content.monsters):
+        fields += [(f"{profile.name} {name}", getattr(profile, name))
+                   for name in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed", "growth", "xp", "xp_per_level")]
+        for skill in (*profile.skills, profile.basic):
+            fields += [(f"{profile.name} {skill.name} {name}", getattr(skill, name))
+                       for name in ("power", "cost", "time", "level", "cross_share")]
+    for name, value in fields:
+        require(not too_big(value), f"{name} is far too large")
 
 
 def check_integers(sim: Simulator) -> None:
@@ -128,6 +157,7 @@ def check_bounds(sim: Simulator) -> None:
     every character and tier stays within the stat bound up to the maximum level, and every
     skill's power is in range."""
     require(sim.content.monsters, "content needs at least one sample opponent")
+    check_sizes(sim)
     check_integers(sim)
     check_finite(sim)
     table = sim.content.level_table
