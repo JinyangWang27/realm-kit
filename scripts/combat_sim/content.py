@@ -1,0 +1,56 @@
+"""Tuned values: builds, skills, the monster and its tiers. Swap these to prototype."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field, replace
+
+from .model import Channel, Kind, Profile, Resource, Skill
+
+
+@dataclass(frozen=True)
+class Tier:
+    hp: float  # multiplier on the monster's HP
+    attack: float  # multiplier on the monster's physical attack
+
+
+@dataclass(frozen=True)
+class Content:
+    warrior: Profile  # the sustain build: rage skills
+    mage: Profile  # the burst build: MP skills
+    monster: Profile
+    tiers: dict[Kind, Tier] = field(default_factory=lambda: {
+        Kind.NORMAL: Tier(1.0, 1.0),
+        Kind.MINION: Tier(0.5, 0.6),
+        Kind.BOSS: Tier(4.0, 1.3),
+    })
+
+    @property
+    def builds(self) -> tuple[Profile, ...]:
+        return self.warrior, self.mage
+
+    def monster_of(self, kind: Kind) -> Profile:
+        tier = self.tiers[kind]
+        return replace(self.monster, name=kind.value, hp=self.monster.hp * tier.hp,
+                       patk=self.monster.patk * tier.attack)
+
+
+# Each later skill trades up: more power for the same cost, so damage per MP or rage rises.
+SPARK = Skill("spark", power=80, channel=Channel.SPECIAL)  # free, so an empty MP pool is not helpless
+BOLT = Skill("bolt", power=170, channel=Channel.SPECIAL, cost=12)
+FIREBALL = Skill("fireball", power=210, channel=Channel.SPECIAL, cost=12, level=10)
+STARFALL = Skill("starfall", power=250, channel=Channel.SPECIAL, cost=12, level=20)
+RAGE_STRIKE = Skill("rage strike", power=150, channel=Channel.PHYSICAL, cost=5, resource=Resource.RAGE)
+CLEAVE = Skill("cleave", power=185, channel=Channel.PHYSICAL, cost=5, resource=Resource.RAGE, level=10)
+EXECUTE = Skill("execute", power=220, channel=Channel.PHYSICAL, cost=5, resource=Resource.RAGE, level=20)
+# Monsters follow the same rules: level-gated rage skills keep them in step with players.
+REND = Skill("rend", power=130, channel=Channel.PHYSICAL, cost=5, resource=Resource.RAGE)
+MAUL = Skill("maul", power=155, channel=Channel.PHYSICAL, cost=5, resource=Resource.RAGE, level=10)
+SAVAGE = Skill("savage", power=180, channel=Channel.PHYSICAL, cost=5, resource=Resource.RAGE, level=20)
+
+DEFAULT = Content(
+    warrior=Profile("warrior", hp=200, mp=0, patk=24, pdef=15, satk=5, sdef=10, speed=100,
+                    skills=(RAGE_STRIKE, CLEAVE, EXECUTE)),
+    mage=Profile("mage", hp=160, mp=75, patk=8, pdef=8, satk=20, sdef=15, speed=100,
+                 skills=(SPARK, BOLT, FIREBALL, STARFALL)),
+    monster=Profile("monster", hp=80, mp=0, patk=16, pdef=10, satk=0, sdef=10, speed=110,
+                    skills=(REND, MAUL, SAVAGE)),
+)

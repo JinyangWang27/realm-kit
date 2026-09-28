@@ -149,7 +149,7 @@ which typed mechanics each source would add.
 
 | | 神雕侠侣 | 天龙八部 | Arthurian legend | 雪中悍刀行 |
 | --- | --- | --- | --- | --- |
-| Damage channels | 外功 physical, 内功 magical | Same | Arms physical, enchantment magical | Arms physical, 气机 and 剑气 magical |
+| Damage channels | 外功 physical, 内功 special | Same | Arms physical, enchantment special | Arms physical, 气机 and 剑气 special |
 | Skill resource | 内力 as MP, restored by 打坐 as rest | 内力, which can be absorbed or dissolved | None for knights; mana for Merlin and Morgan | 气机 as MP; a rage-style 刀意 suits 徐凤年 |
 | Growth | Techniques from 秘籍 and 奇遇 | Techniques and absorbed 内力 | Deeds and renown | Realms from 三品 to 陆地神仙 |
 | Signature mechanics | 点穴 stun, poison, 双剑合璧 combo, mood-gated 黯然销魂掌 | 斗转星移 reflection, 内力 attacks, unreliable 六脉神剑, 生死符 | Excalibur's scabbard, Gawain's strength until noon, the Green Knight | 金刚 toughness, 指玄 insight, summoned swords |
@@ -158,7 +158,8 @@ which typed mechanics each source would add.
 ### Weapons
 
 Weapons are equipment (M4) with world-authored categories rather than a
-universal list. A small closed set of typed properties covers these sources:
+universal list. A small closed set of typed properties covers these sources. Special attack
+and defence carry the world's own name, such as 内力 in wuxia:
 
 - a category that techniques can require, so a 剑法 needs a 剑;
 - stat modifiers, including a speed penalty for heavy weapons;
@@ -188,8 +189,8 @@ world that needs it:
 3. **Status effects** (three sources): stun from 点穴, poison, enchanted sleep,
    with durations in encounter time. Planned for M4.
 4. **Defence bypass and immunity** (雪中悍刀行, Arthurian legend): planned for M4.
-   Illusion or mind attacks, such as Morgan's, are one candidate for the
-   undecided third damage channel.
+   Illusion or mind attacks, such as Morgan's, become special hits with an
+   explicit bypass or immunity rule rather than a third channel.
 5. **Resource attacks** (天龙八部): skills that absorb or dissolve MP.
 6. **Conditional techniques:** Gawain's noon strength needs World Time,
    黯然销魂掌 depends on a story flag, and 六脉神剑's unreliability uses the

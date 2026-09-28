@@ -162,8 +162,8 @@ plugin framework or ECS.
 | MP / maximum MP | Resource for skills |
 | Physical attack | Strength of physical damage |
 | Physical defence | Mitigation of physical damage |
-| Magical attack | Strength of magical damage |
-| Magical defence | Mitigation of magical damage |
+| Special attack | Strength of special damage: magic, 内力, mana, as the world names it |
+| Special defence | Mitigation of special damage |
 | Speed | Action timing; exact model discussed below |
 
 Use these direct combat stats first. Strength, intelligence, dexterity, elemental
@@ -171,11 +171,15 @@ resistance, accuracy and critical chance can come later when builds need them.
 
 - Apply the same stat and damage rules to players and monsters.
 - Add a basic physical attack, one rage-costing physical skill, one MP-costing
-  magical skill and one free magical skill, sufficient to test both damage
-  channels and both [skill resources](#skill-resources). Define safe-location
-  HP/MP recovery explicitly.
-- Select physical attack/defence for physical skills and magical attack/defence
-  for magical skills. Keep skill power separate from the character's attack stat.
+  special skill and one free special skill, sufficient to test both damage
+  channels and both [skill resources](#skill-resources). Costly skills come in
+  tiers unlocked by character level, and monsters get level-gated skills under
+  the same rules; see [Tuned values](#tuned-values). Define safe-location HP/MP
+  recovery explicitly.
+- The skill's channel selects the dominant attack/defence pair, and the other
+  channel adds its authored share, as described under
+  [Damage](#damage-two-channels-gradual-defence--proposed-formula). Keep skill
+  power separate from the character's attack stat.
 - Centralize damage calculation in the engine; content supplies bounded numeric
   parameters, never executable formula strings.
 - Specify rounding, minimum damage, resource costs, death and action cancellation.
@@ -188,13 +192,44 @@ resistance, accuracy and critical chance can come later when builds need them.
   with saved RNG state. Keep semantically unrelated random domains independent
   where incidental draw coupling would produce surprising gameplay changes.
 
-**Done when:** a small duel demonstrates distinct physical/magical builds, MP
+**Done when:** a small duel demonstrates distinct physical/special builds, MP
 and rage expenditure and recovery, and a measurable benefit from increased speed. In M3,
 builds are fixture stat blocks; player-chosen builds arrive with equipment in M4.
 A one-against-two fixture exercises several opponents, explicit targeting and
 tie order. Tests cover formulas, scheduling, ties, death, resource rejection,
 replay and save/load, including a save made mid-encounter. A combat-free fixture
 validates and plays through a main quest without combat data, levels or menus.
+
+### Optional parts of combat · proposed
+
+Combat is optional, and so are most of its parts. A world uses a part by
+authoring content that needs it. An absent part leaves no state, UI, required
+data or placeholder, exactly as an absent capability does. Only the parts every
+fight needs are fixed.
+
+| Part | Present when | Without it |
+| --- | --- | --- |
+| Core: HP, attack and defence stats, speed, damage, timeline, basic attack, encounters | The world has combat | No combat at all |
+| Character levels and XP | The world authors a level table | Stats come from authored base stats, techniques and equipment; defeats grant no XP |
+| MP | Any skill costs MP | No MP stat, bar or regeneration |
+| MP regeneration in encounters | A rate is authored | MP refills only by resting |
+| Rage | Any skill costs rage | No rage state or constants |
+| Skills beyond the basic attack | Any are authored | Basic attack only |
+| Technique ranks (M4) | A technique authors more than one rank | Every technique has one fixed rank |
+| Realm display (M4) | A core internal art is named | No realm shown |
+| Repeatable groups, yielding, flee restrictions | Authored on a group | Groups fight once, to the death, and allow fleeing |
+| Seeded RNG (M3d) | Stochastic content exists | No RNG state |
+
+Validation warns about configuration that no content uses, such as rage
+constants without a rage skill, rather than rejecting it.
+
+**Power comes from stats, never from character level.** A character at level 1
+can be very strong: 虚竹 receives 无崖子's seventy years of 内力 at once (传功), and
+段誉 absorbs 内力 through 北冥神功. Stats may come from a level table, technique
+passives, equipment or authored grants, and the damage formula and timeline read
+only the resulting stats. Character level, where it exists, records experience.
+It still drives XP falloff; a world without levels compares an opponent's
+authored level with the player's realm rank instead, or has no falloff.
 
 ### Delivery slices · proposed
 
@@ -214,7 +249,8 @@ balance decisions.
    them: every content edit already invalidates saves through the package
    revision. The demo plays as before.
 2. **M3b — stats, damage and skills.** The seven-stat block, gradual defence
-   reduction with level-scaled K, the skills and MP costs listed under
+   reduction by the damage formula confirmed in decision 3, the skills and MP
+   costs listed under
    [Tuned values](#tuned-values), and a `Rest` command at authored safe locations
    that restores HP and MP outside encounters. Rage and MP regeneration during
    encounters need encounter time, so they arrive with M3c. Save only current HP/MP,
@@ -330,7 +366,7 @@ Encounter           active local state; at most one per playthrough
 
 Group size needs balancing as a unit: each extra opponent acts as often as a lone
 one would. In the balance simulation below, two same-level ordinary monsters
-cost a level-5 warrior about 62% of its HP, so packs should mostly be built from
+cost a level-5 warrior about 64% of its HP, so packs should mostly be built from
 a weaker minion tier.
 
 ### Stat ranges and caps · proposed
@@ -361,11 +397,14 @@ between starting and final values. Stats are not stored in 8 bits, so a cap of
 
 ### Balance simulation · proposed
 
-`scripts/combat_sim.py` models these rules: the damage formula, the timeline,
-tie order and the basic enemy behaviour, not the engine itself. Run it without
-arguments for a report, with `--check` to assert the balance targets, or with
-`--k fixed` to compare against a constant K. It tunes against these targets,
-which suit a game where grinding for levels (打怪练级) matters:
+The `scripts/combat_sim` package models these rules: the damage formula, the
+timeline, tie order and the basic enemy behaviour, not the engine itself. From
+the repository root, `python3 -m scripts.combat_sim` prints a report, `check`
+asserts the balance targets, `tune` nudges each tuned value by about 15% to show
+which targets break, and `--formula` compares the K formulas. Tuned values live
+in `content.py`, separate from the rules in `model.py`, so a prototype swaps
+content without editing the model. It tunes against these targets, which suit a
+game where grinding for levels (打怪练级) matters:
 
 - A same-level ordinary monster takes 3–6 player actions and costs 15–35% of HP,
   allowing two to five fights between rests.
@@ -376,6 +415,8 @@ which suit a game where grinding for levels (打怪练级) matters:
 - Builds keep distinct identities without either dominating: the mage finishes
   fights in fewer actions, the warrior fights more times between rests, and
   neither needs more than one extra level to beat a boss.
+- Skills unlocked at higher levels clearly matter: at level 20, a build limited
+  to its level-1 skills loses at least 5 more percentage points of HP.
 
 #### Skill resources
 
@@ -390,9 +431,11 @@ different limits:
 - **MP regeneration follows encounter time, not actions.** A baseline turn is one
   basic action at speed 100. A faster actor regenerates at the same rate per unit
   of time, as the speed rules require, but gets more actions to spend it on.
-- **MP costs grow with the user's level at the same rate as the MP pool.** With
-  flat costs, a growing pool lets casters cast more per rest at every level, and
-  sustain drifts upward.
+- **In worlds with character levels, MP costs grow with the user's level at the
+  same rate as the MP pool.** With flat costs, a uniformly growing pool lets
+  casters cast more per rest at every level, and sustain drifts upward.
+  Technique ranks (M4) author their own costs instead, so a deep 内力 pool from
+  a high-rank internal art genuinely means more casts.
 - **Rage never persists outside an encounter** and is not saved between fights.
   It is part of the saved encounter state during one.
 - **Outside encounters,** MP refills only by resting in M3. Regeneration over
@@ -405,42 +448,74 @@ different limits:
 Level-1 values that meet every target, with every stat growing 10% per level for
 players and monsters alike:
 
-| | HP | MP | P.Atk | P.Def | M.Atk | M.Def | Spd |
+| | HP | MP | P.Atk | P.Def | S.Atk | S.Def | Spd |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Warrior fixture | 200 | — | 20 | 15 | 5 | 10 | 100 |
-| Mage fixture | 160 | 60 | 8 | 8 | 20 | 15 | 100 |
-| Ordinary monster | 80 | — | 12 | 10 | 0 | 5 | 110 |
+| Warrior fixture | 200 | — | 24 | 15 | 5 | 10 | 100 |
+| Mage fixture | 160 | 75 | 8 | 8 | 20 | 15 | 100 |
+| Ordinary monster | 80 | — | 16 | 10 | 0 | 10 | 110 |
 
-| Skill | Channel | Power | Cost |
-| --- | --- | --- | --- |
-| Basic attack | Physical | 100 | — |
-| Rage strike (warrior) | Physical | 175 | 5 rage |
-| Bolt (mage) | Magical | 170 | 12 MP at level 1 |
-| Spark (mage) | Magical | 80 | — |
+Skills unlock at a character level, and each later tier trades up: more power
+for the same cost. Monsters follow the same rules with their own tiers.
 
-Minions have half HP and 60% attack; bosses have four times the HP and 130%
-attack. The sim uses the strongest affordable skill on every turn. Results:
+| Skill | Who | Channel | From level | Power | Cost |
+| --- | --- | --- | --- | --- | --- |
+| Basic attack | Everyone | Physical | 1 | 100 | — |
+| Spark | Mage | Special | 1 | 80 | — |
+| Bolt / fireball / starfall | Mage | Special | 1 / 10 / 20 | 170 / 210 / 250 | 12 MP at level 1 |
+| Rage strike / cleave / execute | Warrior | Physical | 1 / 10 / 20 | 150 / 185 / 220 | 5 rage |
+| Rend / maul / savage | Monster | Physical | 1 / 10 / 20 | 130 / 155 / 180 | 5 rage |
+
+The cross share is 25%. Minions have half HP and 60% attack; bosses have four
+times the HP and 130% attack. The sim uses the strongest affordable skill on
+every turn. Results at level 10, within a few points at every level from 1 to 30:
 
 | | Warrior | Mage |
 | --- | --- | --- |
-| Same-level fight | 4 actions, 21% HP lost | 3 actions, 20% HP lost |
+| Same-level fight | 4 actions, 22% HP lost | 3 actions, 24% HP lost |
 | Fights per rest | 4 | 3 |
 | Level needed for a level-5 / 10 / 20 boss | 6 / 11 / 21 | 7 / 12 / 22 |
-| Grinding from level 1 to 10 | 33 kills, 6 rests | 33 kills, 9 rests |
+| Grinding from level 1 to 10 | 39 kills, 8 rests | 43 kills, 15 rests |
+| At level 20, level-1 skills only | 5 actions, 32% (instead of 25%) | 4 actions, 37% (instead of 27%) |
 
-These values sit inside a stable region of the search: 2% or 3% MP regeneration
-and each of the tested bolt variants (150/10, 170/12 and 200/15 MP) also pass.
+The last row is a target: later skills must clearly matter. Monster skill tiers
+keep same-level fights steady as players unlock theirs. Without them, the mage's
+level-20 fights fell to 3 actions and 18% HP, and monsters four levels higher
+became easy.
+
+`tune` shows 26 of 54 single-value nudges keep every target. Nearly every break is
+the boss-parity target, which allows the builds to differ by at most one level
+on the same boss. Allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`) raises
+this to 42 of 54; it is a design choice, not a tuning fix.
+
+#### Choosing skill power
+
+Power is authored on each skill, weapon and technique rank; the engine never
+computes it. Rules of thumb for authors, to be verified with `check` and `tune`:
+
+- **Free skills stay at or below 100**, the basic attack, as spark's 80 does.
+  Otherwise nobody uses the basic attack.
+- **Costly skills gain power in proportion to what they spend.** Bolt adds 70
+  over a basic attack for 12 MP; rage strike adds 50 for 5 rage. Compare skills
+  by extra power per unit of resource, and remember that MP limits a whole rest
+  cycle while rage limits one fight.
+- **Later tiers trade up by roughly 20% at the same cost**, as 170 → 210 → 250
+  and 150 → 185 → 220 do, or keep their power and cost less. Give monsters
+  matching tiers so same-level fights stay steady and players need the new skills.
+- **Slower actions need power at least in proportion to their action time.** A
+  heavy weapon's basic attack at 160% time needs about 160 power to break even,
+  and more to be worth its lost turns.
+- **Check hits-to-kill breakpoints.** A little extra power that saves one hit
+  removes whole enemy turns, so small changes can swing short fights.
 
 #### Findings
 
-- **K should grow with the attacker's level.** With a constant K, defence
-  outgrows it and fights lengthen: a level-30 warrior needs 10 actions per
-  ordinary fight instead of 4. Scaling K with level (here by the same 10% per
-  level, as WoW does with armour) keeps fights similar in length at every level.
-  K becomes a per-level value, still authored data rather than a formula string.
-  A K-free alternative, `attack × power × attack / (attack + defence)`, is also
-  level-consistent; it trades the parameter for defence that depends on the
-  attacker.
+- **Damage must not depend on a fixed K or on level.** With a constant K,
+  defence outgrows it and fights lengthen: a level-30 warrior needed 10 actions
+  per ordinary fight instead of 4. Scaling K with the attacker's level, as WoW
+  does with armour, fixes that but ties damage to level: a level-1 character
+  given level-15 stats needed 5 actions instead of 4 against a level-15 monster.
+  The K-free ratio formula has neither problem, and the tuned values above use
+  it. Run `--formula k-scaled` or `--formula k-fixed` to compare.
 - **Each resource favours a fight length; combining them balances.** With MP
   refilled only by resting, long boss fights starved the mage, which needed three
   to five extra levels. Rage alone made the warrior the only viable boss build,
@@ -452,11 +527,12 @@ and each of the tested bolt variants (150/10, 170/12 and 200/15 MP) also pass.
   with power 170 and 160% action time adds only about 6% damage per unit of
   time, but it halved fight length: the monster died in 2 hits instead of 4 and
   got half as many turns. Tune skills against hits-to-kill, not only damage rate.
-- **Speed helps unevenly in short fights for the same reason.** Speeds 110, 120
-  and 140 give the same result against an ordinary monster. In longer boss fights,
-  every speed increase helps.
+- **Speed helps unevenly in short fights for the same reason.** Under the
+  earlier values, with 4-action fights, speeds 110, 120 and 140 gave identical
+  results. With the current values, 100, 110, 140 and 200 give 23%, 18%, 13%
+  and 9% HP lost for a level-5 warrior; 110 and 120 still tie.
 - **Packs need a minion tier.** Two same-level ordinary monsters cost a level-5
-  warrior 62% of its HP; two minions cost 28%.
+  warrior 64% of its HP; two minions cost 16%.
 - **Grinding needs XP that falls off with level difference.** With ±10% XP per
   level of difference and nothing from monsters five or more levels below,
   farming level-1 monsters stalls at level 6. Without the falloff it reaches
@@ -580,52 +656,63 @@ survival and actual encounter outcomes. High speed may dominate if it costs no
 attack, defence or other build investment; do not treat all stat points as equally
 valuable merely because they are integers.
 
-### Damage: gradual defence reduction · direction agreed
+### Damage: two channels, gradual defence · proposed formula
 
 Use gradual defence scaling rather than subtracting defence directly from attack.
-The exact scale, starter stats and balance targets remain proposals. Explicit
-immunity and vulnerability are a separate layer from ordinary defence.
+Explicit immunity and vulnerability are a separate layer from ordinary defence.
+
+There are two damage channels, **physical** and **special**. A world gives
+special its own name and meaning: magic, 内力, mana, 气机. Each skill has one
+channel. The stats matching that channel dominate, and the other channel's
+stats add a smaller authored share, so deep 内力 also turns aside some physical
+blows. A world that keeps the channels strictly apart sets the share to zero.
 
 Proposed calculation for a positive-power damaging hit that has landed:
 
 ```text
-A = physical or magical attack, matching the skill
-D = matching defence
+S = cross share as an integer percentage; world default, a skill may override
+A = 100 × matching attack  + S × other-channel attack
+D = 100 × matching defence + S × other-channel defence
 P = skill power as an integer percentage; basic attack = 100
-K = positive world-level defence scale; example = 100
-M_num / M_den = resolved incoming-damage multiplier for this damage type
+M_num / M_den = resolved incoming-damage multiplier for the skill's channel
                normal = 1/1; immunity = 0/1; vulnerability = 2/1
 
 if M_num == 0:
     damage = 0
 else:
-    damage = max(1, floor(A × P × K × M_num
-                         / (100 × (K + D) × M_den)))
+    damage = max(1, floor(A × P × A × M_num
+                         / (100 × 100 × (A + D) × M_den)))
 ```
 
-Require nonnegative defence/multiplier numerators, a positive multiplier
-denominator, and valid positive attack/power for this damaging-hit calculation.
-Round once, at the end, with checked wide intermediate arithmetic. Cap actual HP
-loss at remaining HP. Healing, non-damaging skills and any future misses use
-separate rules. **Immunity overrides minimum damage:** an immune target takes zero,
-never the fallback one point.
+A and D carry a factor of 100 so the cross share adds no rounding step. Require
+nonnegative defence/multiplier numerators, a positive multiplier denominator, a
+share from 0 to 100, and valid positive attack/power for this damaging-hit
+calculation. Round once, at the end, with checked wide intermediate arithmetic.
+Cap actual HP loss at remaining HP. Healing, non-damaging skills and any future
+misses use separate rules. **Immunity overrides minimum damage:** an immune
+target takes zero, never the fallback one point.
 
-With attack 40, power 100%, K = 100 and a normal 1× multiplier:
+Defence equal to the combined attack halves damage, and there is no separate
+scale K. Examples with physical attack 40, special attack 20, power 100%, a 25%
+share and a normal 1× multiplier (so a physical hit's combined attack is 45):
 
-| Defence | Damage |
-| --- | --- |
-| 0 | 40 |
-| 20 | 33 |
-| 100 | 20 |
-| 300 | 10 |
+| Defender | Physical hit | Special hit (combined attack 30) |
+| --- | --- | --- |
+| No defence | 45 | 30 |
+| Physical defence 45 | 22 | 21 |
+| Special defence 80, no physical defence | 31 | 8 |
+| Physical defence 20, no special defence | 31 | 25 |
 
-At defence K, incoming damage is approximately halved. K should be an explicit
-balance parameter, not a hidden constant or a scripting language. Select it using
-expected stat ranges and target battle lengths; these numbers are examples.
+The third row is deep 内力 blocking a physical blow as well as 20 points of
+physical defence would. The formula reads only stats, never character level,
+so power from techniques, grants or equipment counts exactly like power from
+levels. The earlier proposal divided by `K + D` with a world-level K; the
+[balance simulation](#findings) showed that a fixed K lets fights drag at high
+levels and a level-scaled K penalises strong low-level characters.
 
-M3 needs only the physical and magical channels with a fixed 1/1 multiplier.
-Immunity, vulnerability, the "special" channel and modifier stacking described
-below arrive in M4 with the equipment that needs them.
+M3 needs the two channels with a fixed 1/1 multiplier. Immunity, vulnerability
+and modifier stacking described below arrive in M4 with the equipment that
+needs them.
 
 #### Exceptional armour: immunity and vulnerability
 
@@ -634,7 +721,7 @@ An armour can combine ordinary defence with explicit damage-type modifiers:
 | Incoming type | Multiplier | Meaning |
 | --- | --- | --- |
 | Physical | 0× | Completely immune to physical damage |
-| "Special" | 2× | Twice the damage that would otherwise pass through its matching defence |
+| Special | 2× | Twice the damage that would otherwise pass through its defence |
 | Other | 1× | Ordinary defence reduction |
 
 For example, a special hit with an exact post-defence value of 40 deals 80 under
@@ -642,9 +729,10 @@ the vulnerability. A physical hit deals zero regardless of its attack value.
 Multiply before the single final rounding step, rather than rounding the
 post-defence value first.
 
-"Special" is a placeholder, not an agreed damage category. It might mean magical
-damage or a separate spiritual/other channel. Decide which defence it uses before
-implementing it. **Double damage and defence bypass are distinct properties**:
+Special is now the second channel, whatever a world calls it, so the example
+needs no extra category. A world that needs a finer distinction, such as
+illusions that ignore armour, adds it as an explicit immunity or bypass rule
+rather than a third channel. **Double damage and defence bypass are distinct properties**:
 vulnerability does not silently ignore defence. An explicit bypass rule would
 omit the defence reduction while still respecting separately specified immunity
 rules; immunity-piercing, if ever needed, would be another explicit rule.
@@ -674,8 +762,7 @@ every package.
 - Give skills authored descriptions, costs, damage channels, power and
   [technique ranks](#technique-ranks--proposed). Introduce cooldowns/status
   effects only alongside skills that require them.
-- Add immunity/vulnerability multipliers, settle the "special" damage channel,
-  specify modifier stacking and immunity precedence, choose armour speed
+- Add immunity/vulnerability multipliers, specify modifier stacking and immunity precedence, choose armour speed
   penalties, and add optional caps for stats other than speed if stacking needs
   them.
 - Define durations in terms of the chosen combat clock; do not casually mix
@@ -703,9 +790,8 @@ has a rank.
 - **Rank tables.** Each technique authors one entry per rank: power, cost, action
   time, and optionally passive stat grants and a changed weapon requirement.
   Internal arts (内功/心法) are passive techniques whose ranks grant stats such as
-  maximum MP or magical attack. A sword art's top rank may drop its weapon
-  requirement, as 独孤求败 moves from 木剑 to 无剑. Authored rank costs still grow
-  with the user's level as M3's MP costs do.
+  maximum MP or special attack. A sword art's top rank may drop its weapon
+  requirement, as 独孤求败 moves from 木剑 to 无剑. Each rank authors its own costs.
 - **Rising through use.** Using a technique in an encounter earns technique XP,
   with the same falloff by level difference as character XP, so practising on
   weak opponents stops paying. Nothing is earned outside encounters.
@@ -718,9 +804,11 @@ has a rank.
 - **Realms.** A world may name one technique as the character's core internal
   art. Its rank is then displayed as the realm (境界) under the world's own names,
   and conditions can test it. No separate tier system exists.
-- **Roles.** Character level supplies base body stats (HP, attack and defence
-  growth) and remains the level used for K and XP falloff. Techniques supply
-  skill power and passives. Two progression axes double the balance surface, so
+- **Roles.** Where a world has character levels, they supply base body stats
+  and experience; techniques supply skill power and passives. A high-rank
+  internal art can make a level-1 character strong, because power comes from
+  stats rather than level. A world may also drop character levels and progress
+  through techniques alone. Two progression axes double the balance surface, so
   the balance simulation must model ranks before their numbers are chosen.
 - **Saves** hold each learned technique's rank and technique XP. Derived stats
   are recomputed from level, technique passives and equipment, never saved.
@@ -888,13 +976,18 @@ maintained in the [open-decisions register](docs/open-decisions.md).
    penalties move to M4 with equipment.
 3. Confirm the [stat ranges](#stat-ranges-and-caps--proposed): the 9,999 engine
    bound and no other stat caps in M3. Confirm the
-   [balance targets](#balance-simulation--proposed), K growing with the
-   attacker's level, and XP that falls off with level difference. Confirm
-   repeatable groups and `Flee` in M3c for grinding.
+   [balance targets](#balance-simulation--proposed), the K-free damage formula
+   in place of level-scaled K (then retune the simulator), and XP that falls off
+   with level difference. Confirm the
+   [optional parts](#optional-parts-of-combat--proposed) and that power comes from
+   stats, never level. Confirm repeatable groups and `Flee` in M3c for
+   grinding.
 4. Confirm the [skill resources](#skill-resources): MP regenerating over
    encounter time and by resting, rage built from actions and damage taken, and
    MP costs that grow with level.
-5. "Special" damage and modifier stacking are deferred to M4.
+5. Confirm the two channels, physical and special, with a world-named special
+   channel and a 25% cross share. Immunity, vulnerability and modifier stacking
+   are deferred to M4.
 6. The M3 combat menu shows exact damage after each action and the projected turn
    order. Qualitative previews wait for a client that needs them.
 7. For M4, confirm [technique ranks](#technique-ranks--proposed) in place of

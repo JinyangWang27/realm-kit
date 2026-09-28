@@ -1,0 +1,147 @@
+"""The proposed M3 combat model: rules and formulas, skills and characters."""
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+from enum import Enum
+
+
+class Formula(Enum):
+    RATIO = "ratio"  # attack × power × attack / (attack + defence): no K, no level
+    K_SCALED = "k-scaled"  # attack × power × K / (K + defence), K grows with attacker level
+    K_FIXED = "k-fixed"  # the same with K fixed at base_k
+
+
+class Channel(Enum):
+    PHYSICAL = "physical"
+    SPECIAL = "special"  # magic, 内力, mana...: each world names it
+
+
+class Resource(Enum):
+    MP = "mp"  # regenerates over encounter time; fully restored by resting
+    RAGE = "rage"  # starts at 0 every fight; builds from acting and from damage taken
+
+
+class Kind(Enum):
+    """Monster tiers; their multipliers are content (see content.Tier)."""
+
+    NORMAL = "normal"
+    MINION = "minion"
+    BOSS = "boss"
+
+
+@dataclass(frozen=True)
+class Skill:
+    name: str
+    power: int  # percent; a basic attack is 100
+    channel: Channel
+    cost: int = 0  # level-1 cost for MP; flat for rage
+    resource: Resource = Resource.MP
+    time: int = 100  # action cost in percent of a basic attack; delays the next turn
+    cross_share: int | None = None  # overrides the world's share, e.g. a 内力-heavy palm
+    level: int = 1  # minimum character level to use it; later skills are stronger or cheaper
+
+
+BASIC_ATTACK = Skill("attack", power=100, channel=Channel.PHYSICAL)
+
+
+@dataclass(frozen=True)
+class Combatant:
+    """A character's combat stats at one level."""
+
+    name: str
+    level: int
+    hp: int
+    mp: int
+    patk: int
+    pdef: int
+    satk: int
+    sdef: int
+    speed: int
+    skills: tuple[Skill, ...]
+
+
+@dataclass(frozen=True)
+class Profile:
+    """Level-1 stats. Floats are allowed because monster tiers scale them."""
+
+    name: str
+    hp: float
+    mp: float
+    patk: float
+    pdef: float
+    satk: float
+    sdef: float
+    speed: int
+    skills: tuple[Skill, ...] = ()
+    growth: float | None = None  # overrides the world's per-level growth for this profile
+
+    def at_level(self, rules: Rules, level: int, speed: int | None = None) -> Combatant:
+        growth = rules.growth if self.growth is None else self.growth
+
+        def grow(value: float) -> int:
+            return round(value * growth ** (level - 1))
+
+        return Combatant(
+            name=self.name,
+            level=level,
+            hp=grow(self.hp),
+            mp=grow(self.mp),
+            patk=grow(self.patk),
+            pdef=grow(self.pdef),
+            satk=grow(self.satk),
+            sdef=grow(self.sdef),
+            speed=self.speed if speed is None else speed,  # speed does not grow
+            skills=tuple(s for s in self.skills if s.level <= level),
+        )
+
+
+@dataclass(frozen=True)
+class Rules:
+    """World-level combat constants and the formulas that use them."""
+
+    action_cost: int = 100_000
+    speed_cap: int = 200
+    growth: float = 1.10  # every stat grows 10% per level, players and monsters alike
+    formula: Formula = Formula.RATIO
+    base_k: int = 100  # only for the K formulas
+    cross_share: int = 25  # % of the other channel's stats added to attack and defence
+    mp_regen_percent: int = 3  # % of max MP regained per baseline turn of encounter time
+    rage_per_action: int = 1
+    rage_per_max_hp: int = 20  # rage gained from taking damage equal to max HP
+
+    @property
+    def baseline_turn(self) -> int:
+        """Encounter time of one basic action at speed 100."""
+        return self.action_cost // 100
+
+    def grow(self, value: float, level: int) -> int:
+        return round(value * self.growth ** (level - 1))
+
+    def k_for(self, level: int) -> int:
+        return self.base_k if self.formula is Formula.K_FIXED else self.grow(self.base_k, level)
+
+    def damage(self, attacker: Combatant, defender: Combatant, skill: Skill) -> int:
+        """Matching stats dominate; the other channel adds `cross_share` percent.
+        Everything is kept scaled by 100 so the result rounds once, minimum 1."""
+        share = self.cross_share if skill.cross_share is None else skill.cross_share
+        if skill.channel is Channel.PHYSICAL:
+            a = 100 * attacker.patk + share * attacker.satk
+            d = 100 * defender.pdef + share * defender.sdef
+        else:
+            a = 100 * attacker.satk + share * attacker.patk
+            d = 100 * defender.sdef + share * defender.pdef
+        if a == 0:
+            return 1
+        if self.formula is Formula.RATIO:
+            return max(1, (a * skill.power * a) // (100 * 100 * (a + d)))
+        k = self.k_for(attacker.level)
+        return max(1, (a * skill.power * k) // (100 * (100 * k + d)))
+
+    def skill_cost(self, skill: Skill, level: int) -> int:
+        """MP costs grow with the user's level like the MP pool, so casts per rest stay level."""
+        return self.grow(skill.cost, level) if skill.resource is Resource.MP else skill.cost
+
+    def delay(self, speed: int, time: int = 100) -> int:
+        """Recovery before the actor's next turn; `time` is the action's cost in percent."""
+        return math.ceil(self.action_cost * time // 100 / min(speed, self.speed_cap))
