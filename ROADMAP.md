@@ -285,10 +285,11 @@ CombatProfile       optional component of a Character definition:
 Encounter           active local state; at most one per playthrough
 ├── now             current timeline time
 └── participants    in fixed order
-    ├── character   CharacterId (M3); InstanceId once duplicate copies exist (M5)
+    ├── character   CharacterId; copies of one definition differ by position
     ├── side        SideId
     ├── control     player | policy
-    ├── hp, mp
+    ├── hp, mp, rage
+    ├── remainders  fractional progress toward the next MP and rage point
     └── next_time
 ```
 
@@ -352,7 +353,8 @@ Encounter           active local state; at most one per playthrough
   participant's HP and MP. The player's persistent vitals move in when it starts
   and back when it ends, so a save never holds two copies. Opponent HP and all
   rage exist only inside the encounter: after a flight, the opponents are whole
-  again next time.
+  again next time. A mid-encounter save holds rage and the fractional MP and rage
+  remainders too, so loading cannot change when a skill next becomes affordable.
 - **Repeatable groups.** An authored group may be repeatable, like a hunting
   ground. Defeating it records nothing as defeated, so it can be engaged again
   immediately, and grants its loot and XP each time, with XP falling off by
@@ -380,10 +382,14 @@ the defence scale K and the baseline speed, and how many meaningful steps lie
 between starting and final values. Stats are not stored in 8 bits, so a cap of
 255 would only be a convention borrowed from older games.
 
-- **Engine bound.** Validation rejects any authored or derived combat stat,
-  including HP and MP, above 9,999. This keeps every intermediate of the damage
-  formula far inside `u64` and keeps displays narrow. It is a safety bound, not a
-  balance target.
+- **Engine bounds.** Validation rejects any authored or derived combat stat,
+  including HP and MP, above 9,999; skill power outside 1–1,000; and, from M4, a
+  damage-multiplier numerator above 10. Together they keep the damage numerator
+  `A × P × A × M_num` below 4 × 10^16, far inside `u64`: the combined attack `A`
+  is at most 1,999,800 even at a 100% cross share. The stat bound alone is not
+  enough, because power is part of the product. Arithmetic stays checked anyway.
+  These are safety bounds, not balance targets, and the stat bound also keeps
+  displays narrow.
 - **Speed cap.** A required world-level parameter because it governs scheduling.
   The starting candidate is 200 with baseline 100.
 - **Other stat caps.** None in M3: the level table is authored, so authors already
@@ -498,8 +504,8 @@ same-level fights steady as players unlock theirs: without them, the mage's
 level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
-`tune` nudges every tuned value, player stats included, and 61 of 102 nudges keep
-every target. Every break is a one-step miss rather than a collapse. Most are the
+`tune` nudges every tuned value, player stats and tier multipliers included, and
+68 of 114 nudges keep every target. Every break is a one-step miss rather than a collapse. Most are the
 boss-parity target against beasts, where the warrior already needs one level
 less than the mage; the player stats most likely to tip the trade-off are the
 warrior's HP and attack and the mage's HP and MP. Allowing two levels

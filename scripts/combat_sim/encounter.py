@@ -31,10 +31,14 @@ class Fighter:
         self.rage += gained
 
     def regenerate(self, rules: Rules, elapsed: int) -> None:
-        """MP regained over encounter time; speed does not change the rate."""
+        """MP regained over encounter time; speed does not change the rate. Time spent at
+        full MP banks nothing, so the carried remainder is dropped at the cap."""
         self.mp_remainder += self.combatant.mp * rules.mp_regen_percent * elapsed
         gained, self.mp_remainder = divmod(self.mp_remainder, 100 * rules.baseline_turn)
-        self.mp = min(self.combatant.mp, self.mp + gained)
+        if self.mp + gained >= self.combatant.mp:
+            self.mp, self.mp_remainder = self.combatant.mp, 0
+        else:
+            self.mp += gained
 
     def can_afford(self, skill: Skill, cost: int) -> bool:
         return (self.mp if skill.resource is Resource.MP else self.rage) >= cost

@@ -22,8 +22,8 @@ from collections.abc import Callable, Iterable, Iterator
 from dataclasses import replace
 from typing import Any, TypeVar
 
-from .content import Content
-from .model import Profile, Rules, Skill
+from .content import Content, Tier
+from .model import Kind, Profile, Rules, Skill
 from .simulator import Simulator
 from .targets import failure
 
@@ -32,7 +32,7 @@ Variant = tuple[str, Rules, Content]
 Knob = Callable[[Rules, Content, float], tuple[Rules, Content, float, float]]
 
 
-T = TypeVar("T", Content, Profile, Rules, Skill)
+T = TypeVar("T", Content, Profile, Rules, Skill, Tier)
 
 
 def with_field(obj: T, name: str, value: Any) -> T:
@@ -96,6 +96,17 @@ def _skill_knob(slot: Slot, skill_name: str, field: str) -> Knob:
     return apply
 
 
+def _tier_knob(kind: Kind, field: str) -> Knob:
+    """Tier multipliers are fractions, so they scale without rounding."""
+    def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
+        tier = content.tiers[kind]
+        before = getattr(tier, field)
+        after = round(before * factor, 3)
+        tiers = {**content.tiers, kind: with_field(tier, field, after)}
+        return rules, replace(content, tiers=tiers), before, after
+    return apply
+
+
 def _rules_knob(field: str) -> Knob:
     def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
         before = getattr(rules, field)
@@ -117,6 +128,9 @@ def knobs(content: Content) -> dict[str, Knob]:
             found[f"{name} {skill.name} power"] = _skill_knob(slot, skill.name, "power")
             if skill.cost:
                 found[f"{name} {skill.name} cost"] = _skill_knob(slot, skill.name, "cost")
+    for kind in content.tiers:
+        for tier_field in ("hp", "attack"):
+            found[f"{kind.value} tier {tier_field}"] = _tier_knob(kind, tier_field)
     for field in ("cross_share", "mp_regen_percent", "rage_per_max_hp"):
         found[field] = _rules_knob(field)
     return found
