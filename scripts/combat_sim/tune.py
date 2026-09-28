@@ -135,6 +135,15 @@ def _rules_knob(field: str) -> Knob:
     return apply
 
 
+def add(found: dict[str, Knob], label: str, knob: Knob) -> None:
+    """Store a knob under a unique label: labels are for display, so a clash (such as a skill
+    named "basic attack") gets a numbered suffix instead of replacing another knob."""
+    unique, n = label, 2
+    while unique in found:
+        unique, n = f"{label} #{n}", n + 1
+    found[unique] = knob
+
+
 def knobs(content: Content) -> dict[str, Knob]:
     """Every tuned value worth nudging: player and opponent stats, skill power and cost, world rules."""
     found: dict[str, Knob] = {}
@@ -143,23 +152,23 @@ def knobs(content: Content) -> dict[str, Knob]:
         for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
             # Zero attacks are nudged too (upward only; see neighbourhood): 0 → 1 can matter.
             if getattr(slot[0](content), stat) or stat in ("patk", "satk"):
-                found[f"{name} {stat}"] = _profile_knob(slot, stat)
+                add(found, f"{name} {stat}", _profile_knob(slot, stat))
     for name, slot in all_slots.items():
         skills = slot[0](content).skills
         for i, skill in enumerate(skills):
             shared = sum(s.name == skill.name for s in skills) > 1
             label = f"{name} {skill.name}" + (f" [{i}]" if shared else "")
-            found[f"{label} power"] = _skill_knob(slot, i, "power")
-            found[f"{label} time"] = _skill_knob(slot, i, "time")
-            found[f"{label} cost"] = _skill_knob(slot, i, "cost")  # a free skill is nudged 0 → 1
+            add(found, f"{label} power", _skill_knob(slot, i, "power"))
+            add(found, f"{label} time", _skill_knob(slot, i, "time"))
+            add(found, f"{label} cost", _skill_knob(slot, i, "cost"))  # a free skill is nudged 0 → 1
         for basic_field in ("power", "time"):
-            found[f"{name} basic attack {basic_field}"] = _basic_knob(slot, basic_field)
+            add(found, f"{name} basic attack {basic_field}", _basic_knob(slot, basic_field))
     for kind in content.tiers:
         for tier_field in ("hp", "attack"):
-            found[f"{kind.value} tier {tier_field}"] = _tier_knob(kind, tier_field)
+            add(found, f"{kind.value} tier {tier_field}", _tier_knob(kind, tier_field))
     for field in ("cross_share", "mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
-        found[field] = _rules_knob(field)
-    found["growth"] = _growth_knob
+        add(found, field, _rules_knob(field))
+    add(found, "growth", _growth_knob)
     return found
 
 

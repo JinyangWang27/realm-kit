@@ -104,6 +104,8 @@ class Simulator:
         while level < target:
             player = self.player(build, level)
             if farm is not None:
+                if not 1 <= farm <= self.content.max_level:
+                    raise ValueError(f"farm level {farm} is outside the table's levels 1-{self.content.max_level}")
                 monster_level = farm
             else:
                 safe = [m for m in range(1, self.content.max_level + 1)

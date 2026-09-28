@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .encounter import Encounter
-from .model import POWER_BOUNDS, STAT_BOUND, Channel, Combatant, Formula, Kind, Resource, Rules, Skill
+from .model import POWER_BOUNDS, STAT_BOUND, Channel, Combatant, Formula, Kind, Profile, Resource, Rules, Skill
 from .simulator import Simulator
 
 class TargetMissed(Exception):
@@ -86,9 +86,21 @@ def check_bounds(sim: Simulator) -> None:
                 require(low <= getattr(c, stat) <= STAT_BOUND,
                         f"{c.name} {stat} {getattr(c, stat)} is outside {low}-{STAT_BOUND} at level {level}")
             require(c.xp >= 0, f"{c.name} grants negative XP ({c.xp}) at level {level}")
-            for skill in (*c.skills, c.basic):
-                require(sim.rules.combined(c, skill) > 0,
-                        f"{c.name} has no attack for {skill.name} at level {level}")
+    # Each skill at its unlock level: attack only rises with level (growth >= 1), so that is
+    # where rounding could leave a newly unlocked skill with no attack.
+    check_unlocks(sim, [*sim.content.builds,
+                        *(sim.content.scaled(foe, kind) for foe in sim.content.monsters for kind in Kind)])
+
+
+def check_unlocks(sim: Simulator, profiles: list[Profile]) -> None:
+    for profile in profiles:
+        for skill in (*profile.skills, profile.basic):
+            level = max(1, skill.level)
+            if level > sim.content.max_level:
+                continue  # beyond the table: never reachable
+            character = profile.at_level(sim.rules, level)
+            require(sim.rules.combined(character, skill) > 0,
+                    f"{character.name} has no attack for {skill.name} when it unlocks at level {level}")
 
 
 def check(sim: Simulator) -> None:
