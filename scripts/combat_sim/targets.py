@@ -106,7 +106,8 @@ def check_exact_stats(profile: Profile, source: str) -> None:
 def check_finite(sim: Simulator) -> None:
     """Decimal amounts must be finite numbers before they are converted exactly."""
     def finite(value: object) -> bool:
-        return isinstance(value, (int, Fraction)) or (isinstance(value, float) and math.isfinite(value))
+        # Exact types, as in whole(): bool is an int subclass but not a number here.
+        return type(value) in (int, Fraction) or (type(value) is float and math.isfinite(value))
     amounts: list[tuple[str, object]] = [("world growth", sim.rules.growth)]
     for profile in (*sim.content.builds, *sim.content.monsters):
         amounts += [(f"{profile.name} {stat}", getattr(profile, stat))
