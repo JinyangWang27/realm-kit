@@ -156,7 +156,7 @@ fn restore(
     let loaded = saves.load(index, |snapshot| {
         let restored = Engine::restore(world, snapshot)?;
         // Recovery resumes a living player; a dead save could never recover.
-        if restored.state().player.hp == 0 {
+        if restored.is_dead() {
             return Err("the player is dead in this save".into());
         }
         Ok(restored)
@@ -212,7 +212,7 @@ fn persist(
         Err(error) => return writeln!(output, "Saves could not be read: {error}"),
     };
     match request {
-        input::Input::Save if engine.state().player.hp == 0 => {
+        input::Input::Save if engine.is_dead() => {
             writeln!(output, "You cannot save now.")
         }
         input::Input::Save => save(engine, saves, Kind::Manual, output),

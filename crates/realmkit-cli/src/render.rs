@@ -69,7 +69,8 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     if !engine.conditions_met(&character.requires) {
                         continue;
                     }
-                    match state.monster_hp.get(id) {
+                    let hp = state.combat.as_ref().and_then(|c| c.opponent_hp.get(id));
+                    match hp {
                         Some(0) => {}
                         Some(hp) => writeln!(
                             output,
@@ -165,16 +166,14 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     )?;
                 }
             }
-            Event::StatusViewed => writeln!(
-                output,
-                "{} — Level {} | HP {}/{} | Attack {} | XP {}",
-                player,
-                state.player.level,
-                state.player.hp,
-                state.player.max_hp,
-                state.player.attack,
-                state.player.xp
-            )?,
+            Event::StatusViewed => match &state.combat {
+                Some(combat) => writeln!(
+                    output,
+                    "{} — Level {} | HP {}/{} | Attack {} | XP {}",
+                    player, combat.level, combat.hp, combat.max_hp, combat.attack, combat.xp
+                )?,
+                None => writeln!(output, "{player}")?,
+            },
             Event::QuestsViewed => {
                 writeln!(output, "Quests:")?;
                 for quest in &world.quests {

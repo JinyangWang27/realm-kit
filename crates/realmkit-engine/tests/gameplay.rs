@@ -9,6 +9,18 @@ fn demo() -> WorldSpec {
     .unwrap()
 }
 
+fn archive() -> WorldSpec {
+    WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/quiet-archive"
+    ))
+    .unwrap()
+}
+
+fn combat<'e>(engine: &'e Engine<'_>) -> &'e CombatState {
+    engine.state().combat.as_ref().unwrap()
+}
+
 fn accept(engine: &mut Engine<'_>) {
     engine.execute(Talk("elder".into())).unwrap();
     engine.execute(ChooseDialogue(1)).unwrap();
@@ -51,9 +63,9 @@ fn full_quest_loop_and_replay_produce_identical_state_and_events() {
     let (state, events) = play();
     assert_eq!((state.clone(), events.clone()), play());
     assert_eq!(state.player.location, "crypt");
-    assert_eq!(state.player.level, 2);
-    assert_eq!(state.player.xp, 15);
-    assert_eq!(state.player.hp, 30);
+    assert_eq!(state.combat.as_ref().unwrap().level, 2);
+    assert_eq!(state.combat.as_ref().unwrap().xp, 15);
+    assert_eq!(state.combat.as_ref().unwrap().hp, 30);
     assert_eq!(state.player.inventory["ash_pelt"], 1);
     assert_eq!(state.player.inventory["candle"], 1);
     assert_eq!(state.quests["quiet_the_track"], QuestStatus::Completed);
@@ -105,8 +117,8 @@ fn combat_tracks_damage_and_never_rewards_a_defeat_twice() {
     accept(&mut engine);
     engine.execute(Move(North)).unwrap();
     let events = engine.execute(Attack("wolf".into())).unwrap();
-    assert_eq!(engine.state().monster_hp["wolf"], 7);
-    assert_eq!(engine.state().player.hp, 20);
+    assert_eq!(combat(&engine).opponent_hp["wolf"], 7);
+    assert_eq!(combat(&engine).hp, 20);
     assert!(events
         .iter()
         .any(|e| matches!(e, Event::DamageDealt { amount: 5, .. })));
@@ -155,7 +167,7 @@ fn death_blocks_actions_but_allows_inspection() {
     let mut engine = Engine::new(&world).unwrap();
     engine.execute(Move(North)).unwrap();
     let events = engine.execute(Attack("wolf".into())).unwrap();
-    assert_eq!(engine.state().player.hp, 0);
+    assert_eq!(combat(&engine).hp, 0);
     assert!(events.contains(&Event::PlayerDied));
     assert!(engine.execute(Move(South)).is_err());
     assert!(engine.execute(Attack("wolf".into())).is_err());
@@ -175,7 +187,7 @@ fn overflowing_rewards_roll_back_the_entire_command() {
     let mut engine = Engine::new(&world).unwrap();
     accept(&mut engine);
     kill(&mut engine);
-    assert_eq!(engine.state().player.level, 3);
+    assert_eq!(combat(&engine).level, 3);
     engine.execute(Move(South)).unwrap();
     let before = engine.state().clone();
     assert!(matches!(
@@ -325,18 +337,27 @@ fn mismatched_or_corrupt_saves_are_rejected() {
         |s| s.package_revision = "fnv1a64:0".into(),
         |s| s.player_route_id = "other".into(),
         |s| s.state.player.location = "nowhere".into(),
-        |s| s.state.player.hp = s.state.player.max_hp + 1,
-        |s| s.state.player.max_hp += 1,
-        |s| s.state.player.level = 0,
-        |s| s.state.player.xp = 10,
+        |s| {
+            let c = s.state.combat.as_mut().unwrap();
+            c.hp = c.max_hp + 1
+        },
+        |s| s.state.combat.as_mut().unwrap().max_hp += 1,
+        |s| s.state.combat.as_mut().unwrap().level = 0,
+        |s| s.state.combat.as_mut().unwrap().xp = 10,
+        |s| s.state.combat = None,
         |s| {
             s.state.player.inventory.insert("ghost".into(), 1);
         },
         |s| {
-            s.state.monster_hp.remove("wolf");
+            s.state.combat.as_mut().unwrap().opponent_hp.remove("wolf");
         },
         |s| {
-            s.state.monster_hp.insert("wolf".into(), 99);
+            s.state
+                .combat
+                .as_mut()
+                .unwrap()
+                .opponent_hp
+                .insert("wolf".into(), 99);
         },
         |s| {
             s.state.quests.insert("extra".into(), QuestStatus::Active);
@@ -353,9 +374,14 @@ fn mismatched_or_corrupt_saves_are_rejected() {
                 .insert("quiet_the_track".into(), QuestStatus::Ready);
         },
         |s| {
-            s.state.monster_hp.insert("wolf".into(), 0);
+            s.state
+                .combat
+                .as_mut()
+                .unwrap()
+                .opponent_hp
+                .insert("wolf".into(), 0);
         },
-        |s| s.state.player.xp += 1,
+        |s| s.state.combat.as_mut().unwrap().xp += 1,
         |s| s.state.turn = u64::MAX,
         |s| {
             s.state.player.inventory.insert("ash_pelt".into(), 1);
@@ -408,4 +434,114 @@ fn a_choice_that_makes_the_speaker_unavailable_ends_the_conversation() {
     accept(&mut engine);
     assert_eq!(engine.state().dialogue, None);
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+/// Learns where the map is and returns to the reading room.
+fn find_map(engine: &mut Engine<'_>) -> Vec<Event> {
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Talk("copyist".into())).unwrap();
+    let events = engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(Move(South)).unwrap();
+    events
+}
+
+fn accept_map(engine: &mut Engine<'_>) {
+    engine.execute(Talk("archivist".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+}
+
+#[test]
+fn a_world_without_combat_plays_its_main_quest_by_talking() {
+    let world = archive();
+    let mut engine = Engine::new(&world).unwrap();
+    assert_eq!(engine.state().combat, None);
+    assert!(!engine.is_dead());
+    accept_map(&mut engine);
+    assert_eq!(engine.state().quests["lost_map"], QuestStatus::Active);
+    let events = find_map(&mut engine);
+    assert!(events.contains(&Event::QuestProgressed {
+        quest: "lost_map".into()
+    }));
+    assert_eq!(engine.state().quests["lost_map"], QuestStatus::Ready);
+    engine.execute(Talk("archivist".into())).unwrap();
+    let events = engine.execute(ChooseDialogue(1)).unwrap();
+    assert!(events.contains(&Event::QuestCompleted {
+        quest: "lost_map".into()
+    }));
+    assert!(!events
+        .iter()
+        .any(|e| matches!(e, Event::ExperienceGranted { .. })));
+    engine.execute(Move(East)).unwrap();
+    assert_eq!(engine.state().player.location, "vault");
+    assert_eq!(engine.state().player.inventory["vault_key"], 1);
+    assert_eq!(engine.state().combat, None);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn a_world_without_combat_offers_no_attack_and_refuses_one() {
+    let world = archive();
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(North)).unwrap();
+    assert_eq!(
+        offered(&engine),
+        vec![
+            (Talk("copyist".into()), true),
+            (Move(South), true),
+            (Inventory, true),
+            (Status, true),
+            (Quests, true),
+        ]
+    );
+    let before = engine.state().clone();
+    assert!(matches!(
+        engine.execute(Attack("copyist".into())),
+        Err(EngineError::NotHere(_))
+    ));
+    assert_eq!(engine.state(), &before);
+}
+
+#[test]
+fn a_flag_set_before_accepting_readies_the_quest_on_acceptance() {
+    let world = archive();
+    let mut engine = Engine::new(&world).unwrap();
+    find_map(&mut engine);
+    assert_eq!(engine.state().quests["lost_map"], QuestStatus::Available);
+    engine.execute(Talk("archivist".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    let events = engine.execute(ChooseDialogue(1)).unwrap();
+    assert!(events.contains(&Event::QuestProgressed {
+        quest: "lost_map".into()
+    }));
+    assert_eq!(engine.state().quests["lost_map"], QuestStatus::Ready);
+}
+
+#[test]
+fn a_world_without_combat_rejects_inconsistent_saves() {
+    let world = archive();
+    let mut engine = Engine::new(&world).unwrap();
+    accept_map(&mut engine);
+    let good = engine.snapshot();
+    let json = serde_json::to_string(&good).unwrap();
+    let resumed = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
+    assert_eq!(resumed.state(), engine.state());
+    let mut fighting = good.clone();
+    fighting.state.combat = Engine::new(&demo()).unwrap().state().combat.clone();
+    let mut ready = good.clone();
+    ready
+        .state
+        .quests
+        .insert("lost_map".into(), QuestStatus::Ready);
+    let mut found = good.clone();
+    found.state.flags.insert("map_found".into());
+    for (i, snapshot) in [fighting, ready, found].into_iter().enumerate() {
+        assert!(
+            matches!(
+                Engine::restore(&world, snapshot),
+                Err(EngineError::InvalidSave(_))
+            ),
+            "corruption {i} was accepted"
+        );
+    }
 }

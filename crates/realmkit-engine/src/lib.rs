@@ -1,7 +1,7 @@
 //! Synchronous gameplay; no generation or presentation dependencies.
 
 use realmkit_spec::{
-    Condition, DialogueChoice, DialogueEffect, Direction, Id, ItemStack, QuestObjective,
+    Character, Condition, DialogueChoice, DialogueEffect, Direction, Id, ItemStack, QuestObjective,
     QuestStatus, SpecError, WorldSpec,
 };
 use serde::{Deserialize, Serialize};
@@ -82,12 +82,21 @@ pub enum Event {
 #[serde(deny_unknown_fields)]
 pub struct PlayerState {
     pub location: Id,
+    pub inventory: BTreeMap<Id, u64>,
+}
+
+/// Fighting progress; exists only in worlds with a combat block.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CombatState {
     pub hp: u32,
     pub max_hp: u32,
     pub attack: u32,
     pub xp: u64,
     pub level: usize,
-    pub inventory: BTreeMap<Id, u64>,
+    /// Remaining HP of each placed fighter; 0 means defeated for good.
+    // ponytail: persistent opponent HP until encounters own it (M3c), then a defeated set.
+    pub opponent_hp: BTreeMap<Id, u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,14 +110,14 @@ pub struct DialogueState {
 #[serde(deny_unknown_fields)]
 pub struct GameState {
     pub player: PlayerState,
-    pub monster_hp: BTreeMap<Id, u32>,
+    pub combat: Option<CombatState>,
     pub quests: BTreeMap<Id, QuestStatus>,
     pub flags: BTreeSet<Id>,
     pub dialogue: Option<DialogueState>,
     pub turn: u64,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 1;
+pub const SAVE_FORMAT_VERSION: u32 = 2;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -172,24 +181,29 @@ mod save;
 impl<'w> Engine<'w> {
     pub fn new(world: &'w WorldSpec) -> Result<Self, EngineError> {
         world.validate()?;
-        let stats = &world.combat().expect("combat world").levels[0];
+        let combat = world.combat().map(|combat| {
+            let stats = &combat.levels[0];
+            CombatState {
+                hp: stats.hp,
+                max_hp: stats.hp,
+                attack: stats.attack,
+                xp: 0,
+                level: 1,
+                opponent_hp: world
+                    .characters
+                    .iter()
+                    .filter_map(|c| Some((c.id.clone(), c.combat.as_ref()?.hp)))
+                    .collect(),
+            }
+        });
         Ok(Self {
             world,
             state: GameState {
                 player: PlayerState {
                     location: world.world.start.clone(),
-                    hp: stats.hp,
-                    max_hp: stats.hp,
-                    attack: stats.attack,
-                    xp: 0,
-                    level: 1,
                     inventory: BTreeMap::new(),
                 },
-                monster_hp: world
-                    .characters
-                    .iter()
-                    .filter_map(|c| Some((c.id.clone(), c.combat.as_ref()?.hp)))
-                    .collect(),
+                combat,
                 quests: world
                     .quests
                     .iter()
@@ -207,6 +221,10 @@ impl<'w> Engine<'w> {
     }
     pub fn world(&self) -> &'w WorldSpec {
         self.world
+    }
+    /// Only a world with combat can kill the player.
+    pub fn is_dead(&self) -> bool {
+        rules::dead(&self.state)
     }
 
     /// Captures the playthrough without changing it, so saving spends no time.
