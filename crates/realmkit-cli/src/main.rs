@@ -4,7 +4,7 @@ use crossterm::{
     queue,
     terminal::{self, Clear, ClearType},
 };
-use menu::{Key, Menu, Outcome};
+use menu::{Key, Menu, Outcome, Pick};
 use realmkit_engine::{Command, Engine, EngineError};
 use realmkit_spec::{SpecError, WorldSpec};
 use std::{
@@ -291,7 +291,7 @@ fn play(
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
     let mut engine = start(world, saves, seed, output)?;
-    let mut menu = Menu::new(&engine, false);
+    let mut menu = Menu::new(&engine, false, None);
     menu.write(output, false)?;
     writeln!(output, "{}", menu::LINE_HINT)?;
     let mut line = String::new();
@@ -312,13 +312,17 @@ fn play(
             }
             Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
                 persist(&mut engine, saves, request, output)?;
-                menu = Menu::new(&engine, false);
+                menu = Menu::new(&engine, false, None);
                 menu.write(output, false)?;
                 continue;
             }
-            Ok(input::Input::Select(number)) => match menu.select(number) {
-                Some(entry) => entry.command.clone(),
-                None => {
+            Ok(input::Input::Select(number)) => match menu.choose(number) {
+                Outcome::Run(command) => command,
+                Outcome::Redraw => {
+                    menu.write(output, false)?;
+                    continue;
+                }
+                _ => {
                     writeln!(output, "{}", menu::NOT_LISTED)?;
                     continue;
                 }
@@ -332,8 +336,9 @@ fn play(
                 continue;
             }
         };
+        let open = menu.stays_open(&command);
         apply(&mut engine, saves, command, output)?;
-        menu = Menu::new(&engine, false);
+        menu = Menu::new(&engine, false, open);
         menu.write(output, false)?;
     }
     Ok(())
@@ -386,9 +391,9 @@ fn play_keys(
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
     let mut engine = start(world, saves, seed, output)?;
-    let mut leave_dialogue = false;
+    let (mut leave_dialogue, mut open) = (false, None);
     'scene: loop {
-        let mut menu = Menu::new(&engine, leave_dialogue);
+        let mut menu = Menu::new(&engine, leave_dialogue, open.take());
         let mut lines = menu.write(output, true)?;
         loop {
             output.flush()?;
@@ -413,7 +418,10 @@ fn play_keys(
                     continue 'scene;
                 }
                 Outcome::Run(command) => {
-                    let label = menu.entries.iter().find(|e| e.command == command);
+                    let label = menu
+                        .entries()
+                        .iter()
+                        .find(|e| e.pick == Pick::Run(command.clone()));
                     erase(output, lines)?;
                     if let Some(entry) = label {
                         writeln!(output, "> {}", entry.label)?;
@@ -427,9 +435,13 @@ fn play_keys(
                     match input::parse(&line) {
                         Ok(input::Input::Quit) => break 'scene,
                         Ok(input::Input::Command(command)) => command,
-                        Ok(input::Input::Select(number)) => match menu.select(number) {
-                            Some(entry) => entry.command.clone(),
-                            None => {
+                        Ok(input::Input::Select(number)) => match menu.choose(number) {
+                            Outcome::Run(command) => command,
+                            Outcome::Redraw => {
+                                open = menu.open;
+                                continue 'scene;
+                            }
+                            _ => {
                                 writeln!(output, "{}", menu::NOT_LISTED)?;
                                 continue 'scene;
                             }
@@ -451,6 +463,7 @@ fn play_keys(
                     }
                 }
             };
+            open = menu.stays_open(&command);
             // Stepping back from a conversation lasts until the player speaks again.
             leave_dialogue &= !matches!(command, Command::Talk(_) | Command::ChooseDialogue(_));
             // A restored save may be mid-conversation; show its choices again.

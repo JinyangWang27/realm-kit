@@ -988,6 +988,22 @@ adventure, with tested equipment/resource rules and readable combat feedback.
 The forge → equip → improve → enchant → save/load journey preserves individual
 item identity and consumes resources atomically without duplicating bonuses.
 
+## Presentation track · in progress
+
+Improvements to the terminal client, delivered in small PRs between
+milestones. They change how play reads, never the engine or its rules.
+
+1. **Grouped menus** · delivered. Stat training and equipment each wait behind
+   one entry (`Train stats — 3 points ›`, `Equipment ›`). The submenu is
+   headed by its name, ends with `Back` (Esc works too), and stays open while
+   its actions are used, so several points can be trained in a row.
+2. **Quieter combat log** · proposed. Fold per-hit technique XP into one line
+   per fight.
+3. **Multi-line status** · proposed. Split the one-line character panel into
+   vitals, stats and progression.
+4. **Light styling** · proposed. Emphasis and colour in a terminal, plain text
+   for pipes and `--line`.
+
 ## M5 — Longer authored adventures and source-specific mechanics
 
 - Add runtime instances for combatant copies whose state outlives an encounter,

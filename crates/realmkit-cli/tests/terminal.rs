@@ -375,13 +375,16 @@ fn a_seed_reproduces_a_run_with_random_content() {
 #[test]
 fn stat_points_are_spent_from_the_menu_or_typed_and_refunded_at_the_gate() {
     let input =
-        "help\nstatus\n7\nallocate hp 2\nstatus\nallocate satk\nallocate hp 9\nrespec\nstatus\n";
+        "help\nstatus\n6\n2\nallocate hp 2\nstatus\nallocate satk\nallocate hp 9\nrespec\nstatus\n";
     let output = run(&["play", ARENA, "--seed", "1"], input);
     let text = String::from_utf8(output.stdout).unwrap();
     for passage in [
         "allocate hp|mp|patk|pdef|satk|sdef|speed [points]",
         "Speed 100 | XP 0 | Points 3",
-        "7. Train Attack: 14 → 15",
+        "6. Train stats — 3 points ›",
+        "\nTrain stats — 3 points\n  1. Train HP",
+        "2. Train Attack: 14 → 15",
+        "5. Back",
         "1 point into Attack.",
         "2 points into HP.",
         "You — Level 1 | HP 70/70 | Attack 15",
@@ -434,13 +437,14 @@ fn the_sect_teaches_trains_and_deepens_named_ranks() {
 #[test]
 fn gear_is_listed_previewed_worn_and_removed() {
     let fight = "attack grey_wolf\n".repeat(3) + &"attack black_wolf\n".repeat(4);
-    let input = format!("help\ninventory\nnorth\nengage grey_wolf\n{fight}south\nequip 5\ninventory\nunequip #5\nequip 9\n");
+    let input = format!("help\ninventory\nnorth\nengage grey_wolf\n{fight}south\n7\nequip 5\ninventory\nunequip #5\nequip 9\n");
     let output = run(&["play", ARENA, "--seed", "1"], &input);
     let text = String::from_utf8(output.stdout).unwrap();
     for passage in [
         "equip <#> — wear a piece from your pack",
         "  #1 Practice sword [equipped] — Blunt",
         "Received: Greatsword ×1",
+        "7. Equipment ›",
         "Equip #5 Greatsword: Attack 15 → 21, Defence 13 → 11",
         "#1 Practice sword goes back in your pack.\n#2 Buckler goes back in your pack.\nYou equip #5 Greatsword.",
         "  #5 Greatsword [equipped] — It needs both hands",
