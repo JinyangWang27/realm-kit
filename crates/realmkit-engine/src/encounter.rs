@@ -172,6 +172,11 @@ pub(super) fn opponents_for(world: &WorldSpec, state: &GameState, id: &str) -> V
         .collect()
 }
 
+/// A participant yields at or below `max(1, ⌊max HP × share / 100⌋)`.
+pub(super) fn yield_threshold(max_hp: u32, share: u32) -> u32 {
+    (u64::from(max_hp) * u64::from(share) / 100).max(1) as u32
+}
+
 /// The group an encounter's opponents share, if any.
 pub(super) fn group<'w>(world: &'w WorldSpec, encounter: &Encounter) -> Option<&'w Group> {
     let first = encounter.participants.get(1)?;
@@ -323,8 +328,7 @@ fn act(
     t.rage = u32::try_from(u128::from(t.rage) + progress / max_hp).unwrap_or(u32::MAX);
     t.rage_remainder = (progress % max_hp) as u64;
     let skill = skill.map(|s| s.id.clone());
-    let threshold =
-        yield_share.map(|share| (u64::from(defender.hp) * u64::from(share) / 100).max(1) as u32);
+    let threshold = yield_share.map(|share| yield_threshold(defender.hp, share));
     let yields = threshold.is_some_and(|limit| t.hp <= limit);
     if actor == 0 {
         events.push(Event::DamageDealt {

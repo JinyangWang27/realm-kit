@@ -231,11 +231,18 @@ fn encounter_state(
     if !(player_ok && opponents_ok && ids.len() == encounter.participants.len()) {
         return Err(invalid());
     }
-    let yields = encounter::group(world, encounter).is_some_and(|g| g.yield_share.is_some());
+    let yield_share = encounter::group(world, encounter).and_then(|g| g.yield_share);
     let vitals_ok = encounter.participants.iter().all(|p| {
         let max = encounter::stats(world, combat.level, p);
-        // Only a yielding group yields, and a yielder is alive.
-        (!p.yielded || (yields && p.hp > 0))
+        // In a yielding group nobody dies, and a participant has yielded exactly
+        // when a hit left it at or below its threshold; elsewhere nobody yields.
+        let yield_ok = match yield_share {
+            Some(share) => {
+                p.hp > 0 && p.yielded == (p.hp <= encounter::yield_threshold(max.hp, share))
+            }
+            None => !p.yielded,
+        };
+        yield_ok
             && p.hp <= max.hp
             && p.mp <= max.mp
             && u128::from(p.mp_remainder) < per_point

@@ -1479,5 +1479,25 @@ fn a_save_after_one_sparring_partner_yields_still_loads() {
     engine.execute(Attack("corporal".into())).unwrap();
     let encounter = engine.encounter().unwrap();
     assert!(encounter.participants[1].next_time < encounter.now);
-    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+    let good = engine.snapshot();
+    assert!(Engine::restore(&world, good.clone()).is_ok());
+    // Yielding is exactly "at or below the threshold", and nobody dies.
+    let broken: Vec<fn(&mut Encounter)> = vec![
+        |e| e.participants[2].yielded = true,
+        |e| e.participants[1].yielded = false,
+        |e| (e.participants[2].hp, e.participants[2].yielded) = (0, false),
+        |e| e.participants[1].hp = 0,
+    ];
+    for (i, corrupt) in broken.into_iter().enumerate() {
+        let mut snapshot = good.clone();
+        let Stance::Fighting(encounter) = &mut snapshot.state.combat.as_mut().unwrap().stance
+        else {
+            unreachable!()
+        };
+        corrupt(encounter);
+        assert!(
+            Engine::restore(&world, snapshot).is_err(),
+            "corruption {i} was accepted"
+        );
+    }
 }
