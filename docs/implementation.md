@@ -46,7 +46,7 @@ proves the complete single-player loop with authored content.
   repeatable groups can be fought again, `Flee` escapes at the player's next
   turn unless forbidden, yielding groups end fights alive with victory or
   defeat flags, opponent levels gate their skills, and XP falls off with level
-  difference as in the simulator. Save format 5; saves bound variable XP and
+  difference as in the simulator. Package and save format 5; saves bound variable XP and
   loot instead of fixing them. `examples/arena` exercises all of it.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.

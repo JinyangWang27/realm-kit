@@ -240,7 +240,8 @@ fn encounter_state(
             && p.mp <= max.mp
             && u128::from(p.mp_remainder) < per_point
             && p.rage_remainder < u64::from(max.hp)
-            && (p.hp == 0 || p.next_time >= encounter.now)
+            // Only participants still fighting keep up with the schedule.
+            && (!p.fighting() || p.next_time >= encounter.now)
     });
     // A live encounter always rests at the player's turn: the player acts now,
     // and every opponent later or, on a tie, after the player's side.

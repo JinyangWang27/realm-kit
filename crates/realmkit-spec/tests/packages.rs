@@ -266,6 +266,11 @@ fn older_packages_are_rejected_clearly() {
             2,
             r#"{ "format_version": 2, "combat": { "levels": [{ "xp": 0, "hp": 1, "attack": 1 }] } }"#,
         ),
+        // M3c-1's opponents used every listed skill regardless of level.
+        (
+            4,
+            r#"{ "format_version": 4, "combat": { "special_name": "Magic" } }"#,
+        ),
         // M3b's combat block has no timeline.
         (
             3,

@@ -456,13 +456,16 @@ fn end(
     };
     if outcome == Outcome::Victory {
         let repeatable = group.is_some_and(|g| g.repeatable);
+        // Every reward scales from the level the player fought at, so a
+        // level-up from one opponent does not change the next one's XP.
+        let level = state.combat.as_ref().unwrap().level;
         for id in fallen {
             let profile = profile(world, &id);
             let combat = state.combat.as_mut().unwrap();
             if !repeatable {
                 combat.defeated.insert(id.clone());
             }
-            let xp = xp_for_defeat(profile.xp, combat.level, profile.level);
+            let xp = xp_for_defeat(profile.xp, level, profile.level);
             rules::grant_items(state, &profile.loot, events)?;
             rules::grant_xp(world, state, xp, events)?;
             let defeat = QuestObjective::Defeat { character: id };

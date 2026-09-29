@@ -1441,3 +1441,43 @@ fn group_encounters_save_exactly_and_reject_a_wrong_cast() {
         );
     }
 }
+
+#[test]
+fn a_pack_is_rewarded_at_the_level_the_player_fought_at() {
+    // The first wolf's 8 XP reaches level 2; the second still pays in full,
+    // whatever order the den lists them in.
+    let mut world = arena();
+    world.world.combat.as_mut().unwrap().levels[1].xp = 8;
+    let mut engine = at(&world, North);
+    engine.execute(Engage("grey_wolf".into())).unwrap();
+    fight_out(&mut engine);
+    assert_eq!((combat(&engine).xp, combat(&engine).level), (16, 2));
+}
+
+#[test]
+fn a_save_after_one_sparring_partner_yields_still_loads() {
+    // A second partner keeps the fight going after the first yields, while the
+    // yielder's turn time falls behind the schedule.
+    let mut world = arena();
+    let mut second = world
+        .characters
+        .iter()
+        .find(|c| c.id == "holt")
+        .unwrap()
+        .clone();
+    second.id = "corporal".into();
+    second.name = "Corporal Wren".into();
+    // Weak enough that the player outlasts Holt.
+    second.combat.as_mut().unwrap().stats.patk = 1;
+    world.characters.push(second);
+    world.locations[3].characters.push("corporal".into());
+    let mut engine = at(&world, West);
+    engine.execute(Engage("holt".into())).unwrap();
+    while !engine.encounter().unwrap().participants[1].yielded {
+        engine.execute(Attack("holt".into())).unwrap();
+    }
+    engine.execute(Attack("corporal".into())).unwrap();
+    let encounter = engine.encounter().unwrap();
+    assert!(encounter.participants[1].next_time < encounter.now);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}

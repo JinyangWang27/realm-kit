@@ -286,7 +286,7 @@ balance decisions.
    format 4); defeated characters replace M3a's persistent opponent vitals.
    **M3c-2 · delivered:** groups and packs, repeatable groups, `Flee`,
    yielding with victory and defeat flags, opponent levels with level-gated
-   skills, and XP falloff (`examples/arena`). Flee's wind-up always completes
+   skills, and XP falloff (`examples/arena`); package and save format 5. Flee's wind-up always completes
    within the one command that declares it, so no pending flight is saved;
    the saved `pending` field waits until turns can pause mid-wind-up (M8).
 4. **M3d — seeded RNG and critical hits (optional).** A small hand-written,
