@@ -8,6 +8,10 @@ const TALK: &str = "Talk to";
 const ATTACK: &str = "Attack";
 const TRAVEL: &str = "Travel";
 const LOCKED: &str = "[locked]";
+const ON: &str = "on";
+const MP: &str = "MP";
+const LOW_MP: &str = "[not enough MP]";
+const REST: &str = "Rest";
 const INVENTORY: &str = "Inventory";
 const CHARACTER: &str = "Character";
 const QUESTS: &str = "Quests";
@@ -85,8 +89,28 @@ impl Menu {
                                 format!(" {LOCKED}")
                             }
                         ),
+                        // Like a locked exit, choosing it explains why it cannot be used.
+                        Command::UseSkill { skill, target } => {
+                            let skill = world.skill(skill).unwrap();
+                            format!(
+                                "{} {ON} {}{}{}",
+                                skill.name,
+                                world.character(target).unwrap().name,
+                                if skill.cost > 0 {
+                                    format!(" — {} {MP}", skill.cost)
+                                } else {
+                                    String::new()
+                                },
+                                if action.available {
+                                    String::new()
+                                } else {
+                                    format!(" {LOW_MP}")
+                                }
+                            )
+                        }
                         // Other unavailable actions (e.g. after death) are not offered.
                         _ if !action.available => return None,
+                        Command::Rest => REST.into(),
                         Command::Talk(id) => {
                             format!("{TALK} {}", world.character(id).unwrap().name)
                         }
@@ -210,6 +234,7 @@ mod tests {
                 "Talk to Elder Mara",
                 "Travel north — The Pine Track",
                 "Travel east — The Roofless Chapel [locked]",
+                "Rest",
                 "Inventory",
                 "Character",
                 "Quests"
@@ -223,7 +248,7 @@ mod tests {
         let mut engine = Engine::new(&world).unwrap();
         let mut menu = Menu::new(&engine, false);
         assert_eq!(menu.handle(Key::Up), Outcome::Redraw);
-        assert_eq!(menu.cursor, 5);
+        assert_eq!(menu.cursor, 6);
         assert_eq!(menu.handle(Key::Down), Outcome::Redraw);
         assert_eq!(menu.handle(Key::Down), Outcome::Redraw);
         assert_eq!(

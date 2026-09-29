@@ -1,8 +1,8 @@
 //! Synchronous gameplay; no generation or presentation dependencies.
 
 use realmkit_spec::{
-    Character, Condition, DialogueChoice, DialogueEffect, Direction, Id, ItemStack, QuestObjective,
-    QuestStatus, SpecError, WorldSpec,
+    Channel, Character, Combat, Condition, DialogueChoice, DialogueEffect, Direction, Id,
+    ItemStack, QuestObjective, QuestStatus, Skill, SpecError, Stats, WorldSpec, BASIC_POWER,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -11,7 +11,14 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum Command {
     Look,
     Move(Direction),
+    /// A basic attack in the player's basic-attack channel.
     Attack(Id),
+    UseSkill {
+        skill: Id,
+        target: Id,
+    },
+    /// Restores HP and MP at a safe location.
+    Rest,
     Talk(Id),
     /// One-based index into the currently visible choices.
     ChooseDialogue(usize),
@@ -31,16 +38,24 @@ pub enum Event {
         from: Id,
         to: Id,
     },
+    /// `skill` is `None` for a basic attack, which uses narrative `variant`.
     DamageDealt {
         target: Id,
         amount: u32,
         variant: usize,
+        skill: Option<Id>,
     },
     DamageReceived {
         source: Id,
         amount: u32,
         variant: usize,
+        skill: Option<Id>,
     },
+    MpSpent {
+        character: Id,
+        amount: u32,
+    },
+    Rested,
     EnemyDefeated {
         monster: Id,
     },
@@ -89,14 +104,21 @@ pub struct PlayerState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CombatState {
+    /// Current vitals; maximums and every other stat derive from `level`.
     pub hp: u32,
-    pub max_hp: u32,
-    pub attack: u32,
+    pub mp: u32,
     pub xp: u64,
     pub level: usize,
-    /// Remaining HP of each placed fighter; 0 means defeated for good.
-    // ponytail: persistent opponent HP until encounters own it (M3c), then a defeated set.
-    pub opponent_hp: BTreeMap<Id, u32>,
+    /// Each placed fighter's vitals; HP 0 means defeated for good.
+    // ponytail: persistent opponent vitals until encounters own them (M3c), then a defeated set.
+    pub opponents: BTreeMap<Id, Vitals>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Vitals {
+    pub hp: u32,
+    pub mp: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,7 +139,7 @@ pub struct GameState {
     pub turn: u64,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 2;
+pub const SAVE_FORMAT_VERSION: u32 = 3;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -145,6 +167,14 @@ pub enum EngineError {
     NotHere(Id),
     #[error("{0} has already been defeated")]
     AlreadyDefeated(Id),
+    #[error("you do not know that skill: {0}")]
+    UnknownSkill(Id),
+    #[error("you have not reached the level for {0}")]
+    SkillLocked(Id),
+    #[error("not enough MP for {0}")]
+    NotEnoughMp(Id),
+    #[error("this is not a safe place to rest")]
+    NotSafe,
     #[error("there is no active conversation")]
     NoDialogue,
     #[error("choose one of the displayed options")]
@@ -182,17 +212,23 @@ impl<'w> Engine<'w> {
     pub fn new(world: &'w WorldSpec) -> Result<Self, EngineError> {
         world.validate()?;
         let combat = world.combat().map(|combat| {
-            let stats = &combat.levels[0];
+            let stats = combat.levels[0].stats;
             CombatState {
-                hp: stats.stats.hp,
-                max_hp: stats.stats.hp,
-                attack: stats.stats.patk,
+                hp: stats.hp,
+                mp: stats.mp,
                 xp: 0,
                 level: 1,
-                opponent_hp: world
+                opponents: world
                     .characters
                     .iter()
-                    .filter_map(|c| Some((c.id.clone(), c.combat.as_ref()?.stats.hp)))
+                    .filter_map(|c| {
+                        let stats = c.combat.as_ref()?.stats;
+                        let vitals = Vitals {
+                            hp: stats.hp,
+                            mp: stats.mp,
+                        };
+                        Some((c.id.clone(), vitals))
+                    })
                     .collect(),
             }
         });
@@ -221,6 +257,11 @@ impl<'w> Engine<'w> {
     }
     pub fn world(&self) -> &'w WorldSpec {
         self.world
+    }
+    /// The player's stats at their level; `None` without combat.
+    pub fn player_stats(&self) -> Option<Stats> {
+        let combat = self.state.combat.as_ref()?;
+        Some(rules::player_stats(self.world, combat.level))
     }
     /// Only a world with combat can kill the player.
     pub fn is_dead(&self) -> bool {
@@ -280,4 +321,25 @@ impl<'w> Engine<'w> {
     pub fn conditions_met(&self, conditions: &[Condition]) -> bool {
         rules::conditions_met(&self.state, conditions)
     }
+}
+
+/// Damage of one landed hit: the channel's combined attack `A` against its
+/// combined defence `D` (each 100 × main + share × other), then
+/// `max(1, A × power × A / (100 × 100 × (A + D)))`, rounded down once.
+/// Defence equal to the attack halves damage; no scale constant or level enters.
+pub fn damage(
+    attacker: &Stats,
+    defender: &Stats,
+    channel: Channel,
+    power: u32,
+    share: u32,
+) -> Result<u32, EngineError> {
+    let a = u128::from(attacker.combined(channel, share, false));
+    let d = u128::from(defender.combined(channel, share, true));
+    let hit = a
+        .checked_mul(u128::from(power))
+        .and_then(|v| v.checked_mul(a))
+        .and_then(|v| v.checked_div(100 * 100 * (a + d)))
+        .ok_or(EngineError::NumericLimit)?;
+    u32::try_from(hit.max(1)).map_err(|_| EngineError::NumericLimit)
 }

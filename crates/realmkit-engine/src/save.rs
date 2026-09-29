@@ -39,7 +39,7 @@ pub(super) fn check(
         state
             .combat
             .as_ref()
-            .is_some_and(|c| c.opponent_hp.get(id) == Some(&0))
+            .is_some_and(|c| c.opponents.get(id).is_some_and(|v| v.hp == 0))
     };
     ensure(
         state.quests.keys().eq(fresh.quests.keys())
@@ -95,17 +95,15 @@ pub(super) fn check(
             "experience does not match level",
         )?;
         ensure(
-            combat.max_hp == stats.stats.hp
-                && combat.attack == stats.stats.patk
-                && combat.hp <= combat.max_hp,
-            "player stats do not match level",
+            combat.hp <= stats.stats.hp && combat.mp <= stats.stats.mp,
+            "player vitals exceed their maximums",
         )?;
         ensure(
-            combat.opponent_hp.keys().eq(fresh.opponent_hp.keys())
-                && combat
-                    .opponent_hp
-                    .iter()
-                    .all(|(id, hp)| *hp <= fresh.opponent_hp[id]),
+            combat.opponents.keys().eq(fresh.opponents.keys())
+                && combat.opponents.iter().all(|(id, v)| {
+                    let max = fresh.opponents[id];
+                    v.hp <= max.hp && v.mp <= max.mp
+                }),
             "invalid opponent state",
         )?;
         ensure(combat.xp == xp, "experience does not match progress")?;

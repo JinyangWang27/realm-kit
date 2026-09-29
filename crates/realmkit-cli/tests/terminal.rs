@@ -79,7 +79,7 @@ fn eof_and_bad_input_do_not_crash_or_mutate_gameplay() {
     );
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
-    assert!(text.contains("HP 24/24"));
+    assert!(text.contains("HP 40/40"));
     assert!(text.contains("XP 0"));
     assert!(text.contains("Invalid command"));
     assert!(!text.contains("panicked"));
@@ -154,7 +154,7 @@ fn a_corrupt_newest_save_is_reported_and_older_saves_are_offered() {
         // The fresh start is auto-saved, so death recovery cannot hit the bad save.
         "  3. auto-save",
         "Loaded save 1.",
-        "HP 24/24",
+        "HP 40/40",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }

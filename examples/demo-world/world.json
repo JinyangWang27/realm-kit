@@ -9,9 +9,9 @@
   "combat": {
     "special_name": "Spirit",
     "levels": [
-      { "xp": 0, "stats": { "hp": 24, "patk": 5, "pdef": 6, "satk": 2, "sdef": 4, "speed": 100 } },
-      { "xp": 10, "stats": { "hp": 30, "patk": 7, "pdef": 7, "satk": 2, "sdef": 5, "speed": 100 } },
-      { "xp": 30, "stats": { "hp": 36, "patk": 9, "pdef": 8, "satk": 3, "sdef": 6, "speed": 100 } }
+      { "xp": 0, "stats": { "hp": 40, "patk": 10, "pdef": 6, "satk": 2, "sdef": 4, "speed": 100 } },
+      { "xp": 10, "stats": { "hp": 48, "patk": 12, "pdef": 7, "satk": 2, "sdef": 5, "speed": 100 } },
+      { "xp": 30, "stats": { "hp": 56, "patk": 14, "pdef": 8, "satk": 3, "sdef": 6, "speed": 100 } }
     ],
     "narrative": {
       "attack": [

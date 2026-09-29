@@ -525,7 +525,7 @@ mod tests {
             "> 1. Talk to Elder Mara",
             "Esc back",
             ": status",
-            "HP 24/24",
+            "HP 40/40",
             "> Attack The Ash Wolf",
             "Level 2",
             "She opens the chapel gate",
@@ -581,7 +581,7 @@ mod tests {
         let after = &text[died..];
         assert!(after.contains("Loaded save 2."), "{after}");
         assert!(after.contains("The Pine Track"), "{after}");
-        assert!(after.contains("HP 24/24"), "{after}");
+        assert!(after.contains("HP 40/40"), "{after}");
         assert!(!after.contains("You cannot save now"), "{after}");
 
         let mut dead = Engine::new(&world).unwrap();

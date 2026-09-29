@@ -33,7 +33,7 @@ pub(super) fn npc_here(world: &WorldSpec, state: &GameState, id: &str) -> bool {
     let defeated = state
         .combat
         .as_ref()
-        .is_some_and(|c| c.opponent_hp.get(id) == Some(&0));
+        .is_some_and(|c| c.opponents.get(id).is_some_and(|v| v.hp == 0));
     !defeated && character_here(world, state, id).is_some_and(|c| c.dialogue.is_some())
 }
 
@@ -117,10 +117,10 @@ fn grant_xp(
         if combat.xp < level.xp {
             break;
         }
+        // Levelling up restores HP and MP fully.
         combat.level += 1;
         combat.hp = level.stats.hp;
-        combat.max_hp = level.stats.hp;
-        combat.attack = level.stats.patk;
+        combat.mp = level.stats.mp;
         events.push(Event::LevelUp {
             level: combat.level,
         });
@@ -185,7 +185,7 @@ fn quest(
         // cannot strand this quest.
         let done = match &quest.objective {
             QuestObjective::Defeat { character } => {
-                state.combat.as_ref().unwrap().opponent_hp[character] == 0
+                state.combat.as_ref().unwrap().opponents[character].hp == 0
             }
             QuestObjective::Flag { flag } => state.flags.contains(flag),
         };
@@ -208,20 +208,37 @@ pub(super) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         .filter(|id| npc_here(world, state, id))
         .map(|id| available(Command::Talk(id.clone())))
         .collect();
-    if let Some(combat) = &state.combat {
-        actions.extend(
-            location
-                .characters
-                .iter()
-                .filter(|id| character_here(world, state, id).is_some())
-                .filter(|id| combat.opponent_hp.get(*id).is_some_and(|hp| *hp > 0))
-                .map(|id| available(Command::Attack(id.clone()))),
-        );
+    if let (Some(combat), Some(rules)) = (&state.combat, world.combat()) {
+        let skills: Vec<_> = rules
+            .player_skills
+            .iter()
+            .filter_map(|id| world.skill(id))
+            .filter(|s| s.level <= combat.level)
+            .collect();
+        for id in &location.characters {
+            if character_here(world, state, id).is_none()
+                || !combat.opponents.get(id).is_some_and(|v| v.hp > 0)
+            {
+                continue;
+            }
+            actions.push(available(Command::Attack(id.clone())));
+            // Unaffordable skills stay listed, so the player sees why they are not usable.
+            actions.extend(skills.iter().map(|s| Action {
+                command: Command::UseSkill {
+                    skill: s.id.clone(),
+                    target: id.clone(),
+                },
+                available: s.cost <= combat.mp,
+            }));
+        }
     }
     actions.extend(location.exits.iter().map(|(direction, exit)| Action {
         command: Command::Move(*direction),
         available: conditions_met(state, &exit.requires),
     }));
+    if state.combat.is_some() && location.safe {
+        actions.push(available(Command::Rest));
+    }
     actions.extend([Command::Inventory, Command::Status, Command::Quests].map(available));
     // Death is not a locked door: offer only what can still be done.
     if dead(state) {
@@ -326,54 +343,131 @@ pub(super) fn execute(
             quest(world, state, &id, true, &mut events)?;
             state.dialogue = None;
         }
-        Command::Attack(id) => {
-            let profile = character_here(world, state, &id).and_then(|c| c.combat.as_ref());
-            let (Some(profile), Some(rules), Some(combat)) =
-                (profile, world.combat(), state.combat.as_mut())
-            else {
-                return Err(EngineError::NotHere(id));
+        Command::Attack(id) => strike(world, state, id, None, &mut events)?,
+        Command::UseSkill { skill, target } => {
+            let known = world
+                .combat()
+                .is_some_and(|c| c.player_skills.contains(&skill));
+            let skill = world
+                .skill(&skill)
+                .filter(|_| known)
+                .ok_or(EngineError::UnknownSkill(skill))?;
+            strike(world, state, target, Some(skill), &mut events)?
+        }
+        Command::Rest => {
+            let safe = world.location(&state.player.location).unwrap().safe;
+            let Some(combat) = state.combat.as_mut().filter(|_| safe) else {
+                return Err(EngineError::NotSafe);
             };
-            let hp = combat.opponent_hp.get_mut(&id).unwrap();
-            if *hp == 0 {
-                return Err(EngineError::AlreadyDefeated(id));
-            }
-            let damage = combat.attack.min(*hp);
-            *hp -= damage;
-            events.push(Event::DamageDealt {
-                target: id.clone(),
-                amount: damage,
-                variant: (state.turn % rules.narrative.attack.len() as u64) as usize,
-            });
-            if *hp > 0 {
-                let damage = profile.stats.patk.min(combat.hp);
-                combat.hp -= damage;
-                events.push(Event::DamageReceived {
-                    source: id,
-                    amount: damage,
-                    variant: (state.turn % rules.narrative.hurt.len() as u64) as usize,
-                });
-                if combat.hp == 0 {
-                    events.push(Event::PlayerDied);
-                }
-            } else {
-                events.push(Event::EnemyDefeated {
-                    monster: id.clone(),
-                });
-                grant_items(state, &profile.loot, &mut events)?;
-                grant_xp(world, state, profile.xp, &mut events)?;
-                for q in &world.quests {
-                    if q.objective
-                        == (QuestObjective::Defeat {
-                            character: id.clone(),
-                        })
-                        && state.quests[&q.id] == QuestStatus::Active
-                    {
-                        progress(state, &q.id, &mut events);
-                    }
-                }
-            }
+            let stats = player_stats(world, combat.level);
+            (combat.hp, combat.mp) = (stats.hp, stats.mp);
             state.dialogue = None;
+            events.push(Event::Rested);
         }
     }
     Ok(events)
+}
+
+pub(super) fn player_stats(world: &WorldSpec, level: usize) -> Stats {
+    world.combat().unwrap().levels[level - 1].stats
+}
+
+/// The player hits `target` with a basic attack or a skill; a surviving target
+/// answers at once with its strongest affordable skill or its basic attack.
+fn strike(
+    world: &WorldSpec,
+    state: &mut GameState,
+    target: Id,
+    skill: Option<&Skill>,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let profile = character_here(world, state, &target).and_then(|c| c.combat.as_ref());
+    let (Some(profile), Some(rules), Some(combat)) =
+        (profile, world.combat(), state.combat.as_mut())
+    else {
+        return Err(EngineError::NotHere(target));
+    };
+    let foe = combat.opponents.get_mut(&target).unwrap();
+    if foe.hp == 0 {
+        return Err(EngineError::AlreadyDefeated(target));
+    }
+    let player = player_stats(world, combat.level);
+    let (channel, power, share) = hit(rules, skill, rules.player_basic_channel);
+    if let Some(skill) = skill {
+        if skill.level > combat.level {
+            return Err(EngineError::SkillLocked(skill.id.clone()));
+        }
+        combat.mp = combat
+            .mp
+            .checked_sub(skill.cost)
+            .ok_or_else(|| EngineError::NotEnoughMp(skill.id.clone()))?;
+        if skill.cost > 0 {
+            events.push(Event::MpSpent {
+                character: world.world.player.clone(),
+                amount: skill.cost,
+            });
+        }
+    }
+    let dealt = damage(&player, &profile.stats, channel, power, share)?.min(foe.hp);
+    foe.hp -= dealt;
+    events.push(Event::DamageDealt {
+        target: target.clone(),
+        amount: dealt,
+        variant: (state.turn % rules.narrative.attack.len() as u64) as usize,
+        skill: skill.map(|s| s.id.clone()),
+    });
+    state.dialogue = None;
+    if foe.hp > 0 {
+        // Strongest first; equal power prefers the cheaper skill.
+        let answer = profile
+            .skills
+            .iter()
+            .filter_map(|id| world.skill(id))
+            .filter(|s| s.cost <= foe.mp)
+            .max_by_key(|s| (s.power, std::cmp::Reverse(s.cost)));
+        if let Some(answer) = answer.filter(|s| s.cost > 0) {
+            foe.mp -= answer.cost;
+            events.push(Event::MpSpent {
+                character: target.clone(),
+                amount: answer.cost,
+            });
+        }
+        let (channel, power, share) = hit(rules, answer, profile.basic_channel);
+        let taken = damage(&profile.stats, &player, channel, power, share)?.min(combat.hp);
+        combat.hp -= taken;
+        events.push(Event::DamageReceived {
+            source: target,
+            amount: taken,
+            variant: (state.turn % rules.narrative.hurt.len() as u64) as usize,
+            skill: answer.map(|s| s.id.clone()),
+        });
+        if combat.hp == 0 {
+            events.push(Event::PlayerDied);
+        }
+        return Ok(());
+    }
+    events.push(Event::EnemyDefeated {
+        monster: target.clone(),
+    });
+    grant_items(state, &profile.loot, events)?;
+    grant_xp(world, state, profile.xp, events)?;
+    let defeat = QuestObjective::Defeat { character: target };
+    for q in &world.quests {
+        if q.objective == defeat && state.quests[&q.id] == QuestStatus::Active {
+            progress(state, &q.id, events);
+        }
+    }
+    Ok(())
+}
+
+/// Channel, power and cross share of a skill, or of a basic attack.
+fn hit(rules: &Combat, skill: Option<&Skill>, basic: Channel) -> (Channel, u32, u32) {
+    match skill {
+        Some(s) => (
+            s.channel,
+            s.power,
+            s.cross_share.unwrap_or(rules.cross_share),
+        ),
+        None => (basic, BASIC_POWER, rules.cross_share),
+    }
 }
