@@ -155,14 +155,7 @@ impl<'w> Engine<'w> {
     pub fn execute(&mut self, command: Command) -> Result<Vec<Event>, EngineError> {
         // ponytail: clone for atomic commands; use a change set if worlds become large.
         let mut next = self.state.clone();
-        let spends_time = !matches!(
-            command,
-            Command::Look
-                | Command::Inventory
-                | Command::Status
-                | Command::Quests
-                | Command::Techniques
-        );
+        let spends_time = !rules::is_panel(&command);
         let events = rules::execute(self.world, &mut next, command)?;
         if spends_time {
             next.turn = next.turn.checked_add(1).ok_or(EngineError::NumericLimit)?;

@@ -1,3 +1,4 @@
+use crate::panels;
 use realmkit_engine::{Engine, Event, Outcome};
 use realmkit_spec::{Direction, Id, Stat, TextTemplate};
 use std::io::{self, Write};
@@ -141,59 +142,11 @@ impl Log {
 
 pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) -> io::Result<()> {
     let world = engine.world();
-    let state = engine.state();
     let name = |id: &str| &world.character(id).unwrap().name;
     let player = name(&world.world.player);
     for event in events {
         match event {
-            Event::LocationViewed { location } => {
-                let location = world.location(location).unwrap();
-                writeln!(output, "{}\n{}", location.name, location.description)?;
-                write!(output, "Exits:")?;
-                for (direction, exit) in &location.exits {
-                    write!(
-                        output,
-                        " {}{}",
-                        direction_name(*direction),
-                        if engine.conditions_met(&exit.requires) {
-                            ""
-                        } else {
-                            " (locked)"
-                        }
-                    )?;
-                }
-                if location.exits.is_empty() {
-                    write!(output, " none")?;
-                }
-                writeln!(output)?;
-                for id in &location.characters {
-                    let character = world.character(id).unwrap();
-                    if !engine.conditions_met(&character.requires) {
-                        continue;
-                    }
-                    let defeated = state
-                        .combat
-                        .as_ref()
-                        .is_some_and(|c| c.defeated.contains(id));
-                    // A fighter shows its HP: current in a fight, full otherwise.
-                    let fighting = engine
-                        .encounter()
-                        .and_then(|e| e.participants.iter().find(|p| &p.character == id));
-                    let hp = fighting
-                        .map(|p| p.hp)
-                        .or(character.combat.as_ref().map(|c| c.stats.hp));
-                    match hp {
-                        _ if defeated => {}
-                        Some(0) => {}
-                        Some(hp) => writeln!(
-                            output,
-                            "{} (HP {hp}) — {}",
-                            character.name, character.description
-                        )?,
-                        None => writeln!(output, "{} — {}", character.name, character.description)?,
-                    }
-                }
-            }
+            Event::LocationViewed { location } => panels::location(output, engine, location)?,
             Event::DamageDealt {
                 target,
                 amount,
@@ -260,30 +213,7 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 "{} +{amount}",
                 world.technique(technique).unwrap().name
             )?,
-            Event::TechniquesViewed => {
-                writeln!(output, "Techniques:")?;
-                let learned = state.combat.as_ref().map(|c| &c.techniques);
-                if learned.is_none_or(|l| l.is_empty()) {
-                    writeln!(output, "  None yet")?;
-                }
-                for (id, progress) in learned.into_iter().flatten() {
-                    let technique = world.technique(id).unwrap();
-                    let rank = &technique.ranks[progress.rank - 1];
-                    write!(output, "  {} — {}", technique.name, rank.name)?;
-                    match technique.ranks.get(progress.rank) {
-                        // A closed gate holds XP at the next threshold.
-                        Some(next) if progress.xp >= next.xp => writeln!(
-                            output,
-                            " ({}/{} to {}, sealed)",
-                            progress.xp, next.xp, next.name
-                        )?,
-                        Some(next) => {
-                            writeln!(output, " ({}/{} to {})", progress.xp, next.xp, next.name)?
-                        }
-                        None => writeln!(output, " (mastered)")?,
-                    }
-                }
-            }
+            Event::TechniquesViewed => panels::techniques(output, engine)?,
             Event::EncounterStarted { opponents } => {
                 let names: Vec<_> = opponents.iter().map(|id| name(id).as_str()).collect();
                 writeln!(output, "You face {}.", names.join(", "))?
@@ -349,69 +279,9 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             Event::QuestCompleted { quest } => {
                 writeln!(output, "{}", world.quest(quest).unwrap().completion)?
             }
-            Event::InventoryViewed => {
-                writeln!(output, "Inventory:")?;
-                let gear = state.combat.as_ref().map(|c| &c.gear);
-                if state.player.inventory.is_empty() && gear.is_none_or(|g| g.is_empty()) {
-                    writeln!(output, "  Empty")?;
-                }
-                // Each piece of equipment is listed on its own, by number.
-                for (id, piece) in gear.into_iter().flatten() {
-                    let item = world.item(&piece.item).unwrap();
-                    let worn = if piece.equipped { " [equipped]" } else { "" };
-                    writeln!(output, "  #{id} {}{worn} — {}", item.name, item.description)?;
-                }
-                for (id, count) in &state.player.inventory {
-                    let item = world.item(id).unwrap();
-                    writeln!(
-                        output,
-                        "  {} ×{} [{}] — {}",
-                        item.name, count, id, item.description
-                    )?;
-                }
-            }
-            Event::StatusViewed => {
-                match (&state.combat, engine.player_stats(), engine.player_vitals()) {
-                    (Some(combat), Some(stats), Some(vitals)) => {
-                        let special = &world.combat().unwrap().special_name;
-                        write!(output, "{player} — Level {}", combat.level)?;
-                        // The realm is the core internal art's rank name.
-                        let rules = world.combat().unwrap();
-                        let realm = rules.core_art.as_ref().and_then(|core| {
-                            let learned = combat.techniques.get(core)?;
-                            Some(&world.technique(core)?.ranks[learned.rank - 1].name)
-                        });
-                        if let Some(realm) = realm {
-                            write!(output, " | Realm {realm}")?;
-                        }
-                        write!(output, " | HP {}/{}", vitals.hp, stats.hp)?;
-                        // A world or build without MP shows none.
-                        if stats.mp > 0 {
-                            write!(output, " | MP {}/{}", vitals.mp, stats.mp)?;
-                        }
-                        write!(
-                        output,
-                        " | Attack {} | Defence {} | {special} attack {} | {special} defence {} | Speed {} | XP {}",
-                        stats.patk, stats.pdef, stats.satk, stats.sdef, stats.speed, combat.xp
-                    )?;
-                        match engine.unspent_points() {
-                            Some(points) if points > 0 => writeln!(output, " | Points {points}")?,
-                            _ => writeln!(output)?,
-                        }
-                    }
-                    _ => writeln!(output, "{player}")?,
-                }
-            }
-            Event::QuestsViewed => {
-                writeln!(output, "Quests:")?;
-                for quest in &world.quests {
-                    writeln!(
-                        output,
-                        "  {} [{}]: {:?}",
-                        quest.name, quest.id, state.quests[&quest.id]
-                    )?;
-                }
-            }
+            Event::InventoryViewed => panels::inventory(output, engine)?,
+            Event::StatusViewed => panels::status(output, engine)?,
+            Event::QuestsViewed => panels::quests(output, engine)?,
             Event::Moved { .. } | Event::DialogueEnded | Event::StoryFlagSet { .. } => {}
         }
     }
