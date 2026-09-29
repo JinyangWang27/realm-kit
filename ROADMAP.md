@@ -194,9 +194,13 @@ resistance, accuracy and critical chance can come later when builds need them.
   with saved RNG state. Keep semantically unrelated random domains independent
   where incidental draw coupling would produce surprising gameplay changes.
 
-**Done when:** a small duel demonstrates distinct physical/special builds, MP
-and rage expenditure and recovery, and a measurable benefit from increased speed. In M3,
-builds are fixture stat blocks; player-chosen builds arrive with equipment in M4.
+**Done when:** a small duel demonstrates physical and special builds that play
+differently, MP and rage expenditure and recovery, and, once the M3c timeline
+exists, a measurable benefit from increased speed. "Differently" means distinct
+actions and resources, not passing the balance targets: tuning waits until the
+systems are complete (see [Balance simulation](#balance-simulation--proposed)).
+In M3, builds are fixture stat blocks; player-chosen builds arrive with
+equipment in M4.
 A one-against-two fixture exercises several opponents, explicit targeting and
 tie order. Tests cover formulas, scheduling, ties, death, resource rejection,
 replay and save/load, including a save made mid-encounter. A combat-free fixture
