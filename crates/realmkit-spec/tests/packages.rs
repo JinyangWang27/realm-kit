@@ -267,6 +267,11 @@ fn older_packages_are_rejected_clearly() {
             2,
             r#"{ "format_version": 2, "combat": { "levels": [{ "xp": 0, "hp": 1, "attack": 1 }] } }"#,
         ),
+        // M3d's format, readable by runtimes that know no stat points.
+        (
+            6,
+            r#"{ "format_version": 6, "combat": { "special_name": "Magic" } }"#,
+        ),
         // M3c-2's format, readable by runtimes that know no crits.
         (
             5,
@@ -522,4 +527,107 @@ fn crits_are_bounded_and_make_a_world_stochastic() {
         world.world.combat.as_mut().unwrap().skills[0].crit = crit(chance, multiplier);
         assert!(world.validate().is_err(), "crit {chance}/{multiplier}");
     }
+}
+
+#[test]
+fn stat_points_are_validated_against_their_worst_case() {
+    let world = arena();
+    let points = world.combat().unwrap().stat_points.clone().unwrap();
+    assert_eq!(points.values[&Stat::Hp], 5);
+    assert_eq!(points.respec, Respec::Safe);
+    assert_eq!(world.combat().unwrap().levels[0].points, 3);
+    let encoded = serde_json::to_string(&world).unwrap();
+    assert_eq!(serde_json::from_str::<WorldSpec>(&encoded).unwrap(), world);
+    let changes: Vec<fn(&mut WorldSpec)> = vec![
+        // Points with nothing to spend them on.
+        |w| w.world.combat.as_mut().unwrap().stat_points = None,
+        |w| {
+            let p = w
+                .world
+                .combat
+                .as_mut()
+                .unwrap()
+                .stat_points
+                .as_mut()
+                .unwrap();
+            p.values.clear()
+        },
+        |w| {
+            let p = w
+                .world
+                .combat
+                .as_mut()
+                .unwrap()
+                .stat_points
+                .as_mut()
+                .unwrap();
+            p.values.insert(Stat::Mp, 0);
+        },
+        |w| {
+            let p = w
+                .world
+                .combat
+                .as_mut()
+                .unwrap()
+                .stat_points
+                .as_mut()
+                .unwrap();
+            p.caps.insert(Stat::Sdef, 3);
+        },
+        // Every point in HP at 5,000 each would pass 9,999.
+        |w| {
+            let p = w
+                .world
+                .combat
+                .as_mut()
+                .unwrap()
+                .stat_points
+                .as_mut()
+                .unwrap();
+            p.values.insert(Stat::Hp, 5_000);
+        },
+    ];
+    for (index, change) in changes.into_iter().enumerate() {
+        let mut world = arena();
+        change(&mut world);
+        assert!(world.validate().is_err(), "invalid points case {index}");
+    }
+    // A cap keeps the worst case in bounds.
+    let mut capped = arena();
+    let p = capped
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .stat_points
+        .as_mut()
+        .unwrap();
+    p.values.insert(Stat::Hp, 5_000);
+    p.caps.insert(Stat::Hp, 1);
+    assert!(capped.validate().is_ok(), "{:?}", capped.diagnostics());
+    // Stat points nobody grants only warn.
+    let mut unused = arena();
+    for level in &mut unused.world.combat.as_mut().unwrap().levels {
+        level.points = 0;
+    }
+    assert!(unused.validate().is_ok());
+    assert_eq!(unused.diagnostics()[0].code, "unused_points");
+}
+
+#[test]
+fn caps_that_cannot_take_every_point_warn() {
+    let mut world = arena();
+    let points = world
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .stat_points
+        .as_mut()
+        .unwrap();
+    points.values.retain(|stat, _| *stat == Stat::Patk);
+    points.caps = [(Stat::Patk, 1)].into();
+    assert!(world.validate().is_ok());
+    let codes: Vec<_> = world.diagnostics().into_iter().map(|d| d.code).collect();
+    assert_eq!(codes, ["stranded_points"]);
 }

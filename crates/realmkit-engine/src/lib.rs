@@ -2,7 +2,8 @@
 
 use realmkit_spec::{
     Channel, Character, Condition, DialogueChoice, DialogueEffect, Direction, Id, ItemStack,
-    QuestObjective, QuestStatus, Resource, Skill, SpecError, Stats, WorldSpec, BASIC_POWER,
+    QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat, Stats, WorldSpec,
+    BASIC_POWER,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,6 +25,13 @@ pub enum Command {
     Flee,
     /// Restores HP and MP at a safe location.
     Rest,
+    /// Spends unspent stat points on one stat.
+    Allocate {
+        stat: Stat,
+        points: u32,
+    },
+    /// Refunds every spent stat point, where the world allows it.
+    Respec,
     Talk(Id),
     /// One-based index into the currently visible choices.
     ChooseDialogue(usize),
@@ -76,6 +84,11 @@ pub enum Event {
         outcome: Outcome,
     },
     Rested,
+    PointsAllocated {
+        stat: Stat,
+        points: u32,
+    },
+    PointsRefunded,
     EnemyDefeated {
         monster: Id,
     },
@@ -128,6 +141,8 @@ pub struct CombatState {
     pub level: usize,
     /// Characters defeated for good.
     pub defeated: BTreeSet<Id>,
+    /// Stat points spent per stat; unspent points are derived from the level.
+    pub allocation: BTreeMap<Stat, u32>,
     pub stance: Stance,
 }
 
@@ -224,7 +239,7 @@ pub struct GameState {
     pub rng: Option<RngState>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 6;
+pub const SAVE_FORMAT_VERSION: u32 = 7;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -264,6 +279,14 @@ pub enum EngineError {
     InEncounter,
     #[error("there is no running from this fight")]
     NoFlee,
+    #[error("you cannot spend points on that stat")]
+    NoSuchStat,
+    #[error("not enough unspent stat points")]
+    NotEnoughPoints,
+    #[error("that stat cannot take more points")]
+    PointCap,
+    #[error("stat points cannot be refunded here")]
+    NoRespec,
     #[error("you are not fighting anyone; engage first")]
     NotFighting,
     #[error("this is not a safe place to rest")]
@@ -321,6 +344,7 @@ impl<'w> Engine<'w> {
                 xp: 0,
                 level: 1,
                 defeated: BTreeSet::new(),
+                allocation: BTreeMap::new(),
                 stance: Stance::Exploring(Vitals {
                     hp: stats.hp,
                     mp: stats.mp,
@@ -354,10 +378,16 @@ impl<'w> Engine<'w> {
     pub fn world(&self) -> &'w WorldSpec {
         self.world
     }
-    /// The player's stats at their level; `None` without combat.
+    /// The player's effective stats: the level table plus allocated points;
+    /// `None` without combat.
     pub fn player_stats(&self) -> Option<Stats> {
         let combat = self.state.combat.as_ref()?;
-        Some(rules::player_stats(self.world, combat.level))
+        Some(rules::player_stats(self.world, combat))
+    }
+    /// Stat points granted so far and not yet spent; `None` without combat.
+    pub fn unspent_points(&self) -> Option<u32> {
+        let combat = self.state.combat.as_ref()?;
+        Some(rules::unspent_points(self.world, combat))
     }
     /// The player's current HP and MP, wherever they live; `None` without combat.
     pub fn player_vitals(&self) -> Option<Vitals> {

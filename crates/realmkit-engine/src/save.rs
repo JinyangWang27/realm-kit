@@ -136,9 +136,22 @@ pub(super) fn check(
             }),
             "invalid defeated characters",
         )?;
+        // Allocation: only stats that accept points, within caps and the
+        // points granted so far.
+        let spec = rules.stat_points.as_ref();
+        let spent: u64 = combat.allocation.values().map(|p| u64::from(*p)).sum();
+        ensure(
+            combat.allocation.iter().all(|(stat, points)| {
+                spec.is_some_and(|s| {
+                    s.values.contains_key(stat) && s.caps.get(stat).is_none_or(|cap| points <= cap)
+                })
+            }) && spent <= rules::granted_points(world, combat.level),
+            "invalid stat point allocation",
+        )?;
+        let max = rules::player_stats(world, combat);
         match &combat.stance {
             Stance::Exploring(v) => ensure(
-                v.hp <= stats.stats.hp && v.mp <= stats.stats.mp,
+                v.hp <= max.hp && v.mp <= max.mp,
                 "player vitals exceed their maximums",
             )?,
             Stance::Fighting(encounter) => encounter_state(world, state, combat, rules, encounter)?,
@@ -238,7 +251,7 @@ fn encounter_state(
     }
     let yield_share = encounter::group(world, encounter).and_then(|g| g.yield_share);
     let vitals_ok = encounter.participants.iter().all(|p| {
-        let max = encounter::stats(world, combat.level, p);
+        let max = encounter::stats(world, rules::player_stats(world, combat), p);
         // In a yielding group nobody dies, and a participant has yielded exactly
         // when a hit left it at or below its threshold. An untouched participant
         // at full HP has not yielded even if full HP is within the threshold

@@ -1,5 +1,5 @@
 use realmkit_engine::{Engine, Event, Outcome};
-use realmkit_spec::{Direction, TextTemplate};
+use realmkit_spec::{Direction, Stat, TextTemplate};
 use std::io::{self, Write};
 
 const CRITICAL: &str = "Critical hit!";
@@ -42,6 +42,22 @@ fn hit(
         ("damage", &amount),
     ];
     writeln!(output, "{}", interpolate(text, &values)?)
+}
+
+/// A stat's display name; special stats use the world's special name.
+pub fn stat_name(world: &realmkit_spec::WorldSpec, stat: Stat) -> String {
+    let special = world
+        .combat()
+        .map_or("Special", |c| c.special_name.as_str());
+    match stat {
+        Stat::Hp => "HP".into(),
+        Stat::Mp => "MP".into(),
+        Stat::Patk => "Attack".into(),
+        Stat::Pdef => "Defence".into(),
+        Stat::Satk => format!("{special} attack"),
+        Stat::Sdef => format!("{special} defence"),
+        Stat::Speed => "Speed".into(),
+    }
 }
 
 pub fn direction_name(direction: Direction) -> &'static str {
@@ -144,6 +160,15 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             }
             // Costs are shown in the menu and remaining MP in the status line.
             Event::ResourceSpent { .. } => {}
+            Event::PointsAllocated { stat, points } => {
+                let plural = if *points == 1 { "point" } else { "points" };
+                writeln!(
+                    output,
+                    "{points} {plural} into {}.",
+                    stat_name(world, *stat)
+                )?
+            }
+            Event::PointsRefunded => writeln!(output, "Your stat points are refunded.")?,
             Event::EncounterStarted { opponents } => {
                 let names: Vec<_> = opponents.iter().map(|id| name(id).as_str()).collect();
                 writeln!(output, "You face {}.", names.join(", "))?
@@ -184,8 +209,19 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             )?,
             Event::ExperienceGranted { amount } => writeln!(output, "+{amount} XP")?,
             Event::LevelUp { level } => {
-                // One grant can pass several levels; each restores that level's MP.
-                let mp = world.combat().unwrap().levels[level - 1].stats.mp > 0;
+                // One grant can pass several levels; each restores that level's
+                // effective MP: its base plus MP bought with points.
+                let combat = world.combat().unwrap();
+                let bought = state.combat.as_ref().map_or(0, |c| {
+                    let per_point = combat
+                        .stat_points
+                        .as_ref()
+                        .and_then(|p| p.values.get(&Stat::Mp))
+                        .copied()
+                        .unwrap_or(0);
+                    c.allocation.get(&Stat::Mp).copied().unwrap_or(0) * per_point
+                });
+                let mp = combat.levels[level - 1].stats.mp + bought > 0;
                 let restored = if mp { "Health and MP" } else { "Health" };
                 writeln!(output, "Level {level}! {restored} restored.")?
             }
@@ -232,11 +268,15 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                         if stats.mp > 0 {
                             write!(output, " | MP {}/{}", vitals.mp, stats.mp)?;
                         }
-                        writeln!(
+                        write!(
                         output,
                         " | Attack {} | Defence {} | {special} attack {} | {special} defence {} | Speed {} | XP {}",
                         stats.patk, stats.pdef, stats.satk, stats.sdef, stats.speed, combat.xp
-                    )?
+                    )?;
+                        match engine.unspent_points() {
+                            Some(points) if points > 0 => writeln!(output, " | Points {points}")?,
+                            _ => writeln!(output)?,
+                        }
                     }
                     _ => writeln!(output, "{player}")?,
                 }

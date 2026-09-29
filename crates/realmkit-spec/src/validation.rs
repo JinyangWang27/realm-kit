@@ -557,6 +557,89 @@ fn usable_skills<'a>(
     }
 }
 
+/// Points need a use, a use needs points, and even every point in one stat
+/// (up to its cap) must keep that stat within the engine bound at every level.
+fn stat_points(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
+    let granted = combat.levels.iter().any(|l| l.points > 0);
+    let Some(points) = &combat.stat_points else {
+        if granted {
+            issue(
+                out,
+                owner,
+                "invalid_points",
+                "levels grant stat points, but the combat block has no stat_points",
+            );
+        }
+        return;
+    };
+    if !granted {
+        out.push(Diagnostic {
+            severity: Severity::Warning,
+            entity_id: Some(owner.into()),
+            code: "unused_points".into(),
+            message: "stat_points is configured but no level grants points".into(),
+        });
+    }
+    if points.values.is_empty() || points.values.values().any(|v| *v == 0) {
+        issue(
+            out,
+            owner,
+            "invalid_points",
+            "stat points must add a positive amount to at least one stat",
+        );
+    }
+    if points
+        .caps
+        .keys()
+        .any(|stat| !points.values.contains_key(stat))
+    {
+        issue(
+            out,
+            owner,
+            "invalid_points",
+            "caps may only limit stats that accept points",
+        );
+    }
+    let mut total = 0_u64;
+    for level in &combat.levels {
+        total += u64::from(level.points);
+        for (stat, value) in &points.values {
+            let taken = points
+                .caps
+                .get(stat)
+                .map_or(total, |cap| total.min(u64::from(*cap)));
+            if u64::from(level.stats.get(*stat)) + taken * u64::from(*value) > u64::from(STAT_BOUND)
+            {
+                issue(
+                    out,
+                    owner,
+                    "invalid_points",
+                    format!("stat points could raise a stat above {STAT_BOUND}; add a cap or lower the value"),
+                );
+                return;
+            }
+        }
+    }
+    // When every accepted stat is capped, the caps must be able to take every
+    // point granted, or the rest can never be spent.
+    let capacity: Option<u64> = points
+        .values
+        .keys()
+        .map(|stat| points.caps.get(stat).map(|cap| u64::from(*cap)))
+        .sum();
+    if capacity.is_some_and(|capacity| total > capacity) {
+        out.push(Diagnostic {
+            severity: Severity::Warning,
+            entity_id: Some(owner.into()),
+            code: "stranded_points".into(),
+            message: format!(
+                "levels grant {total} points, but the caps only take {}",
+                capacity.unwrap()
+            ),
+        });
+    }
+}
+
 fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &Combat) {
     if combat.special_name.trim().is_empty() {
         issue(
@@ -625,6 +708,7 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         }
     }
     let levels = &combat.levels;
+    stat_points(out, owner, combat);
     for level in levels {
         stats(out, owner, &level.stats);
     }

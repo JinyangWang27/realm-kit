@@ -1,4 +1,7 @@
-use crate::{input, render::direction_name};
+use crate::{
+    input,
+    render::{direction_name, stat_name},
+};
 use realmkit_engine::{Command, Engine};
 use realmkit_spec::Resource;
 use std::io::{self, Write};
@@ -15,6 +18,8 @@ const MP: &str = "MP";
 const RAGE: &str = "rage";
 const REST: &str = "Rest";
 const FLEE: &str = "Flee";
+const TRAIN: &str = "Train";
+const RESPEC: &str = "Refund stat points";
 const YIELDED: &str = "yielded";
 const INVENTORY: &str = "Inventory";
 const CHARACTER: &str = "Character";
@@ -164,6 +169,18 @@ impl Menu {
                         _ if !action.available => return None,
                         Command::Rest => REST.into(),
                         Command::Flee => FLEE.into(),
+                        // "Train Attack: 12 → 13", from the same effective stats the engine uses.
+                        Command::Allocate { stat, .. } => {
+                            let now = engine.player_stats().unwrap().get(*stat);
+                            let value =
+                                world.combat().unwrap().stat_points.as_ref().unwrap().values[stat];
+                            format!(
+                                "{TRAIN} {}: {now} → {}",
+                                stat_name(world, *stat),
+                                now + value
+                            )
+                        }
+                        Command::Respec => RESPEC.into(),
                         Command::Engage(id) => {
                             format!("{ENGAGE} {}", world.character(id).unwrap().name)
                         }

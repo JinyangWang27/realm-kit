@@ -307,7 +307,7 @@ fn play(
             Ok(input::Input::Quit) => break,
             Ok(input::Input::Blank) => continue,
             Ok(input::Input::Help) => {
-                writeln!(output, "{}", input::help(world.combat().is_some()))?;
+                writeln!(output, "{}", input::help(world))?;
                 continue;
             }
             Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
@@ -409,7 +409,7 @@ fn play_keys(
                     continue 'scene;
                 }
                 Outcome::Help => {
-                    writeln!(output, "{}", input::help(world.combat().is_some()))?;
+                    writeln!(output, "{}", input::help(world))?;
                     continue 'scene;
                 }
                 Outcome::Run(command) => {
@@ -435,7 +435,7 @@ fn play_keys(
                             }
                         },
                         Ok(input::Input::Help) => {
-                            writeln!(output, "{}", input::help(world.combat().is_some()))?;
+                            writeln!(output, "{}", input::help(world))?;
                             continue 'scene;
                         }
                         Ok(input::Input::Blank) => continue 'scene,
@@ -594,6 +594,28 @@ mod tests {
         let text = String::from_utf8(output).unwrap();
         assert!(text.contains("Level 2! Health restored."), "{text}");
         assert!(text.contains("Level 3! Health and MP restored."), "{text}");
+    }
+
+    #[test]
+    fn a_level_up_mentions_mp_bought_with_points() {
+        // The arena has no base MP; buying it with a point makes level-ups restore it.
+        let mut world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena")).unwrap();
+        let points = world
+            .world
+            .combat
+            .as_mut()
+            .unwrap()
+            .stat_points
+            .as_mut()
+            .unwrap();
+        points.values.insert(realmkit_spec::Stat::Mp, 5);
+        let mut output = Vec::new();
+        let rats = "engage rat\nattack rat\n".repeat(3);
+        let input = format!("allocate mp\neast\n{rats}");
+        play(&world, None, Some(1), input.as_bytes(), &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains("Level 2! Health and MP restored."), "{text}");
     }
 
     #[test]

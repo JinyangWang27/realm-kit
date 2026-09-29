@@ -122,7 +122,8 @@ Skills spend MP, which regenerates as the fight goes on, or rage, which builds
 from acting and being hit; opponents answer with their own skills, and the
 player can rest at safe places (`examples/duel`). Packs fight together, some
 fights can be repeated for grinding, you can flee most of them, and sparring
-partners yield instead of dying (`examples/arena`).
+partners yield instead of dying (`examples/arena`). Worlds can also grant stat
+points on levelling up, which you spend to shape your own build.
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting

@@ -217,9 +217,10 @@ invoke the same commands as the deterministic command interface.
 
 ## Delivery and open decisions
 
-M4a: equipment definitions, individual instances, equip/unequip and comparisons.
-M4b: materials, stations and forging/improvement recipes with one smithing track.
-M4c: a learned enchantment, a catalyst and one compatible effect per instance.
+M4c: equipment definitions, individual instances, equip/unequip and comparisons.
+M4d: materials, stations and forging/improvement recipes with one smithing track.
+M4e: a learned enchantment, a catalyst and one compatible effect per instance.
+(M4a and M4b are player-allocated stat points and technique ranks.)
 Each step should produce a playable, tested loop before adding more content.
 These milestones build reusable optional capabilities and a fixture world that
 demonstrates them; they do not make crafting mandatory in every RealmKit world.

@@ -222,6 +222,7 @@ fight needs are fixed.
 | Rage | Any skill costs rage | No rage state or constants |
 | Skills beyond the basic attack | Any are authored | Basic attack only |
 | Technique ranks (M4) | A technique authors more than one rank | Every technique has one fixed rank |
+| Stat points (M4) | The level table grants points | Stats come only from the level table, techniques and equipment |
 | Realm display (M4) | A core internal art is named | No realm shown |
 | Repeatable groups, yielding, flee restrictions | Authored on a group | Groups fight once, to the death, and allow fleeing |
 | Seeded RNG (M3d) | Stochastic content exists | No RNG state |
@@ -901,7 +902,7 @@ every package.
 - Derive effective stats from base progression plus equipment; prevent repeated
   equip/unequip from permanently accumulating bonuses.
 - Give skills authored descriptions, costs, damage channels, power and
-  [technique ranks](#technique-ranks--proposed). Introduce cooldowns/status
+  [technique ranks](#technique-ranks--decided). Introduce cooldowns/status
   effects only alongside skills that require them.
 - Add immunity/vulnerability multipliers, specify modifier stacking and immunity precedence, choose armour speed
   penalties, and add optional caps for stats other than speed if stacking needs
@@ -909,36 +910,42 @@ every package.
 - Define durations in terms of the chosen combat clock; do not casually mix
   wall-clock seconds, actor turns and timeline units.
 - Show why stats changed and what an action costs before confirming it.
-- Deliver in slices: M4a equipment instances and equip/unequip; M4b stations,
-  deterministic forging and authored improvement-state transitions; M4c one
-  compatible learned enchantment per item. Runtime instances use deterministic
+- Deliver in slices: M4a player-allocated stat points (delivered); M4b technique ranks;
+  M4c equipment instances and equip/unequip; M4d stations, deterministic
+  forging and authored improvement-state transitions; M4e one compatible
+  learned enchantment per item. Runtime instances use deterministic
   saved IDs only when distinguishable copies need independent state; unique
   legendary equipment may still have one mutable instance, while fungible
   identical resources remain definition + quantity. Materials/quality are concrete
   authored data rather than a universal runtime hierarchy. Preserve authored
   source-language names and prose throughout crafting.
-- Optionally let players allocate stat points: content authors points gained
-  per level, which stats accept them and how much one point is worth, plus a
-  respec policy. Saves store the allocation, and effective stats are derived as
-  progression + allocation + equipment. With flat MP costs, points poured into
-  MP mean unlimited casting, so allocation needs per-stat caps or a low MP value
-  per point, and the balance simulation should first gain a target that no
-  single-stat build dominates. The capability suits worlds whose sources have
-  it; wuxia worlds grow 内力 through technique ranks instead. Proposed, not
-  decided.
+- **Player-allocated stat points · decided, a core part of M4** and, like
+  every combat part, optional per world. Content authors points gained per
+  level, which stats accept them and how much one point is worth, plus a respec
+  policy. Saves store the allocation, and effective stats are derived as level
+  table + allocation + technique passives + equipment, never saved. With flat MP
+  costs, points poured into MP mean near-unlimited casting, so allocation needs
+  per-stat caps or a low MP value per point; the balance simulation gains a
+  target that no single-stat build dominates when balancing resumes. Worlds
+  whose sources grow power through cultivation, such as wuxia 内力, may use
+  technique ranks instead or as well.
 - Keep recipe knowledge separate from proficiency: authored teachers, plans,
   quests or discoveries grant recipes, while smithing determines whether a known
   recipe can be used. Proficiency alone does not reveal recipes initially.
 
-### Technique ranks · proposed
+### Technique ranks · decided
 
 Wuxia sources measure power by how deeply a technique is mastered: 龙象般若功 has
 ten layers, 九阴真经 is learned layer by layer, and 郭靖 learns 降龙十八掌 one
 move at a time. Instead of a separate realm-tier system, each learned technique
 has a rank.
 
-- **Rank tables.** Each technique authors one entry per rank: power, cost, action
-  time, and optionally passive stat grants and a changed weapon requirement.
+- **Rank tables.** Each technique authors one entry per rank: a name, power,
+  cost, action time, and optionally passive stat grants and a changed weapon
+  requirement. The world author names every rank of every technique, in the
+  source's own terms (第一重 … 第十重 for 龙象般若功, one move's name per rank
+  for 降龙十八掌, "Novice" … "Master" elsewhere); clients show that name, never
+  a bare number.
   Internal arts (内功/心法) are passive techniques whose ranks grant stats such as
   maximum MP or special attack. A sword art's top rank may drop its weapon
   requirement, as 独孤求败 moves from 木剑 to 无剑. Each rank authors its own costs.
@@ -952,8 +959,8 @@ has a rank.
   volume. Technique XP stops at the gated threshold until the gate opens, so the
   per-chapter level cap becomes a per-technique cap.
 - **Realms.** A world may name one technique as the character's core internal
-  art. Its rank is then displayed as the realm (境界) under the world's own names,
-  and conditions can test it. No separate tier system exists.
+  art. Its current rank's authored name is then displayed as the realm (境界),
+  and conditions can test the rank. No separate tier system exists.
 - **Roles.** Where a world has character levels, they supply base body stats
   and experience; techniques supply skill power and passives. A high-rank
   internal art can make a level-1 character strong, because power comes from
@@ -1141,9 +1148,10 @@ maintained in the [open-decisions register](docs/open-decisions.md).
    Immunity, vulnerability and modifier stacking are deferred to M4.
 6. The M3 combat menu shows exact damage after each action and the projected turn
    order. Qualitative previews wait for a client that needs them.
-7. For M4, confirm [technique ranks](#technique-ranks--proposed) in place of
-   realm tiers, and extend the balance simulation to ranks before choosing their
-   numbers.
+7. [Technique ranks](#technique-ranks--decided) are decided for M4, in place of
+   realm tiers, with an authored name for every rank; player-allocated stat
+   points are decided as a core, per-world-optional part of M4. Extend the
+   balance simulation to ranks and stat points when balancing resumes.
 
 M3a and M3b are delivered; M3b implemented decisions 3 and 5 as proposed.
 Decisions 1, 2 and 4 are settled for M3c.

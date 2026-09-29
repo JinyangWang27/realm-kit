@@ -1,5 +1,5 @@
 {
-  "format_version": 6,
+  "format_version": 7,
   "id": "training_arena",
   "name": "The Training Arena",
   "language": "en",
@@ -11,12 +11,12 @@
     "timeline": { "action_cost": 100000, "speed_cap": 200 },
     "resources": { "rage_per_action": 1, "rage_per_max_hp": 20 },
     "levels": [
-      { "xp": 0, "stats": { "hp": 60, "patk": 12, "pdef": 8, "satk": 2, "sdef": 6, "speed": 100 } },
-      { "xp": 10, "stats": { "hp": 66, "patk": 13, "pdef": 9, "satk": 2, "sdef": 6, "speed": 100 } },
-      { "xp": 20, "stats": { "hp": 72, "patk": 14, "pdef": 9, "satk": 2, "sdef": 7, "speed": 100 } },
-      { "xp": 30, "stats": { "hp": 78, "patk": 15, "pdef": 10, "satk": 3, "sdef": 7, "speed": 100 } },
-      { "xp": 40, "stats": { "hp": 84, "patk": 16, "pdef": 10, "satk": 3, "sdef": 8, "speed": 100 } },
-      { "xp": 50, "stats": { "hp": 90, "patk": 17, "pdef": 11, "satk": 3, "sdef": 8, "speed": 100 } }
+      { "xp": 0, "stats": { "hp": 60, "patk": 12, "pdef": 8, "satk": 2, "sdef": 6, "speed": 100 }, "points": 3 },
+      { "xp": 10, "stats": { "hp": 66, "patk": 13, "pdef": 9, "satk": 2, "sdef": 6, "speed": 100 }, "points": 2 },
+      { "xp": 20, "stats": { "hp": 72, "patk": 14, "pdef": 9, "satk": 2, "sdef": 7, "speed": 100 }, "points": 2 },
+      { "xp": 30, "stats": { "hp": 78, "patk": 15, "pdef": 10, "satk": 3, "sdef": 7, "speed": 100 }, "points": 2 },
+      { "xp": 40, "stats": { "hp": 84, "patk": 16, "pdef": 10, "satk": 3, "sdef": 8, "speed": 100 }, "points": 2 },
+      { "xp": 50, "stats": { "hp": 90, "patk": 17, "pdef": 11, "satk": 3, "sdef": 8, "speed": 100 }, "points": 2 }
     ],
     "skills": [
       {
@@ -52,6 +52,11 @@
       }
     ],
     "player_skills": ["heavy_blow"],
+    "stat_points": {
+      "values": { "hp": 5, "patk": 1, "pdef": 1, "speed": 2 },
+      "caps": { "speed": 10 },
+      "respec": "safe"
+    },
     "groups": [
       { "id": "pack" },
       { "id": "warren", "repeatable": true },

@@ -183,9 +183,10 @@ Each mechanic is a typed engine rule with authored parameters, added only with a
 world that needs it:
 
 1. **Yielding** (all four): a fight ends at an authored HP share without death.
-   Planned for M3c; also protects canon anchors.
+   Delivered in M3c; also protects canon anchors.
 2. **Technique ranks** (the wuxia sources): ranked techniques with breakthrough
-   gates, where a realm is the rank of a core internal art. Planned for M4.
+   gates and an authored name for every rank, where a realm is the named rank
+   of a core internal art. Decided for M4.
 3. **Status effects** (three sources): stun from 点穴, poison, enchanted sleep,
    with durations in encounter time. Planned for M4.
 4. **Defence bypass and immunity** (雪中悍刀行, Arthurian legend): planned for M4.
