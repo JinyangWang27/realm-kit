@@ -108,12 +108,10 @@ impl WorldDraft {
         })?;
         write_json(directory, "world.json", &self.world.world)?;
         write_json(directory, "locations.json", &self.world.locations)?;
-        write_json(directory, "npcs.json", &self.world.npcs)?;
-        write_json(directory, "monsters.json", &self.world.monsters)?;
+        write_json(directory, "characters.json", &self.world.characters)?;
         write_json(directory, "items.json", &self.world.items)?;
         write_json(directory, "quests.json", &self.world.quests)?;
         write_json(directory, "dialogues.json", &self.world.dialogues)?;
-        write_json(directory, "narrative.json", &self.world.narrative)?;
         Ok(())
     }
 }

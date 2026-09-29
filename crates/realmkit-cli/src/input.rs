@@ -1,7 +1,15 @@
 use realmkit_engine::Command;
 use realmkit_spec::Direction;
 
-pub const HELP: &str = "<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\nattack <monster-id>\ntalk <npc-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nsave\nload [number] — list saves, or restore one\nhelp\nquit";
+/// Commands a player can type; `attack` only where the world has combat.
+pub fn help(combat: bool) -> String {
+    let attack = if combat {
+        "attack <character-id>\n"
+    } else {
+        ""
+    };
+    format!("<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\n{attack}talk <character-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nsave\nload [number] — list saves, or restore one\nhelp\nquit")
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Input {

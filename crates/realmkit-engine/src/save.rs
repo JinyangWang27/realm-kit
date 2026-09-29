@@ -31,49 +31,40 @@ pub(super) fn check(
         world.location(&player.location).is_some(),
         "unknown player location",
     )?;
-    let stats = player
-        .level
-        .checked_sub(1)
-        .and_then(|i| world.world.levels.get(i))
-        .ok_or("invalid player level")?;
-    let next = world.world.levels.get(player.level);
     ensure(
-        player.xp >= stats.xp && next.is_none_or(|next| player.xp < next.xp),
-        "experience does not match level",
+        state.combat.is_some() == world.combat().is_some(),
+        "combat state does not match the world",
     )?;
-    ensure(
-        player.max_hp == stats.hp && player.attack == stats.attack && player.hp <= player.max_hp,
-        "player stats do not match level",
-    )?;
-    ensure(
-        state.monster_hp.keys().eq(fresh.monster_hp.keys())
-            && state
-                .monster_hp
-                .iter()
-                .all(|(id, hp)| *hp <= fresh.monster_hp[id]),
-        "invalid monster state",
-    )?;
+    let defeated = |id: &str| {
+        state
+            .combat
+            .as_ref()
+            .is_some_and(|c| c.opponent_hp.get(id) == Some(&0))
+    };
     ensure(
         state.quests.keys().eq(fresh.quests.keys())
             && world.quests.iter().all(|quest| {
-                let QuestObjective::Defeat { monster } = &quest.objective;
-                let defeated = state.monster_hp.get(monster) == Some(&0);
+                let done = match &quest.objective {
+                    QuestObjective::Defeat { character } => defeated(character),
+                    QuestObjective::Flag { flag } => state.flags.contains(flag),
+                };
                 match state.quests[&quest.id] {
                     QuestStatus::Available => true,
-                    QuestStatus::Active => !defeated,
-                    QuestStatus::Ready | QuestStatus::Completed => defeated,
+                    QuestStatus::Active => !done,
+                    QuestStatus::Ready | QuestStatus::Completed => done,
                 }
             }),
         "invalid quest state",
     )?;
-    // Format 1 grants XP, items and quest flags exactly once, from defeated
-    // monsters and completed quests, so progress fixes their exact values.
+    // XP, items and quest flags are granted exactly once, from defeated
+    // characters and completed quests, so progress fixes their exact values.
     // Anything else could not have been played, and could overflow later grants.
     let no_flags: &[Id] = &[];
     let defeated = world
-        .monsters
+        .characters
         .iter()
-        .filter(|m| state.monster_hp[&m.id] == 0)
+        .filter(|c| defeated(&c.id))
+        .filter_map(|c| c.combat.as_ref())
         .map(|m| (m.xp, &m.loot, no_flags));
     let completed = world
         .quests
@@ -91,7 +82,34 @@ pub(super) fn check(
         }
         quest_flags.extend(flags.iter().cloned());
     }
-    ensure(player.xp == xp, "experience does not match progress")?;
+    if let (Some(combat), Some(fresh), Some(rules)) = (&state.combat, &fresh.combat, world.combat())
+    {
+        let stats = combat
+            .level
+            .checked_sub(1)
+            .and_then(|i| rules.levels.get(i))
+            .ok_or("invalid player level")?;
+        let next = rules.levels.get(combat.level);
+        ensure(
+            combat.xp >= stats.xp && next.is_none_or(|next| combat.xp < next.xp),
+            "experience does not match level",
+        )?;
+        ensure(
+            combat.max_hp == stats.hp
+                && combat.attack == stats.attack
+                && combat.hp <= combat.max_hp,
+            "player stats do not match level",
+        )?;
+        ensure(
+            combat.opponent_hp.keys().eq(fresh.opponent_hp.keys())
+                && combat
+                    .opponent_hp
+                    .iter()
+                    .all(|(id, hp)| *hp <= fresh.opponent_hp[id]),
+            "invalid opponent state",
+        )?;
+        ensure(combat.xp == xp, "experience does not match progress")?;
+    }
     ensure(
         player.inventory == inventory,
         "inventory does not match progress",
@@ -116,8 +134,8 @@ pub(super) fn check(
     )?;
     if let Some(dialogue) = &state.dialogue {
         let node_exists = world
-            .npc(&dialogue.npc)
-            .and_then(|npc| world.dialogue(&npc.dialogue))
+            .character(&dialogue.npc)
+            .and_then(|npc| world.dialogue(npc.dialogue.as_ref()?))
             .is_some_and(|d| d.nodes.iter().any(|n| n.id == dialogue.node));
         ensure(
             node_exists

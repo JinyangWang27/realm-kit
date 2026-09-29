@@ -72,7 +72,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let world = WorldSpec::load(Path::new(&args[1]))?;
     match action {
         "validate" => writeln!(output, "{}: valid (format {})", world.world.name, world.world.format_version)?,
-        "inspect" => writeln!(output, "{} [{}]\nLanguage: {}\n{} locations, {} NPCs, {} monsters, {} items, {} quests, {} dialogues\nStart: {}", world.world.name, world.world.id, world.world.language, world.locations.len(), world.npcs.len(), world.monsters.len(), world.items.len(), world.quests.len(), world.dialogues.len(), world.world.start)?,
+        "inspect" => writeln!(output, "{} [{}]\nLanguage: {}\n{} locations, {} characters, {} items, {} quests, {} dialogues\nStart: {}", world.world.name, world.world.id, world.world.language, world.locations.len(), world.characters.len(), world.items.len(), world.quests.len(), world.dialogues.len(), world.world.start)?,
         "play" if !line_mode && io::stdin().is_terminal() && output.is_terminal() => {
             play_keys(&world, saves, terminal_keys(), &mut output)?
         }
@@ -156,7 +156,7 @@ fn restore(
     let loaded = saves.load(index, |snapshot| {
         let restored = Engine::restore(world, snapshot)?;
         // Recovery resumes a living player; a dead save could never recover.
-        if restored.state().player.hp == 0 {
+        if restored.is_dead() {
             return Err("the player is dead in this save".into());
         }
         Ok(restored)
@@ -212,7 +212,7 @@ fn persist(
         Err(error) => return writeln!(output, "Saves could not be read: {error}"),
     };
     match request {
-        input::Input::Save if engine.state().player.hp == 0 => {
+        input::Input::Save if engine.is_dead() => {
             writeln!(output, "You cannot save now.")
         }
         input::Input::Save => save(engine, saves, Kind::Manual, output),
@@ -291,7 +291,7 @@ fn play(
             Ok(input::Input::Quit) => break,
             Ok(input::Input::Blank) => continue,
             Ok(input::Input::Help) => {
-                writeln!(output, "{}", input::HELP)?;
+                writeln!(output, "{}", input::help(world.combat().is_some()))?;
                 continue;
             }
             Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
@@ -392,7 +392,7 @@ fn play_keys(
                     continue 'scene;
                 }
                 Outcome::Help => {
-                    writeln!(output, "{}", input::HELP)?;
+                    writeln!(output, "{}", input::help(world.combat().is_some()))?;
                     continue 'scene;
                 }
                 Outcome::Run(command) => {
@@ -418,7 +418,7 @@ fn play_keys(
                             }
                         },
                         Ok(input::Input::Help) => {
-                            writeln!(output, "{}", input::HELP)?;
+                            writeln!(output, "{}", input::help(world.combat().is_some()))?;
                             continue 'scene;
                         }
                         Ok(input::Input::Blank) => continue 'scene,
@@ -569,7 +569,7 @@ mod tests {
             "/../../examples/demo-world"
         ))
         .unwrap();
-        world.monsters[0].attack = 100;
+        world.characters[2].combat.as_mut().unwrap().attack = 100;
         let dir = std::env::temp_dir().join(format!("realmkit-death-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let saves = Saves::open(&dir).unwrap();

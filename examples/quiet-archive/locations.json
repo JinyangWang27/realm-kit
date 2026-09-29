@@ -1,0 +1,29 @@
+[
+  {
+    "id": "reading_room",
+    "name": "The Reading Room",
+    "description": "Green lamps pool light on long tables. Every chair faces the iron door at the far end.",
+    "exits": {
+      "north": { "destination": "stacks", "blocked_text": "The stacks are closed." },
+      "east": {
+        "destination": "vault",
+        "requires": [{ "kind": "flag", "flag": "vault_open" }],
+        "blocked_text": "The iron door is locked. Pell keeps the key."
+      }
+    },
+    "characters": ["archivist"]
+  },
+  {
+    "id": "stacks",
+    "name": "The Stacks",
+    "description": "Shelves climb into the dark. Somewhere above, a ladder creaks on its rail.",
+    "exits": { "south": { "destination": "reading_room", "blocked_text": "The way back is closed." } },
+    "characters": ["copyist"]
+  },
+  {
+    "id": "vault",
+    "name": "The Map Vault",
+    "description": "Flat drawers line the walls, each labelled in Pell's careful hand. One drawer stands open, waiting for the map.\n\nYour visit to the archive is complete.",
+    "exits": { "west": { "destination": "reading_room", "blocked_text": "The iron door has swung shut." } }
+  }
+]

@@ -11,14 +11,14 @@
         "blocked_text": "The elder keeps the chapel gate locked. Speak with her first."
       }
     },
-    "npcs": ["elder"]
+    "characters": ["elder"]
   },
   {
     "id": "forest",
     "name": "The Pine Track",
     "description": "The path narrows to a seam of black earth. A shepherd's red thread hangs from a thorn, turning slowly though there is no wind. Something pale moves between the roots.",
     "exits": { "south": { "destination": "village", "blocked_text": "The village road is closed." } },
-    "monsters": ["wolf"]
+    "characters": ["wolf"]
   },
   {
     "id": "ruins",

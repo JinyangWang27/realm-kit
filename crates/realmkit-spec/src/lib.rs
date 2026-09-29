@@ -7,19 +7,17 @@ mod validation;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WorldSpec {
     pub world: World,
     pub locations: Vec<Location>,
-    pub npcs: Vec<Npc>,
-    pub monsters: Vec<Monster>,
+    pub characters: Vec<Character>,
     pub items: Vec<Item>,
     pub quests: Vec<Quest>,
     pub dialogues: Vec<Dialogue>,
-    pub narrative: Narrative,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -31,10 +29,20 @@ pub struct World {
     /// Language tag for authored player-facing content (for example "en" or "zh-Hans").
     pub language: String,
     pub start: Id,
-    pub player_name: String,
-    pub levels: Vec<Level>,
+    /// The player-controlled character.
+    pub player: Id,
     #[serde(default)]
     pub flags: Vec<Id>,
+    /// Absent in a world without fighting; then there is no XP or level either.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<Combat>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Combat {
+    pub levels: Vec<Level>,
+    pub narrative: Narrative,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -66,9 +74,7 @@ pub struct Location {
     #[serde(default)]
     pub exits: BTreeMap<Direction, Exit>,
     #[serde(default)]
-    pub npcs: Vec<Id>,
-    #[serde(default)]
-    pub monsters: Vec<Id>,
+    pub characters: Vec<Id>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -80,23 +86,25 @@ pub struct Exit {
     pub blocked_text: String,
 }
 
+/// Anyone in the world. Talking and fighting are optional components.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct Npc {
+pub struct Character {
     pub id: Id,
     pub name: String,
     pub description: String,
-    pub dialogue: Id,
+    /// Conditions for the character to be present where it is placed.
     #[serde(default)]
     pub requires: Vec<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dialogue: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<CombatProfile>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct Monster {
-    pub id: Id,
-    pub name: String,
-    pub description: String,
+pub struct CombatProfile {
     pub hp: u32,
     pub attack: u32,
     pub xp: u64,
@@ -129,6 +137,7 @@ pub struct Quest {
     pub introduction: String,
     pub progress: String,
     pub completion: String,
+    #[serde(default)]
     pub reward_xp: u64,
     #[serde(default)]
     pub reward_items: Vec<ItemStack>,
@@ -139,7 +148,8 @@ pub struct Quest {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum QuestObjective {
-    Defeat { monster: Id },
+    Defeat { character: Id },
+    Flag { flag: Id },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -209,15 +219,25 @@ pub struct Narrative {
 impl WorldSpec {
     pub fn load(directory: impl AsRef<Path>) -> Result<Self, SpecError> {
         let directory = directory.as_ref();
+        // Check the version before the typed parse, which would fail on older
+        // packages' fields with an obscure JSON error.
+        let header: serde_json::Value = read_json(directory, "world.json")?;
+        let found = header
+            .get("format_version")
+            .and_then(serde_json::Value::as_u64);
+        if found != Some(FORMAT_VERSION.into()) {
+            return Err(SpecError::UnsupportedFormat { found });
+        }
         let world = Self {
-            world: read_json(directory, "world.json")?,
+            world: serde_json::from_value(header).map_err(|source| SpecError::Json {
+                path: directory.join("world.json"),
+                source,
+            })?,
             locations: read_json(directory, "locations.json")?,
-            npcs: read_json(directory, "npcs.json")?,
-            monsters: read_json(directory, "monsters.json")?,
+            characters: read_json(directory, "characters.json")?,
             items: read_json(directory, "items.json")?,
             quests: read_json(directory, "quests.json")?,
             dialogues: read_json(directory, "dialogues.json")?,
-            narrative: read_json(directory, "narrative.json")?,
         };
         world.validate()?;
         Ok(world)
@@ -253,11 +273,11 @@ impl WorldSpec {
     pub fn location(&self, id: &str) -> Option<&Location> {
         self.locations.iter().find(|v| v.id == id)
     }
-    pub fn npc(&self, id: &str) -> Option<&Npc> {
-        self.npcs.iter().find(|v| v.id == id)
+    pub fn character(&self, id: &str) -> Option<&Character> {
+        self.characters.iter().find(|v| v.id == id)
     }
-    pub fn monster(&self, id: &str) -> Option<&Monster> {
-        self.monsters.iter().find(|v| v.id == id)
+    pub fn combat(&self) -> Option<&Combat> {
+        self.world.combat.as_ref()
     }
     pub fn item(&self, id: &str) -> Option<&Item> {
         self.items.iter().find(|v| v.id == id)

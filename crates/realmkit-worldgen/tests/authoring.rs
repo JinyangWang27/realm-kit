@@ -15,7 +15,7 @@ fn typed_edits_link_locations_and_report_repairable_diagnostics() {
     let world = demo();
     let mut location = world.locations[0].clone();
     location.id = "garden".into();
-    location.npcs.clear();
+    location.characters.clear();
     location.exits.clear();
     let mut draft = WorldDraft::new(world);
     draft.create_location(location.clone()).unwrap();
@@ -57,7 +57,7 @@ fn typed_edits_link_locations_and_report_repairable_diagnostics() {
     assert_eq!(draft.get_world(), &before);
     assert!(draft.validate_world().is_empty());
     let mut broken = draft.get_world().location("garden").unwrap().clone();
-    broken.npcs.push("missing".into());
+    broken.characters.push("missing".into());
     draft.update_location(broken).unwrap();
     assert!(draft
         .validate_world()
@@ -91,6 +91,36 @@ fn exports_a_self_contained_package_and_refuses_to_overwrite() {
     let original = fs::read(destination.join("world.json")).unwrap();
     assert!(draft.export(&destination).is_err());
     assert_eq!(fs::read(destination.join("world.json")).unwrap(), original);
+    let mut files: Vec<_> = fs::read_dir(&destination)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    files.sort();
+    assert_eq!(
+        files,
+        [
+            "characters.json",
+            "dialogues.json",
+            "items.json",
+            "locations.json",
+            "quests.json",
+            "world.json"
+        ]
+    );
+    // A world without combat exports without a combat block and loads back.
+    let archive = WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/quiet-archive"
+    ))
+    .unwrap();
+    let destination = temp.0.join("archive");
+    WorldDraft::new(archive.clone())
+        .export(&destination)
+        .unwrap();
+    assert!(!fs::read_to_string(destination.join("world.json"))
+        .unwrap()
+        .contains("combat"));
+    assert_eq!(WorldSpec::load(&destination).unwrap(), archive);
 }
 
 struct TestDir(PathBuf);

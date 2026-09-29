@@ -9,9 +9,10 @@ fn demo() -> WorldSpec {
             "../../../examples/demo-world/locations.json"
         ))
         .unwrap(),
-        npcs: serde_json::from_str(include_str!("../../../examples/demo-world/npcs.json")).unwrap(),
-        monsters: serde_json::from_str(include_str!("../../../examples/demo-world/monsters.json"))
-            .unwrap(),
+        characters: serde_json::from_str(include_str!(
+            "../../../examples/demo-world/characters.json"
+        ))
+        .unwrap(),
         items: serde_json::from_str(include_str!("../../../examples/demo-world/items.json"))
             .unwrap(),
         quests: serde_json::from_str(include_str!("../../../examples/demo-world/quests.json"))
@@ -20,11 +21,23 @@ fn demo() -> WorldSpec {
             "../../../examples/demo-world/dialogues.json"
         ))
         .unwrap(),
-        narrative: serde_json::from_str(include_str!(
-            "../../../examples/demo-world/narrative.json"
-        ))
-        .unwrap(),
     }
+}
+
+fn archive() -> WorldSpec {
+    WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/quiet-archive"
+    ))
+    .unwrap()
+}
+
+fn wolf(w: &mut WorldSpec) -> &mut Character {
+    w.characters.iter_mut().find(|c| c.id == "wolf").unwrap()
+}
+
+fn codes(w: &WorldSpec) -> Vec<String> {
+    w.diagnostics().into_iter().map(|d| d.code).collect()
 }
 
 #[test]
@@ -56,19 +69,24 @@ fn refuses_unsupported_versions_duplicate_ids_and_dangling_references() {
                 .unwrap()
                 .destination = "missing".into()
         },
-        |w| w.locations[0].npcs.push("missing".into()),
-        |w| w.locations[1].monsters.push("missing".into()),
-        |w| w.npcs[0].dialogue = "missing".into(),
+        |w| w.locations[0].characters.push("missing".into()),
+        |w| w.characters[1].dialogue = Some("missing".into()),
+        |w| w.world.player = "missing".into(),
         |w| w.dialogues[0].nodes[0].choices[0].next = Some("missing".into()),
         |w| {
             w.dialogues[0].nodes[0].choices[0].effect = Some(DialogueEffect::AcceptQuest {
                 quest: "missing".into(),
             })
         },
-        |w| w.monsters[0].loot[0].item = "missing".into(),
+        |w| wolf(w).combat.as_mut().unwrap().loot[0].item = "missing".into(),
         |w| {
             w.quests[0].objective = QuestObjective::Defeat {
-                monster: "missing".into(),
+                character: "missing".into(),
+            }
+        },
+        |w| {
+            w.quests[0].objective = QuestObjective::Flag {
+                flag: "missing".into(),
             }
         },
         |w| w.quests[0].completion_flags.push("missing".into()),
@@ -93,18 +111,19 @@ fn refuses_unsupported_versions_duplicate_ids_and_dangling_references() {
 #[test]
 fn refuses_unusable_rules_and_malformed_templates() {
     let changes: Vec<fn(&mut WorldSpec)> = vec![
-        |w| w.world.levels.clear(),
-        |w| w.world.levels[0].xp = 1,
-        |w| w.world.levels[1].xp = 0,
-        |w| w.world.levels[0].hp = 0,
-        |w| w.world.levels[0].attack = 0,
-        |w| w.monsters[0].hp = 0,
-        |w| w.monsters[0].loot[0].quantity = 0,
-        |w| w.locations[0].monsters.push("wolf".into()),
-        |w| w.narrative.attack.clear(),
-        |w| w.narrative.attack[0].0 = "{unknown}".into(),
-        |w| w.narrative.attack[0].0 = "{damage".into(),
-        |w| w.narrative.attack[0].0 = "damage}".into(),
+        |w| w.world.combat.as_mut().unwrap().levels.clear(),
+        |w| w.world.combat.as_mut().unwrap().levels[0].xp = 1,
+        |w| w.world.combat.as_mut().unwrap().levels[1].xp = 0,
+        |w| w.world.combat.as_mut().unwrap().levels[0].hp = 0,
+        |w| w.world.combat.as_mut().unwrap().levels[0].attack = 0,
+        |w| wolf(w).combat.as_mut().unwrap().hp = 0,
+        |w| wolf(w).combat.as_mut().unwrap().attack = 0,
+        |w| wolf(w).combat.as_mut().unwrap().loot[0].quantity = 0,
+        |w| w.locations[0].characters.push("wolf".into()),
+        |w| w.world.combat.as_mut().unwrap().narrative.attack.clear(),
+        |w| w.world.combat.as_mut().unwrap().narrative.attack[0].0 = "{unknown}".into(),
+        |w| w.world.combat.as_mut().unwrap().narrative.attack[0].0 = "{damage".into(),
+        |w| w.world.combat.as_mut().unwrap().narrative.attack[0].0 = "damage}".into(),
         |w| w.items[0].id = "has spaces".into(),
     ];
     for (index, change) in changes.into_iter().enumerate() {
@@ -118,7 +137,7 @@ fn refuses_unusable_rules_and_malformed_templates() {
 fn diagnostics_identify_entities_and_stable_codes_for_repair() {
     let mut world = demo();
     world.world.start = "missing".into();
-    world.monsters[0].hp = 0;
+    wolf(&mut world).combat.as_mut().unwrap().hp = 0;
     let diagnostics = world.diagnostics();
     assert_eq!(diagnostics.len(), 2);
     assert!(diagnostics
@@ -140,4 +159,88 @@ fn revision_is_stable_for_equal_content_and_changes_with_any_edit() {
     let mut edited = demo();
     edited.items[0].description.push('.');
     assert_ne!(world.revision(), edited.revision());
+}
+
+#[test]
+fn a_world_without_combat_loads_and_roundtrips() {
+    let world = archive();
+    assert!(world.combat().is_none());
+    assert!(world.characters.iter().all(|c| c.combat.is_none()));
+    let encoded = serde_json::to_string(&world).unwrap();
+    assert!(!encoded.contains("combat"));
+    assert_eq!(serde_json::from_str::<WorldSpec>(&encoded).unwrap(), world);
+}
+
+#[test]
+fn a_world_without_combat_refuses_fighting_content() {
+    let mut fighter = archive();
+    fighter.characters[2].combat = Some(CombatProfile {
+        hp: 5,
+        attack: 1,
+        xp: 1,
+        loot: vec![],
+    });
+    let mut defeat = archive();
+    defeat.quests[0].objective = QuestObjective::Defeat {
+        character: "copyist".into(),
+    };
+    let mut xp = archive();
+    xp.quests[0].reward_xp = 5;
+    for world in [fighter, defeat, xp] {
+        assert!(codes(&world).contains(&"combat_disabled".to_string()));
+    }
+}
+
+#[test]
+fn the_player_is_an_unplaced_character_without_components() {
+    let changes: Vec<fn(&mut WorldSpec)> = vec![
+        |w| w.characters[0].dialogue = Some("mara".into()),
+        |w| {
+            w.characters[0].combat = Some(CombatProfile {
+                hp: 5,
+                attack: 1,
+                xp: 1,
+                loot: vec![],
+            })
+        },
+        |w| w.locations[0].characters.push("you".into()),
+    ];
+    for (index, change) in changes.into_iter().enumerate() {
+        let mut world = demo();
+        change(&mut world);
+        assert_eq!(codes(&world), ["invalid_player"], "player case {index}");
+    }
+}
+
+#[test]
+fn quest_givers_talk_and_defeat_targets_fight() {
+    let mut giver = demo();
+    giver.quests[0].giver = "wolf".into();
+    assert_eq!(codes(&giver), ["invalid_giver"]);
+    let mut target = demo();
+    target.quests[0].objective = QuestObjective::Defeat {
+        character: "elder".into(),
+    };
+    assert!(codes(&target).contains(&"invalid_target".to_string()));
+}
+
+#[test]
+fn format_1_packages_are_rejected_clearly() {
+    let temp = std::env::temp_dir().join(format!("realmkit-format1-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&temp);
+    std::fs::create_dir(&temp).unwrap();
+    std::fs::write(
+        temp.join("world.json"),
+        r#"{ "format_version": 1, "id": "old", "player_name": "You", "levels": [] }"#,
+    )
+    .unwrap();
+    let error = WorldSpec::load(&temp).unwrap_err();
+    std::fs::remove_dir_all(&temp).unwrap();
+    assert!(matches!(
+        error,
+        SpecError::UnsupportedFormat { found: Some(1) }
+    ));
+    assert!(error
+        .to_string()
+        .contains("Format 1 packages are no longer supported"));
 }

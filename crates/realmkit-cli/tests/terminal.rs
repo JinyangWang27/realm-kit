@@ -195,3 +195,49 @@ fn saving_is_off_without_a_saves_directory() {
     assert!(!run(&["play", WORLD, "--saves"], "").status.success());
     assert!(!run(&["validate", WORLD, "--line"], "").status.success());
 }
+
+const ARCHIVE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/quiet-archive");
+
+#[test]
+fn a_world_without_combat_plays_by_menus_with_no_fighting() {
+    let dir = saves_dir("archive");
+    // Accept, learn where the map is, report back, and enter the vault.
+    let input = "help\nstatus\n1\n1\n1\n2\n1\n1\n2\n1\n1\n3\n";
+    let output = run(&["play", ARCHIVE, "--line", "--saves", &dir], input);
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "talk <character-id>",
+        "\n> You\n",
+        "1. Talk to Old Copyist",
+        "You know where the map is.",
+        "Received: Vault key ×1",
+        "Your visit to the archive is complete.",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    for absent in ["attack", "Attack", "HP", "XP", "Level"] {
+        assert!(!text.contains(absent), "unexpected {absent:?} in {text}");
+    }
+    let resumed = run(&["play", ARCHIVE, "--saves", &dir], "load\n");
+    assert!(String::from_utf8(resumed.stdout)
+        .unwrap()
+        .contains("Loaded save 2."));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn format_1_packages_are_refused_with_a_clear_message() {
+    let dir = saves_dir("format1");
+    std::fs::create_dir(&dir).unwrap();
+    std::fs::write(
+        format!("{dir}/world.json"),
+        r#"{ "format_version": 1, "player_name": "You" }"#,
+    )
+    .unwrap();
+    let output = run(&["validate", &dir], "");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr)
+        .contains("Format 1 packages are no longer supported"));
+    std::fs::remove_dir_all(dir).unwrap();
+}

@@ -1,14 +1,28 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "id": "bell_in_the_pines",
   "name": "The Bell in the Pines",
   "language": "en",
   "start": "village",
-  "player_name": "You",
-  "levels": [
-    { "xp": 0, "hp": 24, "attack": 5 },
-    { "xp": 10, "hp": 30, "attack": 7 },
-    { "xp": 30, "hp": 36, "attack": 9 }
-  ],
-  "flags": ["ruins_open"]
+  "player": "you",
+  "flags": ["ruins_open"],
+  "combat": {
+    "levels": [
+      { "xp": 0, "hp": 24, "attack": 5 },
+      { "xp": 10, "hp": 30, "attack": 7 },
+      { "xp": 30, "hp": 36, "attack": 9 }
+    ],
+    "narrative": {
+      "attack": [
+        "{attacker} strike through the pine-dark air. {target} takes {damage} damage.",
+        "{attacker} press forward; {target} yields a step, taking {damage} damage."
+      ],
+      "hurt": [
+        "{attacker} snaps at {target}: {damage} damage.",
+        "A flash of teeth. {attacker} deals {damage} damage to {target}."
+      ],
+      "victory": "{target} falls still. In the branches above, a bird ventures one uncertain note.",
+      "death": "The trees close over the last of the light. Somewhere beyond them, a bell begins to ring.\nYour journey has ended. Start a new game to try again."
+    }
+  }
 }

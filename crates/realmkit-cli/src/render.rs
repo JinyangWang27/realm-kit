@@ -40,6 +40,8 @@ pub fn direction_name(direction: Direction) -> &'static str {
 pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) -> io::Result<()> {
     let world = engine.world();
     let state = engine.state();
+    let name = |id: &str| &world.character(id).unwrap().name;
+    let player = name(&world.world.player);
     for event in events {
         match event {
             Event::LocationViewed { location } => {
@@ -62,20 +64,20 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     write!(output, " none")?;
                 }
                 writeln!(output)?;
-                for id in &location.npcs {
-                    let npc = world.npc(id).unwrap();
-                    if engine.conditions_met(&npc.requires) {
-                        writeln!(output, "{} — {}", npc.name, npc.description)?;
+                for id in &location.characters {
+                    let character = world.character(id).unwrap();
+                    if !engine.conditions_met(&character.requires) {
+                        continue;
                     }
-                }
-                for id in &location.monsters {
-                    if state.monster_hp[id] > 0 {
-                        let monster = world.monster(id).unwrap();
-                        writeln!(
+                    let hp = state.combat.as_ref().and_then(|c| c.opponent_hp.get(id));
+                    match hp {
+                        Some(0) => {}
+                        Some(hp) => writeln!(
                             output,
-                            "{} (HP {}) — {}",
-                            monster.name, state.monster_hp[id], monster.description
-                        )?;
+                            "{} (HP {hp}) — {}",
+                            character.name, character.description
+                        )?,
+                        None => writeln!(output, "{} — {}", character.name, character.description)?,
                     }
                 }
             }
@@ -89,10 +91,10 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     output,
                     "{}",
                     interpolate(
-                        &world.narrative.attack[*variant],
+                        &world.combat().unwrap().narrative.attack[*variant],
                         &[
-                            ("attacker", &world.world.player_name),
-                            ("target", &world.monster(target).unwrap().name),
+                            ("attacker", player),
+                            ("target", name(target)),
                             ("damage", &amount)
                         ]
                     )?
@@ -108,10 +110,10 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     output,
                     "{}",
                     interpolate(
-                        &world.narrative.hurt[*variant],
+                        &world.combat().unwrap().narrative.hurt[*variant],
                         &[
-                            ("attacker", &world.monster(source).unwrap().name),
-                            ("target", &world.world.player_name),
+                            ("attacker", name(source)),
+                            ("target", player),
                             ("damage", &amount)
                         ]
                     )?
@@ -121,11 +123,11 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 output,
                 "{}",
                 interpolate(
-                    &world.narrative.victory,
-                    &[("target", &world.monster(monster).unwrap().name)]
+                    &world.combat().unwrap().narrative.victory,
+                    &[("target", name(monster))]
                 )?
             )?,
-            Event::PlayerDied => writeln!(output, "{}", world.narrative.death)?,
+            Event::PlayerDied => writeln!(output, "{}", world.combat().unwrap().narrative.death)?,
             Event::ItemReceived { item, quantity } => writeln!(
                 output,
                 "Received: {} ×{}",
@@ -136,8 +138,8 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             Event::LevelUp { level } => writeln!(output, "Level {level}! Health restored.")?,
             // Choices are shown by the menu, which also numbers them.
             Event::Dialogue { npc, node, .. } => {
-                let npc = world.npc(npc).unwrap();
-                let dialogue = world.dialogue(&npc.dialogue).unwrap();
+                let npc = world.character(npc).unwrap();
+                let dialogue = world.dialogue(npc.dialogue.as_ref().unwrap()).unwrap();
                 let node = dialogue.nodes.iter().find(|n| &n.id == node).unwrap();
                 writeln!(output, "{}: {}", npc.name, node.text)?;
             }
@@ -164,16 +166,14 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     )?;
                 }
             }
-            Event::StatusViewed => writeln!(
-                output,
-                "{} — Level {} | HP {}/{} | Attack {} | XP {}",
-                world.world.player_name,
-                state.player.level,
-                state.player.hp,
-                state.player.max_hp,
-                state.player.attack,
-                state.player.xp
-            )?,
+            Event::StatusViewed => match &state.combat {
+                Some(combat) => writeln!(
+                    output,
+                    "{} — Level {} | HP {}/{} | Attack {} | XP {}",
+                    player, combat.level, combat.hp, combat.max_hp, combat.attack, combat.xp
+                )?,
+                None => writeln!(output, "{player}")?,
+            },
             Event::QuestsViewed => {
                 writeln!(output, "Quests:")?;
                 for quest in &world.quests {
