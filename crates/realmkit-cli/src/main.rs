@@ -20,7 +20,7 @@ mod saves;
 
 use saves::{Entry, Kind, Saves};
 
-const USAGE: &str = "RealmKit — static worlds, deterministic adventures\n\n  realmkit play <world-directory> [--line] [--saves <directory>]\n  realmkit validate <world-directory>\n  realmkit inspect <world-directory>";
+const USAGE: &str = "RealmKit — static worlds, deterministic adventures\n\n  realmkit play <world-directory> [--line] [--saves <directory>] [--seed <number>]\n  realmkit validate <world-directory>\n  realmkit inspect <world-directory>";
 
 fn main() {
     if let Err(error) = run() {
@@ -57,13 +57,17 @@ fn run() -> Result<(), Box<dyn Error>> {
     if args.len() < 2 || !matches!(action, "play" | "validate" | "inspect") {
         return Err(USAGE.into());
     }
-    let (mut line_mode, mut saves) = (false, None);
+    let (mut line_mode, mut saves, mut seed) = (false, None, None);
     let mut options = args[2..].iter();
     while let Some(option) = options.next() {
         match option.to_str() {
             Some("--line") if action == "play" => line_mode = true,
             Some("--saves") if action == "play" => {
                 saves = Some(Saves::open(options.next().ok_or(USAGE)?)?)
+            }
+            Some("--seed") if action == "play" => {
+                let value = options.next().and_then(|v| v.to_str()).ok_or(USAGE)?;
+                seed = Some(value.parse::<u64>().map_err(|_| USAGE)?)
             }
             _ => return Err(USAGE.into()),
         }
@@ -74,9 +78,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         "validate" => writeln!(output, "{}: valid (format {})", world.world.name, world.world.format_version)?,
         "inspect" => writeln!(output, "{} [{}]\nLanguage: {}\n{} locations, {} characters, {} items, {} quests, {} dialogues\nStart: {}", world.world.name, world.world.id, world.world.language, world.locations.len(), world.characters.len(), world.items.len(), world.quests.len(), world.dialogues.len(), world.world.start)?,
         "play" if !line_mode && io::stdin().is_terminal() && output.is_terminal() => {
-            play_keys(&world, saves, terminal_keys(), &mut output)?
+            play_keys(&world, saves, seed, terminal_keys(), &mut output)?
         }
-        "play" => play(&world, saves, io::stdin().lock(), &mut output)?,
+        "play" => play(&world, saves, seed, io::stdin().lock(), &mut output)?,
         _ => unreachable!(),
     }
     Ok(())
@@ -238,9 +242,17 @@ fn persist(
 fn start<'w>(
     world: &'w WorldSpec,
     saves: Option<&Saves>,
+    seed: Option<u64>,
     output: &mut impl Write,
 ) -> Result<Engine<'w>, Box<dyn Error>> {
-    let mut engine = Engine::new(world)?;
+    // Without a chosen seed, the clock picks one; it is printed so a run
+    // with random content can be replayed with --seed.
+    let seed = seed.unwrap_or_else(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos() as u64)
+    });
+    let mut engine = Engine::new_with_seed(world, seed)?;
     let note = if saves.is_some() {
         "Progress is saved when you complete a quest; type save to save now."
     } else {
@@ -262,6 +274,9 @@ fn start<'w>(
         // falls back to the save that just failed.
         save(&engine, saves, Kind::Auto, output)?;
     }
+    if world.stochastic() {
+        writeln!(output, "Seed: {seed}\n")?;
+    }
     let events = engine.execute(Command::Look)?;
     render::events(output, &engine, &events)?;
     Ok(engine)
@@ -271,10 +286,11 @@ fn start<'w>(
 fn play(
     world: &WorldSpec,
     saves: Option<&Saves>,
+    seed: Option<u64>,
     mut input: impl BufRead,
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
-    let mut engine = start(world, saves, output)?;
+    let mut engine = start(world, saves, seed, output)?;
     let mut menu = Menu::new(&engine, false);
     menu.write(output, false)?;
     writeln!(output, "{}", menu::LINE_HINT)?;
@@ -365,10 +381,11 @@ fn read_typed(
 fn play_keys(
     world: &WorldSpec,
     saves: Option<&Saves>,
+    seed: Option<u64>,
     mut keys: impl Iterator<Item = io::Result<Key>>,
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
-    let mut engine = start(world, saves, output)?;
+    let mut engine = start(world, saves, seed, output)?;
     let mut leave_dialogue = false;
     'scene: loop {
         let mut menu = Menu::new(&engine, leave_dialogue);
@@ -519,7 +536,7 @@ mod tests {
             Down, Enter, // down
         ]);
         let mut output = Vec::new();
-        play_keys(&world, None, keys.into_iter().map(Ok), &mut output).unwrap();
+        play_keys(&world, None, None, keys.into_iter().map(Ok), &mut output).unwrap();
         let text = String::from_utf8(output).unwrap();
         for passage in [
             "> 1. Talk to Elder Mara",
@@ -544,7 +561,7 @@ mod tests {
         .unwrap();
         let mut output = Vec::new();
         let keys = [Char(':'), Char('x'), Quit, Enter];
-        play_keys(&world, None, keys.into_iter().map(Ok), &mut output).unwrap();
+        play_keys(&world, None, None, keys.into_iter().map(Ok), &mut output).unwrap();
         assert!(!String::from_utf8(output)
             .unwrap()
             .contains("looking at the bell"));
@@ -558,7 +575,7 @@ mod tests {
         ))
         .unwrap();
         let keys = [Ok(Down), Err(io::Error::other("tty lost"))];
-        let error = play_keys(&world, None, keys.into_iter(), &mut Vec::new()).unwrap_err();
+        let error = play_keys(&world, None, None, keys.into_iter(), &mut Vec::new()).unwrap_err();
         assert_eq!(error.to_string(), "tty lost");
     }
 
@@ -573,7 +590,7 @@ mod tests {
         world.characters[2].combat.as_mut().unwrap().xp = 30;
         let mut output = Vec::new();
         let input = "north\nengage wolf\nattack wolf\nattack wolf\nattack wolf\n".as_bytes();
-        play(&world, None, input, &mut output).unwrap();
+        play(&world, None, None, input, &mut output).unwrap();
         let text = String::from_utf8(output).unwrap();
         assert!(text.contains("Level 2! Health restored."), "{text}");
         assert!(text.contains("Level 3! Health and MP restored."), "{text}");
@@ -592,7 +609,7 @@ mod tests {
         let saves = Saves::open(&dir).unwrap();
         let mut output = Vec::new();
         let input = "north\nsave\nengage wolf\nsave\nstatus\n".as_bytes();
-        play(&world, Some(&saves), input, &mut output).unwrap();
+        play(&world, Some(&saves), None, input, &mut output).unwrap();
         let text = String::from_utf8(output).unwrap();
         let died = text.find("Your journey has ended").expect(&text);
         let after = &text[died..];
@@ -607,7 +624,7 @@ mod tests {
         dead.execute(Command::Engage("wolf".into())).unwrap();
         saves.write(Kind::Manual, &dead.snapshot()).unwrap();
         let mut output = Vec::new();
-        play(&world, Some(&saves), "".as_bytes(), &mut output).unwrap();
+        play(&world, Some(&saves), None, "".as_bytes(), &mut output).unwrap();
         let text = String::from_utf8(output).unwrap();
         assert!(text.contains("the player is dead in this save"), "{text}");
         std::fs::remove_dir_all(dir).unwrap();
