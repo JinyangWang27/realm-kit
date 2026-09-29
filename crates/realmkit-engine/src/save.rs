@@ -39,7 +39,7 @@ pub(super) fn check(
         state
             .combat
             .as_ref()
-            .is_some_and(|c| c.opponents.get(id).is_some_and(|v| v.hp == 0))
+            .is_some_and(|c| c.defeated.contains(id))
     };
     ensure(
         state.quests.keys().eq(fresh.quests.keys())
@@ -82,8 +82,7 @@ pub(super) fn check(
         }
         quest_flags.extend(flags.iter().cloned());
     }
-    if let (Some(combat), Some(fresh), Some(rules)) = (&state.combat, &fresh.combat, world.combat())
-    {
+    if let (Some(combat), Some(rules)) = (&state.combat, world.combat()) {
         let stats = combat
             .level
             .checked_sub(1)
@@ -95,17 +94,19 @@ pub(super) fn check(
             "experience does not match level",
         )?;
         ensure(
-            combat.hp <= stats.stats.hp && combat.mp <= stats.stats.mp,
-            "player vitals exceed their maximums",
+            combat.defeated.iter().all(|id| {
+                world.character(id).is_some_and(|c| c.combat.is_some())
+                    && world.locations.iter().any(|l| l.characters.contains(id))
+            }),
+            "invalid defeated characters",
         )?;
-        ensure(
-            combat.opponents.keys().eq(fresh.opponents.keys())
-                && combat.opponents.iter().all(|(id, v)| {
-                    let max = fresh.opponents[id];
-                    v.hp <= max.hp && v.mp <= max.mp
-                }),
-            "invalid opponent state",
-        )?;
+        match &combat.stance {
+            Stance::Exploring(v) => ensure(
+                v.hp <= stats.stats.hp && v.mp <= stats.stats.mp,
+                "player vitals exceed their maximums",
+            )?,
+            Stance::Fighting(encounter) => encounter_state(world, state, combat, rules, encounter)?,
+        }
         ensure(combat.xp == xp, "experience does not match progress")?;
     }
     ensure(
@@ -143,4 +144,54 @@ pub(super) fn check(
         )?;
     }
     Ok(())
+}
+
+/// An encounter is consistent with the rules that produce it: the player
+/// first, opponents present and undefeated, vitals within maxima, remainders
+/// below one point and turns not in the past.
+fn encounter_state(
+    world: &WorldSpec,
+    state: &GameState,
+    combat: &CombatState,
+    rules: &realmkit_spec::Combat,
+    encounter: &Encounter,
+) -> Result<(), String> {
+    let invalid = || "invalid encounter state".to_string();
+    let per_point = 100 * encounter::baseline_turn(&rules.timeline).map_err(|_| invalid())?;
+    let (player, opponents) = encounter.participants.split_first().ok_or_else(invalid)?;
+    let player_ok = player.character == world.world.player
+        && player.side == 0
+        && player.control == Control::Player;
+    let opponents_ok = !opponents.is_empty()
+        && opponents.iter().all(|p| {
+            p.side != 0
+                && p.control == Control::Policy
+                && !combat.defeated.contains(&p.character)
+                && rules::character_here(world, state, &p.character)
+                    .is_some_and(|c| c.combat.is_some())
+        });
+    let ids: BTreeSet<_> = encounter
+        .participants
+        .iter()
+        .map(|p| &p.character)
+        .collect();
+    // Identities first: stats exist only for the player and characters that can fight.
+    if !(player_ok && opponents_ok && ids.len() == encounter.participants.len()) {
+        return Err(invalid());
+    }
+    let vitals_ok = encounter.participants.iter().all(|p| {
+        let max = encounter::stats(world, combat.level, p);
+        p.hp <= max.hp
+            && p.mp <= max.mp
+            && p.mp_remainder < per_point
+            && p.rage_remainder < u64::from(max.hp)
+            && (p.hp == 0 || p.next_time >= encounter.now)
+    });
+    // A finished fight never stays open: the player is alive with an opponent, or dead.
+    let open = player.hp == 0 || opponents.iter().any(|p| p.hp > 0);
+    if vitals_ok && open && state.dialogue.is_none() {
+        Ok(())
+    } else {
+        Err(invalid())
+    }
 }

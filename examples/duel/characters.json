@@ -9,7 +9,7 @@
     "name": "The Hedge Witch",
     "description": "She waits in the ring of nettles, humming.",
     "combat": {
-      "stats": { "hp": 30, "mp": 10, "patk": 2, "pdef": 4, "satk": 8, "sdef": 6, "speed": 100 },
+      "stats": { "hp": 30, "mp": 10, "patk": 2, "pdef": 4, "satk": 8, "sdef": 6, "speed": 120 },
       "xp": 12,
       "skills": ["hex"],
       "basic_channel": "special"

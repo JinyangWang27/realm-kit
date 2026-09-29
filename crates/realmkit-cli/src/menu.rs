@@ -1,5 +1,6 @@
 use crate::{input, render::direction_name};
 use realmkit_engine::{Command, Engine};
+use realmkit_spec::Resource;
 use std::io::{self, Write};
 
 // Fixed interface words live here, apart from authored world text, so a locale
@@ -9,8 +10,9 @@ const ATTACK: &str = "Attack";
 const TRAVEL: &str = "Travel";
 const LOCKED: &str = "[locked]";
 const ON: &str = "on";
+const ENGAGE: &str = "Engage";
 const MP: &str = "MP";
-const LOW_MP: &str = "[not enough MP]";
+const RAGE: &str = "rage";
 const REST: &str = "Rest";
 const INVENTORY: &str = "Inventory";
 const CHARACTER: &str = "Character";
@@ -92,25 +94,32 @@ impl Menu {
                         // Like a locked exit, choosing it explains why it cannot be used.
                         Command::UseSkill { skill, target } => {
                             let skill = world.skill(skill).unwrap();
+                            let resource = match skill.resource {
+                                Resource::Mp => MP,
+                                Resource::Rage => RAGE,
+                            };
                             format!(
                                 "{} {ON} {}{}{}",
                                 skill.name,
                                 world.character(target).unwrap().name,
                                 if skill.cost > 0 {
-                                    format!(" — {} {MP}", skill.cost)
+                                    format!(" — {} {resource}", skill.cost)
                                 } else {
                                     String::new()
                                 },
                                 if action.available {
                                     String::new()
                                 } else {
-                                    format!(" {LOW_MP}")
+                                    format!(" [not enough {resource}]")
                                 }
                             )
                         }
                         // Other unavailable actions (e.g. after death) are not offered.
                         _ if !action.available => return None,
                         Command::Rest => REST.into(),
+                        Command::Engage(id) => {
+                            format!("{ENGAGE} {}", world.character(id).unwrap().name)
+                        }
                         Command::Talk(id) => {
                             format!("{TALK} {}", world.character(id).unwrap().name)
                         }

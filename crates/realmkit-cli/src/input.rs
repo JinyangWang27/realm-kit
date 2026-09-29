@@ -4,7 +4,7 @@ use realmkit_spec::Direction;
 /// Commands a player can type; fighting and resting only where the world has combat.
 pub fn help(combat: bool) -> String {
     let attack = if combat {
-        "attack <character-id>\nuse <skill-id> <character-id>\nrest — at a safe place\n"
+        "engage <character-id>\nattack <character-id>\nuse <skill-id> <character-id>\nrest — at a safe place\n"
     } else {
         ""
     };
@@ -59,6 +59,7 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
         ("go", [value]) => {
             Command::Move(direction(&value.to_ascii_lowercase()).ok_or("unknown direction")?)
         }
+        ("engage", [id]) => Command::Engage((*id).into()),
         ("attack", [id]) => Command::Attack((*id).into()),
         ("use", [skill, target]) => Command::UseSkill {
             skill: (*skill).into(),

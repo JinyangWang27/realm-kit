@@ -1,0 +1,391 @@
+//! Encounters on the paused initiative timeline. Every rule here mirrors
+//! `scripts/combat_sim/encounter.py`; tests hold the two to the same numbers.
+
+use super::*;
+use realmkit_spec::Timeline;
+
+/// Ticks until an actor's next turn after an action taking `time` percent of
+/// a basic action: `max(1, ceil(action_cost × time / (100 × speed)))`, with
+/// speed clamped to `[1, speed_cap]`.
+pub(super) fn delay(timeline: &Timeline, speed: u32, time: u32) -> Result<u64, EngineError> {
+    let speed = u128::from(speed.clamp(1, timeline.speed_cap.max(1)));
+    let ticks = u128::from(timeline.action_cost) * u128::from(time);
+    u64::try_from(ticks.div_ceil(100 * speed).max(1)).map_err(|_| EngineError::NumericLimit)
+}
+
+/// One basic action at baseline speed 100; MP regeneration is measured in it.
+pub(super) fn baseline_turn(timeline: &Timeline) -> Result<u64, EngineError> {
+    delay(timeline, 100, 100)
+}
+
+/// A participant's stats: the player's from the level table, anyone else's
+/// from their combat profile.
+pub(super) fn stats(world: &WorldSpec, level: usize, p: &Participant) -> Stats {
+    match p.control {
+        Control::Player => rules::player_stats(world, level),
+        Control::Policy => profile(world, &p.character).stats,
+    }
+}
+
+fn profile<'w>(world: &'w WorldSpec, id: &str) -> &'w realmkit_spec::CombatProfile {
+    world.character(id).unwrap().combat.as_ref().unwrap()
+}
+
+fn basic_channel(world: &WorldSpec, p: &Participant) -> Channel {
+    match p.control {
+        Control::Player => world.combat().unwrap().player_basic_channel,
+        Control::Policy => profile(world, &p.character).basic_channel,
+    }
+}
+
+fn affordable(p: &Participant, skill: &Skill) -> bool {
+    let pool = match skill.resource {
+        Resource::Mp => p.mp,
+        Resource::Rage => p.rage,
+    };
+    pool >= skill.cost
+}
+
+/// The player's command, or `Err` without any change when it cannot be used.
+pub(super) fn check_skill(p: &Participant, level: usize, skill: &Skill) -> Result<(), EngineError> {
+    if skill.level > level {
+        return Err(EngineError::SkillLocked(skill.id.clone()));
+    }
+    if !affordable(p, skill) {
+        return Err(match skill.resource {
+            Resource::Mp => EngineError::NotEnoughMp(skill.id.clone()),
+            Resource::Rage => EngineError::NotEnoughRage(skill.id.clone()),
+        });
+    }
+    Ok(())
+}
+
+/// The strongest affordable skill, else the basic attack. Equal power prefers
+/// the cheaper skill, then the later tier; the first listed wins a full tie.
+fn choose<'w>(world: &'w WorldSpec, p: &Participant) -> Option<&'w Skill> {
+    profile(world, &p.character)
+        .skills
+        .iter()
+        .filter_map(|id| world.skill(id))
+        .filter(|s| affordable(p, s))
+        .rev()
+        .max_by_key(|s| (s.power, std::cmp::Reverse(s.cost), s.level))
+}
+
+/// Starts an encounter with `id`, then lets opponents act until the player's turn.
+pub(super) fn engage(
+    world: &WorldSpec,
+    state: &mut GameState,
+    id: Id,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let fighter = rules::character_here(world, state, &id).and_then(|c| c.combat.as_ref());
+    let (Some(profile), Some(rules), Some(combat)) =
+        (fighter, world.combat(), state.combat.as_mut())
+    else {
+        return Err(EngineError::NotHere(id));
+    };
+    if combat.defeated.contains(&id) {
+        return Err(EngineError::AlreadyDefeated(id));
+    }
+    let Stance::Exploring(vitals) = combat.stance else {
+        return Err(EngineError::InEncounter);
+    };
+    let player = rules::player_stats(world, combat.level);
+    // Everyone's first action comes after one opening delay, so speed matters at once.
+    let joiner = |character: Id, side, control, hp, mp, speed| -> Result<_, EngineError> {
+        Ok(Participant {
+            character,
+            side,
+            control,
+            hp,
+            mp,
+            rage: 0,
+            mp_remainder: 0,
+            rage_remainder: 0,
+            next_time: delay(&rules.timeline, speed, 100)?,
+        })
+    };
+    let participants = vec![
+        joiner(
+            world.world.player.clone(),
+            0,
+            Control::Player,
+            vitals.hp,
+            vitals.mp,
+            player.speed,
+        )?,
+        joiner(
+            id.clone(),
+            1,
+            Control::Policy,
+            profile.stats.hp,
+            profile.stats.mp,
+            profile.stats.speed,
+        )?,
+    ];
+    combat.stance = Stance::Fighting(Encounter {
+        now: 0,
+        participants,
+    });
+    state.dialogue = None;
+    events.push(Event::EncounterStarted {
+        opponents: vec![id],
+    });
+    advance(world, state, events)
+}
+
+fn fighting(state: &mut GameState) -> Result<(&mut Encounter, usize), EngineError> {
+    let combat = state.combat.as_mut().ok_or(EngineError::NotFighting)?;
+    match &mut combat.stance {
+        Stance::Fighting(encounter) => Ok((encounter, combat.level)),
+        Stance::Exploring(_) => Err(EngineError::NotFighting),
+    }
+}
+
+/// The player's attack or skill on `target`, then opponents act until the
+/// player's next turn or the end.
+pub(super) fn player_action(
+    world: &WorldSpec,
+    state: &mut GameState,
+    target: Id,
+    skill: Option<&Skill>,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let turn = state.turn;
+    let (encounter, level) = fighting(state)?;
+    let index = encounter
+        .participants
+        .iter()
+        .position(|p| p.character == target && p.side != 0 && p.hp > 0)
+        .ok_or(EngineError::NotHere(target))?;
+    if let Some(skill) = skill {
+        check_skill(&encounter.participants[0], level, skill)?;
+    }
+    // Advancing always stops on the player's turn, so the player acts now.
+    tick(world, encounter, level, 0)?;
+    act(world, encounter, level, turn, 0, index, skill, events)?;
+    advance(world, state, events)
+}
+
+/// Regenerates everyone for the time until `actor`'s turn, then moves there.
+fn tick(
+    world: &WorldSpec,
+    encounter: &mut Encounter,
+    level: usize,
+    actor: usize,
+) -> Result<(), EngineError> {
+    let rules = world.combat().unwrap();
+    let at = encounter.participants[actor].next_time;
+    let elapsed = at - encounter.now;
+    let per_point = 100 * u128::from(baseline_turn(&rules.timeline)?);
+    for p in &mut encounter.participants {
+        let max = stats(world, level, p).mp;
+        // Time spent at full MP banks nothing, so the remainder drops at the cap.
+        let progress = u128::from(p.mp_remainder)
+            + u128::from(max) * u128::from(rules.resources.mp_regen_percent) * u128::from(elapsed);
+        let gained = progress / per_point;
+        if u128::from(p.mp) + gained >= u128::from(max) {
+            (p.mp, p.mp_remainder) = (max, 0);
+        } else {
+            p.mp += gained as u32;
+            p.mp_remainder = (progress % per_point) as u64;
+        }
+    }
+    encounter.now = at;
+    Ok(())
+}
+
+/// Resolves one action. Rage from acting is credited after the action, so an
+/// actor one point short cannot spend what its own action earns; rage from
+/// being hit follows the damage dealt, before capping at the target's HP.
+#[allow(clippy::too_many_arguments)]
+fn act(
+    world: &WorldSpec,
+    encounter: &mut Encounter,
+    level: usize,
+    turn: u64,
+    actor: usize,
+    target: usize,
+    skill: Option<&Skill>,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let rules = world.combat().unwrap();
+    let (a, t) = (
+        &encounter.participants[actor],
+        &encounter.participants[target],
+    );
+    let (attacker, defender) = (stats(world, level, a), stats(world, level, t));
+    let (channel, power, share) = match skill {
+        Some(s) => (
+            s.channel,
+            s.power,
+            s.cross_share.unwrap_or(rules.cross_share),
+        ),
+        None => (basic_channel(world, a), BASIC_POWER, rules.cross_share),
+    };
+    let dealt = damage(&attacker, &defender, channel, power, share)?;
+    let time = skill.map_or(100, |s| s.time);
+    let next = delay(&rules.timeline, attacker.speed, time)?;
+    let a = &mut encounter.participants[actor];
+    if let Some(skill) = skill.filter(|s| s.cost > 0) {
+        match skill.resource {
+            Resource::Mp => a.mp -= skill.cost,
+            Resource::Rage => a.rage -= skill.cost,
+        }
+        events.push(Event::ResourceSpent {
+            character: a.character.clone(),
+            resource: skill.resource,
+            amount: skill.cost,
+        });
+    }
+    a.rage = a
+        .rage
+        .checked_add(rules.resources.rage_per_action)
+        .ok_or(EngineError::NumericLimit)?;
+    a.next_time = a
+        .next_time
+        .checked_add(next)
+        .ok_or(EngineError::NumericLimit)?;
+    let source = a.character.clone();
+    let t = &mut encounter.participants[target];
+    let taken = dealt.min(t.hp);
+    t.hp -= taken;
+    let progress = u128::from(t.rage_remainder)
+        + u128::from(rules.resources.rage_per_max_hp) * u128::from(dealt);
+    let max_hp = u128::from(defender.hp);
+    t.rage = u32::try_from(u128::from(t.rage) + progress / max_hp)
+        .map_err(|_| EngineError::NumericLimit)?;
+    t.rage_remainder = (progress % max_hp) as u64;
+    let skill = skill.map(|s| s.id.clone());
+    if actor == 0 {
+        events.push(Event::DamageDealt {
+            target: t.character.clone(),
+            amount: taken,
+            variant: (turn % rules.narrative.attack.len() as u64) as usize,
+            skill,
+        });
+        if t.hp == 0 {
+            events.push(Event::EnemyDefeated {
+                monster: t.character.clone(),
+            });
+        }
+    } else {
+        events.push(Event::DamageReceived {
+            source,
+            amount: taken,
+            variant: (turn % rules.narrative.hurt.len() as u64) as usize,
+            skill,
+        });
+        if t.hp == 0 && t.control == Control::Player {
+            events.push(Event::PlayerDied);
+        }
+    }
+    Ok(())
+}
+
+/// The living participant who acts next: `(next_time, side, position)`.
+fn next_actor(encounter: &Encounter) -> Option<usize> {
+    (0..encounter.participants.len())
+        .filter(|&i| encounter.participants[i].hp > 0)
+        .min_by_key(|&i| {
+            let p = &encounter.participants[i];
+            (p.next_time, p.side, i)
+        })
+}
+
+/// Resolves policy actions until the player's turn, the player's death, or victory.
+fn advance(
+    world: &WorldSpec,
+    state: &mut GameState,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let turn = state.turn;
+    loop {
+        let (encounter, level) = fighting(state)?;
+        let player = &encounter.participants[0];
+        if player.hp == 0 {
+            return Ok(());
+        }
+        if encounter
+            .participants
+            .iter()
+            .all(|p| p.side == 0 || p.hp == 0)
+        {
+            return end(world, state, events);
+        }
+        let actor = next_actor(encounter).unwrap();
+        if encounter.participants[actor].control == Control::Player {
+            return Ok(());
+        }
+        tick(world, encounter, level, actor)?;
+        let side = encounter.participants[actor].side;
+        let target = (0..encounter.participants.len())
+            .find(|&i| encounter.participants[i].side != side && encounter.participants[i].hp > 0)
+            .unwrap();
+        let skill = choose(world, &encounter.participants[actor]);
+        act(world, encounter, level, turn, actor, target, skill, events)?;
+    }
+}
+
+/// Victory: the player's vitals return to exploring, then each defeated
+/// opponent's loot and XP are granted once and defeat objectives advance.
+fn end(
+    world: &WorldSpec,
+    state: &mut GameState,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let combat = state.combat.as_mut().unwrap();
+    let Stance::Fighting(encounter) = &combat.stance else {
+        unreachable!("only a running encounter ends");
+    };
+    let player = &encounter.participants[0];
+    let vitals = Vitals {
+        hp: player.hp,
+        mp: player.mp,
+    };
+    let opponents: Vec<Id> = encounter.participants[1..]
+        .iter()
+        .map(|p| p.character.clone())
+        .collect();
+    combat.stance = Stance::Exploring(vitals);
+    combat.defeated.extend(opponents.iter().cloned());
+    events.push(Event::EncounterEnded);
+    for id in opponents {
+        let profile = profile(world, &id);
+        rules::grant_items(state, &profile.loot, events)?;
+        rules::grant_xp(world, state, profile.xp, events)?;
+        let defeat = QuestObjective::Defeat { character: id };
+        for q in &world.quests {
+            if q.objective == defeat && state.quests[&q.id] == QuestStatus::Active {
+                rules::progress(state, &q.id, events);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The next `n` actors if every action took a basic action's time.
+pub(super) fn turn_order(world: &WorldSpec, state: &GameState, n: usize) -> Vec<Id> {
+    let Some(combat) = &state.combat else {
+        return Vec::new();
+    };
+    let Stance::Fighting(encounter) = &combat.stance else {
+        return Vec::new();
+    };
+    let timeline = world.combat().unwrap().timeline;
+    let mut projected = encounter.clone();
+    let mut order = Vec::new();
+    while order.len() < n {
+        let Some(i) = next_actor(&projected) else {
+            break;
+        };
+        let p = &projected.participants[i];
+        let Ok(step) = delay(&timeline, stats(world, combat.level, p).speed, 100) else {
+            break;
+        };
+        order.push(p.character.clone());
+        projected.participants[i].next_time = p.next_time.saturating_add(step);
+    }
+    order
+}

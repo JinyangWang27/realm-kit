@@ -1,8 +1,8 @@
 //! Synchronous gameplay; no generation or presentation dependencies.
 
 use realmkit_spec::{
-    Channel, Character, Combat, Condition, DialogueChoice, DialogueEffect, Direction, Id,
-    ItemStack, QuestObjective, QuestStatus, Skill, SpecError, Stats, WorldSpec, BASIC_POWER,
+    Channel, Character, Condition, DialogueChoice, DialogueEffect, Direction, Id, ItemStack,
+    QuestObjective, QuestStatus, Resource, Skill, SpecError, Stats, WorldSpec, BASIC_POWER,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -11,7 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum Command {
     Look,
     Move(Direction),
-    /// A basic attack in the player's basic-attack channel.
+    /// Starts an encounter with a fighter at the current location.
+    Engage(Id),
+    /// In an encounter: a basic attack in the player's basic-attack channel.
     Attack(Id),
     UseSkill {
         skill: Id,
@@ -51,10 +53,16 @@ pub enum Event {
         variant: usize,
         skill: Option<Id>,
     },
-    MpSpent {
+    ResourceSpent {
         character: Id,
+        resource: Resource,
         amount: u32,
     },
+    EncounterStarted {
+        opponents: Vec<Id>,
+    },
+    /// Every opponent is defeated; rewards follow.
+    EncounterEnded,
     Rested,
     EnemyDefeated {
         monster: Id,
@@ -104,14 +112,20 @@ pub struct PlayerState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CombatState {
-    /// Current vitals; maximums and every other stat derive from `level`.
-    pub hp: u32,
-    pub mp: u32,
     pub xp: u64,
     pub level: usize,
-    /// Each placed fighter's vitals; HP 0 means defeated for good.
-    // ponytail: persistent opponent vitals until encounters own them (M3c), then a defeated set.
-    pub opponents: BTreeMap<Id, Vitals>,
+    /// Characters defeated for good.
+    pub defeated: BTreeSet<Id>,
+    pub stance: Stance,
+}
+
+/// Where the player's HP and MP live: exactly one owner at a time, so a save
+/// never holds two copies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum Stance {
+    Exploring(Vitals),
+    Fighting(Encounter),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,6 +133,44 @@ pub struct CombatState {
 pub struct Vitals {
     pub hp: u32,
     pub mp: u32,
+}
+
+/// A fight on the paused initiative timeline. It owns every participant's
+/// vitals until it ends.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Encounter {
+    /// Current timeline time, in ticks.
+    pub now: u64,
+    /// The player first, then opponents in engage order; ties break by
+    /// `(next_time, side, position)`.
+    pub participants: Vec<Participant>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Control {
+    /// The timeline pauses for a command.
+    Player,
+    /// The engine resolves an authored policy immediately.
+    Policy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Participant {
+    pub character: Id,
+    /// 0 is the player's side.
+    pub side: u32,
+    pub control: Control,
+    pub hp: u32,
+    pub mp: u32,
+    pub rage: u32,
+    /// Regeneration progress toward the next MP point, so rounding loses nothing.
+    pub mp_remainder: u64,
+    /// Damage-rage progress toward the next rage point.
+    pub rage_remainder: u64,
+    pub next_time: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,7 +191,7 @@ pub struct GameState {
     pub turn: u64,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 3;
+pub const SAVE_FORMAT_VERSION: u32 = 4;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -173,6 +225,12 @@ pub enum EngineError {
     SkillLocked(Id),
     #[error("not enough MP for {0}")]
     NotEnoughMp(Id),
+    #[error("not enough rage for {0}")]
+    NotEnoughRage(Id),
+    #[error("finish the fight first")]
+    InEncounter,
+    #[error("you are not fighting anyone; engage first")]
+    NotFighting,
     #[error("this is not a safe place to rest")]
     NotSafe,
     #[error("there is no active conversation")]
@@ -205,6 +263,7 @@ pub struct Engine<'w> {
     state: GameState,
 }
 
+mod encounter;
 mod rules;
 mod save;
 
@@ -214,22 +273,13 @@ impl<'w> Engine<'w> {
         let combat = world.combat().map(|combat| {
             let stats = combat.levels[0].stats;
             CombatState {
-                hp: stats.hp,
-                mp: stats.mp,
                 xp: 0,
                 level: 1,
-                opponents: world
-                    .characters
-                    .iter()
-                    .filter_map(|c| {
-                        let stats = c.combat.as_ref()?.stats;
-                        let vitals = Vitals {
-                            hp: stats.hp,
-                            mp: stats.mp,
-                        };
-                        Some((c.id.clone(), vitals))
-                    })
-                    .collect(),
+                defeated: BTreeSet::new(),
+                stance: Stance::Exploring(Vitals {
+                    hp: stats.hp,
+                    mp: stats.mp,
+                }),
             }
         });
         Ok(Self {
@@ -262,6 +312,23 @@ impl<'w> Engine<'w> {
     pub fn player_stats(&self) -> Option<Stats> {
         let combat = self.state.combat.as_ref()?;
         Some(rules::player_stats(self.world, combat.level))
+    }
+    /// The player's current HP and MP, wherever they live; `None` without combat.
+    pub fn player_vitals(&self) -> Option<Vitals> {
+        rules::player_vitals(&self.state)
+    }
+    /// The active encounter, if any.
+    pub fn encounter(&self) -> Option<&Encounter> {
+        match &self.state.combat.as_ref()?.stance {
+            Stance::Fighting(encounter) => Some(encounter),
+            Stance::Exploring(_) => None,
+        }
+    }
+    /// The next `n` actors, projected as if every action took a basic
+    /// action's time. A projection, not a promise: skills with other times
+    /// change it.
+    pub fn turn_order(&self, n: usize) -> Vec<Id> {
+        encounter::turn_order(self.world, &self.state, n)
     }
     /// Only a world with combat can kill the player.
     pub fn is_dead(&self) -> bool {

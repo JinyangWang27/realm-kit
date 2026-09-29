@@ -85,8 +85,19 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     if !engine.conditions_met(&character.requires) {
                         continue;
                     }
-                    let hp = state.combat.as_ref().and_then(|c| c.opponents.get(id));
-                    match hp.map(|v| v.hp) {
+                    let defeated = state
+                        .combat
+                        .as_ref()
+                        .is_some_and(|c| c.defeated.contains(id));
+                    // A fighter shows its HP: current in a fight, full otherwise.
+                    let fighting = engine
+                        .encounter()
+                        .and_then(|e| e.participants.iter().find(|p| &p.character == id));
+                    let hp = fighting
+                        .map(|p| p.hp)
+                        .or(character.combat.as_ref().map(|c| c.stats.hp));
+                    match hp {
+                        _ if defeated => {}
                         Some(0) => {}
                         Some(hp) => writeln!(
                             output,
@@ -122,7 +133,12 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 hit(output, text, name(source), player, *amount)?;
             }
             // Costs are shown in the menu and remaining MP in the status line.
-            Event::MpSpent { .. } => {}
+            Event::ResourceSpent { .. } => {}
+            Event::EncounterStarted { opponents } => {
+                let names: Vec<_> = opponents.iter().map(|id| name(id).as_str()).collect();
+                writeln!(output, "You face {}.", names.join(", "))?
+            }
+            Event::EncounterEnded => writeln!(output, "The fight is over.")?,
             Event::Rested => {
                 let mp = engine.player_stats().is_some_and(|s| s.mp > 0);
                 let restored = if mp { "Health and MP" } else { "Health" };
@@ -180,26 +196,28 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     )?;
                 }
             }
-            Event::StatusViewed => match (&state.combat, engine.player_stats()) {
-                (Some(combat), Some(stats)) => {
-                    let special = &world.combat().unwrap().special_name;
-                    write!(
-                        output,
-                        "{player} — Level {} | HP {}/{}",
-                        combat.level, combat.hp, stats.hp
-                    )?;
-                    // A world or build without MP shows none.
-                    if stats.mp > 0 {
-                        write!(output, " | MP {}/{}", combat.mp, stats.mp)?;
-                    }
-                    writeln!(
+            Event::StatusViewed => {
+                match (&state.combat, engine.player_stats(), engine.player_vitals()) {
+                    (Some(combat), Some(stats), Some(vitals)) => {
+                        let special = &world.combat().unwrap().special_name;
+                        write!(
+                            output,
+                            "{player} — Level {} | HP {}/{}",
+                            combat.level, vitals.hp, stats.hp
+                        )?;
+                        // A world or build without MP shows none.
+                        if stats.mp > 0 {
+                            write!(output, " | MP {}/{}", vitals.mp, stats.mp)?;
+                        }
+                        writeln!(
                         output,
                         " | Attack {} | Defence {} | {special} attack {} | {special} defence {} | Speed {} | XP {}",
                         stats.patk, stats.pdef, stats.satk, stats.sdef, stats.speed, combat.xp
                     )?
+                    }
+                    _ => writeln!(output, "{player}")?,
                 }
-                _ => writeln!(output, "{player}")?,
-            },
+            }
             Event::QuestsViewed => {
                 writeln!(output, "Quests:")?;
                 for quest in &world.quests {

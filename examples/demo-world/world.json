@@ -9,11 +9,24 @@
   "combat": {
     "special_name": "Spirit",
     "timeline": { "action_cost": 100000, "speed_cap": 200 },
+    "resources": { "rage_per_action": 1, "rage_per_max_hp": 20 },
     "levels": [
       { "xp": 0, "stats": { "hp": 40, "patk": 10, "pdef": 6, "satk": 2, "sdef": 4, "speed": 100 } },
       { "xp": 10, "stats": { "hp": 48, "patk": 12, "pdef": 7, "satk": 2, "sdef": 5, "speed": 100 } },
       { "xp": 30, "stats": { "hp": 56, "patk": 14, "pdef": 8, "satk": 3, "sdef": 6, "speed": 100 } }
     ],
+    "skills": [
+      {
+        "id": "heavy_swing",
+        "name": "Heavy swing",
+        "power": 150,
+        "channel": "physical",
+        "cost": 5,
+        "resource": "rage",
+        "text": "{attacker} put your weight behind a heavy swing. {target} takes {damage} damage."
+      }
+    ],
+    "player_skills": ["heavy_swing"],
     "narrative": {
       "attack": [
         "{attacker} strike through the pine-dark air. {target} takes {damage} damage.",
