@@ -121,7 +121,7 @@ fn apply(
     log.events(output, engine, &events)?;
     if let (Some(saves), true) = (saves, events.contains(&realmkit_engine::Event::PlayerDied)) {
         writeln!(output, "\nRestoring your most recent save…")?;
-        return restore(engine, saves, None, output);
+        return restore(engine, saves, log, None, output);
     }
     Ok(false)
 }
@@ -154,6 +154,7 @@ fn list(entries: &[Entry], output: &mut impl Write) -> io::Result<()> {
 fn restore(
     engine: &mut Engine<'_>,
     saves: &Saves,
+    log: &mut render::Log,
     index: Option<usize>,
     output: &mut impl Write,
 ) -> io::Result<bool> {
@@ -169,6 +170,8 @@ fn restore(
     match loaded {
         Ok((index, restored)) => {
             *engine = restored;
+            // Progress since the save is gone, and so is anything tallied for it.
+            log.reset();
             writeln!(output, "Loaded save {}.\n", index + 1)?;
             let events = engine
                 .execute(Command::Look)
@@ -203,6 +206,7 @@ fn restore(
 fn persist(
     engine: &mut Engine<'_>,
     saves: Option<&Saves>,
+    log: &mut render::Log,
     request: input::Input,
     output: &mut impl Write,
 ) -> io::Result<()> {
@@ -230,7 +234,7 @@ fn persist(
         }
         input::Input::Load(Some(number)) => {
             match number.checked_sub(1).filter(|i| *i < entries.len()) {
-                Some(index) => restore(engine, saves, Some(index), output).map(drop),
+                Some(index) => restore(engine, saves, log, Some(index), output).map(drop),
                 None => writeln!(output, "Choose one of the listed saves."),
             }
         }
@@ -244,6 +248,7 @@ fn start<'w>(
     world: &'w WorldSpec,
     saves: Option<&Saves>,
     seed: Option<u64>,
+    log: &mut render::Log,
     output: &mut impl Write,
 ) -> Result<Engine<'w>, Box<dyn Error>> {
     // Without a chosen seed, the clock picks one; it is printed so a run
@@ -262,7 +267,7 @@ fn start<'w>(
     writeln!(output, "{}\n{note}\n", world.world.name)?;
     if let Some(saves) = saves {
         let resumable = !saves.entries().is_ok_and(|e| e.is_empty());
-        if resumable && restore(&mut engine, saves, None, output)? {
+        if resumable && restore(&mut engine, saves, log, None, output)? {
             return Ok(engine);
         }
         if resumable {
@@ -291,8 +296,8 @@ fn play(
     mut input: impl BufRead,
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
-    let mut engine = start(world, saves, seed, output)?;
     let mut log = render::Log::default();
+    let mut engine = start(world, saves, seed, &mut log, output)?;
     let mut menu = Menu::new(&engine, false, None);
     menu.write(output, false)?;
     writeln!(output, "{}", menu::LINE_HINT)?;
@@ -313,7 +318,7 @@ fn play(
                 continue;
             }
             Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
-                persist(&mut engine, saves, request, output)?;
+                persist(&mut engine, saves, &mut log, request, output)?;
                 menu = Menu::new(&engine, false, None);
                 menu.write(output, false)?;
                 continue;
@@ -392,8 +397,8 @@ fn play_keys(
     mut keys: impl Iterator<Item = io::Result<Key>>,
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
-    let mut engine = start(world, saves, seed, output)?;
     let mut log = render::Log::default();
+    let mut engine = start(world, saves, seed, &mut log, output)?;
     let (mut leave_dialogue, mut open) = (false, None);
     'scene: loop {
         let mut menu = Menu::new(&engine, leave_dialogue, open.take());
@@ -455,7 +460,7 @@ fn play_keys(
                         }
                         Ok(input::Input::Blank) => continue 'scene,
                         Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
-                            persist(&mut engine, saves, request, output)?;
+                            persist(&mut engine, saves, &mut log, request, output)?;
                             leave_dialogue = false;
                             continue 'scene;
                         }
@@ -719,5 +724,21 @@ mod tests {
             "{text}"
         );
         assert!(!text.contains("\nCloud Palm +10"), "{text}");
+    }
+
+    #[test]
+    fn loading_a_save_mid_fight_forgets_the_rolled_back_technique_xp() {
+        let world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect")).unwrap();
+        let dir = std::env::temp_dir().join(format!("realmkit-tally-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let saves = Saves::open(&dir).unwrap();
+        let mut output = Vec::new();
+        let input = "talk qing\nchoose 1\nnorth\nengage dummy\nsave\nuse palm_drifting dummy\nload 2\nflee\n";
+        play(&world, Some(&saves), None, input.as_bytes(), &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        let fled = text.find("You get away.").expect(&text);
+        assert!(!text[fled..].contains("Technique XP"), "{text}");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

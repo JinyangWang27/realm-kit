@@ -91,6 +91,11 @@ pub struct Log {
 }
 
 impl Log {
+    /// Forgets the tally, for when a save replaces the playthrough.
+    pub fn reset(&mut self) {
+        self.technique_xp.clear();
+    }
+
     /// Renders one command's events, holding back technique XP until the
     /// fight ends. A fight the player dies in never ends; the next one
     /// starts a fresh tally.
