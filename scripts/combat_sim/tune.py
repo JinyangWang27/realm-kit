@@ -221,7 +221,7 @@ def knobs(content: Content) -> dict[str, Knob]:
             add(found, f"{name} basic attack cross_share", _share_knob(slot, None))
     if any(s.cross_share is None for p in profiles for s in (*p.skills, p.basic)):
         add(found, "cross_share", _rules_knob("cross_share"))
-    for field in ("mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
+    for field in ("speed_cap", "mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
         add(found, field, _rules_knob(field))
     if any(p.growth is None for p in profiles):
         add(found, "growth", _growth_knob)

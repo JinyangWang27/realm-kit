@@ -21,6 +21,7 @@ def require(condition: object, message: str) -> None:
         raise TargetMissed(message)
 
 
+XP_BOUND = 2**64 - 1  # XP is stored as u64 in the engine
 SAME_LEVEL_ACTIONS = (3, 6)  # player actions to beat a same-level ordinary monster
 BOSS_LEVEL_GAP = 1  # most levels one build may need beyond another to beat the same boss
 
@@ -197,6 +198,15 @@ def check_bounds(sim: Simulator) -> None:
     for name in ("mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
         require(getattr(sim.rules, name) >= 0, f"{name} {getattr(sim.rules, name)} must not be negative")
     require(0 <= sim.rules.cross_share <= 100, f"world cross share {sim.rules.cross_share} is outside 0-100")
+    # The exact grown values at the top level, checked before any stats are generated: rounding
+    # could pull them back in bounds, and a huge growth would make unprintably large integers.
+    top = sim.content.max_level
+    for profile in (*sim.content.builds,
+                    *(sim.content.scaled(foe, kind) for foe in sim.content.monsters for kind in Kind)):
+        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef"):
+            value = sim.rules.grown(getattr(profile, stat), top, profile.growth)
+            require(value <= STAT_BOUND,
+                    f"{profile.name} {stat} grows to {decimal(value)} at level {top}, above {STAT_BOUND}")
     for level in (1, sim.content.max_level):  # growth >= 1 keeps stats monotonic: both ends suffice
         characters = [sim.player(build, level) for build in sim.content.builds]
         characters += [sim.content.scaled(foe, kind).at_level(sim.rules, level)
@@ -206,15 +216,8 @@ def check_bounds(sim: Simulator) -> None:
                 low = 1 if stat in ("hp", "speed") else 0
                 require(low <= getattr(c, stat) <= STAT_BOUND,
                         f"{c.name} {stat} {getattr(c, stat)} is outside {low}-{STAT_BOUND} at level {level}")
-            require(c.xp >= 0, f"{c.name} grants negative XP ({c.xp}) at level {level}")
-    # The exact grown values at the top level, before rounding could pull them back in bounds.
-    top = sim.content.max_level
-    for profile in (*sim.content.builds,
-                    *(sim.content.scaled(foe, kind) for foe in sim.content.monsters for kind in Kind)):
-        for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef"):
-            value = sim.rules.grown(getattr(profile, stat), top, profile.growth)
-            require(value <= STAT_BOUND,
-                    f"{profile.name} {stat} grows to {decimal(value)} at level {top}, above {STAT_BOUND}")
+            require(0 <= c.xp <= XP_BOUND,
+                    f"{c.name} grants XP {c.xp} at level {level}, outside 0-{XP_BOUND} (the engine's u64)")
     # Each skill at its unlock level: attack only rises with level (growth >= 1), so that is
     # where rounding could leave a newly unlocked skill with no attack.
     check_unlocks(sim, [*sim.content.builds,

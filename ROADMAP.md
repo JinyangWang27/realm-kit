@@ -544,8 +544,8 @@ level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
 `tune` nudges player and opponent stats, skill and basic-attack power, cost and
-action time, tier multipliers, the growth rate and the resource rules, and 105 of
-166 nudges keep every target. Zero stats and costs are nudged upward only, since
+action time, tier multipliers, the growth rate, the speed cap and the resource
+rules, and 107 of 168 nudges keep every target. Zero stats and costs are nudged upward only, since
 0 → 1 can matter: a beast with 1 special attack already breaks boss parity. It
 reports the first target each nudge breaks. Half of the 61 breaks (30) are boss
 parity against beasts, each a two-level gap where one is
