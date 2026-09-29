@@ -291,7 +291,7 @@ fn play(
             Ok(input::Input::Quit) => break,
             Ok(input::Input::Blank) => continue,
             Ok(input::Input::Help) => {
-                writeln!(output, "{}", input::HELP)?;
+                writeln!(output, "{}", input::help(world.combat().is_some()))?;
                 continue;
             }
             Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
@@ -392,7 +392,7 @@ fn play_keys(
                     continue 'scene;
                 }
                 Outcome::Help => {
-                    writeln!(output, "{}", input::HELP)?;
+                    writeln!(output, "{}", input::help(world.combat().is_some()))?;
                     continue 'scene;
                 }
                 Outcome::Run(command) => {
@@ -418,7 +418,7 @@ fn play_keys(
                             }
                         },
                         Ok(input::Input::Help) => {
-                            writeln!(output, "{}", input::HELP)?;
+                            writeln!(output, "{}", input::help(world.combat().is_some()))?;
                             continue 'scene;
                         }
                         Ok(input::Input::Blank) => continue 'scene,

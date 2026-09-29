@@ -91,6 +91,36 @@ fn exports_a_self_contained_package_and_refuses_to_overwrite() {
     let original = fs::read(destination.join("world.json")).unwrap();
     assert!(draft.export(&destination).is_err());
     assert_eq!(fs::read(destination.join("world.json")).unwrap(), original);
+    let mut files: Vec<_> = fs::read_dir(&destination)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    files.sort();
+    assert_eq!(
+        files,
+        [
+            "characters.json",
+            "dialogues.json",
+            "items.json",
+            "locations.json",
+            "quests.json",
+            "world.json"
+        ]
+    );
+    // A world without combat exports without a combat block and loads back.
+    let archive = WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/quiet-archive"
+    ))
+    .unwrap();
+    let destination = temp.0.join("archive");
+    WorldDraft::new(archive.clone())
+        .export(&destination)
+        .unwrap();
+    assert!(!fs::read_to_string(destination.join("world.json"))
+        .unwrap()
+        .contains("combat"));
+    assert_eq!(WorldSpec::load(&destination).unwrap(), archive);
 }
 
 struct TestDir(PathBuf);
