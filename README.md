@@ -110,11 +110,14 @@ There are no clocks, random generators, network clients, or AI SDKs in gameplay.
 
 Combat is optional: a world without a `combat` block has no fighting, HP, XP or
 levels, and its quests complete through flags set in dialogue
-(`examples/quiet-archive`). Where a world has combat, it deals fixed damage
-followed by a surviving enemy's counterattack. Damage is capped at remaining HP.
-Each fighting character is a unique, non-respawning instance; defeat rewards
-happen once. Levels use authored cumulative XP
-thresholds and fully restore HP. Quests remember earlier defeats, so accepting
+(`examples/quiet-archive`). Where a world has combat, characters have seven
+stats and hits deal physical or special damage (the world names special, for
+example magic or 内力) through one formula in which defence reduces damage
+gradually. Skills spend MP, a surviving enemy answers at once with its own skill
+or basic attack, and the player can rest at safe places (`examples/duel`).
+Damage is capped at remaining HP. Each fighting character is a unique,
+non-respawning instance; defeat rewards happen once. Levels use authored
+cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting
 after a kill does not strand the quest. Death stops actions; inspection remains
 available. With saves on, the CLI restores the newest save.
 

@@ -257,7 +257,7 @@ balance decisions.
    between separate attacks, inside the optional combat state as
    `CombatState.opponent_hp` (0 means defeated), because nothing else owns it
    until M3c encounters do; M3c replaces it with the defeated set.
-2. **M3b — stats, damage and skills.** The seven-stat block, gradual defence
+2. **M3b — stats, damage and skills · delivered.** The seven-stat block, gradual defence
    reduction by the damage formula confirmed in decision 3, the skills and MP
    costs listed under
    [Tuned values](#tuned-values), and a `Rest` command at authored safe locations
@@ -270,6 +270,10 @@ balance decisions.
    special channel, which clients show in place of "special". Speed is authored
    from M3b so M3c needs no format change, but it has no effect until the M3c
    timeline; the docs say so. MP costs are flat, exactly as authored.
+   As delivered, level-up keeps restoring HP and MP fully; opponents keep HP
+   and MP between attacks until M3c encounters own them; a combat profile has
+   no level yet, so every skill it lists is usable; rage is not implemented, so
+   the rage skills in [Tuned values](#tuned-values) wait for M3c.
 3. **M3c — encounters on the timeline.** `Engage`, participants and sides,
    timeline scheduling, the projected turn order, and mid-encounter save/load, as
    described in [Combatants and encounters](#combatants-and-encounters--proposed).
@@ -1127,5 +1131,6 @@ maintained in the [open-decisions register](docs/open-decisions.md).
    realm tiers, and extend the balance simulation to ranks before choosing their
    numbers.
 
-M3a is delivered. Settle 3 and 5 before M3b, and 1, 2 and 4 before M3c: the
-speed cap and action cost only matter once the timeline exists.
+M3a and M3b are delivered; M3b implemented decisions 3 and 5 as proposed.
+Settle 1, 2 and 4 before M3c: the speed cap and action cost only matter once
+the timeline exists.

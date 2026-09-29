@@ -138,7 +138,11 @@ Talking and fighting are optional components:
     "id": "wolf",
     "name": "The Ash Wolf",
     "description": "…",
-    "combat": { "hp": 12, "attack": 4, "xp": 10, "loot": [{ "item": "ash_pelt", "quantity": 1 }] }
+    "combat": {
+      "stats": { "hp": 20, "patk": 8, "pdef": 4, "satk": 0, "sdef": 4, "speed": 110 },
+      "xp": 10,
+      "loot": [{ "item": "ash_pelt", "quantity": 1 }]
+    }
   }
 ]
 ```
@@ -147,8 +151,10 @@ Talking and fighting are optional components:
 and is placed nowhere; in a combat world its numbers come from the level table.
 A location's `characters` list places the others. A placed character is present
 while its `requires` conditions hold; the player can talk to it if it has a
-`dialogue` and attack it if it has a `combat` profile (positive `hp` and
-`attack`, `xp`, optional `loot`). A defeated character is gone: it is no longer
+`dialogue` and attack it if it has a `combat` profile: its `stats` (see
+[Stats](#stats-damage-and-skills)), the `xp` granted on defeat, optional `loot`,
+optional `skills` (skill IDs; profiles have no level yet, so every listed skill
+is usable) and `basic_channel` (`physical` by default). A defeated character is gone: it is no longer
 listed and cannot be talked to. A character with a combat profile is one instance: it
 may be placed at most once, and its defeat is permanent (no respawns). Other
 characters may appear at several locations. Combat profiles require the world's
@@ -175,7 +181,8 @@ Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 
 Choices are filtered and then numbered contiguously from one. Omitting `next`
 ends the conversation. A node with no visible choices displays its text and
-ends the conversation. Moving or attacking also closes the conversation.
+ends the conversation. Moving, attacking, using a skill or resting also closes
+the conversation.
 
 A quest's `giver` must be a character with a dialogue. Its objective is one of:
 
@@ -196,26 +203,83 @@ prose. Dialogue visibility conditions are not additional quest prerequisites.
 
 ## Combat block, numeric rules and templates
 
-The optional `combat` object in `world.json` holds `levels` and `narrative`:
+The optional `combat` object in `world.json` holds the level table, skills and
+combat prose:
 
 ```json
 "combat": {
-  "levels": [{ "xp": 0, "hp": 24, "attack": 5 }, { "xp": 10, "hp": 30, "attack": 7 }],
+  "special_name": "Witchcraft",
+  "cross_share": 25,
+  "levels": [
+    { "xp": 0, "stats": { "hp": 34, "mp": 24, "patk": 3, "pdef": 4, "satk": 10, "sdef": 6, "speed": 100 } },
+    { "xp": 12, "stats": { "hp": 40, "mp": 30, "patk": 3, "pdef": 5, "satk": 12, "sdef": 7, "speed": 100 } }
+  ],
+  "skills": [
+    {
+      "id": "bolt",
+      "name": "Bolt",
+      "power": 170,
+      "channel": "special",
+      "cost": 12,
+      "text": "{attacker} loose a bolt of witchlight. {target} takes {damage} damage."
+    }
+  ],
+  "player_skills": ["bolt"],
+  "player_basic_channel": "physical",
   "narrative": {
-    "attack": ["{attacker} strike. {target} takes {damage} damage."],
-    "hurt": ["{attacker} snaps at {target}: {damage} damage."],
-    "victory": "{target} falls still.",
-    "death": "Your journey has ended."
+    "attack": ["{attacker} swing the staff. {target} takes {damage} damage."],
+    "hurt": ["{attacker} rakes {target} with a cold touch: {damage} damage."],
+    "victory": "{target} concedes.",
+    "death": "The duel is lost."
   }
 }
 ```
 
-Level entries supply cumulative `xp`, maximum `hp` and `attack`. The first
-entry requires zero XP; thresholds strictly increase. HP/attack are positive
-and do not decrease between levels. HP/damage use `u32`; XP and item counts use
-`u64`. Overflow refuses the whole command with no partial rewards or state.
+### Stats, damage and skills
 
-`attack` and `hurt` each require at least one template. They allow
+Every level entry and combat profile has seven `stats`: `hp`, `mp` (optional,
+default 0), physical attack and defence `patk`/`pdef`, special attack and
+defence `satk`/`sdef`, and `speed`. Each is at most 9,999, and HP and speed are
+at least 1. Speed is authored and validated now but has no effect until
+encounters run on a timeline (M3c).
+
+Level entries supply cumulative `xp` and the player's stats at that level. The
+first entry requires zero XP; thresholds strictly increase; no stat decreases
+between levels. Saves hold only current HP and MP, XP and level; every other
+stat is read from the level table. Levelling up restores HP and MP fully.
+HP/damage use `u32`; XP and item counts use `u64`. Overflow refuses the whole
+command with no partial rewards or state.
+
+There are two damage channels, physical and special. `special_name` (required,
+non-empty) is the world's name for special — magic, 内力, mana — and clients
+show it wherever "special" would appear. A hit uses the combined attack `A` and
+combined defence `D` of its channel: 100 × the channel's stat plus
+`cross_share` (0–100, default 25) × the other channel's stat. Then
+
+```text
+damage = max(1, floor(A × power × A / (100 × 100 × (A + D))))
+```
+
+capped at the target's remaining HP. Defence equal to the combined attack
+halves damage; no scale constant or character level enters.
+
+A skill has an `id`, `name`, `power` (1–1,000; a basic attack is 100), a
+`channel`, an MP `cost` (default 0, spent exactly as authored), the `level` at
+which the player can use it (default 1), an optional `cross_share` overriding
+the world's, and its own `text` template (`{attacker}`, `{target}`,
+`{damage}`). `player_skills` lists the player's skills; `player_basic_channel`
+and a profile's `basic_channel` set the channel of each character's basic
+attack. Every usable skill and basic attack needs attack in its channel, and
+every skill must be affordable with the MP its user has when it unlocks.
+
+Attacking or using a skill resolves the player's hit, then a surviving opponent
+answers at once with its strongest affordable skill (equal power prefers the
+cheaper one), else its basic attack. Opponents keep their HP and MP between
+attacks. A location with `"safe": true` lets the player `rest`, restoring HP
+and MP; it needs the combat block.
+
+`attack` and `hurt` each require at least one template; they narrate basic
+attacks, while skills use their own `text`. They allow
 `{attacker}`, `{target}`, `{damage}`. The `victory` template allows `{target}`;
 `death` is plain text. Example:
 
@@ -250,7 +314,8 @@ and JSON syntax/type errors retain the file path and underlying error.
 
 Checks include version, IDs, references, dialogue links/effects, declared flags,
 the player character, quest givers and targets, combat content in worlds
-without combat (`combat_disabled`), level rules, HP, loot quantities, fighter
+without combat (`combat_disabled`), level rules, stat, power and share bounds,
+skill references, usable and affordable skills, loot quantities, fighter
 placement and template placeholders. `load()` reports a package whose
 `format_version` is not 2 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,

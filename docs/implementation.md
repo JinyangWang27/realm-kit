@@ -29,6 +29,11 @@ proves the complete single-player loop with authored content.
   block. Combat state is `GameState.combat`, absent without combat. Quests can
   complete on a flag. Format 1 packages and saves are rejected, not migrated.
   The combat-free `examples/quiet-archive` fixture proves the path.
+- [x] Stats, damage and skills (M3b): seven stats per level and combat profile,
+  a world-named special channel, two-channel damage with no scale constant,
+  skills with flat MP costs and unlock levels, opponents answering with their
+  strongest affordable skill, and resting at safe locations. Saves hold only
+  current vitals, XP and level. `examples/duel` exercises a mage build.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
@@ -46,8 +51,9 @@ explicit strings, exits are directed, and every reference is validated on load.
 Unknown fields and unsupported versions fail early. The format implements only
 the MVP domains, with extensions requiring an explicit format/version decision.
 
-Combat is optional. Where a world has it, combat uses fixed integer damage, one
-instance per fighting character, and no respawns. Defeats grant fixed loot/XP exactly once; active kill quests
+Combat is optional. Where a world has it, damage comes from the two-channel
+formula in `realmkit-engine::damage`, with checked integer arithmetic and one
+final rounding; there is one instance per fighting character and no respawns. Defeats grant fixed loot/XP exactly once; active kill quests
 advance on defeat. Quest completion is an explicit dialogue choice at the giver
 and sets an authored flag that unlocks a ruins exit. Dialogue choices can require
 flags or quest states. A lethal enemy response ends play; with saves on, the
@@ -57,7 +63,8 @@ A package revision is a 64-bit FNV-1a digest of the package's canonical JSON, so
 any content edit makes older saves incompatible; there are no migrations yet.
 Loading checks the format version, package, revision and route, then the state
 invariants the rules maintain (known IDs, combat state present exactly when the
-world has combat, stats matching the level, opponent HP within authored limits,
+world has combat, XP matching the level, player and opponent HP and MP within
+their maximums,
 quest states matching defeats and flags, a valid conversation). The CLI writes each save to a new
 file, then updates `lineage.json`; both writes go to a temporary file first and
 are then renamed into place.
