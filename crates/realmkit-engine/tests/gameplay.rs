@@ -1014,6 +1014,7 @@ fn replay(fight: SimFight) {
     combat.levels = vec![Level {
         xp: 0,
         stats: fight.player,
+        points: 0,
     }];
     combat.resources = Resources {
         mp_regen_percent: 3,

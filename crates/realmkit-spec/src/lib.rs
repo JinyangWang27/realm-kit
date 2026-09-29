@@ -7,7 +7,7 @@ mod validation;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 6;
+pub const FORMAT_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -61,6 +61,8 @@ pub struct Combat {
     pub player_basic_crit: Option<Crit>,
     #[serde(default)]
     pub groups: Vec<Group>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stat_points: Option<StatPoints>,
     pub narrative: Narrative,
 }
 
@@ -123,11 +125,59 @@ pub struct Stats {
     pub pdef: u32,
     pub satk: u32,
     pub sdef: u32,
-    /// Authored now; it has no effect until encounters run on a timeline.
+    /// How often the character acts in an encounter.
     pub speed: u32,
 }
 
+/// One of the seven combat stats, for content that names a stat.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum Stat {
+    Hp,
+    Mp,
+    Patk,
+    Pdef,
+    Satk,
+    Sdef,
+    Speed,
+}
+
+impl Stat {
+    pub const ALL: [Stat; 7] = [
+        Stat::Hp,
+        Stat::Mp,
+        Stat::Patk,
+        Stat::Pdef,
+        Stat::Satk,
+        Stat::Sdef,
+        Stat::Speed,
+    ];
+}
+
 impl Stats {
+    pub fn get(&self, stat: Stat) -> u32 {
+        match stat {
+            Stat::Hp => self.hp,
+            Stat::Mp => self.mp,
+            Stat::Patk => self.patk,
+            Stat::Pdef => self.pdef,
+            Stat::Satk => self.satk,
+            Stat::Sdef => self.sdef,
+            Stat::Speed => self.speed,
+        }
+    }
+    pub fn get_mut(&mut self, stat: Stat) -> &mut u32 {
+        match stat {
+            Stat::Hp => &mut self.hp,
+            Stat::Mp => &mut self.mp,
+            Stat::Patk => &mut self.patk,
+            Stat::Pdef => &mut self.pdef,
+            Stat::Satk => &mut self.satk,
+            Stat::Sdef => &mut self.sdef,
+            Stat::Speed => &mut self.speed,
+        }
+    }
+
     /// The channel's attack (or defence) plus `share` percent of the other
     /// channel's, scaled by 100 so the share adds no rounding step.
     /// Wide enough that unvalidated stats and shares cannot overflow.
@@ -205,6 +255,37 @@ pub struct Level {
     /// Cumulative experience required for this level; level one starts at zero.
     pub xp: u64,
     pub stats: Stats,
+    /// Stat points granted on reaching this level; the first level's are the
+    /// starting pool.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub points: u32,
+}
+
+fn is_zero(value: &u32) -> bool {
+    *value == 0
+}
+
+/// Player-allocated stat points: what one point adds to each stat that
+/// accepts points, optional per-stat caps, and whether they can be refunded.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct StatPoints {
+    pub values: BTreeMap<Stat, u32>,
+    /// Most points one stat may take.
+    #[serde(default)]
+    pub caps: BTreeMap<Stat, u32>,
+    #[serde(default)]
+    pub respec: Respec,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Respec {
+    /// Allocation is permanent.
+    #[default]
+    Never,
+    /// Everything can be refunded at a safe location.
+    Safe,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
