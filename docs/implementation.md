@@ -53,6 +53,10 @@ proves the complete single-player loop with authored content.
   in worlds that author a crit. Seeds are explicit (`Engine::new_with_seed`,
   `--seed`); refused commands draw nothing; replays are exact. Package and
   save format 6.
+- [x] Stat points (M4a): levels grant points that the player allocates to the
+  stats a world accepts, within caps, with an optional refund at safe places.
+  Effective stats (level table + allocation) are derived by one function every
+  rule uses and never saved. Package and save format 7.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
