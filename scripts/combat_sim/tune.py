@@ -219,7 +219,7 @@ def knobs(content: Content) -> dict[str, Knob]:
         if profile.growth is not None:
             add(found, f"{name} growth", _profile_growth_knob(slot))
         for i, skill in enumerate(profile.skills):
-            if skill.cross_share is not None:
+            if skill.cross_share is not None and skill.level <= content.max_level:
                 add(found, f"{name} {skill.name} cross_share", _share_knob(slot, i))
         if profile.basic.cross_share is not None:
             add(found, f"{name} basic attack cross_share", _share_knob(slot, None))

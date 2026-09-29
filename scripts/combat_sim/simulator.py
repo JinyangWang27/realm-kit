@@ -9,6 +9,7 @@ from .model import Combatant, Kind, Profile, Rules
 
 
 U64_MAX = 2**64 - 1  # the engine stores XP as u64 and adds it with overflow checks
+KILL_LIMIT = 100_000  # grinding simulates each fight; stop there rather than run for hours
 
 
 @dataclass(frozen=True)
@@ -43,9 +44,11 @@ class GrindResult:
     level: int
     kills: int
     rests: int
+    limited: bool = False  # stopped at KILL_LIMIT rather than by the rules
 
     def __str__(self) -> str:
-        return f"L{self.level}, {self.kills} kills, {self.rests} rests"
+        note = f" (stopped at the {KILL_LIMIT:,}-kill simulation limit)" if self.limited else ""
+        return f"L{self.level}, {self.kills} kills, {self.rests} rests{note}"
 
 
 def hp_lost_percent(player: Combatant, hp: int) -> int:
@@ -143,6 +146,8 @@ class Simulator:
                 hp, mp = result.hp, result.mp
                 if total + gain > U64_MAX:  # the engine's checked addition refuses this reward
                     return GrindResult(level, kills, rests)
+                if kills >= KILL_LIMIT:
+                    return GrindResult(level, kills, rests, limited=True)
                 kills += 1
                 total += gain
             level += 1
