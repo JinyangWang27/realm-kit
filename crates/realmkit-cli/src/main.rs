@@ -633,6 +633,30 @@ mod tests {
     }
 
     #[test]
+    fn a_level_up_mentions_mp_from_a_technique() {
+        // No MP in the level table: only Azure Breath's First Layer gives any.
+        let mut world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect")).unwrap();
+        let combat = world.world.combat.as_mut().unwrap();
+        combat.levels.iter_mut().for_each(|l| l.stats.mp = 0);
+        combat.skills.iter_mut().for_each(|s| s.cost = 0);
+        world
+            .characters
+            .iter_mut()
+            .find(|c| c.id == "dummy")
+            .unwrap()
+            .combat
+            .as_mut()
+            .unwrap()
+            .xp = 20;
+        let mut output = Vec::new();
+        let input = format!("north\nengage dummy\n{}", "attack dummy\n".repeat(8));
+        play(&world, None, None, input.as_bytes(), &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains("Level 2! Health and MP restored."), "{text}");
+    }
+
+    #[test]
     fn death_restores_the_newest_save() {
         let mut world = WorldSpec::load(concat!(
             env!("CARGO_MANIFEST_DIR"),

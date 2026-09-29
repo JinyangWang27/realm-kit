@@ -789,6 +789,22 @@ fn techniques(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
             core,
             w.technique(core).is_some(),
         );
+        // The realm needs a way to learn its art.
+        let teachable = combat.player_techniques.iter().any(|g| &g.technique == core)
+            || w.quests.iter().flat_map(|q| &q.reward_techniques).any(|g| &g.technique == core)
+            || w.dialogues
+                .iter()
+                .flat_map(|d| &d.nodes)
+                .flat_map(|n| &n.choices)
+                .any(|c| matches!(&c.effect, Some(DialogueEffect::GrantTechnique(g)) if &g.technique == core));
+        if !teachable {
+            issue(
+                out,
+                core,
+                "unreachable_core_art",
+                "no starting technique, dialogue or quest teaches the core art",
+            );
+        }
     }
 }
 
@@ -972,12 +988,29 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         }
     }
     if let Some(first) = levels.first() {
-        let unlocked = combat
+        // A rank skill is usable with at least that rank's own passive bonus.
+        let none = BTreeMap::new();
+        let with_rank: Vec<(&Skill, Stats)> = combat
             .player_skills
             .iter()
-            .chain(rank_skills.iter().copied())
-            .filter_map(|id| w.skill(id))
-            .filter_map(|s| Some((s, &levels.get(s.level.checked_sub(1)?)?.stats)));
+            .filter_map(|id| Some((w.skill(id)?, &none)))
+            .chain(
+                combat
+                    .techniques
+                    .iter()
+                    .flat_map(|t| &t.ranks)
+                    .filter_map(|r| Some((w.skill(r.skill.as_ref()?)?, &r.passive))),
+            )
+            .filter_map(|(skill, passive)| {
+                let mut stats = levels.get(skill.level.checked_sub(1)?)?.stats;
+                for (stat, bonus) in passive {
+                    let total = stats.get_mut(*stat);
+                    *total = total.saturating_add(*bonus);
+                }
+                Some((skill, stats))
+            })
+            .collect();
+        let unlocked = with_rank.iter().map(|(skill, stats)| (*skill, stats));
         usable_skills(
             out,
             combat,

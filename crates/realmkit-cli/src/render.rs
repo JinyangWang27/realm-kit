@@ -249,7 +249,8 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             Event::ExperienceGranted { amount } => writeln!(output, "+{amount} XP")?,
             Event::LevelUp { level } => {
                 // One grant can pass several levels; each restores that level's
-                // effective MP: its base plus MP bought with points.
+                // effective MP: its base plus MP bought with points and MP from
+                // learned techniques' current ranks.
                 let combat = world.combat().unwrap();
                 let bought = state.combat.as_ref().map_or(0, |c| {
                     let per_point = combat
@@ -260,7 +261,18 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                         .unwrap_or(0);
                     c.allocation.get(&Stat::Mp).copied().unwrap_or(0) * per_point
                 });
-                let mp = combat.levels[level - 1].stats.mp + bought > 0;
+                let passive: u32 = state.combat.as_ref().map_or(0, |c| {
+                    c.techniques
+                        .iter()
+                        .filter_map(|(id, learned)| {
+                            world.technique(id)?.ranks[learned.rank - 1]
+                                .passive
+                                .get(&Stat::Mp)
+                                .copied()
+                        })
+                        .sum()
+                });
+                let mp = combat.levels[level - 1].stats.mp + bought + passive > 0;
                 let restored = if mp { "Health and MP" } else { "Health" };
                 writeln!(output, "Level {level}! {restored} restored.")?
             }

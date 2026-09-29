@@ -698,6 +698,15 @@ fn techniques_have_named_rising_ranks_and_valid_grants() {
                 xp: 5,
             }))
         },
+        // A core art nothing can teach would never show a realm.
+        |w| {
+            let combat = w.world.combat.as_mut().unwrap();
+            let mut hidden = combat.techniques[0].clone();
+            hidden.id = "hidden_art".into();
+            hidden.ranks.iter_mut().for_each(|r| r.passive.clear());
+            combat.techniques.push(hidden);
+            combat.core_art = Some("hidden_art".into())
+        },
         // A passive this large could lift MP past the stat bound.
         |w| {
             w.world.combat.as_mut().unwrap().techniques[0].ranks[2]
@@ -713,4 +722,25 @@ fn techniques_have_named_rising_ranks_and_valid_grants() {
     let mut renamed = sect();
     renamed.world.combat.as_mut().unwrap().techniques[1].name = "Palm of Clouds".into();
     assert!(renamed.validate().is_ok());
+}
+
+#[test]
+fn a_rank_skill_may_rely_on_its_own_rank_bonus() {
+    // Without special attack or MP of its own, the player can still use the
+    // palm at Gathering Storm because that rank grants what it needs.
+    let mut world = sect();
+    let combat = world.world.combat.as_mut().unwrap();
+    for level in &mut combat.levels {
+        (level.stats.mp, level.stats.satk, level.stats.patk) = (0, 0, 0);
+    }
+    combat.player_basic_channel = Channel::Physical;
+    combat.levels.iter_mut().for_each(|l| l.stats.patk = 1);
+    let rank = &mut combat.techniques[1].ranks[1];
+    rank.passive = [(Stat::Mp, 10), (Stat::Satk, 5)].into();
+    combat.techniques[1].ranks[0].skill = None;
+    combat.techniques[0]
+        .ranks
+        .iter_mut()
+        .for_each(|r| r.passive.clear());
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
 }
