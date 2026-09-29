@@ -176,6 +176,8 @@ def _rules_knob(field: str) -> Knob:
     def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
         before = getattr(rules, field)
         after = step(before, factor)
+        if field == "cross_share":
+            after = min(100, after)  # a share is a percentage; the no-op at 100 is skipped
         return with_field(rules, field, after), content, before, after
     return apply
 

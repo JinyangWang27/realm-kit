@@ -216,8 +216,10 @@ def check_bounds(sim: Simulator) -> None:
                 low = 1 if stat in ("hp", "speed") else 0
                 require(low <= getattr(c, stat) <= STAT_BOUND,
                         f"{c.name} {stat} {getattr(c, stat)} is outside {low}-{STAT_BOUND} at level {level}")
-            require(0 <= c.xp <= XP_BOUND,
-                    f"{c.name} grants XP {c.xp} at level {level}, outside 0-{XP_BOUND} (the engine's u64)")
+            # The falloff can add up to 40% for a much stronger opponent; that must still fit.
+            require(0 <= c.xp and c.xp * 14 // 10 <= XP_BOUND,
+                    f"{c.name} grants XP {c.xp} at level {level}; with the falloff's +40% it would "
+                    f"exceed {XP_BOUND} (the engine's u64)")
     # Each skill at its unlock level: attack only rises with level (growth >= 1), so that is
     # where rounding could leave a newly unlocked skill with no attack.
     check_unlocks(sim, [*sim.content.builds,
