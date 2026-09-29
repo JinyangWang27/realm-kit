@@ -845,6 +845,26 @@ fn equipment_occupies_declared_slots_within_bounds() {
             let slots = &mut w.world.combat.as_mut().unwrap().slots;
             slots.push(slots[0].clone())
         },
+        // Each wearable one is its own piece, so grants stay small.
+        |w| {
+            let wolf = w
+                .characters
+                .iter_mut()
+                .find(|c| c.id == "black_wolf")
+                .unwrap();
+            wolf.combat.as_mut().unwrap().loot[0].quantity = GEAR_STACK_BOUND + 1;
+        },
+        |w| {
+            let slots = &mut w.world.combat.as_mut().unwrap().slots;
+            slots.extend((0..SLOT_BOUND).map(|i| format!("extra_{i}")));
+        },
+        // A special-channel weapon for a player with no special attack at all.
+        |w| {
+            let combat = w.world.combat.as_mut().unwrap();
+            combat.cross_share = 0;
+            combat.levels.iter_mut().for_each(|l| l.stats.satk = 0);
+            gear(w, "greatsword").basic_channel = Some(Channel::Special);
+        },
         // Every best piece at once could lift defence past the stat bound.
         |w| {
             gear(w, "iron_mail").bonuses.insert(Stat::Pdef, 9_990);
@@ -865,4 +885,14 @@ fn equipment_occupies_declared_slots_within_bounds() {
     let mut quiet = archive();
     quiet.items[0].equipment = Some(arena().item("buckler").unwrap().equipment.clone().unwrap());
     assert!(codes(&quiet).contains(&"combat_disabled".to_string()));
+}
+
+#[test]
+fn a_two_handed_bonus_counts_once_in_the_worst_case() {
+    // 9,000 attack on a piece filling two slots is 9,000 worn, not 18,000.
+    let mut world = arena();
+    gear(&mut world, "greatsword")
+        .bonuses
+        .insert(Stat::Patk, 9_000);
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
 }

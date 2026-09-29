@@ -44,22 +44,38 @@ pub(super) fn basic(world: &WorldSpec, combat: &CombatState) -> (Option<Channel>
 /// The multiplier worn gear applies to damage on `channel`: modifiers multiply,
 /// any immunity wins (0), and the product stays within 1/10 to 10.
 pub(super) fn modifier(world: &WorldSpec, combat: &CombatState, channel: Channel) -> (u64, u64) {
-    let (mut num, mut den) = (1_u64, 1_u64);
+    // At most 32 slots of factors up to 10: products stay below 10^32, exact in u128.
+    let (mut num, mut den) = (1_u128, 1_u128);
     for piece in worn(world, combat) {
         if let Some(m) = piece.modifiers.get(&channel) {
             if m.num == 0 {
                 return (0, 1);
             }
-            num = num.saturating_mul(u64::from(m.num));
-            den = den.saturating_mul(u64::from(m.den));
+            num *= u128::from(m.num);
+            den *= u128::from(m.den);
         }
     }
-    if num > den.saturating_mul(10) {
+    if num > den * 10 {
         (10, 1)
-    } else if num.saturating_mul(10) < den {
+    } else if num * 10 < den {
         (1, 10)
     } else {
-        (num, den)
+        // Within 1/10 to 10: reduce, then scale both terms down together until
+        // they fit the damage arithmetic; the ratio barely moves.
+        let divisor = gcd(num, den);
+        let (mut num, mut den) = (num / divisor, den / divisor);
+        while num > 1_000_000 || den > 1_000_000 {
+            (num, den) = ((num / 2).max(1), (den / 2).max(1));
+        }
+        (num as u64, den as u64)
+    }
+}
+
+fn gcd(a: u128, b: u128) -> u128 {
+    if b == 0 {
+        a
+    } else {
+        gcd(b, a % b)
     }
 }
 

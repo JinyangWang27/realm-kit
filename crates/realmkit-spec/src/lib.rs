@@ -179,6 +179,10 @@ pub const STAT_BOUND: u32 = 9_999;
 pub const ACTION_COST_BOUND: u64 = 1_000_000_000_000;
 /// An action's time, in percent of a basic action: up to ten basic actions long.
 pub const TIME_BOUNDS: (u32, u32) = (1, 1_000);
+/// Most pieces of equipment one grant creates, since each is its own item.
+pub const GEAR_STACK_BOUND: u64 = 100;
+/// Most equipment slots a world declares; keeps worn modifier products exact.
+pub const SLOT_BOUND: usize = 32;
 /// Skill power is a percentage of a basic attack, which is 100.
 pub const POWER_BOUNDS: (u32, u32) = (1, 1_000);
 pub const BASIC_POWER: u32 = 100;

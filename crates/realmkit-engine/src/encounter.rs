@@ -619,7 +619,12 @@ pub(super) fn turn_order(world: &WorldSpec, state: &GameState, n: usize) -> Vec<
         };
         let p = &projected.participants[i];
         let player = rules::player_stats(world, combat);
-        let Ok(step) = delay(&timeline, stats(world, player, p).speed, 100) else {
+        // The player's basic action may be a heavy weapon's slower swing.
+        let time = match p.control {
+            Control::Player => gear::basic(world, combat).1.unwrap_or(100),
+            Control::Policy => 100,
+        };
+        let Ok(step) = delay(&timeline, stats(world, player, p).speed, time) else {
             break;
         };
         order.push(p.character.clone());

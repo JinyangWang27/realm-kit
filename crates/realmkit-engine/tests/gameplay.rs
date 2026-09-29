@@ -2462,3 +2462,77 @@ fn saves_reject_equipment_the_rules_could_not_produce() {
         );
     }
 }
+
+#[test]
+fn the_projection_uses_a_heavy_weapons_basic_time() {
+    let mut world = arena();
+    world.world.combat.as_mut().unwrap().player_equipment = vec!["greatsword".into()];
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(West)).unwrap();
+    engine.execute(Engage("holt".into())).unwrap();
+    // Both open at 1,000; the greatsword's 130% puts the player's next turn
+    // at 2,300, after Holt's at 2,000.
+    assert_eq!(engine.turn_order(4), ["fighter", "holt", "holt", "fighter"]);
+}
+
+#[test]
+fn a_save_wearing_an_unknown_item_is_rejected_not_a_crash() {
+    let world = arena();
+    let engine = Engine::new(&world).unwrap();
+    for item in ["missing", "rat_tail"] {
+        let mut snapshot = engine.snapshot();
+        let piece = snapshot
+            .state
+            .combat
+            .as_mut()
+            .unwrap()
+            .gear
+            .get_mut(&1)
+            .unwrap();
+        piece.item = item.into();
+        assert!(matches!(
+            Engine::restore(&world, snapshot),
+            Err(EngineError::InvalidSave(_))
+        ));
+    }
+}
+
+#[test]
+fn many_worn_modifiers_combine_exactly() {
+    // 28 more slots (32 in all) of alternating 10/9 and 9/10 wards multiply
+    // to exactly 1, though each product alone overflows 64 bits.
+    let warded = |modify: bool| {
+        let mut world = arena();
+        let slots: Vec<String> = (0..28).map(|i| format!("s{i}")).collect();
+        let combat = world.world.combat.as_mut().unwrap();
+        combat.slots.extend(slots.iter().cloned());
+        combat.player_equipment = slots.iter().map(|s| format!("ward_{s}")).collect();
+        for (i, slot) in slots.iter().enumerate() {
+            let (num, den) = if i % 2 == 0 { (10, 9) } else { (9, 10) };
+            let mut modifiers = std::collections::BTreeMap::new();
+            if modify {
+                modifiers.insert(Channel::Physical, Modifier { num, den });
+            }
+            world.items.push(Item {
+                id: format!("ward_{slot}"),
+                name: "Ward".into(),
+                description: "A ward.".into(),
+                equipment: Some(Equipment {
+                    slots: vec![slot.clone()],
+                    bonuses: Default::default(),
+                    speed_penalty: 0,
+                    basic_channel: None,
+                    basic_time: None,
+                    modifiers,
+                }),
+            });
+        }
+        world
+    };
+    let bites = |world: &WorldSpec| {
+        let mut engine = Engine::new(world).unwrap();
+        engine.execute(Move(North)).unwrap();
+        engine.execute(Engage("grey_wolf".into())).unwrap()
+    };
+    assert_eq!(bites(&warded(true)), bites(&warded(false)));
+}

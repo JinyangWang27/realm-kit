@@ -122,6 +122,22 @@ pub(super) fn check(
         .map(|s| &s.item)
         .collect();
     if let (Some(combat), Some(rules)) = (&state.combat, world.combat()) {
+        // Gear first: every stat check below derives stats from worn pieces.
+        // Pieces are real equipment with IDs below the counter, and worn
+        // pieces never share a slot.
+        let mut worn = BTreeSet::new();
+        ensure(
+            combat.gear.iter().all(|(id, piece)| {
+                *id < combat.next_gear
+                    && world
+                        .item(&piece.item)
+                        .and_then(|i| i.equipment.as_ref())
+                        .is_some_and(|e| {
+                            !piece.equipped || e.slots.iter().all(|slot| worn.insert(slot.clone()))
+                        })
+            }),
+            "invalid equipment",
+        )?;
         let stats = combat
             .level
             .checked_sub(1)
@@ -230,23 +246,6 @@ pub(super) fn check(
                 .all(|(item, h)| inventory.get(item) == Some(h) || repeatable_loot.contains(item)),
         "inventory does not match progress",
     )?;
-    if let Some(combat) = &state.combat {
-        // Pieces are real equipment with IDs below the counter, and worn
-        // pieces never share a slot.
-        let mut worn = BTreeSet::new();
-        ensure(
-            combat.gear.iter().all(|(id, piece)| {
-                *id < combat.next_gear
-                    && world
-                        .item(&piece.item)
-                        .and_then(|i| i.equipment.as_ref())
-                        .is_some_and(|e| {
-                            !piece.equipped || e.slots.iter().all(|slot| worn.insert(slot.clone()))
-                        })
-            }),
-            "invalid equipment",
-        )?;
-    }
     let group_flags: BTreeSet<_> = world
         .combat()
         .into_iter()

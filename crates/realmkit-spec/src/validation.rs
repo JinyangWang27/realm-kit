@@ -122,6 +122,16 @@ fn items(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, stacks: &[ItemSt
                 "item quantity must be positive",
             );
         }
+        // Each wearable one becomes its own piece, so keep grants small.
+        let wearable = w.item(&stack.item).is_some_and(|i| i.equipment.is_some());
+        if wearable && stack.quantity > GEAR_STACK_BOUND {
+            issue(
+                out,
+                owner,
+                "invalid_quantity",
+                format!("at most {GEAR_STACK_BOUND} pieces of equipment are granted at once"),
+            );
+        }
     }
 }
 
@@ -610,7 +620,12 @@ fn stat_points(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &C
                     .iter()
                     .filter_map(|i| i.equipment.as_ref())
                     .filter(|e| e.slots.contains(slot))
-                    .map(|e| u64::from(e.bonuses.get(&stat).copied().unwrap_or(0)))
+                    // A piece's bonus counts once, spread over its slots, so
+                    // the sum over slots bounds any set of worn pieces.
+                    .map(|e| {
+                        let bonus = u64::from(e.bonuses.get(&stat).copied().unwrap_or(0));
+                        bonus.div_ceil(e.slots.len().max(1) as u64)
+                    })
                     .max()
                     .unwrap_or(0)
             })
@@ -848,6 +863,14 @@ fn techniques(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
 /// the starting gear is wearable.
 fn equipment(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
     ids(out, "slot", combat.slots.iter().map(String::as_str));
+    if combat.slots.len() > SLOT_BOUND {
+        issue(
+            out,
+            &w.world.id,
+            "invalid_slots",
+            format!("a world has at most {SLOT_BOUND} slots"),
+        );
+    }
     for item in &w.items {
         let Some(gear) = &item.equipment else {
             continue;
@@ -1138,6 +1161,29 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
             unlocked,
             &first,
         );
+        // A weapon that changes the basic attack's channel needs attack there,
+        // counting what the weapon itself adds.
+        for item in &w.items {
+            let Some(gear) = &item.equipment else {
+                continue;
+            };
+            let Some(channel) = gear.basic_channel else {
+                continue;
+            };
+            let mut stats = first;
+            for (stat, bonus) in &gear.bonuses {
+                let total = stats.get_mut(*stat);
+                *total = total.saturating_add(*bonus);
+            }
+            if stats.combined(channel, combat.cross_share, false) == 0 {
+                issue(
+                    out,
+                    &item.id,
+                    "no_attack",
+                    "this weapon's basic attack needs attack in its channel",
+                );
+            }
+        }
     }
     let narrative = &combat.narrative;
     for (key, variants) in [("attack", &narrative.attack), ("hurt", &narrative.hurt)] {
