@@ -411,6 +411,8 @@ fn the_sect_teaches_trains_and_deepens_named_ranks() {
     let output = run(&["play", SECT, "--line"], &walkthrough);
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
+    // Line mode and pipes stay plain text.
+    assert!(!text.contains('\u{1b}'), "{text:?}");
     for passage in [
         "You — Level 1 · Realm First Layer\n  HP 50/50 · MP 30/30\n",
         "You learn Cloud Palm.",

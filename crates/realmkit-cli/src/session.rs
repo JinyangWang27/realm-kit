@@ -102,7 +102,7 @@ fn restore(
             let events = engine
                 .execute(Command::Look)
                 .expect("looking is always allowed");
-            render::events(output, engine, &events)?;
+            render::events(output, engine, &events, log.paint)?;
             // Resume a conversation with the line its choices answer.
             if let Some(dialogue) = engine.state().dialogue.clone() {
                 let event = realmkit_engine::Event::Dialogue {
@@ -110,7 +110,7 @@ fn restore(
                     node: dialogue.node,
                     choices: Vec::new(),
                 };
-                render::events(output, engine, &[event])?;
+                render::events(output, engine, &[event], log.paint)?;
             }
             Ok(true)
         }
@@ -210,6 +210,6 @@ pub(crate) fn start<'w>(
         writeln!(output, "Seed: {seed}\n")?;
     }
     let events = engine.execute(Command::Look)?;
-    render::events(output, &engine, &events)?;
+    render::events(output, &engine, &events, log.paint)?;
     Ok(engine)
 }

@@ -41,7 +41,8 @@ or press the number. Stat training and equipment wait behind one entry each
 (`Train stats ›`, `Equipment ›`) and stay open while you use them. Esc steps
 back out of a submenu or a conversation,
 `n/s/e/w/u/d` (or `h/j/k/l`) move directly, and `:` opens a typed command
-such as `:talk elder`. Ctrl-C quits.
+such as `:talk elder`. Ctrl-C quits. Terminal play adds bold and colour;
+set `NO_COLOR` for plain text.
 
 Piped input, scripts and `realmkit play <world> --line` use line mode: type a
 menu number or a command and press Enter. Type `help` for the command list.
