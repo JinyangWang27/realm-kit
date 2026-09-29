@@ -177,7 +177,9 @@ def check_bounds(sim: Simulator) -> None:
             require(skill.level >= 1, f"{profile.name} {skill.name} unlocks below level 1")
         # Costs are flat, so a skill must be affordable with the MP its user has when it unlocks.
         for skill in profile.skills:
-            if skill.resource is Resource.MP and skill.cost > 0:
+            # Unreachable skills are check_unlocks' concern; skipping them also keeps a huge
+            # authored level from making the exact growth below enormous.
+            if skill.resource is Resource.MP and skill.cost > 0 and skill.level <= sim.content.max_level:
                 mp = sim.rules.grow(profile.mp, skill.level, profile.growth_for("mp"))
                 require(skill.cost <= mp, f"{profile.name} {skill.name} costs {skill.cost} MP but "
                         f"{profile.name} has only {mp} at level {skill.level}")
