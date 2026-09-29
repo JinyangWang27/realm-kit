@@ -147,8 +147,9 @@ Talking and fighting are optional components:
 and is placed nowhere; in a combat world its numbers come from the level table.
 A location's `characters` list places the others. A placed character is present
 while its `requires` conditions hold; the player can talk to it if it has a
-`dialogue` and attack it if it has a `combat` profile (positive `hp`, `attack`,
-`xp`, optional `loot`). A character with a combat profile is one instance: it
+`dialogue` and attack it if it has a `combat` profile (positive `hp` and
+`attack`, `xp`, optional `loot`). A defeated character is gone: it is no longer
+listed and cannot be talked to. A character with a combat profile is one instance: it
 may be placed at most once, and its defeat is permanent (no respawns). Other
 characters may appear at several locations. Combat profiles require the world's
 `combat` block.

@@ -545,3 +545,20 @@ fn a_world_without_combat_rejects_inconsistent_saves() {
         );
     }
 }
+
+#[test]
+fn a_defeated_character_can_no_longer_be_talked_to() {
+    let mut world = demo();
+    world.characters[2].dialogue = Some("mara".into());
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(North)).unwrap();
+    assert_eq!(offered(&engine)[0], (Talk("wolf".into()), true));
+    for _ in 0..3 {
+        engine.execute(Attack("wolf".into())).unwrap();
+    }
+    assert!(!offered(&engine).iter().any(|(c, _)| matches!(c, Talk(_))));
+    assert!(matches!(
+        engine.execute(Talk("wolf".into())),
+        Err(EngineError::NotHere(_))
+    ));
+}

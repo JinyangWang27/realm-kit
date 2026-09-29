@@ -117,6 +117,7 @@ fn refuses_unusable_rules_and_malformed_templates() {
         |w| w.world.combat.as_mut().unwrap().levels[0].hp = 0,
         |w| w.world.combat.as_mut().unwrap().levels[0].attack = 0,
         |w| wolf(w).combat.as_mut().unwrap().hp = 0,
+        |w| wolf(w).combat.as_mut().unwrap().attack = 0,
         |w| wolf(w).combat.as_mut().unwrap().loot[0].quantity = 0,
         |w| w.locations[0].characters.push("wolf".into()),
         |w| w.world.combat.as_mut().unwrap().narrative.attack.clear(),

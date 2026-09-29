@@ -28,8 +28,13 @@ pub(super) fn character_here<'a>(
         .filter(|c| placed && conditions_met(state, &c.requires))
 }
 
+/// Can be talked to here; a defeated fighter is gone, like its listing.
 pub(super) fn npc_here(world: &WorldSpec, state: &GameState, id: &str) -> bool {
-    character_here(world, state, id).is_some_and(|c| c.dialogue.is_some())
+    let defeated = state
+        .combat
+        .as_ref()
+        .is_some_and(|c| c.opponent_hp.get(id) == Some(&0));
+    !defeated && character_here(world, state, id).is_some_and(|c| c.dialogue.is_some())
 }
 
 pub(super) fn choices<'a>(

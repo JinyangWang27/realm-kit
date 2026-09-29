@@ -262,12 +262,12 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
         }
         conditions(&mut out, w, &character.id, &character.requires);
         if let Some(profile) = &character.combat {
-            if profile.hp == 0 {
+            if profile.hp == 0 || profile.attack == 0 {
                 issue(
                     &mut out,
                     &character.id,
                     "invalid_stats",
-                    "combat HP must be positive",
+                    "combat HP and attack must be positive",
                 );
             }
             items(&mut out, w, &character.id, &profile.loot);
