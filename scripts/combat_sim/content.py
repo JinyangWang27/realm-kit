@@ -67,7 +67,7 @@ WITHER = Skill("wither", power=180, channel=Channel.SPECIAL, cost=5, resource=Re
 DEFAULT = Content(
     warrior=Profile("warrior", hp=200, mp=0, patk=24, pdef=15, satk=5, sdef=10, speed=100,
                     skills=(RAGE_STRIKE, CLEAVE, EXECUTE)),
-    mage=Profile("mage", hp=170, mp=75, patk=8, pdef=10, satk=20, sdef=15, speed=100,
+    mage=Profile("mage", hp=170, mp=75, patk=8, pdef=10, satk=20, sdef=15, speed=100, mp_growth=1.0,
                  skills=(SPARK, BOLT, FIREBALL, STARFALL)),
     monsters=(
         Profile("beast", hp=80, mp=0, patk=16, pdef=10, satk=0, sdef=10, speed=110,

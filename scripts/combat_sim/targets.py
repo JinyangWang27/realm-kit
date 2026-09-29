@@ -175,7 +175,7 @@ def check_bounds(sim: Simulator) -> None:
             require(skill.level >= 1, f"{profile.name} {skill.name} unlocks below level 1")
         if sim.rules.grow(profile.mp, 1, profile.growth) == 0:
             paid = [s.name for s in profile.skills if s.resource is Resource.MP and s.cost > 0]
-            require(not paid, f"{profile.name} has MP-costing {', '.join(paid)} but no MP at level 1 to scale costs from")
+            require(not paid, f"{profile.name} has MP-costing {', '.join(paid)} but no MP at level 1")
         require(profile.basic.cost == 0 and profile.basic.level == 1,
                 f"{profile.name}'s basic attack must be free and available from level 1")
         check_exact_stats(profile, "authored")

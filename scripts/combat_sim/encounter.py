@@ -40,22 +40,21 @@ class Fighter:
         else:
             self.mp += gained
 
-    def can_afford(self, skill: Skill, cost: int) -> bool:
-        return (self.mp if skill.resource is Resource.MP else self.rage) >= cost
+    def can_afford(self, skill: Skill) -> bool:
+        return (self.mp if skill.resource is Resource.MP else self.rage) >= skill.cost
 
-    def choose_skill(self, rules: Rules) -> Skill:
+    def choose_skill(self) -> Skill:
         """The strongest affordable skill, falling back to a basic attack. Equal power prefers
         the cheaper skill, then the later tier, so a cheaper later tier is actually used."""
-        priced = [(s, rules.skill_cost(s, self.combatant)) for s in self.combatant.skills]
-        affordable = [(s, cost) for s, cost in priced if self.can_afford(s, cost)]
-        best = max(affordable, key=lambda pair: (pair[0].power, -pair[1], pair[0].level), default=None)
-        return self.combatant.basic if best is None else best[0]
+        affordable = [s for s in self.combatant.skills if self.can_afford(s)]
+        best = max(affordable, key=lambda s: (s.power, -s.cost, s.level), default=None)
+        return self.combatant.basic if best is None else best
 
-    def pay(self, skill: Skill, cost: int) -> None:
+    def pay(self, skill: Skill) -> None:
         if skill.resource is Resource.MP:
-            self.mp -= cost
+            self.mp -= skill.cost
         else:
-            self.rage -= cost
+            self.rage -= skill.cost
 
 
 @dataclass(frozen=True)
@@ -100,8 +99,8 @@ class Encounter:
     def _act(self, actor: Fighter) -> None:
         target = next(f for f in self.fighters if f.alive and f.side != actor.side)
         attacker, defender = actor.combatant, target.combatant
-        skill = actor.choose_skill(self.rules)
-        actor.pay(skill, self.rules.skill_cost(skill, attacker))
+        skill = actor.choose_skill()
+        actor.pay(skill)
         dealt = self.rules.damage(attacker, defender, skill)
         target.hp -= min(dealt, target.hp)
         actor.rage += self.rules.rage_per_action
