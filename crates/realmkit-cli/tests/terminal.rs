@@ -415,8 +415,8 @@ fn the_sect_teaches_trains_and_deepens_named_ranks() {
         "You — Level 1 | Realm First Layer | HP 50/50 | MP 30/30",
         "You learn Cloud Palm.",
         "2. Cloud Palm · Drifting Cloud on A Straw Dummy — 5 MP",
-        "Cloud Palm +10",
-        "Azure Breath +1",
+        // Technique XP from a fight arrives as one line when it ends.
+        "The fight is over.\n+5 XP\nTechnique XP: Cloud Palm +20, Azure Breath +1\n",
         "Cloud Palm: Gathering Storm!",
         "2. Cloud Palm · Gathering Storm on A Straw Dummy — 6 MP",
         "  Cloud Palm — Gathering Storm (mastered)",
@@ -428,6 +428,9 @@ fn the_sect_teaches_trains_and_deepens_named_ranks() {
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
+    assert!(!text.contains("Cloud Palm +10\n"), "{text}");
+    // A reward without XP says nothing about XP.
+    assert!(!text.contains("+0 XP"), "{text}");
     let help = String::from_utf8(run(&["play", SECT], "help\n").stdout).unwrap();
     assert!(help.contains("techniques — learned techniques"));
     let demo = String::from_utf8(run(&["play", WORLD], "help\n").stdout).unwrap();

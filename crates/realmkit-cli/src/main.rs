@@ -92,6 +92,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 fn apply(
     engine: &mut Engine<'_>,
     saves: Option<&Saves>,
+    log: &mut render::Log,
     command: Command,
     output: &mut impl Write,
 ) -> io::Result<bool> {
@@ -117,7 +118,7 @@ fn apply(
     if let (Some(saves), true) = (saves, completed) {
         save(engine, saves, Kind::Auto, output)?;
     }
-    render::events(output, engine, &events)?;
+    log.events(output, engine, &events)?;
     if let (Some(saves), true) = (saves, events.contains(&realmkit_engine::Event::PlayerDied)) {
         writeln!(output, "\nRestoring your most recent save…")?;
         return restore(engine, saves, None, output);
@@ -291,6 +292,7 @@ fn play(
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
     let mut engine = start(world, saves, seed, output)?;
+    let mut log = render::Log::default();
     let mut menu = Menu::new(&engine, false, None);
     menu.write(output, false)?;
     writeln!(output, "{}", menu::LINE_HINT)?;
@@ -337,7 +339,7 @@ fn play(
             }
         };
         let open = menu.stays_open(&command);
-        apply(&mut engine, saves, command, output)?;
+        apply(&mut engine, saves, &mut log, command, output)?;
         menu = Menu::new(&engine, false, open);
         menu.write(output, false)?;
     }
@@ -391,6 +393,7 @@ fn play_keys(
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
     let mut engine = start(world, saves, seed, output)?;
+    let mut log = render::Log::default();
     let (mut leave_dialogue, mut open) = (false, None);
     'scene: loop {
         let mut menu = Menu::new(&engine, leave_dialogue, open.take());
@@ -467,7 +470,7 @@ fn play_keys(
             // Stepping back from a conversation lasts until the player speaks again.
             leave_dialogue &= !matches!(command, Command::Talk(_) | Command::ChooseDialogue(_));
             // A restored save may be mid-conversation; show its choices again.
-            if apply(&mut engine, saves, command, output)? {
+            if apply(&mut engine, saves, &mut log, command, output)? {
                 leave_dialogue = false;
             }
             continue 'scene;
@@ -701,5 +704,20 @@ mod tests {
         let text = String::from_utf8(output).unwrap();
         assert!(text.contains("the player is dead in this save"), "{text}");
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn technique_xp_from_a_fight_is_one_line_even_after_fleeing() {
+        let world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect")).unwrap();
+        let mut output = Vec::new();
+        let input = "talk qing\nchoose 1\nnorth\nengage dummy\nuse palm_drifting dummy\nflee\n";
+        play(&world, None, None, input.as_bytes(), &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(
+            text.contains("You get away.\nTechnique XP: Cloud Palm +10\n"),
+            "{text}"
+        );
+        assert!(!text.contains("\nCloud Palm +10"), "{text}");
     }
 }

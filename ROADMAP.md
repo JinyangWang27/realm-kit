@@ -997,8 +997,10 @@ milestones. They change how play reads, never the engine or its rules.
    one entry (`Train stats — 3 points ›`, `Equipment ›`). The submenu is
    headed by its name, ends with `Back` (Esc works too), and stays open while
    its actions are used, so several points can be trained in a row.
-2. **Quieter combat log** · proposed. Fold per-hit technique XP into one line
-   per fight.
+2. **Quieter combat log** · delivered. Technique XP earned during a fight
+   is shown as one line when it ends (`Technique XP: Cloud Palm +20, Azure
+   Breath +1`), whether it was won or fled. Rank-ups still appear at once,
+   and a reward without XP no longer prints `+0 XP`.
 3. **Multi-line status** · proposed. Split the one-line character panel into
    vitals, stats and progression.
 4. **Light styling** · proposed. Emphasis and colour in a terminal, plain text
