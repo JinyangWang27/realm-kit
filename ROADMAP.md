@@ -238,7 +238,7 @@ authored level with the player's realm rank instead, or has no falloff.
 Each slice ships and is tested on its own. M3a depends on none of the open
 balance decisions.
 
-1. **M3a — combat becomes optional (Format 2).** Merge `npcs.json` and
+1. **M3a — combat becomes optional (Format 2) · delivered.** Merge `npcs.json` and
    `monsters.json` into one character list whose dialogue and combat profile are
    optional components, matching the glossary's shared Character model. The
    player-controlled character becomes an entry in that list, named by the world
@@ -249,7 +249,10 @@ balance decisions.
    characters. Add a flag-based quest objective so a combat-free fixture can have
    a main quest. Reject Format 1 packages and saves clearly rather than migrating
    them: every content edit already invalidates saves through the package
-   revision. The demo plays as before.
+   revision. The demo plays as before. As delivered, opponent HP still persists
+   between separate attacks, inside the optional combat state as
+   `CombatState.opponent_hp` (0 means defeated), because nothing else owns it
+   until M3c encounters do; M3c replaces it with the defeated set.
 2. **M3b — stats, damage and skills.** The seven-stat block, gradual defence
    reduction by the damage formula confirmed in decision 3, the skills and MP
    costs listed under
@@ -1089,5 +1092,4 @@ maintained in the [open-decisions register](docs/open-decisions.md).
    realm tiers, and extend the balance simulation to ranks before choosing their
    numbers.
 
-Recommended next step: start M3a, which needs none of these decisions. Settle 2
-and 3 before M3b, and 1 and 4 before M3c.
+M3a is delivered. Settle 2 and 3 before M3b, and 1 and 4 before M3c.

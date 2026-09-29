@@ -32,8 +32,7 @@ fn author() -> Result<(), Box<dyn std::error::Error>> {
     garden.id = "garden".into();
     garden.name = "The Walled Garden".into();
     garden.description = "The last apples lie in the wet grass.".into();
-    garden.npcs.clear();
-    garden.monsters.clear();
+    garden.characters.clear();
     garden.exits.clear();
     draft.create_location(garden)?;
     draft.link_locations("village", Direction::West, Exit {

@@ -5,8 +5,9 @@ A small, deterministic text-RPG engine for authored or generated worlds.
 
 “RPG” does not require combat. RealmKit's long-term model is a narrative world
 plus source-grounded capabilities: a detective story may use interviews, clues,
-deductions and accusations while omitting combat completely. The current demo and
-format are the first combat-enabled slice, not a requirement for every world.
+deductions and accusations while omitting combat completely. Package Format 2
+makes combat an optional block: the demo uses it, while
+`examples/quiet-archive` is a small world without it.
 See the [architecture glossary](docs/glossary.md) and
 [optional capability catalog](docs/capabilities.md).
 
@@ -107,14 +108,17 @@ belongs to another package, revision or route, or holds impossible state.
 Given the same world and command sequence, state and events are identical.
 There are no clocks, random generators, network clients, or AI SDKs in gameplay.
 
-Combat deals fixed damage followed by a surviving enemy's counterattack.
-Damage is capped at remaining HP. Each monster is a unique, non-respawning
-instance; defeat rewards happen once. Levels use authored cumulative XP
+Combat is optional: a world without a `combat` block has no fighting, HP, XP or
+levels, and its quests complete through flags set in dialogue
+(`examples/quiet-archive`). Where a world has combat, it deals fixed damage
+followed by a surviving enemy's counterattack. Damage is capped at remaining HP.
+Each fighting character is a unique, non-respawning instance; defeat rewards
+happen once. Levels use authored cumulative XP
 thresholds and fully restore HP. Quests remember earlier defeats, so accepting
 after a kill does not strand the quest. Death stops actions; inspection remains
 available. With saves on, the CLI restores the newest save.
 
-All story prose comes from the world package. Format 1 currently chooses combat
+All story prose comes from the world package. The engine currently chooses combat
 template variants from deterministic engine progression; M1 makes `look`,
 inventory, status and quest-panel inspection spend no turn, so presentation-only
 browsing no longer perturbs later combat prose. The exact variant-selection key is

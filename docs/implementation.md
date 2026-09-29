@@ -23,6 +23,12 @@ proves the complete single-player loop with authored content.
   `default` route. The CLI stores them in a `--saves` directory with a lineage
   index, auto-saves at route start and quest completion, and restores the newest
   save on death.
+- [x] Optional combat (M3a): package Format 2 merges NPCs and monsters into one
+  character list with optional dialogue and combat components, names the player
+  as a character, and moves levels and combat prose into an optional `combat`
+  block. Combat state is `GameState.combat`, absent without combat. Quests can
+  complete on a flag. Format 1 packages and saves are rejected, not migrated.
+  The combat-free `examples/quiet-archive` fixture proves the path.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
@@ -33,14 +39,15 @@ worldgen depend only on spec. CLI depends on engine and spec. Only serde,
 serde_json and thiserror are needed by the core crates; the CLI adds crossterm
 for raw terminal key input.
 
-The package uses fixed JSON filenames, with world metadata, locations, NPCs,
-monsters, items, quests, dialogues and narrative in separate files. IDs are
+The package uses fixed JSON filenames, with world metadata (including the
+optional combat block), locations, characters, items, quests and dialogues in
+separate files. IDs are
 explicit strings, exits are directed, and every reference is validated on load.
 Unknown fields and unsupported versions fail early. The format implements only
 the MVP domains, with extensions requiring an explicit format/version decision.
 
-Combat uses fixed integer damage, one monster instance per authored monster ID,
-and no respawns. Defeats grant fixed loot/XP exactly once; active kill quests
+Combat is optional. Where a world has it, combat uses fixed integer damage, one
+instance per fighting character, and no respawns. Defeats grant fixed loot/XP exactly once; active kill quests
 advance on defeat. Quest completion is an explicit dialogue choice at the giver
 and sets an authored flag that unlocks a ruins exit. Dialogue choices can require
 flags or quest states. A lethal enemy response ends play; with saves on, the
@@ -49,8 +56,9 @@ CLI restores the newest save. Level thresholds are cumulative.
 A package revision is a 64-bit FNV-1a digest of the package's canonical JSON, so
 any content edit makes older saves incompatible; there are no migrations yet.
 Loading checks the format version, package, revision and route, then the state
-invariants the rules maintain (known IDs, stats matching the level, monster HP
-within authored limits, a valid conversation). The CLI writes each save to a new
+invariants the rules maintain (known IDs, combat state present exactly when the
+world has combat, stats matching the level, opponent HP within authored limits,
+quest states matching defeats and flags, a valid conversation). The CLI writes each save to a new
 file, then updates `lineage.json`; both writes go to a temporary file first and
 are then renamed into place.
 
@@ -83,7 +91,7 @@ English-only fixed interface labels (centralized in its menu/presentation code).
 Full package-language UI localization remains future presentation work, not an
 exception to the source-language invariant.
 
-Format 1's combat prose selection remains an implementation detail. M1 ensures
+Combat prose selection remains an implementation detail. M1 ensures
 presentation-only inspection commands do not advance the turn, so browsing no
 longer perturbs later combat prose. Future formats may use more semantically local
 event/encounter counters when needed.

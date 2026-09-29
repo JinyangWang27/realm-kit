@@ -1,15 +1,20 @@
-# World package format 1
+# World package format 2
 
-Format 1 is the combat-enabled scaffold format used by the demo. Its mandatory
-level table and narrative combat templates mean it does **not yet** represent the
-long-term rule that combat is optional. A later compatible extension or format
-version must allow combat data and combat state to be wholly absent; authors
+Format 2 makes combat optional. The level table and combat prose live in an
+optional `combat` block in `world.json`; a world without that block has no
+fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
 combat and other genre mechanics as source-grounded capabilities.
 
-Format 1 also represents one fixed player-controlled character and one playable
+Format 1 packages (separate `npcs.json`, `monsters.json` and `narrative.json`,
+a `player_name`) are rejected when loading with a message saying so; there is
+no migration. Convert them by hand: merge NPCs and monsters into
+`characters.json`, add a player character, and move `levels` and the narrative
+into `world.json`'s `combat` block.
+
+Format 2 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 1 does not serialize a route collection
+stable logical route ID `default`; Format 2 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -24,7 +29,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 1 also requires item and quest tables because they serve the current demo.
+Format 2 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -36,20 +41,18 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language, starting location, player name, level table, declared flags |
-| `locations.json` | Array of locations with descriptions, directional exits, NPC and monster IDs |
-| `npcs.json` | Array of NPCs with descriptions, dialogue IDs and availability conditions |
-| `monsters.json` | Array of unique monster instances with descriptions, HP, attack, XP and fixed loot |
+| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat` block |
+| `locations.json` | Array of locations with descriptions, directional exits and placed character IDs |
+| `characters.json` | Array of characters with descriptions, availability conditions, and optional dialogue and combat profile |
 | `items.json` | Array of items with names and descriptions |
-| `quests.json` | Array of quests with giver, defeat objective, prose, rewards and completion flags |
+| `quests.json` | Array of quests with giver, defeat or flag objective, prose, rewards and completion flags |
 | `dialogues.json` | Array of dialogue trees with nodes, choices, conditions and effects |
-| `narrative.json` | Combat template variants, victory template and death text |
 
 Empty content tables are `[]`; files must still exist. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
-Version 1 describes this initial schema; incompatible changes require an
-explicit version/migration decision.
+Version 2 describes this schema; incompatible changes require an explicit
+version/migration decision.
 
 IDs use ASCII letters, digits, `_` and `-`, with uniqueness within each entity
 table and within each dialogue's node list. IDs are machine handles; displayed
@@ -61,7 +64,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 1 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 2 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -105,7 +108,7 @@ explicit and does not require a universal z-axis.
 ```
 
 `requires` lists are AND conditions and default to empty. They can appear on
-exits, NPCs and dialogue choices. A condition tests either a declared flag or a
+exits, characters and dialogue choices. A condition tests either a declared flag or a
 quest state:
 
 ```json
@@ -116,19 +119,43 @@ Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags
 are monotonic in this version. Conditions govern availability/choice visibility.
 
-This flat conjunctive representation is a Format 1 limitation. The long-term
+This flat conjunctive representation is a Format 2 limitation. The long-term
 condition model uses pure typed predicates composed with `All / Any / Not`;
 predicates remain domain-specific and typed rather than becoming arbitrary
 expressions/property paths. Typed effects execute in authored order as part of the
 engine's atomic state transition.
 
-Each monster ID can appear at most once across all locations. This version has
-no separate monster templates/spawns and no respawns. Quest targets must be
-placed. NPCs may appear at several locations; conditions determine availability.
+## Characters
+
+Everyone in the world, including the player, is one entry in `characters.json`.
+Talking and fighting are optional components:
+
+```json
+[
+  { "id": "you", "name": "You", "description": "A stranger in Ashbell." },
+  { "id": "elder", "name": "Elder Mara", "description": "…", "dialogue": "mara" },
+  {
+    "id": "wolf",
+    "name": "The Ash Wolf",
+    "description": "…",
+    "combat": { "hp": 12, "attack": 4, "xp": 10, "loot": [{ "item": "ash_pelt", "quantity": 1 }] }
+  }
+]
+```
+
+`world.player` names the player character. It has no dialogue or combat profile
+and is placed nowhere; in a combat world its numbers come from the level table.
+A location's `characters` list places the others. A placed character is present
+while its `requires` conditions hold; the player can talk to it if it has a
+`dialogue` and attack it if it has a `combat` profile (positive `hp`, `attack`,
+`xp`, optional `loot`). A character with a combat profile is one instance: it
+may be placed at most once, and its defeat is permanent (no respawns). Other
+characters may appear at several locations. Combat profiles require the world's
+`combat` block.
 
 ## Dialogue and quests
 
-Format 1 has a single flat quest collection. The long-term model should retain
+Format 2 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -149,14 +176,38 @@ Choices are filtered and then numbered contiguously from one. Omitting `next`
 ends the conversation. A node with no visible choices displays its text and
 ends the conversation. Moving or attacking also closes the conversation.
 
-The first objective type is `{"kind":"defeat","monster":"wolf"}`. An active
-quest becomes ready when that instance dies. Accepting after its defeat makes
-the quest ready immediately. Accept/complete actions require the available
+A quest's `giver` must be a character with a dialogue. Its objective is one of:
+
+```json
+{ "kind": "defeat", "character": "wolf" }
+{ "kind": "flag", "flag": "map_found" }
+```
+
+A `defeat` objective needs the world's `combat` block and a placed character
+with a combat profile; an active quest becomes ready when that character is
+defeated. A `flag` objective names a declared flag; an active quest becomes
+ready when the flag is set, so a world without combat can still have a main
+questline. Accepting after the defeat or flag makes the quest ready immediately.
+`reward_xp` defaults to 0 and must stay 0 in a world without combat. Accept/complete actions require the available
 giver in the player's current location, whether invoked by dialogue or a direct
 command. Completion grants rewards once, sets flags, and emits stored completion
 prose. Dialogue visibility conditions are not additional quest prerequisites.
 
-## Numeric rules and templates
+## Combat block, numeric rules and templates
+
+The optional `combat` object in `world.json` holds `levels` and `narrative`:
+
+```json
+"combat": {
+  "levels": [{ "xp": 0, "hp": 24, "attack": 5 }, { "xp": 10, "hp": 30, "attack": 7 }],
+  "narrative": {
+    "attack": ["{attacker} strike. {target} takes {damage} damage."],
+    "hurt": ["{attacker} snaps at {target}: {damage} damage."],
+    "victory": "{target} falls still.",
+    "death": "Your journey has ended."
+  }
+}
+```
 
 Level entries supply cumulative `xp`, maximum `hp` and `attack`. The first
 entry requires zero XP; thresholds strictly increase. HP/attack are positive
@@ -176,7 +227,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 1 currently selects combat prose variants from the current
+Format 2 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -197,7 +248,10 @@ any are errors. `load()` validates before returning a playable world. File I/O
 and JSON syntax/type errors retain the file path and underlying error.
 
 Checks include version, IDs, references, dialogue links/effects, declared flags,
-level rules, HP, loot quantities, monster placement and template placeholders.
+the player character, quest givers and targets, combat content in worlds
+without combat (`combat_disabled`), level rules, HP, loot quantities, fighter
+placement and template placeholders. `load()` reports a package whose
+`format_version` is not 2 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.
