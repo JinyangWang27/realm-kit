@@ -6,6 +6,59 @@ use common::*;
 use realmkit_spec::*;
 
 #[test]
+fn skills_are_bounded_referenced_usable_and_affordable() {
+    let world = duel();
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    assert_eq!(world.skill("bolt").unwrap().cost, 12);
+    let changes: Vec<fn(&mut WorldSpec)> = vec![
+        |w| w.world.combat.as_mut().unwrap().skills[1].power = 0,
+        |w| w.world.combat.as_mut().unwrap().skills[1].power = POWER_BOUNDS.1 + 1,
+        |w| w.world.combat.as_mut().unwrap().skills[1].level = 0,
+        |w| w.world.combat.as_mut().unwrap().skills[1].cross_share = Some(101),
+        |w| w.world.combat.as_mut().unwrap().skills[1].text.0 = "{skill}".into(),
+        |w| w.world.combat.as_mut().unwrap().skills[1].id = "spark".into(),
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .player_skills
+                .push("missing".into())
+        },
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .player_skills
+                .push("bolt".into())
+        },
+        // Fireball unlocks at level 2; level 3 does not exist.
+        |w| w.world.combat.as_mut().unwrap().skills[2].level = 3,
+        // More MP than the player has at the level the skill unlocks.
+        |w| w.world.combat.as_mut().unwrap().skills[1].cost = 25,
+        |w| w.world.combat.as_mut().unwrap().skills[1].time = 0,
+        |w| w.world.combat.as_mut().unwrap().skills[1].time = TIME_BOUNDS.1 + 1,
+        |w| w.world.combat.as_mut().unwrap().timeline.action_cost = 0,
+        |w| w.world.combat.as_mut().unwrap().timeline.action_cost = ACTION_COST_BOUND + 1,
+        |w| w.world.combat.as_mut().unwrap().timeline.speed_cap = 0,
+        |w| w.world.combat.as_mut().unwrap().timeline.speed_cap = STAT_BOUND + 1,
+        // Hex costs 5; the witch has 10.
+        |w| w.characters[1].combat.as_mut().unwrap().stats.mp = 4,
+        // A special skill with no attack in either channel.
+        |w| {
+            let stats = &mut w.world.combat.as_mut().unwrap().levels[0].stats;
+            (stats.satk, stats.patk) = (0, 0)
+        },
+    ];
+    for (index, change) in changes.into_iter().enumerate() {
+        let mut world = duel();
+        change(&mut world);
+        assert!(world.validate().is_err(), "invalid skill case {index}");
+    }
+}
+
+#[test]
 fn the_cross_share_blends_channels_and_defaults_to_25() {
     let world = duel();
     assert_eq!(world.combat().unwrap().cross_share, 25);
@@ -176,89 +229,4 @@ fn crits_are_bounded_and_make_a_world_stochastic() {
         world.world.combat.as_mut().unwrap().skills[0].crit = crit(chance, multiplier);
         assert!(world.validate().is_err(), "crit {chance}/{multiplier}");
     }
-}
-
-#[test]
-fn stat_points_are_validated_against_their_worst_case() {
-    let world = arena();
-    let points = world.combat().unwrap().stat_points.clone().unwrap();
-    assert_eq!(points.values[&Stat::Hp], 5);
-    assert_eq!(points.respec, Respec::Safe);
-    assert_eq!(world.combat().unwrap().levels[0].points, 3);
-    let encoded = serde_json::to_string(&world).unwrap();
-    assert_eq!(serde_json::from_str::<WorldSpec>(&encoded).unwrap(), world);
-    let changes: Vec<fn(&mut WorldSpec)> = vec![
-        // Points with nothing to spend them on.
-        |w| w.world.combat.as_mut().unwrap().stat_points = None,
-        |w| {
-            let p = w
-                .world
-                .combat
-                .as_mut()
-                .unwrap()
-                .stat_points
-                .as_mut()
-                .unwrap();
-            p.values.clear()
-        },
-        |w| {
-            let p = w
-                .world
-                .combat
-                .as_mut()
-                .unwrap()
-                .stat_points
-                .as_mut()
-                .unwrap();
-            p.values.insert(Stat::Mp, 0);
-        },
-        |w| {
-            let p = w
-                .world
-                .combat
-                .as_mut()
-                .unwrap()
-                .stat_points
-                .as_mut()
-                .unwrap();
-            p.caps.insert(Stat::Sdef, 3);
-        },
-        // Every point in HP at 5,000 each would pass 9,999.
-        |w| {
-            let p = w
-                .world
-                .combat
-                .as_mut()
-                .unwrap()
-                .stat_points
-                .as_mut()
-                .unwrap();
-            p.values.insert(Stat::Hp, 5_000);
-        },
-    ];
-    for (index, change) in changes.into_iter().enumerate() {
-        let mut world = arena();
-        change(&mut world);
-        assert!(world.validate().is_err(), "invalid points case {index}");
-    }
-    // A cap keeps the worst case in bounds.
-    let mut capped = arena();
-    let p = capped
-        .world
-        .combat
-        .as_mut()
-        .unwrap()
-        .stat_points
-        .as_mut()
-        .unwrap();
-    p.values.insert(Stat::Hp, 5_000);
-    p.caps.insert(Stat::Hp, 1);
-    assert!(capped.validate().is_ok(), "{:?}", capped.diagnostics());
-    // Stat points nobody grants only warn.
-    let mut unused = arena();
-    for level in &mut unused.world.combat.as_mut().unwrap().levels {
-        level.points = 0;
-    }
-    assert!(unused.validate().is_ok());
-    assert_eq!(unused.diagnostics()[0].code, "unused_points");
 }

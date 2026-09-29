@@ -327,17 +327,3 @@ fn untouched_participants_at_a_full_yield_share_save_and_load() {
         outcome: Outcome::Victory
     }));
 }
-
-#[test]
-fn splitmix64_produces_its_published_sequence() {
-    let mut state = 0;
-    let outputs: Vec<u64> = (0..3).map(|_| splitmix64(&mut state)).collect();
-    assert_eq!(
-        outputs,
-        [
-            0xe220_a839_7b1d_cdaf,
-            0x6e78_9e6a_a1b9_65f4,
-            0x06c4_5d18_8009_454f
-        ]
-    );
-}

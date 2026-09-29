@@ -7,6 +7,20 @@ use realmkit_engine::{Command::*, *};
 use realmkit_spec::{Direction::*, *};
 
 #[test]
+fn splitmix64_produces_its_published_sequence() {
+    let mut state = 0;
+    let outputs: Vec<u64> = (0..3).map(|_| splitmix64(&mut state)).collect();
+    assert_eq!(
+        outputs,
+        [
+            0xe220_a839_7b1d_cdaf,
+            0x6e78_9e6a_a1b9_65f4,
+            0x06c4_5d18_8009_454f
+        ]
+    );
+}
+
+#[test]
 fn a_world_without_random_content_keeps_no_generator() {
     for world in [demo(), duel(), archive()] {
         assert!(!world.stochastic());
