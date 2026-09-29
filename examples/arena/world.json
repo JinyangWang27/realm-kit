@@ -26,7 +26,8 @@
         "channel": "physical",
         "cost": 5,
         "resource": "rage",
-        "text": "{attacker} bring the practice sword down hard. {target} takes {damage} damage."
+        "text": "{attacker} bring the practice sword down hard. {target} takes {damage} damage.",
+        "crit": { "chance_percent": 25, "multiplier_percent": 150 }
       },
       {
         "id": "smash",
@@ -36,7 +37,8 @@
         "cost": 5,
         "resource": "rage",
         "level": 3,
-        "text": "{attacker} smashes {target} with a fist like a millstone: {damage} damage."
+        "text": "{attacker} smashes {target} with a fist like a millstone: {damage} damage.",
+        "crit": { "chance_percent": 20, "multiplier_percent": 150 }
       },
       {
         "id": "crush",

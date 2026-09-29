@@ -506,19 +506,19 @@ fn crits_are_bounded_and_make_a_world_stochastic() {
             multiplier_percent,
         })
     };
-    assert!(!arena().stochastic() && !duel().stochastic() && !archive().stochastic());
-    let mut skill = arena();
+    assert!(!duel().stochastic() && !archive().stochastic() && arena().stochastic());
+    let mut skill = duel();
     skill.world.combat.as_mut().unwrap().skills[0].crit = crit(25, 150);
-    let mut basic = arena();
+    let mut basic = duel();
     basic.world.combat.as_mut().unwrap().player_basic_crit = crit(100, 101);
-    let mut foe = arena();
-    fighter(&mut foe, "ogre").basic_crit = crit(1, 1_000);
+    let mut foe = duel();
+    fighter(&mut foe, "witch").basic_crit = crit(1, 1_000);
     for world in [skill, basic, foe] {
         assert!(world.stochastic());
         assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
     }
     for (chance, multiplier) in [(0, 150), (101, 150), (25, 100), (25, 1_001)] {
-        let mut world = arena();
+        let mut world = duel();
         world.world.combat.as_mut().unwrap().skills[0].crit = crit(chance, multiplier);
         assert!(world.validate().is_err(), "crit {chance}/{multiplier}");
     }
