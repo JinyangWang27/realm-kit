@@ -141,11 +141,12 @@ pub(super) fn grant_xp(
         if combat.xp < level.xp {
             break;
         }
-        // Levelling up restores HP and MP fully.
+        // Levelling up restores HP and MP fully, to the effective maxima.
         combat.level += 1;
+        let max = player_stats(world, combat);
         combat.stance = Stance::Exploring(Vitals {
-            hp: level.stats.hp,
-            mp: level.stats.mp,
+            hp: max.hp,
+            mp: max.mp,
         });
         events.push(Event::LevelUp {
             level: combat.level,
@@ -412,12 +413,14 @@ pub(super) fn execute(
                 .ok_or(EngineError::UnknownSkill(skill))?;
             encounter::player_action(world, state, target, Some(skill), &mut events)?
         }
+        Command::Allocate { stat, points } => allocate(world, state, stat, points, &mut events)?,
+        Command::Respec => respec(world, state, &mut events)?,
         Command::Rest => {
             let safe = world.location(&state.player.location).unwrap().safe;
             let Some(combat) = state.combat.as_mut().filter(|_| safe) else {
                 return Err(EngineError::NotSafe);
             };
-            let stats = player_stats(world, combat.level);
+            let stats = player_stats(world, combat);
             combat.stance = Stance::Exploring(Vitals {
                 hp: stats.hp,
                 mp: stats.mp,
@@ -429,6 +432,88 @@ pub(super) fn execute(
     Ok(events)
 }
 
-pub(super) fn player_stats(world: &WorldSpec, level: usize) -> Stats {
-    world.combat().unwrap().levels[level - 1].stats
+/// Effective stats: the level table plus allocated stat points. Derived
+/// whenever needed, never saved, so no bonus can be counted twice.
+pub(super) fn player_stats(world: &WorldSpec, combat: &CombatState) -> Stats {
+    let rules = world.combat().unwrap();
+    let mut stats = rules.levels[combat.level - 1].stats;
+    if let Some(points) = &rules.stat_points {
+        for (stat, spent) in &combat.allocation {
+            let value = points.values.get(stat).copied().unwrap_or(0);
+            let total = stats.get_mut(*stat);
+            *total = total.saturating_add(spent.saturating_mul(value));
+        }
+    }
+    stats
+}
+
+/// Points granted by every level reached, minus those spent.
+pub(super) fn granted_points(world: &WorldSpec, level: usize) -> u64 {
+    let levels = &world.combat().unwrap().levels;
+    levels[..level].iter().map(|l| u64::from(l.points)).sum()
+}
+
+pub(super) fn unspent_points(world: &WorldSpec, combat: &CombatState) -> u32 {
+    let spent: u64 = combat.allocation.values().map(|p| u64::from(*p)).sum();
+    u32::try_from(granted_points(world, combat.level).saturating_sub(spent)).unwrap_or(u32::MAX)
+}
+
+/// Spends points on one stat; the gained maximum HP or MP is gained now too.
+fn allocate(
+    world: &WorldSpec,
+    state: &mut GameState,
+    stat: Stat,
+    points: u32,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let rules = world.combat().ok_or(EngineError::NoSuchStat)?;
+    let spec = rules.stat_points.as_ref().ok_or(EngineError::NoSuchStat)?;
+    let value = *spec.values.get(&stat).ok_or(EngineError::NoSuchStat)?;
+    let combat = state.combat.as_mut().unwrap();
+    if points == 0 || points > unspent_points(world, combat) {
+        return Err(EngineError::NotEnoughPoints);
+    }
+    let spent = combat.allocation.get(&stat).copied().unwrap_or(0);
+    let total = spent
+        .checked_add(points)
+        .ok_or(EngineError::NotEnoughPoints)?;
+    if spec.caps.get(&stat).is_some_and(|cap| total > *cap) {
+        return Err(EngineError::PointCap);
+    }
+    combat.allocation.insert(stat, total);
+    let gain = points.saturating_mul(value);
+    if let Stance::Exploring(vitals) = &mut combat.stance {
+        match stat {
+            Stat::Hp => vitals.hp = vitals.hp.saturating_add(gain),
+            Stat::Mp => vitals.mp = vitals.mp.saturating_add(gain),
+            _ => {}
+        }
+    }
+    events.push(Event::PointsAllocated { stat, points });
+    Ok(())
+}
+
+/// Refunds every point where the world allows it; HP and MP keep what fits.
+fn respec(
+    world: &WorldSpec,
+    state: &mut GameState,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let allowed = world
+        .combat()
+        .and_then(|c| c.stat_points.as_ref())
+        .is_some_and(|p| p.respec == Respec::Safe);
+    let safe = world.location(&state.player.location).unwrap().safe;
+    if !allowed || !safe {
+        return Err(EngineError::NoRespec);
+    }
+    let combat = state.combat.as_mut().unwrap();
+    combat.allocation.clear();
+    let max = player_stats(world, combat);
+    if let Stance::Exploring(vitals) = &mut combat.stance {
+        vitals.hp = vitals.hp.min(max.hp);
+        vitals.mp = vitals.mp.min(max.mp);
+    }
+    events.push(Event::PointsRefunded);
+    Ok(())
 }

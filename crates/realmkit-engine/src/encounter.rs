@@ -18,11 +18,19 @@ pub(super) fn baseline_turn(timeline: &Timeline) -> Result<u64, EngineError> {
     delay(timeline, 100, 100)
 }
 
-/// A participant's stats: the player's from the level table, anyone else's
+/// The player during an encounter: level (for skill unlocks) and effective
+/// stats, which cannot change until the encounter ends.
+#[derive(Clone, Copy)]
+pub(super) struct Me {
+    pub level: usize,
+    pub stats: Stats,
+}
+
+/// A participant's stats: the player's effective stats, anyone else's
 /// from their combat profile.
-pub(super) fn stats(world: &WorldSpec, level: usize, p: &Participant) -> Stats {
+pub(super) fn stats(world: &WorldSpec, player: Stats, p: &Participant) -> Stats {
     match p.control {
-        Control::Player => rules::player_stats(world, level),
+        Control::Player => player,
         Control::Policy => profile(world, &p.character).stats,
     }
 }
@@ -98,7 +106,7 @@ pub(super) fn engage(
     let Stance::Exploring(vitals) = combat.stance else {
         return Err(EngineError::InEncounter);
     };
-    let player = rules::player_stats(world, combat.level);
+    let player = rules::player_stats(world, combat);
     let opponents: Vec<(Id, Stats)> = opponents_for(world, state, &id)
         .into_iter()
         .map(|c| (c.clone(), profile(world, &c).stats))
@@ -197,11 +205,11 @@ pub(super) fn flee(
     state: &mut GameState,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
-    let (encounter, level) = fighting(&mut state.combat)?;
+    let (encounter, me) = fighting(world, &mut state.combat)?;
     if group(world, encounter).is_some_and(|g| g.no_flee) {
         return Err(EngineError::NoFlee);
     }
-    let speed = rules::player_stats(world, level).speed;
+    let speed = me.stats.speed;
     let step = delay(&world.combat().unwrap().timeline, speed, 100)?;
     let player = &mut encounter.participants[0];
     player.next_time = player
@@ -212,10 +220,17 @@ pub(super) fn flee(
     advance(world, state, events, true)
 }
 
-fn fighting(combat: &mut Option<CombatState>) -> Result<(&mut Encounter, usize), EngineError> {
+fn fighting<'s>(
+    world: &WorldSpec,
+    combat: &'s mut Option<CombatState>,
+) -> Result<(&'s mut Encounter, Me), EngineError> {
     let combat = combat.as_mut().ok_or(EngineError::NotFighting)?;
+    let me = Me {
+        level: combat.level,
+        stats: rules::player_stats(world, combat),
+    };
     match &mut combat.stance {
-        Stance::Fighting(encounter) => Ok((encounter, combat.level)),
+        Stance::Fighting(encounter) => Ok((encounter, me)),
         Stance::Exploring(_) => Err(EngineError::NotFighting),
     }
 }
@@ -230,7 +245,7 @@ pub(super) fn player_action(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let turn = state.turn;
-    let (encounter, level) = fighting(&mut state.combat)?;
+    let (encounter, me) = fighting(world, &mut state.combat)?;
     let index = encounter
         .participants
         .iter()
@@ -239,12 +254,12 @@ pub(super) fn player_action(
     // Advancing stops at the player's turn, already regenerated, so the
     // player acts now with the MP they see.
     if let Some(skill) = skill {
-        check_skill(&encounter.participants[0], level, skill)?;
+        check_skill(&encounter.participants[0], me.level, skill)?;
     }
     act(
         world,
         encounter,
-        level,
+        me,
         turn,
         &mut state.rng,
         0,
@@ -259,7 +274,7 @@ pub(super) fn player_action(
 fn tick(
     world: &WorldSpec,
     encounter: &mut Encounter,
-    level: usize,
+    me: Me,
     actor: usize,
 ) -> Result<(), EngineError> {
     let rules = world.combat().unwrap();
@@ -267,7 +282,7 @@ fn tick(
     let elapsed = at - encounter.now;
     let per_point = 100 * u128::from(baseline_turn(&rules.timeline)?);
     for p in &mut encounter.participants {
-        let max = stats(world, level, p).mp;
+        let max = stats(world, me.stats, p).mp;
         // Time spent at full MP banks nothing, so the remainder drops at the cap.
         let progress = u128::from(p.mp_remainder)
             + u128::from(max) * u128::from(rules.resources.mp_regen_percent) * u128::from(elapsed);
@@ -290,7 +305,7 @@ fn tick(
 fn act(
     world: &WorldSpec,
     encounter: &mut Encounter,
-    level: usize,
+    me: Me,
     turn: u64,
     rng: &mut Option<RngState>,
     actor: usize,
@@ -303,7 +318,7 @@ fn act(
         &encounter.participants[actor],
         &encounter.participants[target],
     );
-    let (attacker, defender) = (stats(world, level, a), stats(world, level, t));
+    let (attacker, defender) = (stats(world, me.stats, a), stats(world, me.stats, t));
     let (channel, power, share) = match skill {
         Some(s) => (
             s.channel,
@@ -420,7 +435,7 @@ fn advance(
 ) -> Result<(), EngineError> {
     let turn = state.turn;
     loop {
-        let (encounter, level) = fighting(&mut state.combat)?;
+        let (encounter, me) = fighting(world, &mut state.combat)?;
         let player = &encounter.participants[0];
         if player.hp == 0 {
             return Ok(());
@@ -437,7 +452,7 @@ fn advance(
         let actor = next_actor(encounter).unwrap();
         // Everyone regenerates up to the next turn before it is taken; the
         // player's turn then waits for a command.
-        tick(world, encounter, level, actor)?;
+        tick(world, encounter, me, actor)?;
         if encounter.participants[actor].control == Control::Player {
             return if fleeing {
                 end(world, state, Outcome::Fled, events)
@@ -456,7 +471,7 @@ fn advance(
         act(
             world,
             encounter,
-            level,
+            me,
             turn,
             &mut state.rng,
             actor,
@@ -544,7 +559,8 @@ pub(super) fn turn_order(world: &WorldSpec, state: &GameState, n: usize) -> Vec<
             break;
         };
         let p = &projected.participants[i];
-        let Ok(step) = delay(&timeline, stats(world, combat.level, p).speed, 100) else {
+        let player = rules::player_stats(world, combat);
+        let Ok(step) = delay(&timeline, stats(world, player, p).speed, 100) else {
             break;
         };
         order.push(p.character.clone());
