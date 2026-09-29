@@ -1135,9 +1135,9 @@ fn a_skill_paid_for_by_regeneration_up_to_the_players_turn_is_usable() {
 }
 
 #[test]
-fn a_huge_action_cost_saves_and_restores_without_overflow() {
+fn the_largest_action_cost_saves_and_restores_without_overflow() {
     let mut world = duel();
-    world.world.combat.as_mut().unwrap().timeline.action_cost = u64::MAX;
+    world.world.combat.as_mut().unwrap().timeline.action_cost = ACTION_COST_BOUND;
     let engine = engaged(&world);
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }

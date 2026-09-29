@@ -58,7 +58,8 @@ pub struct Menu {
     header: Vec<String>,
 }
 
-const NEXT: &str = "Next";
+/// The engine projects turns as if every action took a basic action's time.
+const NEXT: &str = "Projected turns";
 const TURNS_SHOWN: usize = 5;
 
 /// "You HP 36/40 · rage 2 | The Ash Wolf HP 13/20" and the next few turns.

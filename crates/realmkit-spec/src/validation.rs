@@ -520,12 +520,15 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
     }
     share(out, owner, combat.cross_share);
     let timeline = combat.timeline;
-    if timeline.action_cost == 0 || timeline.speed_cap == 0 || timeline.speed_cap > STAT_BOUND {
+    if !(1..=ACTION_COST_BOUND).contains(&timeline.action_cost)
+        || timeline.speed_cap == 0
+        || timeline.speed_cap > STAT_BOUND
+    {
         issue(
             out,
             owner,
             "invalid_timeline",
-            format!("action cost must be positive and the speed cap from 1 to {STAT_BOUND}"),
+            format!("action cost must be from 1 to {ACTION_COST_BOUND} and the speed cap from 1 to {STAT_BOUND}"),
         );
     }
     // Unused constants are harmless, so they only warn.

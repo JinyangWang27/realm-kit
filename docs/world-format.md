@@ -302,8 +302,9 @@ participant order. Each command resolves the player's attack or skill, then
 every opponent's turn until the player's next turn or the end; an opponent uses
 its strongest affordable skill (equal power prefers the cheaper one, then the
 later tier), else its basic attack. Only attacks, skills and panels work during
-a fight. `action_cost` only sets integer precision; 100,000 gives every speed up
-to 255 its own delay.
+a fight. `action_cost` (1 to 10^12) only sets integer precision; 100,000 gives
+every speed up to 255 its own delay. Clients may show the next few turns, labelled
+as a projection that assumes basic-action times.
 
 MP regenerates during encounters at `mp_regen_percent` of maximum MP per
 baseline turn (one basic action at speed 100) of elapsed time, carrying the

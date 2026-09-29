@@ -100,6 +100,9 @@ pub enum Resource {
 
 /// Engine bound for every authored stat; keeps damage arithmetic small.
 pub const STAT_BOUND: u32 = 9_999;
+/// Upper bound for a timeline's action cost: enough precision for any speed
+/// cap, and small enough that timeline arithmetic stays within `u64`.
+pub const ACTION_COST_BOUND: u64 = 1_000_000_000_000;
 /// Skill power is a percentage of a basic attack, which is 100.
 pub const POWER_BOUNDS: (u32, u32) = (1, 1_000);
 pub const BASIC_POWER: u32 = 100;

@@ -316,6 +316,7 @@ fn skills_are_bounded_referenced_usable_and_affordable() {
         |w| w.world.combat.as_mut().unwrap().skills[1].cost = 25,
         |w| w.world.combat.as_mut().unwrap().skills[1].time = 0,
         |w| w.world.combat.as_mut().unwrap().timeline.action_cost = 0,
+        |w| w.world.combat.as_mut().unwrap().timeline.action_cost = ACTION_COST_BOUND + 1,
         |w| w.world.combat.as_mut().unwrap().timeline.speed_cap = 0,
         |w| w.world.combat.as_mut().unwrap().timeline.speed_cap = STAT_BOUND + 1,
         // Hex costs 5; the witch has 10.
