@@ -1106,12 +1106,12 @@ scheduling and persistence policies have reproducible tests. No runtime AI.
 This is the immediate combat-oriented subset. The complete cross-project list is
 maintained in the [open-decisions register](docs/open-decisions.md).
 
-1. Confirm the [encounter model](#combatants-and-encounters--proposed): `Engage`
-   on any character with a combat profile, authored groups, sides, player or
-   policy control, tie order and vitals ownership. Confirm that very fast actors
-   can take several consecutive turns as in the timeline example.
-2. Confirm speed cap 200 at baseline 100 and action cost 100,000. Armour speed
-   penalties move to M4 with equipment.
+1. The [encounter model](#combatants-and-encounters--proposed) is decided:
+   `Engage` on any character with a combat profile, authored groups, sides,
+   player or policy control, tie order and vitals ownership. Very fast actors
+   can take several consecutive turns, as in the timeline example.
+2. Speed cap 200 at baseline 100 and action cost 100,000 are decided. Armour
+   speed penalties move to M4 with equipment.
 3. Confirm the [stat ranges](#stat-ranges-and-caps--proposed): the 9,999 engine
    bound and no other stat caps in M3. Confirm the
    [balance targets](#balance-simulation--proposed), the K-free damage formula
@@ -1120,9 +1120,10 @@ maintained in the [open-decisions register](docs/open-decisions.md).
    [optional parts](#optional-parts-of-combat--proposed) and that power comes from
    stats, never level. Confirm repeatable groups and `Flee` in M3c for
    grinding.
-4. Confirm the [skill resources](#skill-resources): MP regenerating over
-   encounter time and by resting, and rage built from actions and damage taken.
-   MP costs are flat, exactly as authored (decided).
+4. The [skill resources](#skill-resources) are decided: MP regenerating over
+   encounter time and by resting, rage built from actions and damage taken,
+   and flat MP costs exactly as authored. The regeneration and rage constants
+   are authored per world, so they stay easy to retune.
 5. Confirm the two channels, physical and special, and a 25% cross share. The
    world names the special channel with a required `special_name` (decided).
    Immunity, vulnerability and modifier stacking are deferred to M4.
@@ -1133,5 +1134,4 @@ maintained in the [open-decisions register](docs/open-decisions.md).
    numbers.
 
 M3a and M3b are delivered; M3b implemented decisions 3 and 5 as proposed.
-Settle 1, 2 and 4 before M3c: the speed cap and action cost only matter once
-the timeline exists.
+Decisions 1, 2 and 4 are settled for M3c.
