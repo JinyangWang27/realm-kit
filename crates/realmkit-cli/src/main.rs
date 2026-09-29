@@ -9,6 +9,7 @@ use std::{
 mod input;
 mod keys;
 mod menu;
+mod panels;
 mod play;
 mod render;
 mod saves;
