@@ -235,10 +235,13 @@ fn encounter_state(
     let vitals_ok = encounter.participants.iter().all(|p| {
         let max = encounter::stats(world, combat.level, p);
         // In a yielding group nobody dies, and a participant has yielded exactly
-        // when a hit left it at or below its threshold; elsewhere nobody yields.
+        // when a hit left it at or below its threshold. An untouched participant
+        // at full HP has not yielded even if full HP is within the threshold
+        // (a 100% share). Elsewhere nobody yields.
         let yield_ok = match yield_share {
             Some(share) => {
-                p.hp > 0 && p.yielded == (p.hp <= encounter::yield_threshold(max.hp, share))
+                let low = p.hp <= encounter::yield_threshold(max.hp, share);
+                p.hp > 0 && (p.yielded == low || (!p.yielded && p.hp == max.hp))
             }
             None => !p.yielded,
         };

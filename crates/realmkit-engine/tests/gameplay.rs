@@ -1501,3 +1501,20 @@ fn a_save_after_one_sparring_partner_yields_still_loads() {
         );
     }
 }
+
+#[test]
+fn untouched_participants_at_a_full_yield_share_save_and_load() {
+    // At a 100% share everyone starts within the threshold, but nobody has
+    // yielded before the first hit; the player acts first on the tie.
+    let mut world = arena();
+    world.world.combat.as_mut().unwrap().groups[2].yield_share = Some(100);
+    let mut engine = at(&world, West);
+    engine.execute(Engage("holt".into())).unwrap();
+    assert!(!engine.encounter().unwrap().participants[1].yielded);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+    // The first touch ends the bout.
+    let events = engine.execute(Attack("holt".into())).unwrap();
+    assert!(events.contains(&Event::EncounterEnded {
+        outcome: Outcome::Victory
+    }));
+}
