@@ -1,6 +1,6 @@
-# World package format 3
+# World package format 4
 
-Format 3 makes combat optional. The level table and combat prose live in an
+Format 4 makes combat optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -15,11 +15,15 @@ there is no migration. Convert them by hand:
   block, then apply the Format 2 steps.
 - **Format 2** (M3a; `hp` and `attack` on level entries and combat profiles):
   replace them with a seven-stat `stats` object and add `special_name` to the
-  combat block. A world without combat only needs its `format_version` raised.
+  combat block, then apply the Format 3 steps.
+- **Format 3** (M3b; no timeline): add a `timeline` to the combat block, and
+  `resources` if skills should regenerate MP or build rage in fights.
 
-Format 3 represents one fixed player-controlled character and one playable
+A world without combat only needs its `format_version` raised.
+
+Format 4 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 3 does not serialize a route collection
+stable logical route ID `default`; Format 4 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -34,7 +38,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 3 also requires item and quest tables because they serve the current demo.
+Format 4 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -69,7 +73,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 3 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 4 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -124,7 +128,7 @@ Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags
 are monotonic in this version. Conditions govern availability/choice visibility.
 
-This flat conjunctive representation is a Format 3 limitation. The long-term
+This flat conjunctive representation is a Format 4 limitation. The long-term
 condition model uses pure typed predicates composed with `All / Any / Not`;
 predicates remain domain-specific and typed rather than becoming arbitrary
 expressions/property paths. Typed effects execute in authored order as part of the
@@ -167,7 +171,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 3 has a single flat quest collection. The long-term model should retain
+Format 4 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -215,6 +219,8 @@ combat prose:
 "combat": {
   "special_name": "Witchcraft",
   "cross_share": 25,
+  "timeline": { "action_cost": 100000, "speed_cap": 200 },
+  "resources": { "mp_regen_percent": 3, "rage_per_action": 1, "rage_per_max_hp": 20 },
   "levels": [
     { "xp": 0, "stats": { "hp": 34, "mp": 24, "patk": 3, "pdef": 4, "satk": 10, "sdef": 6, "speed": 100 } },
     { "xp": 12, "stats": { "hp": 40, "mp": 30, "patk": 3, "pdef": 5, "satk": 12, "sdef": 7, "speed": 100 } }
@@ -245,8 +251,7 @@ combat prose:
 Every level entry and combat profile has seven `stats`: `hp`, `mp` (optional,
 default 0), physical attack and defence `patk`/`pdef`, special attack and
 defence `satk`/`sdef`, and `speed`. Each is at most 9,999, and HP and speed are
-at least 1. Speed is authored and validated now but has no effect until
-encounters run on a timeline (M3c).
+at least 1. Speed sets how often a character acts in an encounter.
 
 Level entries supply cumulative `xp` and the player's stats at that level. The
 first entry requires zero XP; thresholds strictly increase; no stat decreases
@@ -269,19 +274,51 @@ capped at the target's remaining HP. Defence equal to the combined attack
 halves damage; no scale constant or character level enters.
 
 A skill has an `id`, `name`, `power` (1–1,000; a basic attack is 100), a
-`channel`, an MP `cost` (default 0, spent exactly as authored), the `level` at
-which the player can use it (default 1), an optional `cross_share` overriding
-the world's, and its own `text` template (`{attacker}`, `{target}`,
-`{damage}`). `player_skills` lists the player's skills; `player_basic_channel`
+`channel`, a `cost` (default 0, spent exactly as authored) in its `resource`
+(`mp`, the default, or `rage`), an action `time` in percent of a basic attack
+(default 100), the `level` at which the player can use it (default 1), an
+optional `cross_share` overriding the world's, and its own `text` template
+(`{attacker}`, `{target}`, `{damage}`). `player_skills` lists the player's skills; `player_basic_channel`
 and a profile's `basic_channel` set the channel of each character's basic
 attack. Every usable skill and basic attack needs attack in its channel, and
-every skill must be affordable with the MP its user has when it unlocks.
+every MP skill must be affordable with the MP its user has when it unlocks;
+rage builds up during a fight, so rage costs have no such ceiling.
 
-Attacking or using a skill resolves the player's hit, then a surviving opponent
-answers at once with its strongest affordable skill (equal power prefers the
-cheaper one), else its basic attack. Opponents keep their HP and MP between
-attacks. A location with `"safe": true` lets the player `rest`, restoring HP
-and MP; it needs the combat block.
+### Encounters
+
+`engage` starts an encounter with a fighter at the player's location; it then
+owns everyone's HP and MP until it ends. Each participant acts on a paused
+initiative timeline: an action of `time` percent delays its actor's next turn
+by
+
+```text
+delay = max(1, ceil(action_cost × time / (100 × min(speed, speed_cap))))
+```
+
+ticks (speed at least 1). Everyone's first turn follows one opening delay, so a
+faster opponent may act before the player's first command, and a much faster
+one may act several times in a row. Ties go to the player's side, then to
+participant order. Each command resolves the player's attack or skill, then
+every opponent's turn until the player's next turn or the end; an opponent uses
+its strongest affordable skill (equal power prefers the cheaper one, then the
+later tier), else its basic attack. Only attacks, skills and panels work during
+a fight. `action_cost` only sets integer precision; 100,000 gives every speed up
+to 255 its own delay.
+
+MP regenerates during encounters at `mp_regen_percent` of maximum MP per
+baseline turn (one basic action at speed 100) of elapsed time, carrying the
+fraction; time at full MP banks nothing. Rage starts at 0 in every encounter,
+grows by `rage_per_action` after each of the actor's own actions (so an actor
+one point short cannot spend what its own action earns), and by
+`rage_per_max_hp` for taking damage equal to its maximum HP, proportionally and
+cumulatively. Rage never outlasts the encounter; `resources` defaults to zero,
+which leaves either resource unused.
+
+Defeating every opponent ends the encounter: the player's HP and MP return to
+exploring, each defeated opponent's loot and XP are granted once, and defeat
+objectives advance. A defeated character stays defeated. A location with
+`"safe": true` lets the player `rest` outside encounters, restoring HP and MP;
+it needs the combat block.
 
 `attack` and `hurt` each require at least one template; they narrate basic
 attacks, while skills use their own `text`. They allow
@@ -297,7 +334,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 3 currently selects combat prose variants from the current
+Format 4 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -322,7 +359,7 @@ the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
 skill references, usable and affordable skills, loot quantities, fighter
 placement and template placeholders. `load()` reports a package whose
-`format_version` is not 3 as `SpecError::UnsupportedFormat` before parsing it.
+`format_version` is not 4 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.

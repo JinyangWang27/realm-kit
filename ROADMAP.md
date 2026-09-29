@@ -279,7 +279,13 @@ balance decisions.
    described in [Combatants and encounters](#combatants-and-encounters--proposed).
    Grinding arrives here too: repeatable encounter groups and `Flee`, along with
    authored yielding. Fixtures cover a 1v1 duel, a 1v2 pack, a repeatable hunting
-   ground, a fled fight and a sparring match that ends in a yield.
+   ground, a fled fight and a sparring match that ends in a yield. Delivered in
+   two parts. **M3c-1 · delivered:** one-opponent encounters, the timeline,
+   rage and in-fight MP regeneration, the projected turn order and
+   mid-encounter saves, matching `scripts/combat_sim` exactly (package and save
+   format 4); defeated characters replace M3a's persistent opponent vitals.
+   **M3c-2:** groups and packs, repeatable groups, `Flee`, yielding, opponent
+   levels with level-gated skills, and XP falloff.
 4. **M3d — seeded RNG and critical hits (optional).** A small hand-written,
    versioned PRNG such as SplitMix64 or PCG32 with saved state. Do not use
    `rand`'s `StdRng`: its output is not guaranteed stable across versions, which
