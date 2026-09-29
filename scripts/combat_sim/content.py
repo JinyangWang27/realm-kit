@@ -1,4 +1,5 @@
 """Tuned values: builds, skills and sample opponents. Swap these to prototype."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
@@ -25,11 +26,13 @@ class Content:
     # 9,999 bound at 10% growth per level. Opponents author their own XP on their profiles.
     level_table: tuple[int, ...] = tuple(50 * (level - 1) * level for level in range(1, 36))
     # Normal, minion and boss are the same character scaled: a sim shortcut, not an engine concept.
-    tiers: dict[Kind, Tier] = field(default_factory=lambda: {
-        Kind.NORMAL: Tier(1.0, 1.0),
-        Kind.MINION: Tier(0.5, 0.6),
-        Kind.BOSS: Tier(4.0, 1.3),
-    })
+    tiers: dict[Kind, Tier] = field(
+        default_factory=lambda: {
+            Kind.NORMAL: Tier(1.0, 1.0),
+            Kind.MINION: Tier(0.5, 0.6),
+            Kind.BOSS: Tier(4.0, 1.3),
+        }
+    )
 
     @property
     def builds(self) -> tuple[Profile, ...]:
@@ -43,9 +46,12 @@ class Content:
     def scaled(self, opponent: Profile, kind: Kind) -> Profile:
         tier = self.tiers[kind]
         # Exact decimal arithmetic, so a half-integer result rounds half up as documented.
-        return replace(opponent, hp=exact(opponent.hp) * exact(tier.hp),
-                       patk=exact(opponent.patk) * exact(tier.attack),
-                       satk=exact(opponent.satk) * exact(tier.attack))
+        return replace(
+            opponent,
+            hp=exact(opponent.hp) * exact(tier.hp),
+            patk=exact(opponent.patk) * exact(tier.attack),
+            satk=exact(opponent.satk) * exact(tier.attack),
+        )
 
 
 # Each later skill trades up: more power for the same cost, so damage per MP or rage rises.
@@ -65,14 +71,48 @@ CURSE = Skill("curse", power=155, channel=Channel.SPECIAL, cost=5, resource=Reso
 WITHER = Skill("wither", power=180, channel=Channel.SPECIAL, cost=5, resource=Resource.RAGE, level=20)
 
 DEFAULT = Content(
-    warrior=Profile("warrior", hp=200, mp=0, patk=24, pdef=15, satk=5, sdef=10, speed=100,
-                    skills=(RAGE_STRIKE, CLEAVE, EXECUTE)),
-    mage=Profile("mage", hp=170, mp=75, patk=8, pdef=10, satk=20, sdef=15, speed=100, mp_growth=1.0,
-                 skills=(SPARK, BOLT, FIREBALL, STARFALL)),
+    warrior=Profile(
+        "warrior", hp=200, mp=0, patk=24, pdef=15, satk=5, sdef=10, speed=100, skills=(RAGE_STRIKE, CLEAVE, EXECUTE)
+    ),
+    mage=Profile(
+        "mage",
+        hp=170,
+        mp=75,
+        patk=8,
+        pdef=10,
+        satk=20,
+        sdef=15,
+        speed=100,
+        mp_growth=1.0,
+        skills=(SPARK, BOLT, FIREBALL, STARFALL),
+    ),
     monsters=(
-        Profile("beast", hp=80, mp=0, patk=16, pdef=10, satk=0, sdef=10, speed=110,
-                skills=(REND, MAUL, SAVAGE), xp=20, xp_per_level=15),
-        Profile("spirit", hp=80, mp=0, patk=0, pdef=10, satk=16, sdef=10, speed=110,
-                skills=(HEX, CURSE, WITHER), basic=SPECIAL_BASIC_ATTACK, xp=20, xp_per_level=15),
+        Profile(
+            "beast",
+            hp=80,
+            mp=0,
+            patk=16,
+            pdef=10,
+            satk=0,
+            sdef=10,
+            speed=110,
+            skills=(REND, MAUL, SAVAGE),
+            xp=20,
+            xp_per_level=15,
+        ),
+        Profile(
+            "spirit",
+            hp=80,
+            mp=0,
+            patk=0,
+            pdef=10,
+            satk=16,
+            sdef=10,
+            speed=110,
+            skills=(HEX, CURSE, WITHER),
+            basic=SPECIAL_BASIC_ATTACK,
+            xp=20,
+            xp_per_level=15,
+        ),
     ),
 )

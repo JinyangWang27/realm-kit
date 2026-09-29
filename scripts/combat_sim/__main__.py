@@ -1,4 +1,5 @@
 """Command line: python3 -m scripts.combat_sim [report|check|tune] [--formula ...]"""
+
 from __future__ import annotations
 
 import argparse
@@ -13,10 +14,16 @@ from .tune import robustness
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="python3 -m scripts.combat_sim",
-                                     description="Balance simulator for the proposed M3 combat rules.")
-    parser.add_argument("command", nargs="?", choices=("report", "check", "tune"), default="report",
-                        help="report tables (default), assert balance targets, or nudge tuned values")
+    parser = argparse.ArgumentParser(
+        prog="python3 -m scripts.combat_sim", description="Balance simulator for the proposed M3 combat rules."
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=("report", "check", "tune"),
+        default="report",
+        help="report tables (default), assert balance targets, or nudge tuned values",
+    )
     parser.add_argument("--formula", choices=[f.value for f in Formula], default=Formula.RATIO.value)
     args = parser.parse_args()
     rules = Rules(formula=Formula(args.formula))
