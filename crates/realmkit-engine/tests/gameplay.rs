@@ -788,11 +788,11 @@ fn mp_regenerates_over_encounter_time_with_a_carried_remainder() {
         let player = &engine.encounter().unwrap().participants[0];
         (player.mp, player.mp_remainder)
     };
-    // Time spent at full MP banks nothing.
-    engine.execute(cast("bolt")).unwrap();
-    assert_eq!(mp(&engine), (12, 0));
+    // Time spent at full MP banks nothing; the pause at the player's turn
+    // already includes the regeneration up to it.
+    assert_eq!(mp(&engine), (24, 0));
     // Each baseline turn regains 3% of 24 MP: 0.72 MP, carried as a remainder.
-    engine.execute(cast("spark")).unwrap();
+    engine.execute(cast("bolt")).unwrap();
     assert_eq!(mp(&engine), (12, 72_000));
     engine.execute(cast("spark")).unwrap();
     assert_eq!(mp(&engine), (13, 44_000));
@@ -927,6 +927,9 @@ fn inconsistent_encounter_saves_are_rejected() {
         |e| e.participants[1].side = 0,
         |e| e.participants[1].character = "apprentice".into(),
         |e| e.participants[1].hp = 0,
+        // The opponent would be overdue: the player's turn must be now.
+        |e| e.participants[0].next_time += 1,
+        |e| e.participants[1].side = 2,
     ];
     for (i, corrupt) in broken.into_iter().enumerate() {
         let mut snapshot = good.clone();
@@ -1109,4 +1112,32 @@ fn encounters_match_the_simulator() {
         hp: 192,
         mp: 33,
     });
+}
+
+#[test]
+fn a_skill_paid_for_by_regeneration_up_to_the_players_turn_is_usable() {
+    // 50% of 24 MP per baseline turn: two bolts empty the pool, and the 12 MP
+    // regained on the way to the next turn pay for a third.
+    let mut world = witch_speed(100);
+    world
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .resources
+        .mp_regen_percent = 50;
+    let mut engine = engaged(&world);
+    engine.execute(cast("bolt")).unwrap();
+    engine.execute(cast("bolt")).unwrap();
+    assert!(vitals(&engine).mp >= 12);
+    assert!(offered(&engine).contains(&(cast("bolt"), true)));
+    engine.execute(cast("bolt")).unwrap();
+}
+
+#[test]
+fn a_huge_action_cost_saves_and_restores_without_overflow() {
+    let mut world = duel();
+    world.world.combat.as_mut().unwrap().timeline.action_cost = u64::MAX;
+    let engine = engaged(&world);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }

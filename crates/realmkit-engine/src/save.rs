@@ -157,14 +157,16 @@ fn encounter_state(
     encounter: &Encounter,
 ) -> Result<(), String> {
     let invalid = || "invalid encounter state".to_string();
-    let per_point = 100 * encounter::baseline_turn(&rules.timeline).map_err(|_| invalid())?;
+    let per_point =
+        100 * u128::from(encounter::baseline_turn(&rules.timeline).map_err(|_| invalid())?);
     let (player, opponents) = encounter.participants.split_first().ok_or_else(invalid)?;
     let player_ok = player.character == world.world.player
         && player.side == 0
         && player.control == Control::Player;
-    let opponents_ok = !opponents.is_empty()
+    // Engage brings in exactly one opponent until authored groups exist.
+    let opponents_ok = opponents.len() == 1
         && opponents.iter().all(|p| {
-            p.side != 0
+            p.side == 1
                 && p.control == Control::Policy
                 && !combat.defeated.contains(&p.character)
                 && rules::character_here(world, state, &p.character)
@@ -183,13 +185,16 @@ fn encounter_state(
         let max = encounter::stats(world, combat.level, p);
         p.hp <= max.hp
             && p.mp <= max.mp
-            && p.mp_remainder < per_point
+            && u128::from(p.mp_remainder) < per_point
             && p.rage_remainder < u64::from(max.hp)
             && (p.hp == 0 || p.next_time >= encounter.now)
     });
+    // A live encounter always rests at the player's turn: the player acts now,
+    // and every opponent later or, on a tie, after the player's side.
+    let paused = player.hp == 0 || player.next_time == encounter.now;
     // A finished fight never stays open: the player is alive with an opponent, or dead.
     let open = player.hp == 0 || opponents.iter().any(|p| p.hp > 0);
-    if vitals_ok && open && state.dialogue.is_none() {
+    if vitals_ok && paused && open && state.dialogue.is_none() {
         Ok(())
     } else {
         Err(invalid())

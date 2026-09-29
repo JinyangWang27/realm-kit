@@ -159,11 +159,11 @@ pub(super) fn player_action(
         .iter()
         .position(|p| p.character == target && p.side != 0 && p.hp > 0)
         .ok_or(EngineError::NotHere(target))?;
+    // Advancing stops at the player's turn, already regenerated, so the
+    // player acts now with the MP they see.
     if let Some(skill) = skill {
         check_skill(&encounter.participants[0], level, skill)?;
     }
-    // Advancing always stops on the player's turn, so the player acts now.
-    tick(world, encounter, level, 0)?;
     act(world, encounter, level, turn, 0, index, skill, events)?;
     advance(world, state, events)
 }
@@ -315,10 +315,12 @@ fn advance(
             return end(world, state, events);
         }
         let actor = next_actor(encounter).unwrap();
+        // Everyone regenerates up to the next turn before it is taken; the
+        // player's turn then waits for a command.
+        tick(world, encounter, level, actor)?;
         if encounter.participants[actor].control == Control::Player {
             return Ok(());
         }
-        tick(world, encounter, level, actor)?;
         let side = encounter.participants[actor].side;
         let target = (0..encounter.participants.len())
             .find(|&i| encounter.participants[i].side != side && encounter.participants[i].hp > 0)
