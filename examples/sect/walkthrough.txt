@@ -1,0 +1,26 @@
+look
+status
+talk qing
+choose 1
+north
+engage dummy
+use palm_drifting dummy
+use palm_drifting dummy
+engage dummy
+use palm_drifting dummy
+use palm_storm dummy
+techniques
+south
+east
+talk wen
+choose 1
+choose 1
+west
+talk qing
+choose 2
+east
+talk wen
+choose 1
+techniques
+status
+quit

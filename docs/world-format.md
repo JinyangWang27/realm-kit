@@ -1,6 +1,6 @@
-# World package format 7
+# World package format 8
 
-Format 7 makes combat optional. The level table and combat prose live in an
+Format 8 makes combat optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -21,15 +21,15 @@ there is no migration. Convert them by hand:
   apply the Format 4 steps.
 - **Format 4** (M3c-1): give each opponent whose skills unlock above level 1 a
   `level`, since opponents now use only skills unlocked at their level;
-  `groups` are optional. Then apply the Format 5 and 6 steps.
-- **Format 5** (M3c-2) and **Format 6** (M3d): only raise the number; `crit`
-  and `stat_points` are optional.
+  `groups` are optional. Then apply the Formats 5–7 step.
+- **Formats 5–7** (M3c-2, M3d, M4a): only raise the number; `crit`,
+  `stat_points` and techniques are optional.
 
 A world without combat only needs its `format_version` raised.
 
-Format 7 represents one fixed player-controlled character and one playable
+Format 8 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 7 does not serialize a route collection
+stable logical route ID `default`; Format 8 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -44,7 +44,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 7 also requires item and quest tables because they serve the current demo.
+Format 8 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -79,7 +79,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 7 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 8 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -123,18 +123,23 @@ explicit and does not require a universal z-axis.
 ```
 
 `requires` lists are AND conditions and default to empty. They can appear on
-exits, characters and dialogue choices. A condition tests either a declared flag or a
-quest state:
+exits, characters and dialogue choices. A condition tests a declared flag, a
+quest state or a technique's rank:
 
 ```json
 { "kind": "quest", "quest": "quiet_the_track", "status": "ready" }
+{ "kind": "technique", "technique": "azure_breath", "rank": 2 }
 ```
+
+A technique condition holds once the player has learned the technique at
+least to that rank (see [Techniques](#techniques)), so a realm can gate an
+exit, a dialogue choice or a character.
 
 Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags
 are monotonic in this version. Conditions govern availability/choice visibility.
 
-This flat conjunctive representation is a Format 7 limitation. The long-term
+This flat conjunctive representation is a Format 8 limitation. The long-term
 condition model uses pure typed predicates composed with `All / Any / Not`;
 predicates remain domain-specific and typed rather than becoming arbitrary
 expressions/property paths. Typed effects execute in authored order as part of the
@@ -180,7 +185,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 7 has a single flat quest collection. The long-term model should retain
+Format 8 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -195,6 +200,7 @@ Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 { "kind": "accept_quest", "quest": "quiet_the_track" }
 { "kind": "complete_quest", "quest": "quiet_the_track" }
 { "kind": "set_flag", "flag": "hall_open" }
+{ "kind": "grant_technique", "technique": "cloud_palm", "rank": 1, "xp": 0 }
 ```
 
 Choices are filtered and then numbered contiguously from one. Omitting `next`
@@ -214,7 +220,8 @@ with a combat profile; an active quest becomes ready when that character is
 defeated. A `flag` objective names a declared flag; an active quest becomes
 ready when the flag is set, so a world without combat can still have a main
 questline. Accepting after the defeat or flag makes the quest ready immediately.
-`reward_xp` defaults to 0 and must stay 0 in a world without combat. Accept/complete actions require the available
+`reward_xp` defaults to 0 and must stay 0 in a world without combat.
+`reward_techniques` lists technique grants (see [Techniques](#techniques)). Accept/complete actions require the available
 giver in the player's current location, whether invoked by dialogue or a direct
 command. Completion grants rewards once, sets flags, and emits stored completion
 prose. Dialogue visibility conditions are not additional quest prerequisites.
@@ -315,6 +322,62 @@ and a profile's `basic_channel` set the channel of each character's basic
 attack. Every usable skill and basic attack needs attack in its channel, and
 every MP skill must be affordable with the MP its user has when it unlocks;
 rage builds up during a fight, so rage costs have no such ceiling.
+
+### Techniques
+
+A technique is mastered rank by rank, and the author names every rank in the
+source's own terms; players see that name, never a number:
+
+```json
+"techniques": [
+  {
+    "id": "azure_breath",
+    "name": "Azure Breath",
+    "xp_share_percent": 20,
+    "ranks": [
+      { "name": "First Layer", "xp": 0, "passive": { "mp": 10, "satk": 2 } },
+      { "name": "Second Layer", "xp": 10, "passive": { "mp": 20, "satk": 4 } },
+      { "name": "Third Layer", "xp": 30, "passive": { "mp": 35, "satk": 7 },
+        "requires": [{ "kind": "flag", "flag": "scripture_found" }] }
+    ]
+  },
+  {
+    "id": "cloud_palm",
+    "name": "Cloud Palm",
+    "ranks": [
+      { "name": "Drifting Cloud", "xp": 0, "skill": "palm_drifting" },
+      { "name": "Gathering Storm", "xp": 30, "skill": "palm_storm" }
+    ]
+  }
+],
+"player_techniques": [{ "technique": "azure_breath" }],
+"core_art": "azure_breath",
+"technique_xp_per_use": 10
+```
+
+- **Ranks** have cumulative technique-XP thresholds starting at 0. A rank may
+  name the `skill` the technique is used as at that rank (an ordinary skill,
+  which then joins the player's usable skills) and a `passive` stat bonus: the
+  technique's whole bonus at that rank, replacing the previous rank's. An
+  internal art is a technique with passives and no skill.
+- **Training.** Each use of a technique's skill in an encounter earns
+  `technique_xp_per_use` (default 10), with the same level falloff as character
+  XP. Each victory also gives every learned technique its `xp_share_percent` of
+  the character XP earned; keep it small so internal arts deepen slowly.
+- **Gates.** A rank's `requires` conditions are a breakthrough gate: technique
+  XP waits at that rank's threshold until they hold, and the technique rises
+  as soon as they do.
+- **Grants** (`player_techniques`, the `grant_technique` dialogue effect and
+  quest `reward_techniques`) teach a technique if unknown, raise it to at least
+  `rank` (teaching passes gates), then add `xp`. A dialogue choice can be taken
+  again, so dialogue grants carry no XP; one-time XP comes from quest rewards.
+  A skill belongs to at most one technique.
+- **Realm.** `core_art` names the technique whose current rank name is shown as
+  the player's realm.
+
+Effective stats are the level table, spent stat points and learned
+techniques' current rank bonuses, derived whenever needed. Even every rank's
+largest bonus together with every stat point must keep each stat within 9,999.
 
 ### Encounters
 
@@ -418,7 +481,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 7 currently selects combat prose variants from the current
+Format 8 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -443,7 +506,7 @@ the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
 skill references, usable and affordable skills, loot quantities, fighter
 placement and template placeholders. `load()` reports a package whose
-`format_version` is not 7 as `SpecError::UnsupportedFormat` before parsing it.
+`format_version` is not 8 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.

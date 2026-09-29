@@ -1,0 +1,62 @@
+[
+  {
+    "id": "qing",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "'Breathe first,' Qing says. 'Then ask.'",
+        "choices": [
+          {
+            "text": "Teach me the Cloud Palm.",
+            "next": "taught",
+            "effect": { "kind": "grant_technique", "technique": "cloud_palm" }
+          },
+          {
+            "text": "Do you have the lost volume of the Azure Breath?",
+            "next": "volume",
+            "requires": [{ "kind": "quest", "quest": "lost_volume", "status": "active" }],
+            "effect": { "kind": "set_flag", "flag": "scripture_found" }
+          },
+          { "text": "Farewell, Elder." }
+        ]
+      },
+      { "id": "taught", "text": "She guides your palm through the form once, slowly. 'Now it is yours to wear smooth.'" },
+      { "id": "volume", "text": "'Borrowed,' she admits, and hands it over. 'Tell Wen I was careful.'" }
+    ]
+  },
+  {
+    "id": "wen",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "'Quietly,' Wen says. 'The scrolls are sleeping.'",
+        "choices": [
+          {
+            "text": "Is something missing?",
+            "next": "request",
+            "requires": [{ "kind": "quest", "quest": "lost_volume", "status": "available" }]
+          },
+          {
+            "text": "The elder had the volume. Here it is.",
+            "next": "thanks",
+            "requires": [{ "kind": "quest", "quest": "lost_volume", "status": "ready" }],
+            "effect": { "kind": "complete_quest", "quest": "lost_volume" }
+          },
+          { "text": "Leave him to his counting." }
+        ]
+      },
+      {
+        "id": "request",
+        "text": "'The third volume of the Azure Breath. Will you look for it?'",
+        "choices": [
+          { "text": "I will.", "next": "accepted", "effect": { "kind": "accept_quest", "quest": "lost_volume" } },
+          { "text": "Not now." }
+        ]
+      },
+      { "id": "accepted", "text": "'Try the elder. She borrows and forgets.'" },
+      { "id": "thanks", "text": "'Read it with me,' he says, and does not let go of the scroll." }
+    ]
+  }
+]

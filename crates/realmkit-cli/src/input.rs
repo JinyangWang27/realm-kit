@@ -8,6 +8,9 @@ pub fn help(world: &WorldSpec) -> String {
     if combat.is_some() {
         attack += "engage <character-id>\nattack <character-id>\nuse <skill-id> <character-id>\nflee\nrest — at a safe place\n";
     }
+    if combat.is_some_and(|c| !c.techniques.is_empty()) {
+        attack += "techniques — learned techniques and their ranks\n";
+    }
     if combat.is_some_and(|c| c.stat_points.is_some()) {
         attack += "allocate hp|mp|patk|pdef|satk|sdef|speed [points]\nrespec — refund stat points, where allowed\n";
     }
@@ -72,6 +75,7 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
         ("inventory" | "i", []) => Command::Inventory,
         ("status" | "c", []) => Command::Status,
         ("quests" | "q", []) => Command::Quests,
+        ("techniques" | "t", []) => Command::Techniques,
         ("go", [value]) => {
             Command::Move(direction(&value.to_ascii_lowercase()).ok_or("unknown direction")?)
         }

@@ -169,6 +169,45 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 )?
             }
             Event::PointsRefunded => writeln!(output, "Your stat points are refunded.")?,
+            Event::TechniqueLearned { technique } => writeln!(
+                output,
+                "You learn {}.",
+                world.technique(technique).unwrap().name
+            )?,
+            Event::TechniqueRankUp { technique, rank } => {
+                let technique = world.technique(technique).unwrap();
+                let name = &technique.ranks[rank - 1].name;
+                writeln!(output, "{}: {name}!", technique.name)?
+            }
+            Event::TechniqueXpGained { technique, amount } => writeln!(
+                output,
+                "{} +{amount}",
+                world.technique(technique).unwrap().name
+            )?,
+            Event::TechniquesViewed => {
+                writeln!(output, "Techniques:")?;
+                let learned = state.combat.as_ref().map(|c| &c.techniques);
+                if learned.is_none_or(|l| l.is_empty()) {
+                    writeln!(output, "  None yet")?;
+                }
+                for (id, progress) in learned.into_iter().flatten() {
+                    let technique = world.technique(id).unwrap();
+                    let rank = &technique.ranks[progress.rank - 1];
+                    write!(output, "  {} — {}", technique.name, rank.name)?;
+                    match technique.ranks.get(progress.rank) {
+                        // A closed gate holds XP at the next threshold.
+                        Some(next) if progress.xp >= next.xp => writeln!(
+                            output,
+                            " ({}/{} to {}, sealed)",
+                            progress.xp, next.xp, next.name
+                        )?,
+                        Some(next) => {
+                            writeln!(output, " ({}/{} to {})", progress.xp, next.xp, next.name)?
+                        }
+                        None => writeln!(output, " (mastered)")?,
+                    }
+                }
+            }
             Event::EncounterStarted { opponents } => {
                 let names: Vec<_> = opponents.iter().map(|id| name(id).as_str()).collect();
                 writeln!(output, "You face {}.", names.join(", "))?
@@ -208,21 +247,12 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 quantity
             )?,
             Event::ExperienceGranted { amount } => writeln!(output, "+{amount} XP")?,
-            Event::LevelUp { level } => {
-                // One grant can pass several levels; each restores that level's
-                // effective MP: its base plus MP bought with points.
-                let combat = world.combat().unwrap();
-                let bought = state.combat.as_ref().map_or(0, |c| {
-                    let per_point = combat
-                        .stat_points
-                        .as_ref()
-                        .and_then(|p| p.values.get(&Stat::Mp))
-                        .copied()
-                        .unwrap_or(0);
-                    c.allocation.get(&Stat::Mp).copied().unwrap_or(0) * per_point
-                });
-                let mp = combat.levels[level - 1].stats.mp + bought > 0;
-                let restored = if mp { "Health and MP" } else { "Health" };
+            Event::LevelUp { level, mp_restored } => {
+                let restored = if *mp_restored {
+                    "Health and MP"
+                } else {
+                    "Health"
+                };
                 writeln!(output, "Level {level}! {restored} restored.")?
             }
             // Choices are shown by the menu, which also numbers them.
@@ -259,11 +289,17 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 match (&state.combat, engine.player_stats(), engine.player_vitals()) {
                     (Some(combat), Some(stats), Some(vitals)) => {
                         let special = &world.combat().unwrap().special_name;
-                        write!(
-                            output,
-                            "{player} — Level {} | HP {}/{}",
-                            combat.level, vitals.hp, stats.hp
-                        )?;
+                        write!(output, "{player} — Level {}", combat.level)?;
+                        // The realm is the core internal art's rank name.
+                        let rules = world.combat().unwrap();
+                        let realm = rules.core_art.as_ref().and_then(|core| {
+                            let learned = combat.techniques.get(core)?;
+                            Some(&world.technique(core)?.ranks[learned.rank - 1].name)
+                        });
+                        if let Some(realm) = realm {
+                            write!(output, " | Realm {realm}")?;
+                        }
+                        write!(output, " | HP {}/{}", vitals.hp, stats.hp)?;
                         // A world or build without MP shows none.
                         if stats.mp > 0 {
                             write!(output, " | MP {}/{}", vitals.mp, stats.mp)?;

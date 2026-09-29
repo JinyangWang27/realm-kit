@@ -399,3 +399,34 @@ fn stat_points_are_spent_from_the_menu_or_typed_and_refunded_at_the_gate() {
     assert!(!demo.contains("allocate hp|"));
     assert!(demo.contains("you cannot spend points on that stat"));
 }
+
+const SECT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect");
+
+#[test]
+fn the_sect_teaches_trains_and_deepens_named_ranks() {
+    let walkthrough = std::fs::read_to_string(format!("{SECT}/walkthrough.txt")).unwrap();
+    let output = run(&["play", SECT, "--line"], &walkthrough);
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "You — Level 1 | Realm First Layer | HP 50/50 | MP 30/30",
+        "You learn Cloud Palm.",
+        "2. Cloud Palm · Drifting Cloud on A Straw Dummy — 5 MP",
+        "Cloud Palm +10",
+        "Azure Breath +1",
+        "Cloud Palm: Gathering Storm!",
+        "2. Cloud Palm · Gathering Storm on A Straw Dummy — 6 MP",
+        "  Cloud Palm — Gathering Storm (mastered)",
+        "Azure Breath +15",
+        "Azure Breath: Second Layer!",
+        "  Azure Breath — Second Layer (17/30 to Third Layer)",
+        "Realm Second Layer",
+        "Techniques",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    let help = String::from_utf8(run(&["play", SECT], "help\n").stdout).unwrap();
+    assert!(help.contains("techniques — learned techniques"));
+    let demo = String::from_utf8(run(&["play", WORLD], "help\n").stdout).unwrap();
+    assert!(!demo.contains("techniques —"));
+}

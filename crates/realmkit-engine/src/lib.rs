@@ -40,6 +40,8 @@ pub enum Command {
     Inventory,
     Status,
     Quests,
+    /// Lists learned techniques and their ranks; only in worlds with techniques.
+    Techniques,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -89,6 +91,19 @@ pub enum Event {
         points: u32,
     },
     PointsRefunded,
+    TechniqueLearned {
+        technique: Id,
+    },
+    /// `rank` is 1-based; its authored name is shown.
+    TechniqueRankUp {
+        technique: Id,
+        rank: usize,
+    },
+    TechniqueXpGained {
+        technique: Id,
+        amount: u64,
+    },
+    TechniquesViewed,
     EnemyDefeated {
         monster: Id,
     },
@@ -99,8 +114,10 @@ pub enum Event {
     ExperienceGranted {
         amount: u64,
     },
+    /// Levelling up restores HP, and MP when the player has any.
     LevelUp {
         level: usize,
+        mp_restored: bool,
     },
     PlayerDied,
     Dialogue {
@@ -143,6 +160,8 @@ pub struct CombatState {
     pub defeated: BTreeSet<Id>,
     /// Stat points spent per stat; unspent points are derived from the level.
     pub allocation: BTreeMap<Stat, u32>,
+    /// Learned techniques by ID.
+    pub techniques: BTreeMap<Id, TechniqueState>,
     pub stance: Stance,
 }
 
@@ -153,6 +172,14 @@ pub struct CombatState {
 pub enum Stance {
     Exploring(Vitals),
     Fighting(Encounter),
+}
+
+/// A learned technique's 1-based rank and its technique XP.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TechniqueState {
+    pub rank: usize,
+    pub xp: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -239,7 +266,7 @@ pub struct GameState {
     pub rng: Option<RngState>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 7;
+pub const SAVE_FORMAT_VERSION: u32 = 8;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -325,6 +352,7 @@ mod encounter;
 mod rng;
 mod rules;
 mod save;
+mod techniques;
 
 pub use rng::{splitmix64, RngState, RNG_VERSION};
 
@@ -345,13 +373,14 @@ impl<'w> Engine<'w> {
                 level: 1,
                 defeated: BTreeSet::new(),
                 allocation: BTreeMap::new(),
+                techniques: BTreeMap::new(),
                 stance: Stance::Exploring(Vitals {
                     hp: stats.hp,
                     mp: stats.mp,
                 }),
             }
         });
-        Ok(Self {
+        let mut engine = Self {
             world,
             state: GameState {
                 player: PlayerState {
@@ -369,7 +398,21 @@ impl<'w> Engine<'w> {
                 turn: 0,
                 rng: world.stochastic().then(|| RngState::new(seed)),
             },
-        })
+        };
+        // Starting techniques, then vitals at the maxima their passives give.
+        if let Some(rules) = world.combat() {
+            let mut ignored = Vec::new();
+            for grant in &rules.player_techniques {
+                techniques::grant(world, &mut engine.state, grant, &mut ignored)?;
+            }
+            let combat = engine.state.combat.as_mut().unwrap();
+            let max = rules::player_stats(world, combat);
+            combat.stance = Stance::Exploring(Vitals {
+                hp: max.hp,
+                mp: max.mp,
+            });
+        }
+        Ok(engine)
     }
 
     pub fn state(&self) -> &GameState {
@@ -436,7 +479,11 @@ impl<'w> Engine<'w> {
         let mut next = self.state.clone();
         let spends_time = !matches!(
             command,
-            Command::Look | Command::Inventory | Command::Status | Command::Quests
+            Command::Look
+                | Command::Inventory
+                | Command::Status
+                | Command::Quests
+                | Command::Techniques
         );
         let events = rules::execute(self.world, &mut next, command)?;
         if spends_time {

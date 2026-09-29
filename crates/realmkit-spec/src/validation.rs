@@ -89,6 +89,18 @@ fn conditions(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, values: &[C
             Condition::Quest { quest, .. } => {
                 reference(out, owner, "quest", quest, w.quest(quest).is_some())
             }
+            Condition::Technique { technique, rank } => {
+                let known = w.technique(technique);
+                reference(out, owner, "technique", technique, known.is_some());
+                if known.is_some_and(|t| *rank == 0 || *rank > t.ranks.len()) {
+                    issue(
+                        out,
+                        owner,
+                        "invalid_rank",
+                        format!("{technique} has no rank {rank}"),
+                    );
+                }
+            }
         }
     }
 }
@@ -406,6 +418,9 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
             );
         }
         items(&mut out, w, &quest.id, &quest.reward_items);
+        for grant in &quest.reward_techniques {
+            technique_grant(&mut out, w, &quest.id, grant);
+        }
         for flag in &quest.completion_flags {
             reference(
                 &mut out,
@@ -459,6 +474,19 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
                         flag,
                         w.world.flags.contains(flag),
                     ),
+                    Some(DialogueEffect::GrantTechnique(grant)) => {
+                        technique_grant(&mut out, w, &dialogue.id, grant);
+                        // A choice can be taken again; teaching a rank is idempotent,
+                        // XP would not be. One-time XP comes from quest rewards.
+                        if grant.xp > 0 {
+                            issue(
+                                &mut out,
+                                &dialogue.id,
+                                "repeatable_reward",
+                                "a dialogue grant may teach a technique or rank, but not XP; reward XP through a quest",
+                            );
+                        }
+                    }
                     None => {}
                 }
             }
@@ -561,6 +589,34 @@ fn usable_skills<'a>(
 /// (up to its cap) must keep that stat within the engine bound at every level.
 fn stat_points(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
     let granted = combat.levels.iter().any(|l| l.points > 0);
+    // Passive technique bonuses count toward the same worst case.
+    let passive = |stat: Stat| -> u64 {
+        combat
+            .techniques
+            .iter()
+            .map(|t| {
+                t.ranks
+                    .iter()
+                    .map(|r| u64::from(r.passive.get(&stat).copied().unwrap_or(0)))
+                    .max()
+                    .unwrap_or(0)
+            })
+            .sum()
+    };
+    for level in &combat.levels {
+        if Stat::ALL
+            .iter()
+            .any(|s| u64::from(level.stats.get(*s)) + passive(*s) > u64::from(STAT_BOUND))
+        {
+            issue(
+                out,
+                owner,
+                "invalid_points",
+                format!("technique bonuses could raise a stat above {STAT_BOUND}"),
+            );
+            return;
+        }
+    }
     let Some(points) = &combat.stat_points else {
         if granted {
             issue(
@@ -608,7 +664,8 @@ fn stat_points(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
                 .caps
                 .get(stat)
                 .map_or(total, |cap| total.min(u64::from(*cap)));
-            if u64::from(level.stats.get(*stat)) + taken * u64::from(*value) > u64::from(STAT_BOUND)
+            if u64::from(level.stats.get(*stat)) + taken * u64::from(*value) + passive(*stat)
+                > u64::from(STAT_BOUND)
             {
                 issue(
                     out,
@@ -637,6 +694,129 @@ fn stat_points(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
                 capacity.unwrap()
             ),
         });
+    }
+}
+
+/// A grant names a known technique and, if it sets one, an existing rank.
+fn technique_grant(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, grant: &TechniqueGrant) {
+    let technique = w.technique(&grant.technique);
+    reference(
+        out,
+        owner,
+        "technique",
+        &grant.technique,
+        technique.is_some(),
+    );
+    if let (Some(technique), Some(rank)) = (technique, grant.rank) {
+        if rank == 0 || rank > technique.ranks.len() {
+            issue(
+                out,
+                owner,
+                "invalid_rank",
+                format!("{} has no rank {rank}", technique.id),
+            );
+        }
+    }
+}
+
+/// Named ranks with rising thresholds, existing skills and declared gates.
+fn techniques(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
+    ids(
+        out,
+        "technique",
+        combat.techniques.iter().map(|t| t.id.as_str()),
+    );
+    // A skill belongs to one technique, so its use trains exactly that one.
+    let mut owners: BTreeMap<&Id, &Id> = BTreeMap::new();
+    for technique in &combat.techniques {
+        for skill in technique.ranks.iter().filter_map(|r| r.skill.as_ref()) {
+            if owners
+                .insert(skill, &technique.id)
+                .is_some_and(|other| other != &technique.id)
+            {
+                issue(
+                    out,
+                    &technique.id,
+                    "invalid_skill",
+                    format!("{skill} already belongs to another technique"),
+                );
+            }
+        }
+    }
+    for technique in &combat.techniques {
+        let id = &technique.id;
+        if technique.name.trim().is_empty()
+            || technique.ranks.is_empty()
+            || technique.ranks.iter().any(|r| r.name.trim().is_empty())
+        {
+            issue(
+                out,
+                id,
+                "empty_name",
+                "a technique and each of its ranks need a name",
+            );
+        }
+        let thresholds: Vec<u64> = technique.ranks.iter().map(|r| r.xp).collect();
+        if thresholds.first().is_some_and(|xp| *xp != 0)
+            || thresholds.windows(2).any(|t| t[0] >= t[1])
+        {
+            issue(
+                out,
+                id,
+                "invalid_levels",
+                "rank XP must start at 0 and strictly increase",
+            );
+        }
+        if technique.xp_share_percent > 100 {
+            issue(
+                out,
+                id,
+                "invalid_share",
+                "an XP share is a percentage from 0 to 100",
+            );
+        }
+        for rank in &technique.ranks {
+            if let Some(skill) = &rank.skill {
+                reference(out, id, "skill", skill, w.skill(skill).is_some());
+                if combat.player_skills.contains(skill) {
+                    issue(
+                        out,
+                        id,
+                        "invalid_skill",
+                        format!("{skill} is a technique's rank and cannot also be a player skill"),
+                    );
+                }
+            }
+            conditions(out, w, id, &rank.requires);
+        }
+    }
+    for grant in &combat.player_techniques {
+        technique_grant(out, w, &w.world.player, grant);
+    }
+    if let Some(core) = &combat.core_art {
+        reference(
+            out,
+            &w.world.id,
+            "core art",
+            core,
+            w.technique(core).is_some(),
+        );
+        // The realm needs a way to learn its art.
+        let teachable = combat.player_techniques.iter().any(|g| &g.technique == core)
+            || w.quests.iter().flat_map(|q| &q.reward_techniques).any(|g| &g.technique == core)
+            || w.dialogues
+                .iter()
+                .flat_map(|d| &d.nodes)
+                .flat_map(|n| &n.choices)
+                .any(|c| matches!(&c.effect, Some(DialogueEffect::GrantTechnique(g)) if &g.technique == core));
+        if !teachable {
+            issue(
+                out,
+                core,
+                "unreachable_core_art",
+                "no starting technique, dialogue or quest teaches the core art",
+            );
+        }
     }
 }
 
@@ -709,6 +889,7 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
     }
     let levels = &combat.levels;
     stat_points(out, owner, combat);
+    techniques(out, w, combat);
     for level in levels {
         stats(out, owner, &level.stats);
     }
@@ -794,8 +975,21 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         "skill reference",
         combat.player_skills.iter().map(String::as_str),
     );
+    // Technique rank skills are the player's too once learned.
+    let rank_skills: Vec<&Id> = combat
+        .techniques
+        .iter()
+        .flat_map(|t| &t.ranks)
+        .filter_map(|r| r.skill.as_ref())
+        .collect();
     for id in &combat.player_skills {
         reference(out, owner, "skill", id, w.skill(id).is_some());
+    }
+    for id in combat
+        .player_skills
+        .iter()
+        .chain(rank_skills.iter().copied())
+    {
         if w.skill(id).is_some_and(|s| s.level > levels.len()) {
             issue(
                 out,
@@ -806,18 +1000,54 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         }
     }
     if let Some(first) = levels.first() {
-        let unlocked = combat
+        // Starting techniques guarantee their passives from the first moment;
+        // a rank skill also has its own rank's passive in place of its
+        // technique's starting one.
+        let starting: Vec<(&Id, &BTreeMap<Stat, u32>)> = combat
+            .player_techniques
+            .iter()
+            .filter_map(|g| {
+                let technique = w.technique(&g.technique)?;
+                let rank = technique.ranks.get(g.rank.unwrap_or(1).checked_sub(1)?)?;
+                Some((&technique.id, &rank.passive))
+            })
+            .collect();
+        let boosted = |base: Stats, own: Option<(&Id, &BTreeMap<Stat, u32>)>| {
+            let mut stats = base;
+            let others = starting
+                .iter()
+                .filter(|(id, _)| own.is_none_or(|(o, _)| o != *id));
+            for (_, passive) in others.map(|(id, p)| (*id, *p)).chain(own) {
+                for (stat, bonus) in passive {
+                    let total = stats.get_mut(*stat);
+                    *total = total.saturating_add(*bonus);
+                }
+            }
+            stats
+        };
+        let with_rank: Vec<(&Skill, Stats)> = combat
             .player_skills
             .iter()
-            .filter_map(|id| w.skill(id))
-            .filter_map(|s| Some((s, &levels.get(s.level.checked_sub(1)?)?.stats)));
+            .filter_map(|id| Some((w.skill(id)?, None)))
+            .chain(combat.techniques.iter().flat_map(|t| {
+                t.ranks.iter().filter_map(move |r| {
+                    Some((w.skill(r.skill.as_ref()?)?, Some((&t.id, &r.passive))))
+                })
+            }))
+            .filter_map(|(skill, own)| {
+                let base = levels.get(skill.level.checked_sub(1)?)?.stats;
+                Some((skill, boosted(base, own)))
+            })
+            .collect();
+        let unlocked = with_rank.iter().map(|(skill, stats)| (*skill, stats));
+        let first = boosted(first.stats, None);
         usable_skills(
             out,
             combat,
             &w.world.player,
             combat.player_basic_channel,
             unlocked,
-            &first.stats,
+            &first,
         );
     }
     let narrative = &combat.narrative;

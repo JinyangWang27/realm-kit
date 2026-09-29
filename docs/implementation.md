@@ -57,6 +57,11 @@ proves the complete single-player loop with authored content.
   stats a world accepts, within caps, with an optional refund at safe places.
   Effective stats (level table + allocation) are derived by one function every
   rule uses and never saved. Package and save format 7.
+- [x] Technique ranks (M4b): techniques with author-named ranks, skills and
+  passive bonuses per rank, trained by use (with falloff) and by a small share
+  of victory XP, taught by dialogue effects and quest rewards, and held by
+  breakthrough gates. The core art's rank is shown as the realm.
+  `examples/sect` exercises it. Package and save format 8.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
