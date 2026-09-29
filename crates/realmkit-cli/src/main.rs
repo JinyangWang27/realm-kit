@@ -563,6 +563,23 @@ mod tests {
     }
 
     #[test]
+    fn each_level_up_reports_the_mp_of_its_own_level() {
+        let mut world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/demo-world"
+        ))
+        .unwrap();
+        world.world.combat.as_mut().unwrap().levels[2].stats.mp = 5;
+        world.characters[2].combat.as_mut().unwrap().xp = 30;
+        let mut output = Vec::new();
+        let input = "north\nattack wolf\nattack wolf\nattack wolf\n".as_bytes();
+        play(&world, None, input, &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains("Level 2! Health restored."), "{text}");
+        assert!(text.contains("Level 3! Health and MP restored."), "{text}");
+    }
+
+    #[test]
     fn death_restores_the_newest_save() {
         let mut world = WorldSpec::load(concat!(
             env!("CARGO_MANIFEST_DIR"),

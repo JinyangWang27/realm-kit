@@ -145,7 +145,8 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             )?,
             Event::ExperienceGranted { amount } => writeln!(output, "+{amount} XP")?,
             Event::LevelUp { level } => {
-                let mp = engine.player_stats().is_some_and(|s| s.mp > 0);
+                // One grant can pass several levels; each restores that level's MP.
+                let mp = world.combat().unwrap().levels[level - 1].stats.mp > 0;
                 let restored = if mp { "Health and MP" } else { "Health" };
                 writeln!(output, "Level {level}! {restored} restored.")?
             }

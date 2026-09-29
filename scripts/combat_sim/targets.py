@@ -175,9 +175,12 @@ def check_bounds(sim: Simulator) -> None:
             require(skill.cost >= 0 and skill.time >= 1,
                     f"{profile.name} {skill.name} needs a nonnegative cost and positive action time")
             require(skill.level >= 1, f"{profile.name} {skill.name} unlocks below level 1")
-        if sim.rules.grow(profile.mp, 1, profile.growth) == 0:
-            paid = [s.name for s in profile.skills if s.resource is Resource.MP and s.cost > 0]
-            require(not paid, f"{profile.name} has MP-costing {', '.join(paid)} but no MP at level 1")
+        # Costs are flat, so a skill must be affordable with the MP its user has when it unlocks.
+        for skill in profile.skills:
+            if skill.resource is Resource.MP and skill.cost > 0:
+                mp = sim.rules.grow(profile.mp, skill.level, profile.growth_for("mp"))
+                require(skill.cost <= mp, f"{profile.name} {skill.name} costs {skill.cost} MP but "
+                        f"{profile.name} has only {mp} at level {skill.level}")
         require(profile.basic.cost == 0 and profile.basic.level == 1,
                 f"{profile.name}'s basic attack must be free and available from level 1")
         check_exact_stats(profile, "authored")
