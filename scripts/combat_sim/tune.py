@@ -141,7 +141,8 @@ def _profile_growth_knob(slot: Slot, name: str = "growth") -> Knob:
         own = getattr(profile, name)
         before = own if own is not None else rules.growth
         after = scale_rate(before, factor)
-        return rules, put(content, replace(profile, **{name: after})), before, after
+        changed = replace(profile, mp_growth=after) if name == "mp_growth" else replace(profile, growth=after)
+        return rules, put(content, changed), before, after
     return apply
 
 
