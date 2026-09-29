@@ -123,8 +123,8 @@ explicit and does not require a universal z-axis.
 ```
 
 `requires` lists are AND conditions and default to empty. They can appear on
-exits, characters and dialogue choices. A condition tests either a declared flag or a
-quest state:
+exits, characters and dialogue choices. A condition tests a declared flag, a
+quest state or a technique's rank:
 
 ```json
 { "kind": "quest", "quest": "quiet_the_track", "status": "ready" }
