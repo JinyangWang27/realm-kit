@@ -566,8 +566,9 @@ level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
 `tune` nudges player and opponent stats, skill and basic-attack power, cost and
-action time, tier multipliers, the growth rate, the speed cap and the resource
-rules, and 106 of 168 nudges keep every target. Zero stats and costs are nudged upward only, since
+action time, tier multipliers, the growth rates (including the mage's MP
+growth), the speed cap and the resource rules, and 107 of 169 nudges keep every
+target. Zero stats and costs are nudged upward only, since
 0 → 1 can matter: a beast with 1 special attack already breaks boss parity. It
 reports the first target each nudge breaks. Half of the 62 breaks (31) are boss
 parity against beasts, each a two-level gap where one is
@@ -657,8 +658,8 @@ computes it. Rules of thumb for authors, to be verified with `check` and `tune`:
   sustain the earlier level-scaled costs produced, and the report is unchanged
   but for one rest in two grinding lines. A world that wants casters to gain
   sustain with level lets MP grow; one that grants 内力 lets it grow by grant.
-  With the sample content, MP growth up to 2% a level keeps every target; at 3%
-  or more the warrior wins only 3 of 14 comparisons, so faster MP growth needs
+  With the sample content, MP growth of 1% a level keeps every target; at 1.5%
+  the warrior already wins only 5 of 16 comparisons, so faster MP growth needs
   compensation elsewhere, such as costlier later tiers or more for the warrior.
 - **Grinding needs XP that falls off with level difference.** With ±10% XP per
   level of difference, capped at ±40% and rounded down, and nothing from monsters
