@@ -2,7 +2,7 @@
 //! recovery chain, oldest first. Loading an older save forks the chain; saves
 //! from the abandoned future stay on disk but are no longer offered.
 
-use realmkit_engine::SaveSnapshot;
+use realmkit_engine::{SaveSnapshot, SAVE_FORMAT_VERSION};
 use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
@@ -125,7 +125,15 @@ impl Saves {
     pub fn read(&self, id: u64) -> Result<SaveSnapshot, Box<dyn Error>> {
         let path = self.file(id);
         let bytes = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()).into())
+        let invalid = |e: serde_json::Error| format!("{}: {e}", path.display());
+        // Check the version first: an older save's state fails typed parsing obscurely.
+        let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(invalid)?;
+        match value["save_format_version"].as_u64() {
+            Some(version) if version != u64::from(SAVE_FORMAT_VERSION) => {
+                Err(format!("unsupported save format version {version}").into())
+            }
+            _ => Ok(serde_json::from_value(value).map_err(invalid)?),
+        }
     }
 
     /// Loads the save at one-based-minus-one `index` (the newest when `None`)
@@ -250,6 +258,29 @@ mod tests {
             .path()
             .extension()
             .is_some_and(|x| x == "tmp")));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn saves_from_an_older_format_are_refused_by_version() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/demo-world"
+        ))
+        .unwrap();
+        let dir = std::env::temp_dir().join(format!("realmkit-oldsave-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let saves = Saves::open(&dir).unwrap();
+        saves
+            .write(Kind::Auto, &Engine::new(&world).unwrap().snapshot())
+            .unwrap();
+        let old = r#"{"save_format_version": 1, "state": {"player": {"hp": 24}}}"#;
+        fs::write(dir.join("0.json"), old).unwrap();
+        let error = saves.read(0).unwrap_err().to_string();
+        assert!(
+            error.contains("unsupported save format version 1"),
+            "{error}"
+        );
         fs::remove_dir_all(dir).unwrap();
     }
 
