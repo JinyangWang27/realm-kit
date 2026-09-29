@@ -150,7 +150,9 @@ fn combat_tracks_damage_and_never_rewards_a_defeat_twice() {
     assert!(!events
         .iter()
         .any(|e| matches!(e, Event::DamageReceived { .. })));
-    assert!(events.contains(&Event::EncounterEnded));
+    assert!(events.contains(&Event::EncounterEnded {
+        outcome: Outcome::Victory
+    }));
     assert!(combat(&engine).defeated.contains("wolf"));
     let before = engine.state().clone();
     assert!(matches!(
@@ -265,6 +267,7 @@ fn actions_list_context_sensitive_commands_with_availability() {
                 },
                 false
             ),
+            (Flee, true),
             (Inventory, true),
             (Status, true),
             (Quests, true),
@@ -1158,4 +1161,283 @@ fn the_largest_action_cost_saves_and_restores_without_overflow() {
     world.world.combat.as_mut().unwrap().timeline.action_cost = ACTION_COST_BOUND;
     let engine = engaged(&world);
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+fn arena() -> WorldSpec {
+    WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena")).unwrap()
+}
+
+fn at(world: &WorldSpec, direction: Direction) -> Engine<'_> {
+    let mut engine = Engine::new(world).unwrap();
+    engine.execute(Move(direction)).unwrap();
+    engine
+}
+
+/// Attacks the first fighting opponent until the encounter ends.
+fn fight_out(engine: &mut Engine<'_>) -> Vec<Event> {
+    let mut events = Vec::new();
+    while let Some(encounter) = engine.encounter() {
+        if engine.is_dead() {
+            break;
+        }
+        let foe = encounter.participants[1..]
+            .iter()
+            .find(|p| p.fighting())
+            .unwrap()
+            .character
+            .clone();
+        events.extend(engine.execute(Attack(foe)).unwrap());
+    }
+    events
+}
+
+#[test]
+fn a_pack_fights_together_and_every_member_must_fall() {
+    let world = arena();
+    let mut engine = at(&world, North);
+    let events = engine.execute(Engage("black_wolf".into())).unwrap();
+    // Engaging either wolf brings both, in the den's authored order.
+    assert!(events.contains(&Event::EncounterStarted {
+        opponents: vec!["grey_wolf".into(), "black_wolf".into()]
+    }));
+    // The faster wolves opened; the player is next, then both wolves in order.
+    assert_eq!(engine.turn_order(3), ["fighter", "grey_wolf", "black_wolf"]);
+    let bites = events
+        .iter()
+        .filter(|e| matches!(e, Event::DamageReceived { .. }))
+        .count();
+    assert_eq!(bites, 2);
+    // Felling the first wolf leaves the fight running against the second.
+    let mut first = Vec::new();
+    while engine.encounter().unwrap().participants[1].hp > 0 {
+        first.extend(engine.execute(Attack("grey_wolf".into())).unwrap());
+    }
+    assert!(engine.encounter().is_some());
+    assert!(!engine.turn_order(4).contains(&"grey_wolf".to_string()));
+    assert!(matches!(
+        engine.execute(Attack("grey_wolf".into())),
+        Err(EngineError::NotHere(_))
+    ));
+    let events = fight_out(&mut engine);
+    assert!(events.contains(&Event::EncounterEnded {
+        outcome: Outcome::Victory
+    }));
+    let defeated = &combat(&engine).defeated;
+    assert!(defeated.contains("grey_wolf") && defeated.contains("black_wolf"));
+    assert_eq!(combat(&engine).xp, 16);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn xp_falls_off_with_level_difference_as_in_the_simulator() {
+    // scripts/combat_sim XpRules.for_kill(100, player, monster) for monster − player.
+    for (diff, expected) in [
+        (-6, 0),
+        (-5, 0),
+        (-4, 60),
+        (-1, 90),
+        (0, 100),
+        (2, 120),
+        (4, 140),
+        (9, 140),
+    ] {
+        let (player, monster) = if diff < 0 {
+            (10, (10 + diff) as usize)
+        } else {
+            (10, 10 + diff as usize)
+        };
+        assert_eq!(
+            xp_for_defeat(100, player, monster),
+            expected,
+            "difference {diff}"
+        );
+    }
+    assert_eq!(xp_for_defeat(7, 1, 2), 7);
+    assert_eq!(xp_for_defeat(u64::MAX, 1, 9), u64::MAX);
+}
+
+#[test]
+fn a_repeatable_group_can_be_fought_again_and_rewards_every_victory() {
+    let world = arena();
+    let mut engine = at(&world, East);
+    for round in 1..=3 {
+        engine.execute(Engage("rat".into())).unwrap();
+        let events = fight_out(&mut engine);
+        assert!(events.contains(&Event::ItemReceived {
+            item: "rat_tail".into(),
+            quantity: 1
+        }));
+        assert_eq!(engine.state().player.inventory["rat_tail"], round);
+    }
+    // Never recorded, and 4 XP for each same-level rat.
+    assert!(combat(&engine).defeated.is_empty());
+    assert_eq!((combat(&engine).xp, combat(&engine).level), (12, 2));
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn nothing_is_learned_from_opponents_five_levels_below() {
+    // One 5-XP rat lifts the player from level 1 to 6; the next rat is five below.
+    let mut world = arena();
+    combatant(&mut world, "rat").xp = 5;
+    for (level, entry) in world
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .levels
+        .iter_mut()
+        .enumerate()
+    {
+        entry.xp = level as u64;
+    }
+    let mut engine = at(&world, East);
+    engine.execute(Engage("rat".into())).unwrap();
+    fight_out(&mut engine);
+    assert_eq!(combat(&engine).level, 6);
+    engine.execute(Engage("rat".into())).unwrap();
+    let events = fight_out(&mut engine);
+    assert!(events.contains(&Event::ExperienceGranted { amount: 0 }));
+    assert_eq!(combat(&engine).xp, 5);
+}
+
+#[test]
+fn fleeing_resolves_at_the_players_next_turn_and_grants_nothing() {
+    let world = arena();
+    let mut engine = at(&world, North);
+    engine.execute(Engage("grey_wolf".into())).unwrap();
+    let hp = vitals(&engine).hp;
+    let events = engine.execute(Flee).unwrap();
+    assert_eq!(events[0], Event::FleeStarted);
+    // Both wolves act during the wind-up, then the escape happens.
+    let bites = events
+        .iter()
+        .filter(|e| matches!(e, Event::DamageReceived { .. }))
+        .count();
+    assert_eq!(bites, 2);
+    assert_eq!(
+        events.last(),
+        Some(&Event::EncounterEnded {
+            outcome: Outcome::Fled
+        })
+    );
+    assert!(vitals(&engine).hp < hp);
+    assert!(engine.encounter().is_none() && combat(&engine).defeated.is_empty());
+    assert_eq!(combat(&engine).xp, 0);
+    // The wolves are whole again next time.
+    engine.execute(Engage("grey_wolf".into())).unwrap();
+    assert!(engine.encounter().unwrap().participants[1..]
+        .iter()
+        .all(|p| p.hp == 24));
+}
+
+/// The arena with the pit open, for tests of the ogre.
+fn open_pit() -> WorldSpec {
+    let mut world = arena();
+    world.locations[0]
+        .exits
+        .get_mut(&Down)
+        .unwrap()
+        .requires
+        .clear();
+    world
+}
+
+#[test]
+fn a_no_flee_group_cannot_be_fled_and_opponent_skills_follow_their_level() {
+    let world = open_pit();
+    let mut engine = at(&world, Down);
+    engine.execute(Engage("ogre".into())).unwrap();
+    assert!(!offered(&engine).iter().any(|(c, _)| *c == Flee));
+    let before = engine.state().clone();
+    assert!(matches!(engine.execute(Flee), Err(EngineError::NoFlee)));
+    assert_eq!(engine.state(), &before);
+    // The level-4 ogre has smash (level 3) but not crush (level 5).
+    let mut used = Vec::new();
+    while engine.encounter().is_some() && !engine.is_dead() {
+        for event in engine.execute(Attack("ogre".into())).unwrap() {
+            if let Event::DamageReceived { skill: Some(s), .. } = event {
+                used.push(s);
+            }
+        }
+    }
+    assert!(used.contains(&"smash".to_string()));
+    assert!(!used.contains(&"crush".to_string()));
+}
+
+#[test]
+fn a_yielding_opponent_ends_the_fight_alive_and_sets_the_victory_flags() {
+    let world = arena();
+    let mut engine = at(&world, West);
+    engine.execute(Engage("holt".into())).unwrap();
+    let events = fight_out(&mut engine);
+    assert!(events.contains(&Event::Yielded {
+        character: "holt".into()
+    }));
+    assert!(events.contains(&Event::EncounterEnded {
+        outcome: Outcome::Victory
+    }));
+    assert!(!events
+        .iter()
+        .any(|e| matches!(e, Event::EnemyDefeated { .. })));
+    assert!(engine.state().flags.contains("spar_won"));
+    // Not recorded, no reward: the sergeant can spar again.
+    assert!(combat(&engine).defeated.is_empty());
+    assert_eq!(combat(&engine).xp, 0);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+    engine.execute(Engage("holt".into())).unwrap();
+}
+
+#[test]
+fn a_player_who_yields_keeps_playing_with_the_defeat_flags_set() {
+    let mut world = arena();
+    combatant(&mut world, "holt").stats.patk = STAT_BOUND;
+    let mut engine = at(&world, West);
+    // A hit never takes a yielder below 1 HP, so an overwhelming blow yields.
+    // Equal speeds: the player's side acts first, then Holt strikes.
+    engine.execute(Engage("holt".into())).unwrap();
+    let events = engine.execute(Attack("holt".into())).unwrap();
+    assert!(events.contains(&Event::Yielded {
+        character: "fighter".into()
+    }));
+    assert!(events.contains(&Event::EncounterEnded {
+        outcome: Outcome::Yielded
+    }));
+    assert!(!events.contains(&Event::PlayerDied));
+    assert_eq!(vitals(&engine).hp, 1);
+    assert!(engine.state().flags.contains("spar_lost"));
+    engine.execute(Move(East)).unwrap();
+    engine.execute(Rest).unwrap();
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn group_encounters_save_exactly_and_reject_a_wrong_cast() {
+    let world = arena();
+    let mut engine = at(&world, North);
+    engine.execute(Engage("grey_wolf".into())).unwrap();
+    engine.execute(Attack("grey_wolf".into())).unwrap();
+    let good = engine.snapshot();
+    let mut resumed = Engine::restore(&world, good.clone()).unwrap();
+    assert_eq!(fight_out(&mut resumed), fight_out(&mut engine));
+    let broken: Vec<fn(&mut Encounter)> = vec![
+        |e| e.participants.truncate(2),
+        |e| e.participants.swap(1, 2),
+        |e| e.participants[1].yielded = true,
+    ];
+    for (i, corrupt) in broken.into_iter().enumerate() {
+        let mut snapshot = good.clone();
+        let Stance::Fighting(encounter) = &mut snapshot.state.combat.as_mut().unwrap().stance
+        else {
+            unreachable!()
+        };
+        corrupt(encounter);
+        assert!(
+            matches!(
+                Engine::restore(&world, snapshot),
+                Err(EngineError::InvalidSave(_))
+            ),
+            "corruption {i} was accepted"
+        );
+    }
 }

@@ -1,4 +1,4 @@
-use realmkit_engine::{Engine, Event};
+use realmkit_engine::{Engine, Event, Outcome};
 use realmkit_spec::{Direction, TextTemplate};
 use std::io::{self, Write};
 
@@ -138,7 +138,20 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 let names: Vec<_> = opponents.iter().map(|id| name(id).as_str()).collect();
                 writeln!(output, "You face {}.", names.join(", "))?
             }
-            Event::EncounterEnded => writeln!(output, "The fight is over.")?,
+            Event::FleeStarted => writeln!(output, "You turn to run.")?,
+            Event::Yielded { character } if *character == world.world.player => {
+                writeln!(output, "You yield.")?
+            }
+            Event::Yielded { character } => writeln!(output, "{} yields.", name(character))?,
+            Event::EncounterEnded { outcome } => writeln!(
+                output,
+                "{}",
+                match outcome {
+                    Outcome::Victory => "The fight is over.",
+                    Outcome::Yielded => "You lose the bout.",
+                    Outcome::Fled => "You get away.",
+                }
+            )?,
             Event::Rested => {
                 let mp = engine.player_stats().is_some_and(|s| s.mp > 0);
                 let restored = if mp { "Health and MP" } else { "Health" };

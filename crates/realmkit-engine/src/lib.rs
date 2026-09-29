@@ -19,6 +19,9 @@ pub enum Command {
         skill: Id,
         target: Id,
     },
+    /// In an encounter: spend this turn turning to run; the escape happens
+    /// at the player's next turn if they live.
+    Flee,
     /// Restores HP and MP at a safe location.
     Rest,
     Talk(Id),
@@ -61,8 +64,15 @@ pub enum Event {
     EncounterStarted {
         opponents: Vec<Id>,
     },
-    /// Every opponent is defeated; rewards follow.
-    EncounterEnded,
+    FleeStarted,
+    /// A participant in a yielding group stops fighting, alive.
+    Yielded {
+        character: Id,
+    },
+    /// Any rewards follow a victory.
+    EncounterEnded {
+        outcome: Outcome,
+    },
     Rested,
     EnemyDefeated {
         monster: Id,
@@ -147,6 +157,16 @@ pub struct Encounter {
     pub participants: Vec<Participant>,
 }
 
+/// How an encounter ended; the player's death leaves it open instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Outcome {
+    /// Every opponent died or yielded.
+    Victory,
+    /// The player yielded.
+    Yielded,
+    Fled,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Control {
@@ -171,6 +191,15 @@ pub struct Participant {
     /// Damage-rage progress toward the next rage point.
     pub rage_remainder: u64,
     pub next_time: u64,
+    /// Stopped fighting, alive, in a yielding group; out of the schedule.
+    pub yielded: bool,
+}
+
+impl Participant {
+    /// Still taking turns: alive and not yielded.
+    pub fn fighting(&self) -> bool {
+        self.hp > 0 && !self.yielded
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -191,7 +220,7 @@ pub struct GameState {
     pub turn: u64,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 4;
+pub const SAVE_FORMAT_VERSION: u32 = 5;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -229,6 +258,8 @@ pub enum EngineError {
     NotEnoughRage(Id),
     #[error("finish the fight first")]
     InEncounter,
+    #[error("there is no running from this fight")]
+    NoFlee,
     #[error("you are not fighting anyone; engage first")]
     NotFighting,
     #[error("this is not a safe place to rest")]
@@ -409,4 +440,17 @@ pub fn damage(
         .and_then(|v| v.checked_div(100 * 100 * (a + d)))
         .ok_or(EngineError::NumericLimit)?;
     u32::try_from(hit.max(1)).map_err(|_| EngineError::NumericLimit)
+}
+
+/// XP for defeating an opponent, by level difference `opponent − player`:
+/// ±10% per level, capped at ±40%, rounded down, and nothing five or more
+/// levels below. Mirrors `scripts/combat_sim` `XpRules.for_kill`.
+pub fn xp_for_defeat(xp: u64, player_level: usize, opponent_level: usize) -> u64 {
+    let diff = opponent_level as i128 - player_level as i128;
+    if diff <= -5 {
+        return 0;
+    }
+    let scaled = u128::from(xp) * (10 + diff.clamp(-4, 4)) as u128 / 10;
+    // At most 140% of a u64 value: saturate rather than wrap on absurd content.
+    u64::try_from(scaled).unwrap_or(u64::MAX)
 }

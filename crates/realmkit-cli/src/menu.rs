@@ -14,6 +14,7 @@ const ENGAGE: &str = "Engage";
 const MP: &str = "MP";
 const RAGE: &str = "rage";
 const REST: &str = "Rest";
+const FLEE: &str = "Flee";
 const INVENTORY: &str = "Inventory";
 const CHARACTER: &str = "Character";
 const QUESTS: &str = "Quests";
@@ -158,6 +159,7 @@ impl Menu {
                         // Other unavailable actions (e.g. after death) are not offered.
                         _ if !action.available => return None,
                         Command::Rest => REST.into(),
+                        Command::Flee => FLEE.into(),
                         Command::Engage(id) => {
                             format!("{ENGAGE} {}", world.character(id).unwrap().name)
                         }

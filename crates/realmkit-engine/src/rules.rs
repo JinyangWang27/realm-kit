@@ -161,7 +161,12 @@ pub(super) fn progress(state: &mut GameState, quest: &Id, events: &mut Vec<Event
     });
 }
 
-fn set_flag(world: &WorldSpec, state: &mut GameState, flag: &str, events: &mut Vec<Event>) {
+pub(super) fn set_flag(
+    world: &WorldSpec,
+    state: &mut GameState,
+    flag: &str,
+    events: &mut Vec<Event>,
+) {
     if !state.flags.insert(flag.into()) {
         return;
     }
@@ -245,7 +250,7 @@ pub(super) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         for foe in encounter
             .participants
             .iter()
-            .filter(|p| p.side != 0 && p.hp > 0)
+            .filter(|p| p.side != 0 && p.fighting())
         {
             actions.push(available(Command::Attack(foe.character.clone())));
             // Unaffordable skills stay listed, so the player sees why they are not usable.
@@ -256,6 +261,9 @@ pub(super) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 },
                 available: encounter::check_skill(player, level, s).is_ok(),
             }));
+        }
+        if !encounter::group(world, encounter).is_some_and(|g| g.no_flee) {
+            actions.push(available(Command::Flee));
         }
         actions.extend(panels);
         return actions;
@@ -305,7 +313,10 @@ pub(super) fn execute(
         command,
         Command::Look | Command::Status | Command::Inventory | Command::Quests
     );
-    let combat_action = matches!(command, Command::Attack(_) | Command::UseSkill { .. });
+    let combat_action = matches!(
+        command,
+        Command::Attack(_) | Command::UseSkill { .. } | Command::Flee
+    );
     // During an encounter only combat actions and panels are possible.
     if fighting(state).is_some() && !panel && !combat_action {
         return Err(EngineError::InEncounter);
@@ -389,6 +400,7 @@ pub(super) fn execute(
             state.dialogue = None;
         }
         Command::Engage(id) => encounter::engage(world, state, id, &mut events)?,
+        Command::Flee => encounter::flee(world, state, &mut events)?,
         Command::Attack(id) => encounter::player_action(world, state, id, None, &mut events)?,
         Command::UseSkill { skill, target } => {
             let known = world
