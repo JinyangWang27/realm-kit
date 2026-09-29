@@ -1,4 +1,5 @@
 """Experiments built from encounters: outcomes, rest cycles, bosses and grinding."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,7 +7,6 @@ from dataclasses import dataclass
 from .content import DEFAULT, Content
 from .encounter import Encounter, FightResult
 from .model import Combatant, Kind, Profile, Rules
-
 
 U64_MAX = 2**64 - 1  # the engine stores XP as u64 and adds it with overflow checks
 KILL_LIMIT = 100_000  # grinding simulates each fight; stop there rather than run for hours
@@ -82,8 +82,9 @@ class Simulator:
     def monster(self, level: int, kind: Kind = Kind.NORMAL) -> Combatant:
         return self.content.scaled(self.foe, kind).at_level(self.rules, level)
 
-    def fight(self, player: Combatant, enemies: list[Combatant],
-              hp: int | None = None, mp: int | None = None) -> FightResult:
+    def fight(
+        self, player: Combatant, enemies: list[Combatant], hp: int | None = None, mp: int | None = None
+    ) -> FightResult:
         return Encounter(self.rules, player, enemies, hp, mp).run()
 
     def outcome(self, build: Profile, level: int, enemies: list[Combatant]) -> Outcome | None:
@@ -105,10 +106,11 @@ class Simulator:
 
     def boss_level_needed(self, build: Profile, boss_level: int) -> int | None:
         boss = self.monster(boss_level, Kind.BOSS)
-        return next((p for p in range(1, self.content.max_level + 1) if self.fight(self.player(build, p), [boss]).won), None)
+        return next(
+            (p for p in range(1, self.content.max_level + 1) if self.fight(self.player(build, p), [boss]).won), None
+        )
 
-    def grind(self, build: Profile, target: int, xp: XpRules = XpRules(),
-              farm: int | None = None) -> GrindResult:
+    def grind(self, build: Profile, target: int, xp: XpRules = XpRules(), farm: int | None = None) -> GrindResult:
         """Grind from level 1 to `target`. Fights the highest monster costing <= 35% HP
         (or always `farm`) and rests when the next fight would be lost."""
         table = self.content.level_table  # cumulative: table[L - 1] is the total XP for level L
@@ -123,9 +125,13 @@ class Simulator:
                     raise ValueError(f"farm level {farm} is outside the table's levels 1-{self.content.max_level}")
                 monster_level = farm
             else:
-                safe = [m for m in range(1, self.content.max_level + 1)
-                        if xp.for_kill(self.monster(m).xp, level, m) > 0
-                        and (o := self.outcome(build, level, [self.monster(m)])) and o.hp_lost <= 35]
+                safe = [
+                    m
+                    for m in range(1, self.content.max_level + 1)
+                    if xp.for_kill(self.monster(m).xp, level, m) > 0
+                    and (o := self.outcome(build, level, [self.monster(m)]))
+                    and o.hp_lost <= 35
+                ]
                 if not safe:
                     break
                 monster_level = max(safe)

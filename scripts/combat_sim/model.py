@@ -1,4 +1,5 @@
 """The proposed M3 combat model: rules and formulas, skills and characters."""
+
 from __future__ import annotations
 
 import math

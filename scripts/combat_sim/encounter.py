@@ -1,4 +1,5 @@
 """One encounter on the paused initiative timeline."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -69,8 +70,9 @@ class Encounter:
     """One player against enemies. Ties resolve by (time, side, order); everyone
     attacks the first living opponent with their strongest affordable skill."""
 
-    def __init__(self, rules: Rules, player: Combatant, enemies: list[Combatant],
-                 hp: int | None = None, mp: int | None = None) -> None:
+    def __init__(
+        self, rules: Rules, player: Combatant, enemies: list[Combatant], hp: int | None = None, mp: int | None = None
+    ) -> None:
         self.rules = rules
         self.fighters = [
             Fighter(c, side=0 if i == 0 else 1, order=i, hp=c.hp, mp=c.mp, next_time=rules.delay(c.speed))

@@ -14,6 +14,7 @@ build yourself, for example:
             replace(DEFAULT, monsters=(replace(beast, hp=hp), *others)))
            for hp, s in product((60, 80, 100), (0, 25, 50)))
 """
+
 from __future__ import annotations
 
 import re
@@ -58,7 +59,8 @@ def _opponent_slot(i: int) -> Slot:
         return content.monsters[i]
 
     def put(content: Content, profile: Profile) -> Content:
-        return replace(content, monsters=content.monsters[:i] + (profile,) + content.monsters[i + 1:])
+        return replace(content, monsters=content.monsters[:i] + (profile,) + content.monsters[i + 1 :])
+
     return get, put
 
 
@@ -90,6 +92,7 @@ def _profile_knob(slot: Slot, stat: str) -> Knob:
         before = getattr(profile, stat)
         after = step(before, factor)
         return rules, put(content, with_field(profile, stat, after)), before, after
+
     return apply
 
 
@@ -103,17 +106,20 @@ def _skill_knob(slot: Slot, index: int, field: str) -> Knob:
         after = step(before, factor)
         skills = tuple(with_field(s, field, after) if i == index else s for i, s in enumerate(profile.skills))
         return rules, put(content, replace(profile, skills=skills)), before, after
+
     return apply
 
 
 def _tier_knob(kind: Kind, field: str) -> Knob:
     """Tier multipliers are fractions, so they scale without rounding."""
+
     def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
         tier = content.tiers[kind]
         before = getattr(tier, field)
         after = round(before * factor, 3)
         tiers = {**content.tiers, kind: with_field(tier, field, after)}
         return rules, replace(content, tiers=tiers), before, after
+
     return apply
 
 
@@ -143,6 +149,7 @@ def _profile_growth_knob(slot: Slot, name: str = "growth") -> Knob:
         after = scale_rate(before, factor)
         changed = replace(profile, mp_growth=after) if name == "mp_growth" else replace(profile, growth=after)
         return rules, put(content, changed), before, after
+
     return apply
 
 
@@ -161,6 +168,7 @@ def _share_knob(slot: Slot, index: int | None) -> Knob:
         else:
             profile = replace(profile, skills=tuple(changed if i == index else s for i, s in enumerate(profile.skills)))
         return rules, put(content, profile), before, after
+
     return apply
 
 
@@ -172,6 +180,7 @@ def _basic_knob(slot: Slot, field: str) -> Knob:
         before = getattr(profile.basic, field)
         after = step(before, factor)
         return rules, put(content, replace(profile, basic=with_field(profile.basic, field, after))), before, after
+
     return apply
 
 
@@ -182,6 +191,7 @@ def _rules_knob(field: str) -> Knob:
         if field == "cross_share":
             after = min(100, after)  # a share is a percentage; the no-op at 100 is skipped
         return with_field(rules, field, after), content, before, after
+
     return apply
 
 

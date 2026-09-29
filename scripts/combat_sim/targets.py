@@ -1,15 +1,17 @@
 """The balance targets as explicit checks; each failure names the broken target."""
+
 from __future__ import annotations
 
 import math
 from dataclasses import replace
 from decimal import Decimal
 from fractions import Fraction
+from itertools import pairwise
 
 from .encounter import Encounter
-from .model import (POWER_BOUNDS, STAT_BOUND, Channel, Combatant, Formula, Kind, Profile, Resource, Rules,
-                    Skill, exact)
+from .model import POWER_BOUNDS, STAT_BOUND, Channel, Combatant, Formula, Kind, Profile, Resource, Rules, Skill, exact
 from .simulator import U64_MAX, Simulator
+
 
 class TargetMissed(Exception):
     """A balance target does not hold."""
@@ -28,28 +30,37 @@ BOSS_LEVEL_GAP = 1  # most levels one build may need beyond another to beat the 
 
 def check_formula(rules: Rules) -> None:
     """Worked examples: physical attack 40 and special attack 20 against varied defences."""
+
     def hit(pdef: int, sdef: int, channel: Channel) -> int:
         a = Combatant("a", 1, 1, 0, patk=40, pdef=0, satk=20, sdef=0, speed=100, skills=())
         d = Combatant("d", 1, 1, 0, patk=0, pdef=pdef, satk=0, sdef=sdef, speed=100, skills=())
         return rules.damage(a, d, Skill("hit", 100, channel))
+
     if rules.formula is Formula.RATIO and rules.cross_share == 25:
         # physical: attack 40 + 25% of 20 = 45; no defence -> 45; defence 45 halves it
-        require(hit(0, 0, Channel.PHYSICAL) == 45 and hit(45, 0, Channel.PHYSICAL) == 22,
-                "formula example: combined physical attack 45, halved by defence 45")
+        require(
+            hit(0, 0, Channel.PHYSICAL) == 45 and hit(45, 0, Channel.PHYSICAL) == 22,
+            "formula example: combined physical attack 45, halved by defence 45",
+        )
         # high 内力 (special defence 80) blocks a physical hit like 20 physical defence
-        require(hit(0, 80, Channel.PHYSICAL) == hit(20, 0, Channel.PHYSICAL) == 31,
-                "formula example: special defence 80 should block like physical defence 20")
+        require(
+            hit(0, 80, Channel.PHYSICAL) == hit(20, 0, Channel.PHYSICAL) == 31,
+            "formula example: special defence 80 should block like physical defence 20",
+        )
         # special: 20 + 25% of 40 = 30
-        require(hit(0, 0, Channel.SPECIAL) == 30,
-                "formula example: combined special attack 30")
+        require(hit(0, 0, Channel.SPECIAL) == 30, "formula example: combined special attack 30")
 
 
 def check_resource_timing(sim: Simulator) -> None:
     """Action rage is credited after the action resolves, so rage one short of a skill's
     cost cannot pay for it that turn. Runs one real action through the encounter."""
     # The cheapest paid rage skill within the table; free rage skills have no shortfall.
-    candidates = [(s.cost, max(1, s.level), b, s) for b in sim.content.builds for s in b.skills
-                  if s.resource is Resource.RAGE and s.cost > 0 and s.level <= sim.content.max_level]
+    candidates = [
+        (s.cost, max(1, s.level), b, s)
+        for b in sim.content.builds
+        for s in b.skills
+        if s.resource is Resource.RAGE and s.cost > 0 and s.level <= sim.content.max_level
+    ]
     if not candidates:
         return
     cost, level, rager, paid = min(candidates, key=lambda c: (c[0], c[1]))
@@ -58,8 +69,10 @@ def check_resource_timing(sim: Simulator) -> None:
     encounter = Encounter(sim.rules, player, [sim.monster(level)])
     encounter.player.rage = cost - 1
     encounter._act(encounter.player)
-    require(encounter.player.rage == cost - 1 + sim.rules.rage_per_action,
-            "rage from the current action must not be spendable in the same action")
+    require(
+        encounter.player.rage == cost - 1 + sim.rules.rage_per_action,
+        "rage from the current action must not be spendable in the same action",
+    )
 
 
 def decimal(value: Fraction) -> str:
@@ -80,24 +93,42 @@ def check_sizes(sim: Simulator) -> None:
     """Reject absurdly large numbers first, without printing them: every later message may
     format a value, and Python limits how many digits an int may convert to a string.
     Every legitimate value is far below 64 bits."""
+
     def too_big(value: object) -> bool:
         if isinstance(value, int):
             return value.bit_length() > 64
         if isinstance(value, Fraction):
             return value.numerator.bit_length() > 64 or value.denominator.bit_length() > 64
         return False
-    fields: list[tuple[str, object]] = [(f"world {name}", getattr(sim.rules, name))
-                                        for name in sim.rules.__dataclass_fields__]
+
+    fields: list[tuple[str, object]] = [
+        (f"world {name}", getattr(sim.rules, name)) for name in sim.rules.__dataclass_fields__
+    ]
     fields += [("a level-table threshold", xp) for xp in sim.content.level_table]
     for tier in sim.content.tiers.values():
         fields += [("a tier multiplier", tier.hp), ("a tier multiplier", tier.attack)]
     for profile in (*sim.content.builds, *sim.content.monsters):
-        fields += [(f"{profile.name} {name}", getattr(profile, name))
-                   for name in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed", "growth", "mp_growth",
-                                "xp", "xp_per_level")]
+        fields += [
+            (f"{profile.name} {name}", getattr(profile, name))
+            for name in (
+                "hp",
+                "mp",
+                "patk",
+                "pdef",
+                "satk",
+                "sdef",
+                "speed",
+                "growth",
+                "mp_growth",
+                "xp",
+                "xp_per_level",
+            )
+        ]
         for skill in (*profile.skills, profile.basic):
-            fields += [(f"{profile.name} {skill.name} {name}", getattr(skill, name))
-                       for name in ("power", "cost", "time", "level", "cross_share")]
+            fields += [
+                (f"{profile.name} {skill.name} {name}", getattr(skill, name))
+                for name in ("power", "cost", "time", "level", "cross_share")
+            ]
     for name, value in fields:
         require(not too_big(value), f"{name} is far too large")
 
@@ -108,8 +139,7 @@ def check_integers(sim: Simulator) -> None:
     Other stats may be decimals; generation rounds them, but speed is used as authored."""
     rules = sim.rules
     require(isinstance(rules.formula, Formula), f"unknown damage formula {rules.formula!r}")
-    for name in ("action_cost", "speed_cap", "cross_share", "mp_regen_percent",
-                 "rage_per_action", "rage_per_max_hp"):
+    for name in ("action_cost", "speed_cap", "cross_share", "mp_regen_percent", "rage_per_action", "rage_per_max_hp"):
         require(whole(getattr(rules, name)), f"world {name} {getattr(rules, name)} must be an integer")
     if rules.formula is not Formula.RATIO:
         require(whole(rules.base_k) and rules.base_k >= 1, f"base_k {rules.base_k} must be a positive integer")
@@ -118,13 +148,19 @@ def check_integers(sim: Simulator) -> None:
         require(whole(profile.xp) and whole(profile.xp_per_level), f"{profile.name} XP must be integers")
         require(whole(profile.speed), f"{profile.name} speed {profile.speed} must be an integer")
         for skill in (*profile.skills, profile.basic):
-            require(isinstance(skill.resource, Resource) and isinstance(skill.channel, Channel),
-                    f"{profile.name} {skill.name} has an unknown resource or channel")
+            require(
+                isinstance(skill.resource, Resource) and isinstance(skill.channel, Channel),
+                f"{profile.name} {skill.name} has an unknown resource or channel",
+            )
             for field in ("power", "cost", "time", "level"):
-                require(whole(getattr(skill, field)),
-                        f"{profile.name} {skill.name} {field} {getattr(skill, field)} must be an integer")
-            require(skill.cross_share is None or whole(skill.cross_share),
-                    f"{profile.name} {skill.name} cross share {skill.cross_share} must be an integer")
+                require(
+                    whole(getattr(skill, field)),
+                    f"{profile.name} {skill.name} {field} {getattr(skill, field)} must be an integer",
+                )
+            require(
+                skill.cross_share is None or whole(skill.cross_share),
+                f"{profile.name} {skill.name} cross share {skill.cross_share} must be an integer",
+            )
 
 
 def check_exact_stats(profile: Profile, source: str) -> None:
@@ -132,19 +168,23 @@ def check_exact_stats(profile: Profile, source: str) -> None:
     for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
         low = 1 if stat in ("hp", "speed") else 0
         value = exact(getattr(profile, stat))
-        require(low <= value <= STAT_BOUND,
-                f"{profile.name} {source} {stat} {decimal(value)} is outside {low}-{STAT_BOUND}")
+        require(
+            low <= value <= STAT_BOUND, f"{profile.name} {source} {stat} {decimal(value)} is outside {low}-{STAT_BOUND}"
+        )
 
 
 def check_finite(sim: Simulator) -> None:
     """Decimal amounts must be finite numbers before they are converted exactly."""
+
     def finite(value: object) -> bool:
         # Exact types, as in whole(): bool is an int subclass but not a number here.
         return type(value) in (int, Fraction) or (type(value) is float and math.isfinite(value))
+
     amounts: list[tuple[str, object]] = [("world growth", sim.rules.growth)]
     for profile in (*sim.content.builds, *sim.content.monsters):
-        amounts += [(f"{profile.name} {stat}", getattr(profile, stat))
-                    for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef")]
+        amounts += [
+            (f"{profile.name} {stat}", getattr(profile, stat)) for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef")
+        ]
         for name in ("growth", "mp_growth"):
             if getattr(profile, name) is not None:
                 amounts.append((f"{profile.name} {name}", getattr(profile, name)))
@@ -164,16 +204,24 @@ def check_bounds(sim: Simulator) -> None:
     check_integers(sim)
     check_finite(sim)
     table = sim.content.level_table
-    require(table[:1] == (0,) and all(a < b for a, b in zip(table, table[1:])),
-            "the level table must start at 0 XP and rise strictly, as the engine requires")
+    require(
+        table[:1] == (0,) and all(a < b for a, b in pairwise(table)),
+        "the level table must start at 0 XP and rise strictly, as the engine requires",
+    )
     for profile in (*sim.content.builds, *sim.content.monsters):
         for skill in (*profile.skills, profile.basic):  # every authored skill, reachable or not
-            require(POWER_BOUNDS[0] <= skill.power <= POWER_BOUNDS[1],
-                    f"{profile.name} {skill.name} power {skill.power} is outside {POWER_BOUNDS}")
-            require(skill.cross_share is None or 0 <= skill.cross_share <= 100,
-                    f"{profile.name} {skill.name} cross share {skill.cross_share} is outside 0-100")
-            require(skill.cost >= 0 and skill.time >= 1,
-                    f"{profile.name} {skill.name} needs a nonnegative cost and positive action time")
+            require(
+                POWER_BOUNDS[0] <= skill.power <= POWER_BOUNDS[1],
+                f"{profile.name} {skill.name} power {skill.power} is outside {POWER_BOUNDS}",
+            )
+            require(
+                skill.cross_share is None or 0 <= skill.cross_share <= 100,
+                f"{profile.name} {skill.name} cross share {skill.cross_share} is outside 0-100",
+            )
+            require(
+                skill.cost >= 0 and skill.time >= 1,
+                f"{profile.name} {skill.name} needs a nonnegative cost and positive action time",
+            )
             require(skill.level >= 1, f"{profile.name} {skill.name} unlocks below level 1")
         # Costs are flat, so a skill must be affordable with the MP its user has when it unlocks.
         for skill in profile.skills:
@@ -181,22 +229,28 @@ def check_bounds(sim: Simulator) -> None:
             # authored level from making the exact growth below enormous.
             if skill.resource is Resource.MP and skill.cost > 0 and skill.level <= sim.content.max_level:
                 mp = sim.rules.grow(profile.mp, skill.level, profile.growth_for("mp"))
-                require(skill.cost <= mp, f"{profile.name} {skill.name} costs {skill.cost} MP but "
-                        f"{profile.name} has only {mp} at level {skill.level}")
-        require(profile.basic.cost == 0 and profile.basic.level == 1,
-                f"{profile.name}'s basic attack must be free and available from level 1")
+                require(
+                    skill.cost <= mp,
+                    f"{profile.name} {skill.name} costs {skill.cost} MP but "
+                    f"{profile.name} has only {mp} at level {skill.level}",
+                )
+        require(
+            profile.basic.cost == 0 and profile.basic.level == 1,
+            f"{profile.name}'s basic attack must be free and available from level 1",
+        )
         check_exact_stats(profile, "authored")
         for name in ("growth", "mp_growth"):
             value = getattr(profile, name)
-            require(value is None or value >= 1,
-                    f"{profile.name} {name} {value} would lower stats as levels rise")
+            require(value is None or value >= 1, f"{profile.name} {name} {value} would lower stats as levels rise")
     unknown = [key for key in sim.content.tiers if not isinstance(key, Kind)]
     require(not unknown, f"unknown tier keys {unknown!r}")
     missing = [kind.value for kind in Kind if kind not in sim.content.tiers]
     require(not missing, f"content has no tier for {', '.join(missing)}")
     for kind, tier in sim.content.tiers.items():
-        require(exact(tier.hp) > 0 and exact(tier.attack) >= 0,
-                f"{kind.value} tier multipliers must be positive for HP and nonnegative for attack")
+        require(
+            exact(tier.hp) > 0 and exact(tier.attack) >= 0,
+            f"{kind.value} tier multipliers must be positive for HP and nonnegative for attack",
+        )
     for foe in sim.content.monsters:
         for kind in Kind:
             check_exact_stats(sim.content.scaled(foe, kind), f"{kind.value}-tier")
@@ -210,29 +264,39 @@ def check_bounds(sim: Simulator) -> None:
     # The exact grown values at the top level, checked before any stats are generated: rounding
     # could pull them back in bounds, and a huge growth would make unprintably large integers.
     top = sim.content.max_level
-    for profile in (*sim.content.builds,
-                    *(sim.content.scaled(foe, kind) for foe in sim.content.monsters for kind in Kind)):
+    for profile in (
+        *sim.content.builds,
+        *(sim.content.scaled(foe, kind) for foe in sim.content.monsters for kind in Kind),
+    ):
         for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef"):
             value = sim.rules.grown(getattr(profile, stat), top, profile.growth_for(stat))
-            require(value <= STAT_BOUND,
-                    f"{profile.name} {stat} grows to {decimal(value)} at level {top}, above {STAT_BOUND}")
+            require(
+                value <= STAT_BOUND,
+                f"{profile.name} {stat} grows to {decimal(value)} at level {top}, above {STAT_BOUND}",
+            )
     for level in (1, sim.content.max_level):  # growth >= 1 keeps stats monotonic: both ends suffice
         characters = [sim.player(build, level) for build in sim.content.builds]
-        characters += [sim.content.scaled(foe, kind).at_level(sim.rules, level)
-                       for foe in sim.content.monsters for kind in Kind]
+        characters += [
+            sim.content.scaled(foe, kind).at_level(sim.rules, level) for foe in sim.content.monsters for kind in Kind
+        ]
         for c in characters:
             for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed"):
                 low = 1 if stat in ("hp", "speed") else 0
-                require(low <= getattr(c, stat) <= STAT_BOUND,
-                        f"{c.name} {stat} {getattr(c, stat)} is outside {low}-{STAT_BOUND} at level {level}")
+                require(
+                    low <= getattr(c, stat) <= STAT_BOUND,
+                    f"{c.name} {stat} {getattr(c, stat)} is outside {low}-{STAT_BOUND} at level {level}",
+                )
             # The falloff can add up to 40% for a much stronger opponent; that must still fit.
-            require(0 <= c.xp and c.xp * 14 // 10 <= XP_BOUND,
-                    f"{c.name} grants XP {c.xp} at level {level}; with the falloff's +40% it would "
-                    f"exceed {XP_BOUND} (the engine's u64)")
+            require(
+                0 <= c.xp and c.xp * 14 // 10 <= XP_BOUND,
+                f"{c.name} grants XP {c.xp} at level {level}; with the falloff's +40% it would "
+                f"exceed {XP_BOUND} (the engine's u64)",
+            )
     # Each skill at its unlock level: attack only rises with level (growth >= 1), so that is
     # where rounding could leave a newly unlocked skill with no attack.
-    check_unlocks(sim, [*sim.content.builds,
-                        *(sim.content.scaled(foe, kind) for foe in sim.content.monsters for kind in Kind)])
+    check_unlocks(
+        sim, [*sim.content.builds, *(sim.content.scaled(foe, kind) for foe in sim.content.monsters for kind in Kind)]
+    )
 
 
 def check_unlocks(sim: Simulator, profiles: list[Profile]) -> None:
@@ -242,8 +306,10 @@ def check_unlocks(sim: Simulator, profiles: list[Profile]) -> None:
             if level > sim.content.max_level:
                 continue  # beyond the table: never reachable
             character = profile.at_level(sim.rules, level)
-            require(sim.rules.combined(character, skill) > 0,
-                    f"{character.name} has no attack for {skill.name} when it unlocks at level {level}")
+            require(
+                sim.rules.combined(character, skill) > 0,
+                f"{character.name} has no attack for {skill.name} when it unlocks at level {level}",
+            )
 
 
 PROBE_LEVELS = (1, 5, 10, 20, 30)  # levels the hard targets test at
@@ -252,8 +318,9 @@ HARDER_BY = 4  # the "much stronger opponent" probe is this many levels above th
 
 def check(sim: Simulator) -> None:
     top = max(PROBE_LEVELS) + HARDER_BY
-    require(sim.content.max_level >= top,
-            f"the level table must reach level {top}, the highest level the targets probe")
+    require(
+        sim.content.max_level >= top, f"the level table must reach level {top}, the highest level the targets probe"
+    )
     check_bounds(sim)
     check_formula(sim.rules)
     check_resource_timing(sim)
@@ -269,37 +336,34 @@ def check_against(sim: Simulator) -> None:
         who = f"{build.name} vs {foe}"
         for p in PROBE_LEVELS:
             same = sim.outcome(build, p, [sim.monster(p)])
-            require(same and SAME_LEVEL_ACTIONS[0] <= same.actions <= SAME_LEVEL_ACTIONS[1] and 15 <= same.hp_lost <= 35,
-                    f"{who} L{p} same-level: {same}")
+            require(
+                same and SAME_LEVEL_ACTIONS[0] <= same.actions <= SAME_LEVEL_ACTIONS[1] and 15 <= same.hp_lost <= 35,
+                f"{who} L{p} same-level: {same}",
+            )
             harder = sim.outcome(build, p, [sim.monster(p + HARDER_BY)])
-            require(harder is None or harder.hp_lost >= 40,
-                    f"{who} L{p} +{HARDER_BY} levels too easy: {harder}")
-            require(2 <= sim.fights_per_rest(build, p, p) <= 5,
-                    f"{who} L{p} fights per rest")
-            require(sim.outcome(build, p, [sim.monster(p, Kind.MINION)] * 2),
-                    f"{who} L{p} loses to 2 minions")
+            require(harder is None or harder.hp_lost >= 40, f"{who} L{p} +{HARDER_BY} levels too easy: {harder}")
+            require(2 <= sim.fights_per_rest(build, p, p) <= 5, f"{who} L{p} fights per rest")
+            require(sim.outcome(build, p, [sim.monster(p, Kind.MINION)] * 2), f"{who} L{p} loses to 2 minions")
         for b in (5, 10, 20):
             need = sim.boss_level_needed(build, b)
-            require(need is not None and b <= need <= b + 3,
-                    f"{who} L{b} boss needs L{need}")
-        require(sim.grind(build, 10).level == 10,
-                f"{who} cannot grind to L10")
-        require(sim.grind(build, 10, farm=1).level < 10,
-                f"{who} can farm L1 opponents to L10")
+            require(need is not None and b <= need <= b + 3, f"{who} L{b} boss needs L{need}")
+        require(sim.grind(build, 10).level == 10, f"{who} cannot grind to L10")
+        require(sim.grind(build, 10, farm=1).level < 10, f"{who} can farm L1 opponents to L10")
         # Later skills must matter: at level 20, a build limited to its level-1 skills does clearly worse.
         full = sim.outcome(build, 20, [sim.monster(20)])
-        basic = sim.outcome(replace(build, skills=tuple(s for s in build.skills if s.level == 1)),
-                            20, [sim.monster(20)])
-        require(full and (basic is None or basic.hp_lost >= full.hp_lost + 5),
-                f"{who} L20: later skills barely help (with {full}, level-1 skills only {basic})")
+        basic = sim.outcome(
+            replace(build, skills=tuple(s for s in build.skills if s.level == 1)), 20, [sim.monster(20)]
+        )
+        require(
+            full and (basic is None or basic.hp_lost >= full.hp_lost + 5),
+            f"{who} L20: later skills barely help (with {full}, level-1 skills only {basic})",
+        )
     for b in (5, 10, 20):
         needs = [sim.boss_level_needed(build, b) or 99 for build in sim.content.builds]
-        require(max(needs) - min(needs) <= BOSS_LEVEL_GAP,
-                f"L{b} {foe} boss: builds need levels {needs}")
+        require(max(needs) - min(needs) <= BOSS_LEVEL_GAP, f"L{b} {foe} boss: builds need levels {needs}")
     boss = sim.monster(5, Kind.BOSS)
     boss_hp = [sim.fight(sim.player(sim.content.warrior, 5, s), [boss]).hp for s in (100, 160, 200)]
-    require(boss_hp[0] < boss_hp[1] <= boss_hp[2],
-            f"speed gives no benefit against a {foe} boss: {boss_hp}")
+    require(boss_hp[0] < boss_hp[1] <= boss_hp[2], f"speed gives no benefit against a {foe} boss: {boss_hp}")
 
 
 IDENTITY_LEVELS = (5, 10, 20)
@@ -323,15 +387,19 @@ def check_identity(sim: Simulator) -> None:
                 (f"{foe.name} L{p} actions", m.actions - w.actions),
                 (f"{foe.name} L{p} HP lost", hp if abs(hp) > HP_TIE else 0),
                 (f"{foe.name} L{p} fights/rest", s.fights_per_rest(warrior, p, p) - s.fights_per_rest(mage, p, p)),
-                (f"{foe.name} L{p} boss level", (s.boss_level_needed(mage, p) or 99)
-                 - (s.boss_level_needed(warrior, p) or 99)),
+                (
+                    f"{foe.name} L{p} boss level",
+                    (s.boss_level_needed(mage, p) or 99) - (s.boss_level_needed(warrior, p) or 99),
+                ),
             ]
     decisive = [edge for _, edge in edges if edge]
     require(decisive, "the builds never differ: there is no trade-off to judge")
     for name, sign in ((warrior.name, 1), (mage.name, -1)):
         won = sum(1 for edge in decisive if edge * sign > 0)
-        require(100 * won >= MIN_WIN_SHARE * len(decisive),
-                f"{name} wins only {won} of {len(decisive)} comparisons where the builds differ")
+        require(
+            100 * won >= MIN_WIN_SHARE * len(decisive),
+            f"{name} wins only {won} of {len(decisive)} comparisons where the builds differ",
+        )
 
 
 def failure(sim: Simulator) -> str | None:

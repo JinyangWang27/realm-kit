@@ -1,0 +1,5 @@
+line-length = 120
+
+# Frozen dataclasses are safe as argument defaults.
+[lint.flake8-bugbear]
+extend-immutable-calls = ["combat_sim.model.Rules", "combat_sim.simulator.XpRules"]
