@@ -441,6 +441,12 @@ lie between starting and final values. Stats are not stored in 8 bits, so a cap 
 
 ### Balance simulation · proposed
 
+Balancing is deferred until the combat, build and equipment systems are all
+implemented. Until then the simulator and its targets are a guide for choosing
+starting numbers and spotting structural problems, not a gate: a slice may ship
+with fixture numbers that miss a target, and final tuning happens once over the
+complete system.
+
 The `scripts/combat_sim` package models these rules: the damage formula, the
 timeline, tie order and the basic enemy behaviour, not the engine itself. From
 the repository root, `python3 -m scripts.combat_sim` prints a report, `check`
@@ -643,6 +649,9 @@ computes it. Rules of thumb for authors, to be verified with `check` and `tune`:
   sustain the earlier level-scaled costs produced, and the report is unchanged
   but for one rest in two grinding lines. A world that wants casters to gain
   sustain with level lets MP grow; one that grants 内力 lets it grow by grant.
+  With the sample content, MP growth up to 2% a level keeps every target; at 3%
+  or more the warrior wins only 3 of 14 comparisons, so faster MP growth needs
+  compensation elsewhere, such as costlier later tiers or more for the warrior.
 - **Grinding needs XP that falls off with level difference.** With ±10% XP per
   level of difference, capped at ±40% and rounded down, and nothing from monsters
   five or more levels below,
@@ -887,6 +896,15 @@ every package.
   identical resources remain definition + quantity. Materials/quality are concrete
   authored data rather than a universal runtime hierarchy. Preserve authored
   source-language names and prose throughout crafting.
+- Optionally let players allocate stat points: content authors points gained
+  per level, which stats accept them and how much one point is worth, plus a
+  respec policy. Saves store the allocation, and effective stats are derived as
+  progression + allocation + equipment. With flat MP costs, points poured into
+  MP mean unlimited casting, so allocation needs per-stat caps or a low MP value
+  per point, and the balance simulation should first gain a target that no
+  single-stat build dominates. The capability suits worlds whose sources have
+  it; wuxia worlds grow 内力 through technique ranks instead. Proposed, not
+  decided.
 - Keep recipe knowledge separate from proficiency: authored teachers, plans,
   quests or discoveries grant recipes, while smithing determines whether a known
   recipe can be used. Proficiency alone does not reveal recipes initially.
