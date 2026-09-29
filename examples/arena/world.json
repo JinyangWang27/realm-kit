@@ -1,5 +1,5 @@
 {
-  "format_version": 8,
+  "format_version": 9,
   "id": "training_arena",
   "name": "The Training Arena",
   "language": "en",
@@ -52,6 +52,8 @@
       }
     ],
     "player_skills": ["heavy_blow"],
+    "slots": ["main_hand", "off_hand", "body", "neck"],
+    "player_equipment": ["practice_sword", "buckler", "leather_vest"],
     "stat_points": {
       "values": { "hp": 5, "patk": 1, "pdef": 1, "speed": 2 },
       "caps": { "speed": 10 },

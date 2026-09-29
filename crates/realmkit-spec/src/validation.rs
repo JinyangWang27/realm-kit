@@ -200,6 +200,16 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
         w.characters.iter().map(|v| v.id.as_str()),
     );
     ids(&mut out, "item", w.items.iter().map(|v| v.id.as_str()));
+    if w.combat().is_none() {
+        for item in w.items.iter().filter(|i| i.equipment.is_some()) {
+            issue(
+                &mut out,
+                &item.id,
+                "combat_disabled",
+                "this world has no combat block, so nothing can be worn for it",
+            );
+        }
+    }
     ids(&mut out, "quest", w.quests.iter().map(|v| v.id.as_str()));
     ids(
         &mut out,
@@ -587,11 +597,25 @@ fn usable_skills<'a>(
 
 /// Points need a use, a use needs points, and even every point in one stat
 /// (up to its cap) must keep that stat within the engine bound at every level.
-fn stat_points(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
+fn stat_points(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &Combat) {
     let granted = combat.levels.iter().any(|l| l.points > 0);
-    // Passive technique bonuses count toward the same worst case.
+    // Passive technique bonuses and the best gear for every slot count toward
+    // the same worst case.
     let passive = |stat: Stat| -> u64 {
-        combat
+        let gear: u64 = combat
+            .slots
+            .iter()
+            .map(|slot| {
+                w.items
+                    .iter()
+                    .filter_map(|i| i.equipment.as_ref())
+                    .filter(|e| e.slots.contains(slot))
+                    .map(|e| u64::from(e.bonuses.get(&stat).copied().unwrap_or(0)))
+                    .max()
+                    .unwrap_or(0)
+            })
+            .sum();
+        gear + combat
             .techniques
             .iter()
             .map(|t| {
@@ -601,7 +625,7 @@ fn stat_points(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
                     .max()
                     .unwrap_or(0)
             })
-            .sum()
+            .sum::<u64>()
     };
     for level in &combat.levels {
         if Stat::ALL
@@ -820,6 +844,70 @@ fn techniques(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
     }
 }
 
+/// Slots exist, gear occupies declared slots within the engine's bounds, and
+/// the starting gear is wearable.
+fn equipment(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
+    ids(out, "slot", combat.slots.iter().map(String::as_str));
+    for item in &w.items {
+        let Some(gear) = &item.equipment else {
+            continue;
+        };
+        let id = &item.id;
+        let mut seen = BTreeSet::new();
+        if gear.slots.is_empty() || !gear.slots.iter().all(|s| seen.insert(s)) {
+            issue(
+                out,
+                id,
+                "invalid_slots",
+                "equipment occupies at least one slot, each once",
+            );
+        }
+        for slot in &gear.slots {
+            reference(out, id, "slot", slot, combat.slots.contains(slot));
+        }
+        if gear
+            .bonuses
+            .values()
+            .chain([&gear.speed_penalty])
+            .any(|v| *v > STAT_BOUND)
+        {
+            issue(
+                out,
+                id,
+                "invalid_stats",
+                format!("equipment bonuses and penalties are at most {STAT_BOUND}"),
+            );
+        }
+        if gear
+            .basic_time
+            .is_some_and(|t| !(TIME_BOUNDS.0..=TIME_BOUNDS.1).contains(&t))
+        {
+            issue(
+                out,
+                id,
+                "invalid_time",
+                "a weapon's basic-attack time is 1 to 1,000 percent",
+            );
+        }
+        if gear
+            .modifiers
+            .values()
+            .any(|m| m.num > 10 || !(1..=10).contains(&m.den))
+        {
+            issue(
+                out,
+                id,
+                "invalid_modifier",
+                "a damage modifier is 0 to 10 over 1 to 10",
+            );
+        }
+    }
+    for id in &combat.player_equipment {
+        let wearable = w.item(id).is_some_and(|i| i.equipment.is_some());
+        reference(out, &w.world.player, "equipment item", id, wearable);
+    }
+}
+
 fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &Combat) {
     if combat.special_name.trim().is_empty() {
         issue(
@@ -888,8 +976,9 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         }
     }
     let levels = &combat.levels;
-    stat_points(out, owner, combat);
+    stat_points(out, w, owner, combat);
     techniques(out, w, combat);
+    equipment(out, w, combat);
     for level in levels {
         stats(out, owner, &level.stats);
     }
