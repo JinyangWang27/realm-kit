@@ -62,6 +62,11 @@ proves the complete single-player loop with authored content.
   of victory XP, taught by dialogue effects and quest rewards, and held by
   breakthrough gates. The core art's rank is shown as the realm.
   `examples/sect` exercises it. Package and save format 8.
+- [x] Equipment (M4c): wearable items in authored slots with bonuses, speed
+  penalties, weapon basic-attack overrides and damage modifiers (multiplying,
+  immunity wins, clamped to 1/10–10). Every piece is an individual saved
+  instance; equip swaps out whatever held its slots, with a before → after
+  preview from the engine. Package and save format 9.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

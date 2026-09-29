@@ -915,8 +915,8 @@ every package.
   wall-clock seconds, actor turns and timeline units.
 - Show why stats changed and what an action costs before confirming it.
 - Deliver in slices: M4a player-allocated stat points (delivered); M4b technique
-  ranks (delivered);
-  M4c equipment instances and equip/unequip; M4d stations, deterministic
+  ranks (delivered); M4c equipment instances and equip/unequip (delivered);
+  M4d stations, deterministic
   forging and authored improvement-state transitions; M4e one compatible
   learned enchantment per item. Runtime instances use deterministic
   saved IDs only when distinguishable copies need independent state; unique
