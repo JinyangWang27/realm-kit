@@ -925,6 +925,26 @@ fn equipment(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
             );
         }
     }
+    // Pieces that set the basic attack must share a slot, so at most one is worn.
+    let weapons: Vec<_> = w
+        .items
+        .iter()
+        .filter_map(|i| Some((&i.id, i.equipment.as_ref()?)))
+        .filter(|(_, g)| g.basic_channel.is_some() || g.basic_time.is_some())
+        .collect();
+    for (i, (id, gear)) in weapons.iter().enumerate() {
+        if weapons[..i]
+            .iter()
+            .any(|(_, other)| !other.slots.iter().any(|s| gear.slots.contains(s)))
+        {
+            issue(
+                out,
+                id,
+                "competing_weapons",
+                "pieces that change the basic attack must share a slot",
+            );
+        }
+    }
     for id in &combat.player_equipment {
         let wearable = w.item(id).is_some_and(|i| i.equipment.is_some());
         reference(out, &w.world.player, "equipment item", id, wearable);

@@ -404,7 +404,8 @@ an item with an `equipment` part can be worn:
 
 - `slots` lists the slots a piece occupies (a two-handed weapon takes two);
   `bonuses` adds to stats while worn; `speed_penalty` subtracts from speed;
-  a weapon's `basic_channel` and `basic_time` replace the wearer's basic attack;
+  a weapon's `basic_channel` and `basic_time` replace the wearer's basic attack
+  (pieces that set either must share a slot, so only one is ever worn);
   `modifiers` scale damage taken on a channel by `num / den` (0–10 over 1–10:
   `0/1` immunity, `1/2` resistance, `2/1` vulnerability).
 - Each piece obtained (starting gear, loot, quest rewards) is an individual

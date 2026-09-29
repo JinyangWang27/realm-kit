@@ -865,6 +865,10 @@ fn equipment_occupies_declared_slots_within_bounds() {
             combat.levels.iter_mut().for_each(|l| l.stats.satk = 0);
             gear(w, "greatsword").basic_channel = Some(Channel::Special);
         },
+        // Two weapons that can be worn together would compete for the attack.
+        |w| {
+            gear(w, "charm_of_warding").basic_time = Some(90);
+        },
         // Every best piece at once could lift defence past the stat bound.
         |w| {
             gear(w, "iron_mail").bonuses.insert(Stat::Pdef, 9_990);
