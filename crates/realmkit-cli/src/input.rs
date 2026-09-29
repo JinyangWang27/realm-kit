@@ -8,6 +8,9 @@ pub fn help(world: &WorldSpec) -> String {
     if combat.is_some() {
         attack += "engage <character-id>\nattack <character-id>\nuse <skill-id> <character-id>\nflee\nrest — at a safe place\n";
     }
+    if combat.is_some_and(|c| !c.slots.is_empty()) {
+        attack += "equip <#> — wear a piece from your pack\nunequip <#>\n";
+    }
     if combat.is_some_and(|c| !c.techniques.is_empty()) {
         attack += "techniques — learned techniques and their ranks\n";
     }
@@ -28,6 +31,14 @@ pub enum Input {
     /// List saves, or restore the one-based save shown in that list.
     Load(Option<usize>),
     Blank,
+}
+
+/// A piece's number as listed in the inventory, with or without its "#".
+fn gear(value: &str) -> Result<u64, &'static str> {
+    value
+        .trim_start_matches('#')
+        .parse()
+        .map_err(|_| "expected an equipment number such as #3")
 }
 
 fn stat(value: &str) -> Option<Stat> {
@@ -88,6 +99,8 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
         ("rest", []) => Command::Rest,
         ("flee", []) => Command::Flee,
         ("respec", []) => Command::Respec,
+        ("equip", [piece]) => Command::Equip(gear(piece)?),
+        ("unequip", [piece]) => Command::Unequip(gear(piece)?),
         ("allocate", [name, rest @ ..]) if rest.len() <= 1 => Command::Allocate {
             stat: stat(&name.to_ascii_lowercase()).ok_or("unknown stat")?,
             points: match rest {
@@ -164,5 +177,8 @@ mod tests {
         assert!(parse("allocate luck").is_err());
         assert!(parse("allocate hp two").is_err());
         assert_eq!(parse("respec"), Ok(Input::Command(Command::Respec)));
+        assert_eq!(parse("equip #3"), Ok(Input::Command(Command::Equip(3))));
+        assert_eq!(parse("unequip 3"), Ok(Input::Command(Command::Unequip(3))));
+        assert!(parse("equip sword").is_err());
     }
 }

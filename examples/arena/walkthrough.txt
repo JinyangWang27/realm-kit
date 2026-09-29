@@ -6,6 +6,7 @@ north
 engage grey_wolf
 flee
 south
+inventory
 east
 engage rat
 attack rat

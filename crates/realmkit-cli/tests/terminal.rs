@@ -430,3 +430,27 @@ fn the_sect_teaches_trains_and_deepens_named_ranks() {
     let demo = String::from_utf8(run(&["play", WORLD], "help\n").stdout).unwrap();
     assert!(!demo.contains("techniques —"));
 }
+
+#[test]
+fn gear_is_listed_previewed_worn_and_removed() {
+    let fight = "attack grey_wolf\n".repeat(3) + &"attack black_wolf\n".repeat(4);
+    let input = format!("help\ninventory\nnorth\nengage grey_wolf\n{fight}south\nequip 5\ninventory\nunequip #5\nequip 9\n");
+    let output = run(&["play", ARENA, "--seed", "1"], &input);
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "equip <#> — wear a piece from your pack",
+        "  #1 Practice sword [equipped] — Blunt",
+        "Received: Greatsword ×1",
+        "Equip #5 Greatsword: Attack 15 → 21, Defence 13 → 11",
+        "#1 Practice sword goes back in your pack.\n#2 Buckler goes back in your pack.\nYou equip #5 Greatsword.",
+        "  #5 Greatsword [equipped] — It needs both hands",
+        "#5 Greatsword goes back in your pack.",
+        "you have no equipment #9",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    // Worlds without slots neither list nor accept equipping.
+    let demo = String::from_utf8(run(&["play", WORLD], "help\nequip 1\n").stdout).unwrap();
+    assert!(!demo.contains("equip <#>"));
+    assert!(demo.contains("you have no equipment #1"));
+}
