@@ -1,7 +1,8 @@
 //! Panels: views of the current state that spend no time.
 
-use crate::render::direction_name;
+use crate::render::{direction_name, stat_name};
 use realmkit_engine::Engine;
+use realmkit_spec::Stat;
 use std::io::{self, Write};
 
 /// The location: its name, description, exits (locked or not) and who is here.
@@ -86,39 +87,47 @@ pub fn inventory(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()>
 /// The player's level, realm, vitals, stats, XP and unspent points.
 pub fn status(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
     let world = engine.world();
-    let state = engine.state();
     let player = &world.character(&world.world.player).unwrap().name;
-    match (&state.combat, engine.player_stats(), engine.player_vitals()) {
-        (Some(combat), Some(stats), Some(vitals)) => {
-            let special = &world.combat().unwrap().special_name;
-            write!(output, "{player} — Level {}", combat.level)?;
-            // The realm is the core internal art's rank name.
-            let rules = world.combat().unwrap();
-            let realm = rules.core_art.as_ref().and_then(|core| {
-                let learned = combat.techniques.get(core)?;
-                Some(&world.technique(core)?.ranks[learned.rank - 1].name)
-            });
-            if let Some(realm) = realm {
-                write!(output, " | Realm {realm}")?;
-            }
-            write!(output, " | HP {}/{}", vitals.hp, stats.hp)?;
-            // A world or build without MP shows none.
-            if stats.mp > 0 {
-                write!(output, " | MP {}/{}", vitals.mp, stats.mp)?;
-            }
-            write!(
-            output,
-            " | Attack {} | Defence {} | {special} attack {} | {special} defence {} | Speed {} | XP {}",
-            stats.patk, stats.pdef, stats.satk, stats.sdef, stats.speed, combat.xp
-        )?;
-            match engine.unspent_points() {
-                Some(points) if points > 0 => writeln!(output, " | Points {points}")?,
-                _ => writeln!(output)?,
-            }
-        }
-        _ => writeln!(output, "{player}")?,
+    let (Some(combat), Some(stats), Some(vitals), Some(rules)) = (
+        &engine.state().combat,
+        engine.player_stats(),
+        engine.player_vitals(),
+        world.combat(),
+    ) else {
+        return writeln!(output, "{player}");
+    };
+    // Who and where: the level, and the core internal art's rank as the realm.
+    write!(output, "{player} — Level {}", combat.level)?;
+    let realm = rules.core_art.as_ref().and_then(|core| {
+        let learned = combat.techniques.get(core)?;
+        Some(&world.technique(core)?.ranks[learned.rank - 1].name)
+    });
+    match realm {
+        Some(realm) => writeln!(output, " · Realm {realm}")?,
+        None => writeln!(output)?,
     }
-    Ok(())
+    // Vitals; a world or build without MP shows none.
+    write!(output, "  HP {}/{}", vitals.hp, stats.hp)?;
+    match stats.mp {
+        0 => writeln!(output)?,
+        max => writeln!(output, " · MP {}/{max}", vitals.mp)?,
+    }
+    let shown: Vec<String> = [Stat::Patk, Stat::Pdef, Stat::Satk, Stat::Sdef, Stat::Speed]
+        .into_iter()
+        .map(|s| format!("{} {}", stat_name(world, s), stats.get(s)))
+        .collect();
+    writeln!(output, "  {}", shown.join(" · "))?;
+    // Progress: XP toward the next level, and points waiting to be spent.
+    write!(output, "  XP {}", combat.xp)?;
+    match rules.levels.get(combat.level) {
+        Some(next) => write!(output, " (level {} at {})", combat.level + 1, next.xp)?,
+        None => write!(output, " (highest level)")?,
+    }
+    match engine.unspent_points() {
+        Some(1) => writeln!(output, " · 1 point to spend"),
+        Some(points) if points > 0 => writeln!(output, " · {points} points to spend"),
+        _ => writeln!(output),
+    }
 }
 
 /// Every quest and its status.

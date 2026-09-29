@@ -1001,8 +1001,9 @@ milestones. They change how play reads, never the engine or its rules.
    is shown as one line when it ends (`Technique XP: Cloud Palm +20, Azure
    Breath +1`), whether it was won or fled. Rank-ups still appear at once,
    and a reward without XP no longer prints `+0 XP`.
-3. **Multi-line status** · proposed. Split the one-line character panel into
-   vitals, stats and progression.
+3. **Multi-line status** · delivered. The character panel shows the level and
+   realm, then vitals, stats and progression on their own lines, with the XP
+   the next level needs and any points waiting to be spent.
 4. **Light styling** · proposed. Emphasis and colour in a terminal, plain text
    for pipes and `--line`.
 

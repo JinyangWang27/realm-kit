@@ -272,9 +272,9 @@ fn a_mage_duels_with_skills_rests_and_levels_up() {
         "concedes the hedge",
         "The fight is over.",
         "Level 2! Health and MP restored.",
-        "Witchcraft attack 12 | Witchcraft defence 7",
+        "Witchcraft attack 12 · Witchcraft defence 7",
         "You rest. Health and MP restored.",
-        "HP 40/40 | MP 30/30",
+        "HP 40/40 · MP 30/30",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
@@ -380,20 +380,20 @@ fn stat_points_are_spent_from_the_menu_or_typed_and_refunded_at_the_gate() {
     let text = String::from_utf8(output.stdout).unwrap();
     for passage in [
         "allocate hp|mp|patk|pdef|satk|sdef|speed [points]",
-        "Speed 100 | XP 0 | Points 3",
+        "Speed 100\n  XP 0 (level 2 at 10) · 3 points to spend\n",
         "6. Train stats — 3 points ›",
         "\nTrain stats — 3 points\n  1. Train HP",
         "2. Train Attack: 14 → 15",
         "5. Back",
         "1 point into Attack.",
         "2 points into HP.",
-        "You — Level 1 | HP 70/70 | Attack 15",
+        "You — Level 1\n  HP 70/70\n  Attack 15 ·",
         "you cannot spend points on that stat",
         "not enough unspent stat points",
         "Refund stat points",
         "Your stat points are refunded.",
         // After the refund, HP is back within the level's maximum.
-        "You — Level 1 | HP 60/60 | Attack 14",
+        "You — Level 1\n  HP 60/60\n  Attack 14 ·",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
@@ -412,7 +412,7 @@ fn the_sect_teaches_trains_and_deepens_named_ranks() {
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
     for passage in [
-        "You — Level 1 | Realm First Layer | HP 50/50 | MP 30/30",
+        "You — Level 1 · Realm First Layer\n  HP 50/50 · MP 30/30\n",
         "You learn Cloud Palm.",
         "2. Cloud Palm · Drifting Cloud on A Straw Dummy — 5 MP",
         // Technique XP from a fight arrives as one line when it ends.
@@ -424,6 +424,8 @@ fn the_sect_teaches_trains_and_deepens_named_ranks() {
         "Azure Breath: Second Layer!",
         "  Azure Breath — Second Layer (17/30 to Third Layer)",
         "Realm Second Layer",
+        // XP shows the next level and where it starts.
+        "XP 10 (level 2 at 15)",
         "Techniques",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
