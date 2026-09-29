@@ -24,6 +24,7 @@ const YIELDED: &str = "yielded";
 const INVENTORY: &str = "Inventory";
 const CHARACTER: &str = "Character";
 const QUESTS: &str = "Quests";
+const TECHNIQUES: &str = "Techniques";
 const KEYS_HINT: &str = "↑/↓ select · Enter confirm · number choose · : command";
 const ESC_HINT: &str = " · Esc back";
 pub const LINE_HINT: &str = "Enter a number, or type help for commands.";
@@ -145,13 +146,24 @@ impl Menu {
                         // Like a locked exit, choosing it explains why it cannot be used.
                         Command::UseSkill { skill, target } => {
                             let skill = world.skill(skill).unwrap();
+                            // A technique's skill carries the name of the rank it belongs to.
+                            let rank = engine.state().combat.as_ref().and_then(|c| {
+                                c.techniques.iter().find_map(|(id, learned)| {
+                                    let rank = &world.technique(id)?.ranks[learned.rank - 1];
+                                    (rank.skill.as_ref() == Some(&skill.id)).then_some(&rank.name)
+                                })
+                            });
+                            let name = match rank {
+                                Some(rank) => format!("{} · {rank}", skill.name),
+                                None => skill.name.clone(),
+                            };
                             let resource = match skill.resource {
                                 Resource::Mp => MP,
                                 Resource::Rage => RAGE,
                             };
                             format!(
                                 "{} {ON} {}{}{}",
-                                skill.name,
+                                name,
                                 world.character(target).unwrap().name,
                                 if skill.cost > 0 {
                                     format!(" — {} {resource}", skill.cost)
@@ -193,6 +205,7 @@ impl Menu {
                         Command::Inventory => INVENTORY.into(),
                         Command::Status => CHARACTER.into(),
                         Command::Quests => QUESTS.into(),
+                        Command::Techniques => TECHNIQUES.into(),
                         _ => return None,
                     };
                     Some(Entry {

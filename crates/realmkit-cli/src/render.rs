@@ -298,11 +298,17 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 match (&state.combat, engine.player_stats(), engine.player_vitals()) {
                     (Some(combat), Some(stats), Some(vitals)) => {
                         let special = &world.combat().unwrap().special_name;
-                        write!(
-                            output,
-                            "{player} — Level {} | HP {}/{}",
-                            combat.level, vitals.hp, stats.hp
-                        )?;
+                        write!(output, "{player} — Level {}", combat.level)?;
+                        // The realm is the core internal art's rank name.
+                        let rules = world.combat().unwrap();
+                        let realm = rules.core_art.as_ref().and_then(|core| {
+                            let learned = combat.techniques.get(core)?;
+                            Some(&world.technique(core)?.ranks[learned.rank - 1].name)
+                        });
+                        if let Some(realm) = realm {
+                            write!(output, " | Realm {realm}")?;
+                        }
+                        write!(output, " | HP {}/{}", vitals.hp, stats.hp)?;
                         // A world or build without MP shows none.
                         if stats.mp > 0 {
                             write!(output, " | MP {}/{}", vitals.mp, stats.mp)?;

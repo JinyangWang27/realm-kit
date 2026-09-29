@@ -619,6 +619,20 @@ mod tests {
     }
 
     #[test]
+    fn a_sealed_rank_shows_its_waiting_progress() {
+        let mut world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect")).unwrap();
+        world.world.combat.as_mut().unwrap().player_techniques[0].xp = 40;
+        let mut output = Vec::new();
+        play(&world, None, None, "techniques\n".as_bytes(), &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(
+            text.contains("  Azure Breath — Second Layer (30/30 to Third Layer, sealed)"),
+            "{text}"
+        );
+    }
+
+    #[test]
     fn death_restores_the_newest_save() {
         let mut world = WorldSpec::load(concat!(
             env!("CARGO_MANIFEST_DIR"),
