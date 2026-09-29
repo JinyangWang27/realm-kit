@@ -148,23 +148,41 @@ pub(super) fn check(
             }) && spent <= rules::granted_points(world, combat.level),
             "invalid stat point allocation",
         )?;
-        // Techniques: known ones at an existing rank, XP at least that rank's
-        // threshold, and at the next threshold only while its gate is closed.
-        // Starting techniques are never forgotten.
+        // Techniques: ones some grant can teach, at an existing rank, XP at
+        // least that rank's threshold and at the next threshold only while its
+        // gate is closed. Starting techniques are never forgotten.
+        let teachable: BTreeSet<&Id> = rules
+            .player_techniques
+            .iter()
+            .chain(world.quests.iter().flat_map(|q| &q.reward_techniques))
+            .chain(
+                world
+                    .dialogues
+                    .iter()
+                    .flat_map(|d| &d.nodes)
+                    .flat_map(|n| &n.choices)
+                    .filter_map(|c| match &c.effect {
+                        Some(DialogueEffect::GrantTechnique(grant)) => Some(grant),
+                        _ => None,
+                    }),
+            )
+            .map(|g| &g.technique)
+            .collect();
         ensure(
             combat.techniques.iter().all(|(id, learned)| {
-                world.technique(id).is_some_and(|t| {
-                    let Some(rank) = learned.rank.checked_sub(1).and_then(|i| t.ranks.get(i))
-                    else {
-                        return false;
-                    };
-                    learned.xp >= rank.xp
-                        && t.ranks.get(learned.rank).is_none_or(|next| {
-                            learned.xp < next.xp
-                                || (learned.xp == next.xp
-                                    && !rules::conditions_met(state, &next.requires))
-                        })
-                })
+                teachable.contains(id)
+                    && world.technique(id).is_some_and(|t| {
+                        let Some(rank) = learned.rank.checked_sub(1).and_then(|i| t.ranks.get(i))
+                        else {
+                            return false;
+                        };
+                        learned.xp >= rank.xp
+                            && t.ranks.get(learned.rank).is_none_or(|next| {
+                                learned.xp < next.xp
+                                    || (learned.xp == next.xp
+                                        && !rules::conditions_met(state, &next.requires))
+                            })
+                    })
             }) && rules.player_techniques.iter().all(|grant| {
                 combat
                     .techniques

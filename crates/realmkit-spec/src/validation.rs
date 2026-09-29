@@ -463,7 +463,17 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
                         w.world.flags.contains(flag),
                     ),
                     Some(DialogueEffect::GrantTechnique(grant)) => {
-                        technique_grant(&mut out, w, &dialogue.id, grant)
+                        technique_grant(&mut out, w, &dialogue.id, grant);
+                        // A choice can be taken again; teaching a rank is idempotent,
+                        // XP would not be. One-time XP comes from quest rewards.
+                        if grant.xp > 0 {
+                            issue(
+                                &mut out,
+                                &dialogue.id,
+                                "repeatable_reward",
+                                "a dialogue grant may teach a technique or rank, but not XP; reward XP through a quest",
+                            );
+                        }
                     }
                     None => {}
                 }
@@ -704,6 +714,23 @@ fn techniques(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
         "technique",
         combat.techniques.iter().map(|t| t.id.as_str()),
     );
+    // A skill belongs to one technique, so its use trains exactly that one.
+    let mut owners: BTreeMap<&Id, &Id> = BTreeMap::new();
+    for technique in &combat.techniques {
+        for skill in technique.ranks.iter().filter_map(|r| r.skill.as_ref()) {
+            if owners
+                .insert(skill, &technique.id)
+                .is_some_and(|other| other != &technique.id)
+            {
+                issue(
+                    out,
+                    &technique.id,
+                    "invalid_skill",
+                    format!("{skill} already belongs to another technique"),
+                );
+            }
+        }
+    }
     for technique in &combat.techniques {
         let id = &technique.id;
         if technique.name.trim().is_empty()
@@ -920,8 +947,21 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         "skill reference",
         combat.player_skills.iter().map(String::as_str),
     );
+    // Technique rank skills are the player's too once learned.
+    let rank_skills: Vec<&Id> = combat
+        .techniques
+        .iter()
+        .flat_map(|t| &t.ranks)
+        .filter_map(|r| r.skill.as_ref())
+        .collect();
     for id in &combat.player_skills {
         reference(out, owner, "skill", id, w.skill(id).is_some());
+    }
+    for id in combat
+        .player_skills
+        .iter()
+        .chain(rank_skills.iter().copied())
+    {
         if w.skill(id).is_some_and(|s| s.level > levels.len()) {
             issue(
                 out,
@@ -935,6 +975,7 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         let unlocked = combat
             .player_skills
             .iter()
+            .chain(rank_skills.iter().copied())
             .filter_map(|id| w.skill(id))
             .filter_map(|s| Some((s, &levels.get(s.level.checked_sub(1)?)?.stats)));
         usable_skills(

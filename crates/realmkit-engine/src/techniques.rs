@@ -76,7 +76,25 @@ pub(super) fn grant(
             rank,
         });
     }
-    add_xp(world, state, &technique.id, grant.xp, events)
+    add_xp(world, state, &technique.id, grant.xp, events)?;
+    clamp_vitals(world, state);
+    Ok(())
+}
+
+/// A rank's bonus replaces the previous one's and may be smaller, so current
+/// HP and MP never stay above the maxima the new ranks give.
+fn clamp_vitals(world: &WorldSpec, state: &mut GameState) {
+    let combat = state.combat.as_mut().unwrap();
+    let max = rules::player_stats(world, combat);
+    let (hp, mp) = match &mut combat.stance {
+        Stance::Exploring(vitals) => (&mut vitals.hp, &mut vitals.mp),
+        Stance::Fighting(encounter) => {
+            let player = &mut encounter.participants[0];
+            (&mut player.hp, &mut player.mp)
+        }
+    };
+    *hp = (*hp).min(max.hp);
+    *mp = (*mp).min(max.mp);
 }
 
 /// Adds technique XP, then promotes through every open rank.
@@ -90,20 +108,32 @@ pub(super) fn add_xp(
     if amount == 0 {
         return Ok(());
     }
-    let learned = state
-        .combat
-        .as_mut()
-        .unwrap()
-        .techniques
-        .get_mut(technique)
-        .unwrap();
-    learned.xp = learned
-        .xp
-        .checked_add(amount)
-        .ok_or(EngineError::NumericLimit)?;
+    // XP stops at the first closed gate it reaches; only what is kept counts.
+    let learned = state.combat.as_ref().unwrap().techniques[technique];
+    let raw = learned.xp.checked_add(amount);
+    let mut kept = raw.unwrap_or(u64::MAX);
+    let mut capped = false;
+    for next in &spec(world, technique).ranks[learned.rank..] {
+        if kept < next.xp {
+            break;
+        }
+        if !rules::conditions_met(state, &next.requires) {
+            (kept, capped) = (next.xp, true);
+            break;
+        }
+    }
+    if !capped && raw.is_none() {
+        return Err(EngineError::NumericLimit);
+    }
+    let gained = kept - learned.xp;
+    if gained == 0 {
+        return Ok(());
+    }
+    let combat = state.combat.as_mut().unwrap();
+    combat.techniques.get_mut(technique).unwrap().xp = kept;
     events.push(Event::TechniqueXpGained {
         technique: technique.into(),
-        amount,
+        amount: gained,
     });
     promote(world, state, events);
     Ok(())
@@ -146,4 +176,5 @@ pub(super) fn promote(world: &WorldSpec, state: &mut GameState, events: &mut Vec
             });
         }
     }
+    clamp_vitals(world, state);
 }

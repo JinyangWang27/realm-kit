@@ -2053,3 +2053,72 @@ fn saves_reject_technique_states_the_rules_could_not_reach() {
         );
     }
 }
+
+/// Accepts Wen's quest, fetches the volume from Qing, and hands it in.
+fn finish_lost_volume(engine: &mut Engine<'_>) -> Vec<Event> {
+    engine.execute(Move(East)).unwrap();
+    engine.execute(Talk("wen".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(Move(West)).unwrap();
+    engine.execute(Talk("qing".into())).unwrap();
+    engine.execute(ChooseDialogue(2)).unwrap();
+    engine.execute(Move(East)).unwrap();
+    engine.execute(Talk("wen".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap()
+}
+
+#[test]
+fn a_smaller_rank_bonus_keeps_vitals_within_the_new_maxima() {
+    // Second Layer here gives less MP than First Layer did.
+    let mut world = sect();
+    let ranks = &mut world.world.combat.as_mut().unwrap().techniques[0].ranks;
+    ranks[1].passive.insert(Stat::Mp, 5);
+    ranks[2].passive.insert(Stat::Mp, 5);
+    let mut engine = Engine::new(&world).unwrap();
+    assert_eq!(vitals(&engine).mp, 30);
+    finish_lost_volume(&mut engine);
+    assert_eq!(learned(&engine, "azure_breath").unwrap().rank, 2);
+    assert_eq!(vitals(&engine).mp, 25);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn xp_held_back_by_a_gate_is_not_reported_as_gained() {
+    // 25 XP at Second Layer; the sealed Third Layer waits at 30.
+    let mut world = sect();
+    world.world.combat.as_mut().unwrap().player_techniques[0].xp = 25;
+    combatant(&mut world, "dummy").xp = 50;
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("dummy".into())).unwrap();
+    let events = fight_out(&mut engine);
+    // A 20% share of 50 is 10, but only 5 fit below the gate.
+    assert!(events.contains(&Event::TechniqueXpGained {
+        technique: "azure_breath".into(),
+        amount: 5
+    }));
+    engine.execute(Engage("dummy".into())).unwrap();
+    let events = fight_out(&mut engine);
+    assert!(!events.iter().any(
+        |e| matches!(e, Event::TechniqueXpGained { technique, .. } if technique == "azure_breath")
+    ));
+}
+
+#[test]
+fn a_save_cannot_hold_a_technique_nothing_teaches() {
+    let mut world = sect();
+    let mut hidden = world.world.combat.as_ref().unwrap().techniques[0].clone();
+    hidden.id = "hidden_art".into();
+    world.world.combat.as_mut().unwrap().techniques.push(hidden);
+    let engine = Engine::new(&world).unwrap();
+    let mut snapshot = engine.snapshot();
+    snapshot
+        .state
+        .combat
+        .as_mut()
+        .unwrap()
+        .techniques
+        .insert("hidden_art".into(), TechniqueState { rank: 1, xp: 0 });
+    assert!(Engine::restore(&world, snapshot).is_err());
+}

@@ -681,6 +681,23 @@ fn techniques_have_named_rising_ranks_and_valid_grants() {
         |w| w.world.combat.as_mut().unwrap().player_techniques[0].rank = Some(4),
         |w| w.world.combat.as_mut().unwrap().player_techniques[0].rank = Some(0),
         |w| w.quests[0].reward_techniques[0].technique = "missing".into(),
+        // A rank skill the player could never unlock or pay for.
+        |w| w.world.combat.as_mut().unwrap().skills[0].level = 9,
+        |w| w.world.combat.as_mut().unwrap().skills[1].cost = 99,
+        // One skill in two techniques could train only one of them.
+        |w| {
+            let combat = w.world.combat.as_mut().unwrap();
+            combat.techniques[0].ranks[0].skill = Some("palm_drifting".into())
+        },
+        // A dialogue choice can be repeated, so it may not hand out XP.
+        |w| {
+            let choice = &mut w.dialogues[0].nodes[0].choices[0];
+            choice.effect = Some(DialogueEffect::GrantTechnique(TechniqueGrant {
+                technique: "cloud_palm".into(),
+                rank: None,
+                xp: 5,
+            }))
+        },
         // A passive this large could lift MP past the stat bound.
         |w| {
             w.world.combat.as_mut().unwrap().techniques[0].ranks[2]

@@ -364,7 +364,9 @@ source's own terms; players see that name, never a number:
   as soon as they do.
 - **Grants** (`player_techniques`, the `grant_technique` dialogue effect and
   quest `reward_techniques`) teach a technique if unknown, raise it to at least
-  `rank` (teaching passes gates), then add `xp`.
+  `rank` (teaching passes gates), then add `xp`. A dialogue choice can be taken
+  again, so dialogue grants carry no XP; one-time XP comes from quest rewards.
+  A skill belongs to at most one technique.
 - **Realm.** `core_art` names the technique whose current rank name is shown as
   the player's realm.
 
