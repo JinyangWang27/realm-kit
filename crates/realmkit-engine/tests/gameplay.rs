@@ -21,6 +21,14 @@ fn combat<'e>(engine: &'e Engine<'_>) -> &'e CombatState {
     engine.state().combat.as_ref().unwrap()
 }
 
+fn vitals(engine: &Engine<'_>) -> Vitals {
+    engine.player_vitals().unwrap()
+}
+
+fn foe(engine: &Engine<'_>) -> Participant {
+    engine.encounter().unwrap().participants[1].clone()
+}
+
 fn accept(engine: &mut Engine<'_>) {
     engine.execute(Talk("elder".into())).unwrap();
     engine.execute(ChooseDialogue(1)).unwrap();
@@ -29,6 +37,7 @@ fn accept(engine: &mut Engine<'_>) {
 
 fn kill(engine: &mut Engine<'_>) -> Vec<Event> {
     engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("wolf".into())).unwrap();
     engine.execute(Attack("wolf".into())).unwrap();
     engine.execute(Attack("wolf".into())).unwrap();
     engine.execute(Attack("wolf".into())).unwrap()
@@ -43,6 +52,7 @@ fn full_quest_loop_and_replay_produce_identical_state_and_events() {
         ChooseDialogue(1),
         ChooseDialogue(1),
         Move(North),
+        Engage("wolf".into()),
         Attack("wolf".into()),
         Attack("wolf".into()),
         Attack("wolf".into()),
@@ -65,8 +75,11 @@ fn full_quest_loop_and_replay_produce_identical_state_and_events() {
     assert_eq!(state.player.location, "crypt");
     assert_eq!(state.combat.as_ref().unwrap().level, 2);
     assert_eq!(state.combat.as_ref().unwrap().xp, 15);
-    // Levelling up restores HP to level 2's maximum.
-    assert_eq!(state.combat.as_ref().unwrap().hp, 48);
+    // Levelling up restores HP to level 2's maximum, and the fight is over.
+    assert_eq!(
+        state.combat.as_ref().unwrap().stance,
+        Stance::Exploring(Vitals { hp: 48, mp: 0 })
+    );
     assert_eq!(state.player.inventory["ash_pelt"], 1);
     assert_eq!(state.player.inventory["candle"], 1);
     assert_eq!(state.quests["quiet_the_track"], QuestStatus::Completed);
@@ -117,9 +130,15 @@ fn combat_tracks_damage_and_never_rewards_a_defeat_twice() {
     let mut engine = Engine::new(&world).unwrap();
     accept(&mut engine);
     engine.execute(Move(North)).unwrap();
+    // The faster wolf strikes before the player's first command.
+    let events = engine.execute(Engage("wolf".into())).unwrap();
+    assert!(events.contains(&Event::EncounterStarted {
+        opponents: vec!["wolf".into()]
+    }));
+    assert_eq!(vitals(&engine).hp, 36);
     let events = engine.execute(Attack("wolf".into())).unwrap();
-    assert_eq!(combat(&engine).opponents["wolf"].hp, 13);
-    assert_eq!(combat(&engine).hp, 36);
+    assert_eq!(foe(&engine).hp, 13);
+    assert_eq!(vitals(&engine).hp, 32);
     assert!(events
         .iter()
         .any(|e| matches!(e, Event::DamageDealt { amount: 7, .. })));
@@ -131,8 +150,17 @@ fn combat_tracks_damage_and_never_rewards_a_defeat_twice() {
     assert!(!events
         .iter()
         .any(|e| matches!(e, Event::DamageReceived { .. })));
+    assert!(events.contains(&Event::EncounterEnded));
+    assert!(combat(&engine).defeated.contains("wolf"));
     let before = engine.state().clone();
-    assert!(engine.execute(Attack("wolf".into())).is_err());
+    assert!(matches!(
+        engine.execute(Attack("wolf".into())),
+        Err(EngineError::NotFighting)
+    ));
+    assert!(matches!(
+        engine.execute(Engage("wolf".into())),
+        Err(EngineError::AlreadyDefeated(_))
+    ));
     assert_eq!(engine.state(), &before);
     engine.execute(Move(South)).unwrap();
     engine
@@ -167,8 +195,8 @@ fn death_blocks_actions_but_allows_inspection() {
     world.characters[2].combat.as_mut().unwrap().stats.patk = STAT_BOUND;
     let mut engine = Engine::new(&world).unwrap();
     engine.execute(Move(North)).unwrap();
-    let events = engine.execute(Attack("wolf".into())).unwrap();
-    assert_eq!(combat(&engine).hp, 0);
+    let events = engine.execute(Engage("wolf".into())).unwrap();
+    assert_eq!(vitals(&engine).hp, 0);
     assert!(events.contains(&Event::PlayerDied));
     assert!(engine.execute(Move(South)).is_err());
     assert!(engine.execute(Attack("wolf".into())).is_err());
@@ -223,11 +251,31 @@ fn actions_list_context_sensitive_commands_with_availability() {
         ]
     );
     engine.execute(Move(North)).unwrap();
-    assert_eq!(offered(&engine)[0], (Attack("wolf".into()), true));
+    assert_eq!(offered(&engine)[0], (Engage("wolf".into()), true));
+    engine.execute(Engage("wolf".into())).unwrap();
+    // In a fight: attacks and skills on each living opponent, then panels only.
+    assert_eq!(
+        offered(&engine),
+        vec![
+            (Attack("wolf".into()), true),
+            (
+                UseSkill {
+                    skill: "heavy_swing".into(),
+                    target: "wolf".into()
+                },
+                false
+            ),
+            (Inventory, true),
+            (Status, true),
+            (Quests, true),
+        ]
+    );
     for _ in 0..3 {
         engine.execute(Attack("wolf".into())).unwrap();
     }
-    assert!(!offered(&engine).iter().any(|(c, _)| matches!(c, Attack(_))));
+    assert!(!offered(&engine)
+        .iter()
+        .any(|(c, _)| matches!(c, Attack(_) | Engage(_))));
 }
 
 #[test]
@@ -239,6 +287,7 @@ fn offered_actions_match_engine_legality_throughout_the_demo() {
         ChooseDialogue(1),
         ChooseDialogue(1),
         Move(North),
+        Engage("wolf".into()),
         Attack("wolf".into()),
         Attack("wolf".into()),
         Attack("wolf".into()),
@@ -294,6 +343,7 @@ fn saving_mid_quest_and_resuming_matches_uninterrupted_play() {
         ChooseDialogue(1),
         ChooseDialogue(1),
         Move(North),
+        Engage("wolf".into()),
         Attack("wolf".into()),
     ];
     let after = [
@@ -339,8 +389,8 @@ fn mismatched_or_corrupt_saves_are_rejected() {
         |s| s.package_revision = "fnv1a64:0".into(),
         |s| s.player_route_id = "other".into(),
         |s| s.state.player.location = "nowhere".into(),
-        |s| s.state.combat.as_mut().unwrap().hp = 41,
-        |s| s.state.combat.as_mut().unwrap().mp = 1,
+        |s| s.state.combat.as_mut().unwrap().stance = Stance::Exploring(Vitals { hp: 41, mp: 0 }),
+        |s| s.state.combat.as_mut().unwrap().stance = Stance::Exploring(Vitals { hp: 1, mp: 1 }),
         |s| s.state.combat.as_mut().unwrap().level = 0,
         |s| s.state.combat.as_mut().unwrap().xp = 10,
         |s| s.state.combat = None,
@@ -348,15 +398,12 @@ fn mismatched_or_corrupt_saves_are_rejected() {
             s.state.player.inventory.insert("ghost".into(), 1);
         },
         |s| {
-            s.state.combat.as_mut().unwrap().opponents.remove("wolf");
-        },
-        |s| {
             s.state
                 .combat
                 .as_mut()
                 .unwrap()
-                .opponents
-                .insert("wolf".into(), Vitals { hp: 99, mp: 0 });
+                .defeated
+                .insert("elder".into());
         },
         |s| {
             s.state.quests.insert("extra".into(), QuestStatus::Active);
@@ -377,8 +424,8 @@ fn mismatched_or_corrupt_saves_are_rejected() {
                 .combat
                 .as_mut()
                 .unwrap()
-                .opponents
-                .insert("wolf".into(), Vitals { hp: 0, mp: 0 });
+                .defeated
+                .insert("wolf".into());
         },
         |s| s.state.combat.as_mut().unwrap().xp += 1,
         |s| s.state.turn = u64::MAX,
@@ -496,7 +543,7 @@ fn a_world_without_combat_offers_no_attack_and_refuses_one() {
     let before = engine.state().clone();
     assert!(matches!(
         engine.execute(Attack("copyist".into())),
-        Err(EngineError::NotHere(_))
+        Err(EngineError::NotFighting)
     ));
     assert_eq!(engine.state(), &before);
 }
@@ -552,6 +599,7 @@ fn a_defeated_character_can_no_longer_be_talked_to() {
     let mut engine = Engine::new(&world).unwrap();
     engine.execute(Move(North)).unwrap();
     assert_eq!(offered(&engine)[0], (Talk("wolf".into()), true));
+    engine.execute(Engage("wolf".into())).unwrap();
     for _ in 0..3 {
         engine.execute(Attack("wolf".into())).unwrap();
     }
@@ -644,128 +692,470 @@ fn damage_matches_the_roadmap_examples_and_the_simulator() {
     assert!(damage(&top, &stats(0, 0, 0, 0), Channel::Special, 1_000, 100).is_ok());
 }
 
-#[test]
-fn skills_spend_mp_and_opponents_answer_with_their_strongest_affordable_skill() {
-    let world = duel();
-    let mut engine = Engine::new(&world).unwrap();
+fn combatant<'w>(world: &'w mut WorldSpec, id: &str) -> &'w mut CombatProfile {
+    world
+        .characters
+        .iter_mut()
+        .find(|c| c.id == id)
+        .unwrap()
+        .combat
+        .as_mut()
+        .unwrap()
+}
+
+fn witch_speed(speed: u32) -> WorldSpec {
+    let mut world = duel();
+    combatant(&mut world, "witch").stats.speed = speed;
+    world
+}
+
+fn engaged(world: &WorldSpec) -> Engine<'_> {
+    let mut engine = Engine::new(world).unwrap();
     engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("witch".into())).unwrap();
+    engine
+}
+
+#[test]
+fn speed_sets_who_acts_first_and_how_often_up_to_the_cap() {
+    // Speed 120 against 100: the witch's opening delay is shorter, so she acts first.
+    let world = duel();
+    let engine = engaged(&world);
+    assert!(vitals(&engine).hp < 34);
+    assert_eq!(
+        engine.turn_order(5),
+        ["apprentice", "witch", "apprentice", "witch", "apprentice"]
+    );
+    // Twice the speed, twice the turns; above the cap, nothing more.
+    let fast = witch_speed(200);
+    let doubled = engaged(&fast).turn_order(6);
+    assert_eq!(
+        doubled,
+        [
+            "apprentice",
+            "witch",
+            "witch",
+            "apprentice",
+            "witch",
+            "witch"
+        ]
+    );
+    let capped = witch_speed(400);
+    assert_eq!(engaged(&capped).turn_order(6), doubled);
+}
+
+#[test]
+fn ties_go_to_the_players_side() {
+    let world = witch_speed(100);
+    let engine = engaged(&world);
+    // Equal opening delays: the player's side acts first, so nobody has hit yet.
+    assert_eq!(vitals(&engine).hp, 34);
+    assert_eq!(engine.turn_order(2), ["apprentice", "witch"]);
+}
+
+#[test]
+fn skills_spend_their_resource_and_opponents_choose_their_strongest_affordable_skill() {
+    let world = duel();
+    let mut engine = engaged(&world);
     let events = engine.execute(cast("bolt")).unwrap();
-    assert!(events.contains(&Event::MpSpent {
+    assert!(events.contains(&Event::ResourceSpent {
         character: "apprentice".into(),
+        resource: Resource::Mp,
         amount: 12
     }));
-    assert!(events.contains(&Event::DamageDealt {
-        target: "witch".into(),
-        amount: 11,
-        variant: 0,
-        skill: Some("bolt".into())
-    }));
-    // The witch hexes twice (5 MP each), then falls back to her basic touch.
-    for (turn, answer) in [(0, Some("hex")), (1, Some("hex")), (2, None)] {
-        let events = if turn == 0 {
-            events.clone()
-        } else {
-            engine.execute(cast("spark")).unwrap()
-        };
-        let received = events
+    // The witch hexed on her opening turn and again after the bolt: 10 MP, 5 each.
+    let hexes = |events: &[Event]| {
+        events
             .iter()
-            .find_map(|e| match e {
-                Event::DamageReceived { skill, .. } => Some(skill.clone()),
-                _ => None,
-            })
-            .unwrap();
-        assert_eq!(received.as_deref(), answer, "turn {turn}");
-    }
-    assert_eq!(combat(&engine).mp, 12);
-    assert_eq!(combat(&engine).opponents["witch"].mp, 0);
+            .filter(|e| matches!(e, Event::DamageReceived { skill: Some(s), .. } if s == "hex"))
+            .count()
+    };
+    assert_eq!(hexes(&events), 1);
+    assert_eq!(foe(&engine).mp, 0);
+    // Out of MP, she falls back to her basic attack.
+    let events = engine.execute(cast("spark")).unwrap();
+    assert_eq!(hexes(&events), 0);
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::DamageReceived { skill: None, .. })));
 }
 
 #[test]
-fn unknown_locked_or_unaffordable_skills_are_refused_atomically() {
-    let world = duel();
+fn mp_regenerates_over_encounter_time_with_a_carried_remainder() {
+    let world = witch_speed(100);
+    let mut engine = engaged(&world);
+    let mp = |engine: &Engine<'_>| {
+        let player = &engine.encounter().unwrap().participants[0];
+        (player.mp, player.mp_remainder)
+    };
+    // Time spent at full MP banks nothing; the pause at the player's turn
+    // already includes the regeneration up to it.
+    assert_eq!(mp(&engine), (24, 0));
+    // Each baseline turn regains 3% of 24 MP: 0.72 MP, carried as a remainder.
+    engine.execute(cast("bolt")).unwrap();
+    assert_eq!(mp(&engine), (12, 72_000));
+    engine.execute(cast("spark")).unwrap();
+    assert_eq!(mp(&engine), (13, 44_000));
+}
+
+#[test]
+fn rage_from_an_action_arrives_after_it_resolves() {
+    let mut world = demo();
+    let combat = world.world.combat.as_mut().unwrap();
+    (
+        combat.resources.rage_per_action,
+        combat.resources.rage_per_max_hp,
+    ) = (5, 0);
     let mut engine = Engine::new(&world).unwrap();
     engine.execute(Move(North)).unwrap();
-    engine.execute(cast("bolt")).unwrap();
-    engine.execute(cast("bolt")).unwrap();
+    engine.execute(Engage("wolf".into())).unwrap();
+    let swing = UseSkill {
+        skill: "heavy_swing".into(),
+        target: "wolf".into(),
+    };
+    // Its own action would earn the 5 rage it costs, but not in time to pay for it.
     let before = engine.state().clone();
-    for (command, expected) in [
-        (cast("hex"), "you do not know that skill: hex"),
-        (cast("missing"), "you do not know that skill: missing"),
+    assert!(matches!(
+        engine.execute(swing.clone()),
+        Err(EngineError::NotEnoughRage(_))
+    ));
+    assert_eq!(engine.state(), &before);
+    engine.execute(Attack("wolf".into())).unwrap();
+    let events = engine.execute(swing).unwrap();
+    assert!(events.contains(&Event::ResourceSpent {
+        character: "you".into(),
+        resource: Resource::Rage,
+        amount: 5
+    }));
+}
+
+#[test]
+fn rage_from_damage_taken_is_proportional_and_cumulative() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("wolf".into())).unwrap();
+    // The wolf's 4 damage is a tenth of 40 HP: 20 × 4 / 40 = 2 rage, nothing carried.
+    let player = &engine.encounter().unwrap().participants[0];
+    assert_eq!((player.rage, player.rage_remainder), (2, 0));
+    engine.execute(Attack("wolf".into())).unwrap();
+    // +1 for acting, +2 for the next bite; the wolf keeps 20 × 7 = 140 of 20 HP: 7 rage.
+    let encounter = engine.encounter().unwrap();
+    assert_eq!(encounter.participants[0].rage, 5);
+    assert_eq!(
         (
-            cast("fireball"),
-            "you have not reached the level for fireball",
+            encounter.participants[1].rage,
+            encounter.participants[1].rage_remainder
         ),
-        (cast("bolt"), "not enough MP for bolt"),
-    ] {
-        let error = engine.execute(command).unwrap_err();
-        assert_eq!(error.to_string(), expected);
+        (2 + 7, 0)
+    );
+}
+
+#[test]
+fn an_encounter_allows_only_combat_actions_and_panels() {
+    let world = duel();
+    let mut engine = engaged(&world);
+    let before = engine.state().clone();
+    for command in [Move(South), Rest, Engage("witch".into())] {
+        assert!(
+            matches!(
+                engine.execute(command.clone()),
+                Err(EngineError::InEncounter)
+            ),
+            "{command:?}"
+        );
         assert_eq!(engine.state(), &before);
     }
-    // Locked skills are hidden; unaffordable ones are shown but unavailable.
-    let offered = offered(&engine);
-    assert!(offered.contains(&(cast("bolt"), false)));
-    assert!(offered.contains(&(cast("spark"), true)));
-    assert!(!offered.iter().any(|(c, _)| c == &cast("fireball")));
-}
-
-#[test]
-fn resting_restores_hp_and_mp_only_where_it_is_safe() {
-    let world = duel();
-    let mut engine = Engine::new(&world).unwrap();
-    engine.execute(Move(North)).unwrap();
-    engine.execute(cast("bolt")).unwrap();
-    assert!(!offered(&engine).iter().any(|(c, _)| c == &Rest));
-    let before = engine.state().clone();
-    assert!(matches!(engine.execute(Rest), Err(EngineError::NotSafe)));
-    assert_eq!(engine.state(), &before);
-    engine.execute(Move(South)).unwrap();
-    assert!(offered(&engine).contains(&(Rest, true)));
-    let turn = engine.state().turn;
-    assert_eq!(engine.execute(Rest).unwrap(), vec![Event::Rested]);
-    assert_eq!((combat(&engine).hp, combat(&engine).mp), (34, 24));
-    assert_eq!(engine.state().turn, turn + 1);
-    // Nothing to rest from without combat.
-    let archive = archive();
-    let mut quiet = Engine::new(&archive).unwrap();
-    assert!(matches!(quiet.execute(Rest), Err(EngineError::NotSafe)));
-}
-
-#[test]
-fn winning_the_duel_levels_up_unlocks_a_skill_and_restores_mp() {
-    let world = duel();
-    let mut engine = Engine::new(&world).unwrap();
-    engine.execute(Move(North)).unwrap();
-    let mut events = Vec::new();
-    for skill in ["bolt", "bolt", "spark", "spark"] {
-        events = engine.execute(cast(skill)).unwrap();
+    for command in [cast("hex"), cast("missing")] {
+        assert!(matches!(
+            engine.execute(command),
+            Err(EngineError::UnknownSkill(_))
+        ));
     }
-    assert!(events.contains(&Event::LevelUp { level: 2 }));
-    assert_eq!((combat(&engine).hp, combat(&engine).mp), (40, 30));
-    assert_eq!(engine.player_stats().unwrap().satk, 12);
-    let snapshot = engine.snapshot();
-    assert!(Engine::restore(&world, snapshot).is_ok());
+    assert!(matches!(
+        engine.execute(cast("fireball")),
+        Err(EngineError::SkillLocked(_))
+    ));
+    assert!(matches!(
+        engine.execute(Attack("apprentice".into())),
+        Err(EngineError::NotHere(_))
+    ));
+    for command in [Look, Status, Inventory, Quests] {
+        engine.execute(command).unwrap();
+    }
+    assert_eq!(engine.state(), &before);
+    let mut exploring = Engine::new(&world).unwrap();
+    assert!(matches!(
+        exploring.execute(Attack("witch".into())),
+        Err(EngineError::NotFighting)
+    ));
 }
 
 #[test]
-fn opponent_vitals_saved_mid_fight_must_stay_within_their_maximums() {
+fn a_mid_encounter_save_resumes_exactly() {
     let world = duel();
-    let mut engine = Engine::new(&world).unwrap();
-    engine.execute(Move(North)).unwrap();
+    let mut uninterrupted = engaged(&world);
+    uninterrupted.execute(cast("bolt")).unwrap();
+    let json = serde_json::to_string(&uninterrupted.snapshot()).unwrap();
+    let mut resumed = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
+    for command in [cast("bolt"), cast("spark"), cast("spark")] {
+        assert_eq!(
+            resumed.execute(command.clone()).unwrap(),
+            uninterrupted.execute(command).unwrap()
+        );
+    }
+    assert_eq!(resumed.state(), uninterrupted.state());
+}
+
+#[test]
+fn inconsistent_encounter_saves_are_rejected() {
+    let world = duel();
+    let mut engine = engaged(&world);
     engine.execute(cast("bolt")).unwrap();
     let good = engine.snapshot();
     assert!(Engine::restore(&world, good.clone()).is_ok());
-    let mut broken = good;
-    broken
+    let broken: Vec<fn(&mut Encounter)> = vec![
+        |e| e.participants.swap(0, 1),
+        |e| e.participants.truncate(1),
+        |e| e.participants.push(e.participants[1].clone()),
+        |e| e.participants[1].hp = 31,
+        |e| e.participants[1].mp = 11,
+        |e| e.participants[0].mp_remainder = 100_000,
+        |e| e.participants[1].rage_remainder = 30,
+        |e| e.participants[1].next_time = e.now - 1,
+        |e| e.participants[1].control = Control::Player,
+        |e| e.participants[1].side = 0,
+        |e| e.participants[1].character = "apprentice".into(),
+        |e| e.participants[1].hp = 0,
+        // The opponent would be overdue: the player's turn must be now.
+        |e| e.participants[0].next_time += 1,
+        |e| e.participants[1].side = 2,
+    ];
+    for (i, corrupt) in broken.into_iter().enumerate() {
+        let mut snapshot = good.clone();
+        let Stance::Fighting(encounter) = &mut snapshot.state.combat.as_mut().unwrap().stance
+        else {
+            unreachable!()
+        };
+        corrupt(encounter);
+        assert!(
+            matches!(
+                Engine::restore(&world, snapshot),
+                Err(EngineError::InvalidSave(_))
+            ),
+            "corruption {i} was accepted"
+        );
+    }
+    // Opponents must be present and undefeated, and nobody talks mid-fight.
+    let mut elsewhere = good.clone();
+    elsewhere.state.player.location = "yard".into();
+    assert!(Engine::restore(&world, elsewhere).is_err());
+    let mut defeated = good;
+    defeated
         .state
         .combat
         .as_mut()
         .unwrap()
-        .opponents
-        .get_mut("witch")
+        .defeated
+        .insert("witch".into());
+    assert!(Engine::restore(&world, defeated).is_err());
+}
+
+/// One fight from the simulator's report: both sides' stats at a level, their
+/// usable skills, and the result `scripts/combat_sim` gives for it.
+struct SimFight {
+    player: Stats,
+    player_skills: Vec<Skill>,
+    player_basic: Channel,
+    foe: Stats,
+    foe_skills: Vec<Skill>,
+    foe_basic: Channel,
+    actions: usize,
+    hp: u32,
+    mp: u32,
+}
+
+fn stats(hp: u32, mp: u32, patk: u32, pdef: u32, satk: u32, sdef: u32, speed: u32) -> Stats {
+    Stats {
+        hp,
+        mp,
+        patk,
+        pdef,
+        satk,
+        sdef,
+        speed,
+    }
+}
+
+fn skill(id: &str, power: u32, channel: Channel, cost: u32, resource: Resource) -> Skill {
+    Skill {
+        id: id.into(),
+        name: id.into(),
+        power,
+        channel,
+        cost,
+        resource,
+        time: 100,
+        level: 1,
+        cross_share: None,
+        text: TextTemplate("{attacker} {target} {damage}".into()),
+    }
+}
+
+/// Plays one simulator fight in the engine, choosing the player's action as the
+/// simulator does: the strongest affordable skill, else the basic attack.
+fn replay(fight: SimFight) {
+    let mut world = duel();
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.levels = vec![Level {
+        xp: 0,
+        stats: fight.player,
+    }];
+    combat.resources = Resources {
+        mp_regen_percent: 3,
+        rage_per_action: 1,
+        rage_per_max_hp: 20,
+    };
+    combat.player_basic_channel = fight.player_basic;
+    combat.player_skills = fight.player_skills.iter().map(|s| s.id.clone()).collect();
+    combat.skills = fight.player_skills.clone();
+    combat.skills.extend(fight.foe_skills.iter().cloned());
+    let witch = combatant(&mut world, "witch");
+    witch.stats = fight.foe;
+    witch.skills = fight.foe_skills.iter().map(|s| s.id.clone()).collect();
+    witch.basic_channel = fight.foe_basic;
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    let mut engine = engaged(&world);
+    let mut actions = 0;
+    while let Some(encounter) = engine.encounter() {
+        let player = &encounter.participants[0];
+        let pool = |s: &Skill| match s.resource {
+            Resource::Mp => player.mp,
+            Resource::Rage => player.rage,
+        };
+        let choice = fight
+            .player_skills
+            .iter()
+            .filter(|s| pool(s) >= s.cost)
+            .rev()
+            .max_by_key(|s| (s.power, std::cmp::Reverse(s.cost), s.level));
+        let command = match choice {
+            Some(s) => UseSkill {
+                skill: s.id.clone(),
+                target: "witch".into(),
+            },
+            None => Attack("witch".into()),
+        };
+        engine.execute(command).unwrap();
+        actions += 1;
+    }
+    let left = vitals(&engine);
+    assert_eq!(
+        (actions, left.hp, left.mp),
+        (fight.actions, fight.hp, fight.mp)
+    );
+}
+
+// Numbers from `scripts/combat_sim` (Rules() defaults, content.DEFAULT):
+// `Encounter(rules, player, [foe]).run()` for each pairing below.
+#[test]
+fn encounters_match_the_simulator() {
+    use Channel::*;
+    use Resource::*;
+    let rage = |id, power, channel| skill(id, power, channel, 5, Rage);
+    // Warrior level 10 against the beast at level 10: rage on both sides.
+    replay(SimFight {
+        player: stats(472, 0, 57, 35, 12, 24, 100),
+        player_skills: vec![
+            rage("rage_strike", 150, Physical),
+            rage("cleave", 185, Physical),
+        ],
+        player_basic: Physical,
+        foe: stats(189, 0, 38, 24, 0, 24, 110),
+        foe_skills: vec![rage("rend", 130, Physical), rage("maul", 155, Physical)],
+        foe_basic: Physical,
+        actions: 4,
+        hp: 370,
+        mp: 0,
+    });
+    let mage = |fireball| {
+        let mut skills = vec![
+            skill("spark", 80, Special, 0, Mp),
+            skill("bolt", 170, Special, 12, Mp),
+        ];
+        if fireball {
+            skills.push(skill("fireball", 210, Special, 12, Mp));
+        }
+        skills
+    };
+    // Mage level 10 against the spirit at level 10: MP regeneration and special channels.
+    replay(SimFight {
+        player: stats(401, 75, 19, 24, 47, 35, 100),
+        player_skills: mage(true),
+        player_basic: Physical,
+        foe: stats(189, 0, 0, 24, 38, 24, 110),
+        foe_skills: vec![rage("hex", 130, Special), rage("curse", 155, Special)],
+        foe_basic: Special,
+        actions: 3,
+        hp: 327,
+        mp: 43,
+    });
+    // Mage level 5 against the beast at level 5.
+    replay(SimFight {
+        player: stats(249, 75, 12, 15, 29, 22, 100),
+        player_skills: mage(false),
+        player_basic: Physical,
+        foe: stats(117, 0, 23, 15, 0, 15, 110),
+        foe_skills: vec![rage("rend", 130, Physical)],
+        foe_basic: Physical,
+        actions: 4,
+        hp: 192,
+        mp: 33,
+    });
+}
+
+#[test]
+fn a_skill_paid_for_by_regeneration_up_to_the_players_turn_is_usable() {
+    // 50% of 24 MP per baseline turn: two bolts empty the pool, and the 12 MP
+    // regained on the way to the next turn pay for a third.
+    let mut world = witch_speed(100);
+    world
+        .world
+        .combat
+        .as_mut()
         .unwrap()
-        .mp = 11;
-    assert!(matches!(
-        Engine::restore(&world, broken),
-        Err(EngineError::InvalidSave(_))
-    ));
+        .resources
+        .mp_regen_percent = 50;
+    let mut engine = engaged(&world);
+    engine.execute(cast("bolt")).unwrap();
+    engine.execute(cast("bolt")).unwrap();
+    assert!(vitals(&engine).mp >= 12);
+    assert!(offered(&engine).contains(&(cast("bolt"), true)));
+    engine.execute(cast("bolt")).unwrap();
+}
+
+#[test]
+fn rage_saturates_instead_of_failing_the_encounter() {
+    let mut world = demo();
+    world
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .resources
+        .rage_per_action = u32::MAX;
+    combatant(&mut world, "wolf").stats.speed = 200;
+    // The wolf acts twice before the player's first turn, overflowing rage.
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("wolf".into())).unwrap();
+    assert_eq!(foe(&engine).rage, u32::MAX);
+}
+
+#[test]
+fn the_largest_action_cost_saves_and_restores_without_overflow() {
+    let mut world = duel();
+    world.world.combat.as_mut().unwrap().timeline.action_cost = ACTION_COST_BOUND;
+    let engine = engaged(&world);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }

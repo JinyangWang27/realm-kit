@@ -7,7 +7,7 @@ mod validation;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 3;
+pub const FORMAT_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -46,6 +46,9 @@ pub struct Combat {
     /// Percentage of the other channel's attack and defence added to a hit.
     #[serde(default = "default_cross_share")]
     pub cross_share: u32,
+    pub timeline: Timeline,
+    #[serde(default)]
+    pub resources: Resources,
     pub levels: Vec<Level>,
     #[serde(default)]
     pub skills: Vec<Skill>,
@@ -61,8 +64,47 @@ fn default_cross_share() -> u32 {
     25
 }
 
+/// Encounter scheduling: an action at speed `s` and time `t`% delays the actor's
+/// next turn by `ceil(action_cost × t / (100 × min(s, speed_cap)))` ticks.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Timeline {
+    /// Ticks have no real-time meaning; the size only sets integer precision.
+    pub action_cost: u64,
+    pub speed_cap: u32,
+}
+
+/// Skill resources during encounters; zero leaves a resource unused.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Resources {
+    /// Percent of maximum MP regained per baseline turn of encounter time.
+    #[serde(default)]
+    pub mp_regen_percent: u32,
+    #[serde(default)]
+    pub rage_per_action: u32,
+    /// Rage gained from taking damage equal to maximum HP, proportionally.
+    #[serde(default)]
+    pub rage_per_max_hp: u32,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Resource {
+    /// Kept between encounters; regenerates over encounter time and by resting.
+    #[default]
+    Mp,
+    /// Starts at 0 in every encounter; builds from acting and being hit.
+    Rage,
+}
+
 /// Engine bound for every authored stat; keeps damage arithmetic small.
 pub const STAT_BOUND: u32 = 9_999;
+/// Upper bound for a timeline's action cost: enough precision for any speed
+/// cap, and small enough that timeline arithmetic stays within `u64`.
+pub const ACTION_COST_BOUND: u64 = 1_000_000_000_000;
+/// An action's time, in percent of a basic action: up to ten basic actions long.
+pub const TIME_BOUNDS: (u32, u32) = (1, 1_000);
 /// Skill power is a percentage of a basic attack, which is 100.
 pub const POWER_BOUNDS: (u32, u32) = (1, 1_000);
 pub const BASIC_POWER: u32 = 100;
@@ -114,9 +156,14 @@ pub struct Skill {
     pub name: String,
     pub power: u32,
     pub channel: Channel,
-    /// MP spent per use, exactly as authored.
+    /// Spent per use, exactly as authored.
     #[serde(default)]
     pub cost: u32,
+    #[serde(default)]
+    pub resource: Resource,
+    /// Action length in percent of a basic attack; delays the user's next turn.
+    #[serde(default = "full_time")]
+    pub time: u32,
     /// Character level at which the player can use it.
     #[serde(default = "first_level")]
     pub level: usize,
@@ -129,6 +176,10 @@ pub struct Skill {
 
 fn first_level() -> usize {
     1
+}
+
+fn full_time() -> u32 {
+    100
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

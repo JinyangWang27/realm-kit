@@ -3,6 +3,7 @@ talk elder
 choose 1
 choose 1
 north
+engage wolf
 attack wolf
 attack wolf
 attack wolf

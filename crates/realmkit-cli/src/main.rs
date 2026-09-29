@@ -512,7 +512,7 @@ mod tests {
             Enter, // typed status
             Enter, Enter, Enter, // talk, ask, accept
             Down, Enter, // north
-            Enter, Enter, Enter, // attack ×3
+            Enter, Enter, Enter, Enter, // engage, attack ×3
             Enter, // south
             Enter, Enter, // talk, report the wolf
             Down, Down, Enter, // east
@@ -572,7 +572,7 @@ mod tests {
         world.world.combat.as_mut().unwrap().levels[2].stats.mp = 5;
         world.characters[2].combat.as_mut().unwrap().xp = 30;
         let mut output = Vec::new();
-        let input = "north\nattack wolf\nattack wolf\nattack wolf\n".as_bytes();
+        let input = "north\nengage wolf\nattack wolf\nattack wolf\nattack wolf\n".as_bytes();
         play(&world, None, input, &mut output).unwrap();
         let text = String::from_utf8(output).unwrap();
         assert!(text.contains("Level 2! Health restored."), "{text}");
@@ -591,7 +591,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let saves = Saves::open(&dir).unwrap();
         let mut output = Vec::new();
-        let input = "north\nsave\nattack wolf\nsave\nstatus\n".as_bytes();
+        let input = "north\nsave\nengage wolf\nsave\nstatus\n".as_bytes();
         play(&world, Some(&saves), input, &mut output).unwrap();
         let text = String::from_utf8(output).unwrap();
         let died = text.find("Your journey has ended").expect(&text);
@@ -604,7 +604,7 @@ mod tests {
         let mut dead = Engine::new(&world).unwrap();
         dead.execute(Command::Move(realmkit_spec::Direction::North))
             .unwrap();
-        dead.execute(Command::Attack("wolf".into())).unwrap();
+        dead.execute(Command::Engage("wolf".into())).unwrap();
         saves.write(Kind::Manual, &dead.snapshot()).unwrap();
         let mut output = Vec::new();
         play(&world, Some(&saves), "".as_bytes(), &mut output).unwrap();

@@ -494,7 +494,8 @@ fn usable_skills<'a>(
                 format!("{} needs attack in its channel", skill.id),
             );
         }
-        if skill.cost > stats.mp {
+        // Rage accumulates during a fight, so only MP has a ceiling to check.
+        if skill.resource == Resource::Mp && skill.cost > stats.mp {
             issue(
                 out,
                 owner,
@@ -518,6 +519,62 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         );
     }
     share(out, owner, combat.cross_share);
+    let timeline = combat.timeline;
+    if !(1..=ACTION_COST_BOUND).contains(&timeline.action_cost)
+        || timeline.speed_cap == 0
+        || timeline.speed_cap > STAT_BOUND
+    {
+        issue(
+            out,
+            owner,
+            "invalid_timeline",
+            format!("action cost must be from 1 to {ACTION_COST_BOUND} and the speed cap from 1 to {STAT_BOUND}"),
+        );
+    }
+    // Unused constants are harmless, so they only warn.
+    let uses = |resource| {
+        combat
+            .skills
+            .iter()
+            .any(|s| s.resource == resource && s.cost > 0)
+    };
+    let r = combat.resources;
+    let rage = r.rage_per_action > 0 || r.rage_per_max_hp > 0;
+    let mut warn = |entity: &str, code: &str, message: String| {
+        out.push(Diagnostic {
+            severity: Severity::Warning,
+            entity_id: Some(entity.into()),
+            code: code.into(),
+            message,
+        })
+    };
+    for (set, used, what) in [
+        (
+            r.mp_regen_percent > 0,
+            uses(Resource::Mp),
+            "MP regeneration",
+        ),
+        (rage, uses(Resource::Rage), "rage"),
+    ] {
+        if set && !used {
+            warn(
+                owner,
+                "unused_resource",
+                format!("{what} is configured but no skill spends it"),
+            );
+        }
+    }
+    // Rage starts at 0 in every fight, so without a source a rage cost is never met.
+    if !rage {
+        for skill in combat
+            .skills
+            .iter()
+            .filter(|s| s.resource == Resource::Rage && s.cost > 0)
+        {
+            let message = "costs rage, but this world has no rage_per_action or rage_per_max_hp";
+            warn(&skill.id, "unusable_skill", message.into());
+        }
+    }
     let levels = &combat.levels;
     for level in levels {
         stats(out, owner, &level.stats);
@@ -558,6 +615,17 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
                 &skill.id,
                 "invalid_level",
                 "skills unlock at level 1 or later",
+            );
+        }
+        if !(TIME_BOUNDS.0..=TIME_BOUNDS.1).contains(&skill.time) {
+            issue(
+                out,
+                &skill.id,
+                "invalid_time",
+                format!(
+                    "action time must be from {} to {} percent",
+                    TIME_BOUNDS.0, TIME_BOUNDS.1
+                ),
             );
         }
         if let Some(value) = skill.cross_share {

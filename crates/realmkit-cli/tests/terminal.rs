@@ -24,7 +24,7 @@ const WORLD: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/demo-wo
 
 #[test]
 fn terminal_plays_the_complete_authored_journey() {
-    let output = run(&["play", WORLD], "go east\ntalk elder\nchoose 1\nchoose 1\nnorth\nattack wolf\nattack wolf\nattack wolf\nsouth\ntalk elder\nchoose 1\ninventory\nstatus\nquests\neast\ndown\nquit\n");
+    let output = run(&["play", WORLD], "go east\ntalk elder\nchoose 1\nchoose 1\nnorth\nengage wolf\nattack wolf\nattack wolf\nattack wolf\nsouth\ntalk elder\nchoose 1\ninventory\nstatus\nquests\neast\ndown\nquit\n");
     assert!(
         output.status.success(),
         "{}",
@@ -49,7 +49,10 @@ fn terminal_plays_the_complete_authored_journey() {
 #[test]
 fn numbered_menus_alone_finish_the_demo() {
     // 3 first: the locked chapel gate explains itself instead of opening.
-    let output = run(&["play", WORLD], "3\n1\n1\n1\n2\n1\n1\n1\n1\n1\n1\n3\n2\n");
+    let output = run(
+        &["play", WORLD],
+        "3\n1\n1\n1\n2\n1\n1\n1\n1\n1\n1\n1\n3\n2\n",
+    );
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
     for passage in [
@@ -57,6 +60,7 @@ fn numbered_menus_alone_finish_the_demo() {
         "2. Travel north — The Pine Track",
         "3. Travel east — The Roofless Chapel [locked]",
         "The elder keeps the chapel gate locked",
+        "1. Engage The Ash Wolf",
         "1. Attack The Ash Wolf",
         "Level 2",
         "She opens the chapel gate",
@@ -116,7 +120,7 @@ fn responses(output: &Output) -> Vec<String> {
 
 #[test]
 fn saving_quitting_and_resuming_matches_uninterrupted_play() {
-    let first = "talk elder\nchoose 1\nchoose 1\nnorth\nattack wolf\n";
+    let first = "talk elder\nchoose 1\nchoose 1\nnorth\nengage wolf\nattack wolf\n";
     let rest = "attack wolf\nattack wolf\nsouth\ntalk elder\nchoose 1\nstatus\n";
     let uninterrupted = responses(&run(&["play", WORLD], &format!("{first}{rest}")));
     let dir = saves_dir("resume");
@@ -124,12 +128,12 @@ fn saving_quitting_and_resuming_matches_uninterrupted_play() {
         &["play", WORLD, "--line", "--saves", &dir],
         &format!("{first}save\nquit\n"),
     );
-    assert!(responses(&saved)[6].starts_with("Saved."));
+    assert!(responses(&saved)[7].starts_with("Saved."));
     let resumed = run(&["play", WORLD, "--saves", &dir], &format!("{rest}load\n"));
     assert!(resumed.status.success());
     let resumed = responses(&resumed);
     assert!(resumed[0].contains("Loaded save 2."), "{}", resumed[0]);
-    assert_eq!(resumed[1..=6], uninterrupted[6..=11]);
+    assert_eq!(resumed[1..=6], uninterrupted[7..=12]);
     assert!(resumed[6].contains("XP 15"));
     // Route start, the manual save, and the quest-completion auto-save.
     assert!(
@@ -246,22 +250,27 @@ const DUEL: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/duel");
 #[test]
 fn a_mage_duels_with_skills_rests_and_levels_up() {
     let input =
-        "help\nnorth\nuse bolt witch\n3\nuse fireball witch\n2\n2\nstatus\nsouth\nrest\nstatus\n";
+        "help\nnorth\nengage witch\nuse bolt witch\n3\nuse fireball witch\n2\n2\nstatus\nsouth\nrest\nstatus\n";
     let output = run(&["play", DUEL], input);
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
     for passage in [
+        "engage <character-id>",
         "use <skill-id> <character-id>",
-        "rest",
+        "1. Engage The Hedge Witch",
+        // The faster witch acts before the player's first command.
+        "You face The Hedge Witch.\nThe Hedge Witch hisses a hex at You: 6 damage.",
+        // Vitals of both sides, MP only where there is some, and the projected order.
+        "You HP 28/34 · MP 24/24 | The Hedge Witch HP 30/30 · MP 5/10\nProjected turns: You, The Hedge Witch, You, The Hedge Witch, You",
         "2. Spark on The Hedge Witch",
         "3. Bolt on The Hedge Witch — 12 MP",
         "You loose a bolt of witchlight. The Hedge Witch takes 11 damage.",
-        "The Hedge Witch hisses a hex at You: 6 damage.",
-        "you have not reached the level for fireball",
         "3. Bolt on The Hedge Witch — 12 MP [not enough MP]",
+        "you have not reached the level for fireball",
         "You flick a spark at The Hedge Witch: 5 damage.",
         "The Hedge Witch rakes You with a cold touch: 4 damage.",
         "concedes the hedge",
+        "The fight is over.",
         "Level 2! Health and MP restored.",
         "Witchcraft attack 12 | Witchcraft defence 7",
         "You rest. Health and MP restored.",

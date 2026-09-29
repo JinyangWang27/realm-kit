@@ -36,6 +36,12 @@ proves the complete single-player loop with authored content.
   current vitals, XP and level. The combat block's new shape makes this package
   Format 3; older packages are rejected, not migrated. `examples/duel`
   exercises a mage build.
+- [x] Encounters (M3c-1): `Engage` starts a fight on a paused initiative
+  timeline where speed sets turn frequency; MP regenerates over encounter time
+  and rage builds from acting and being hit; opponents use their strongest
+  affordable skill. The player's vitals live in one place at a time
+  (`Stance::Exploring` or `Stance::Fighting`), encounters save and resume
+  exactly, and results match `scripts/combat_sim`. Package and save format 4.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
@@ -65,8 +71,8 @@ A package revision is a 64-bit FNV-1a digest of the package's canonical JSON, so
 any content edit makes older saves incompatible; there are no migrations yet.
 Loading checks the format version, package, revision and route, then the state
 invariants the rules maintain (known IDs, combat state present exactly when the
-world has combat, XP matching the level, player and opponent HP and MP within
-their maximums,
+world has combat, XP matching the level, vitals within their maximums, and an
+encounter whose participants, times and remainders the rules could produce,
 quest states matching defeats and flags, a valid conversation). The CLI writes each save to a new
 file, then updates `lineage.json`; both writes go to a temporary file first and
 are then renamed into place.

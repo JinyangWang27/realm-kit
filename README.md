@@ -113,8 +113,11 @@ levels, and its quests complete through flags set in dialogue
 (`examples/quiet-archive`). Where a world has combat, characters have seven
 stats and hits deal physical or special damage (the world names special, for
 example magic or 内力) through one formula in which defence reduces damage
-gradually. Skills spend MP, a surviving enemy answers at once with its own skill
-or basic attack, and the player can rest at safe places (`examples/duel`).
+gradually. Fights are encounters on a paused initiative timeline: speed decides
+who acts first and how often, and the game waits for each of your commands.
+Skills spend MP, which regenerates as the fight goes on, or rage, which builds
+from acting and being hit; opponents answer with their own skills, and the
+player can rest at safe places (`examples/duel`).
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting
