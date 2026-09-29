@@ -1,2 +1,11 @@
+look
 north
+use bolt witch
+use bolt witch
+use spark witch
+use spark witch
 status
+south
+rest
+status
+quit

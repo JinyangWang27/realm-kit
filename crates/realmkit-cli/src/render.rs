@@ -140,7 +140,11 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 quantity
             )?,
             Event::ExperienceGranted { amount } => writeln!(output, "+{amount} XP")?,
-            Event::LevelUp { level } => writeln!(output, "Level {level}! Health restored.")?,
+            Event::LevelUp { level } => {
+                let mp = engine.player_stats().is_some_and(|s| s.mp > 0);
+                let restored = if mp { "Health and MP" } else { "Health" };
+                writeln!(output, "Level {level}! {restored} restored.")?
+            }
             // Choices are shown by the menu, which also numbers them.
             Event::Dialogue { npc, node, .. } => {
                 let npc = world.character(npc).unwrap();
