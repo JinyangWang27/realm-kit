@@ -7,7 +7,7 @@ mod validation;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 7;
+pub const FORMAT_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -63,7 +63,69 @@ pub struct Combat {
     pub groups: Vec<Group>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stat_points: Option<StatPoints>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub techniques: Vec<Technique>,
+    /// Techniques the player knows from the start.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub player_techniques: Vec<TechniqueGrant>,
+    /// The internal art whose rank name is shown as the player's realm.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub core_art: Option<Id>,
+    /// Technique XP for each use of a technique's skill, before falloff.
+    #[serde(default = "default_technique_xp")]
+    pub technique_xp_per_use: u32,
     pub narrative: Narrative,
+}
+
+fn default_technique_xp() -> u32 {
+    10
+}
+
+/// A technique mastered rank by rank. Each rank is named by the author.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Technique {
+    pub id: Id,
+    pub name: String,
+    pub ranks: Vec<TechniqueRank>,
+    /// Percent of the character XP from each victory this technique gains;
+    /// small values make internal arts rise slowly.
+    #[serde(default)]
+    pub xp_share_percent: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TechniqueRank {
+    /// Shown to the player instead of a number, in the source's own terms.
+    pub name: String,
+    /// Cumulative technique XP for this rank; the first rank's is 0.
+    pub xp: u64,
+    /// The skill the technique is used as at this rank; passive arts have none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill: Option<Id>,
+    /// The technique's whole stat bonus at this rank, replacing the previous rank's.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub passive: BTreeMap<Stat, u32>,
+    /// A breakthrough gate: technique XP waits at this rank's threshold until it holds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<Condition>,
+}
+
+/// Teaches a technique if it is unknown, raises it to at least `rank`
+/// (1-based; teaching passes gates), then adds `xp`, which gates can hold back.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TechniqueGrant {
+    pub technique: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rank: Option<usize>,
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub xp: u64,
+}
+
+fn is_zero_u64(value: &u64) -> bool {
+    *value == 0
 }
 
 fn default_cross_share() -> u32 {
@@ -413,6 +475,8 @@ pub struct Quest {
     pub reward_items: Vec<ItemStack>,
     #[serde(default)]
     pub completion_flags: Vec<Id>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reward_techniques: Vec<TechniqueGrant>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -468,9 +532,17 @@ pub struct DialogueChoice {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum DialogueEffect {
-    AcceptQuest { quest: Id },
-    CompleteQuest { quest: Id },
-    SetFlag { flag: Id },
+    AcceptQuest {
+        quest: Id,
+    },
+    CompleteQuest {
+        quest: Id,
+    },
+    SetFlag {
+        flag: Id,
+    },
+    /// A master, manual or chance encounter teaches or deepens a technique.
+    GrantTechnique(TechniqueGrant),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -558,6 +630,9 @@ impl WorldSpec {
             .characters
             .iter()
             .any(|c| c.combat.as_ref().is_some_and(|p| p.basic_crit.is_some()))
+    }
+    pub fn technique(&self, id: &str) -> Option<&Technique> {
+        self.combat()?.techniques.iter().find(|v| v.id == id)
     }
     pub fn group(&self, id: &str) -> Option<&Group> {
         self.combat()?.groups.iter().find(|v| v.id == id)

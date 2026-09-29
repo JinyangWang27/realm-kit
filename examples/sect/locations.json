@@ -1,0 +1,27 @@
+[
+  {
+    "id": "courtyard",
+    "name": "The Sect Courtyard",
+    "description": "Pines, a bronze bell, and the elder's mat beneath the eaves.",
+    "exits": {
+      "north": { "destination": "yard", "blocked_text": "The yard is closed." },
+      "east": { "destination": "pavilion", "blocked_text": "The pavilion is closed." }
+    },
+    "characters": ["qing"],
+    "safe": true
+  },
+  {
+    "id": "yard",
+    "name": "The Training Yard",
+    "description": "Raked sand and a row of straw dummies.",
+    "exits": { "south": { "destination": "courtyard", "blocked_text": "The gate is shut." } },
+    "characters": ["dummy"]
+  },
+  {
+    "id": "pavilion",
+    "name": "The Scripture Pavilion",
+    "description": "Shelves of scrolls, one conspicuous gap among them.",
+    "exits": { "west": { "destination": "courtyard", "blocked_text": "The door is shut." } },
+    "characters": ["wen"]
+  }
+]

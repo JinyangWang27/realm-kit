@@ -1,0 +1,25 @@
+[
+  { "id": "disciple", "name": "You", "description": "A new disciple of the Cloud Sect." },
+  {
+    "id": "qing",
+    "name": "Elder Qing",
+    "description": "Her sleeves move as if in a wind nobody else feels.",
+    "dialogue": "qing"
+  },
+  {
+    "id": "wen",
+    "name": "Keeper Wen",
+    "description": "He counts the scrolls twice, and frowns both times.",
+    "dialogue": "wen"
+  },
+  {
+    "id": "dummy",
+    "name": "A Straw Dummy",
+    "description": "It has taken worse beatings than yours.",
+    "combat": {
+      "stats": { "hp": 25, "patk": 3, "pdef": 4, "satk": 0, "sdef": 4, "speed": 90 },
+      "xp": 5,
+      "group": "drill"
+    }
+  }
+]

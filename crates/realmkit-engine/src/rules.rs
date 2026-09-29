@@ -399,6 +399,8 @@ pub(super) fn execute(
                     quest(world, state, id, true, &mut events)?
                 }
                 Some(DialogueEffect::SetFlag { flag }) => set_flag(world, state, flag, &mut events),
+                // Techniques arrive with the engine's next commit.
+                Some(DialogueEffect::GrantTechnique(_)) => {}
                 None => {}
             }
             // An effect can make the speaker unavailable; the conversation ends then.

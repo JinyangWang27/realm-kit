@@ -267,6 +267,11 @@ fn older_packages_are_rejected_clearly() {
             2,
             r#"{ "format_version": 2, "combat": { "levels": [{ "xp": 0, "hp": 1, "attack": 1 }] } }"#,
         ),
+        // M4a's format, readable by runtimes that know no techniques.
+        (
+            7,
+            r#"{ "format_version": 7, "combat": { "special_name": "Magic" } }"#,
+        ),
         // M3d's format, readable by runtimes that know no stat points.
         (
             6,
@@ -481,6 +486,7 @@ fn groups_and_profile_levels_are_validated() {
                 reward_xp: 0,
                 reward_items: vec![],
                 completion_flags: vec![],
+                reward_techniques: vec![],
             })
         },
     ];
@@ -630,4 +636,64 @@ fn caps_that_cannot_take_every_point_warn() {
     assert!(world.validate().is_ok());
     let codes: Vec<_> = world.diagnostics().into_iter().map(|d| d.code).collect();
     assert_eq!(codes, ["stranded_points"]);
+}
+
+fn sect() -> WorldSpec {
+    WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect")).unwrap()
+}
+
+#[test]
+fn techniques_have_named_rising_ranks_and_valid_grants() {
+    let world = sect();
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    let breath = world.technique("azure_breath").unwrap();
+    assert_eq!(breath.ranks[2].name, "Third Layer");
+    assert_eq!(breath.ranks[1].passive[&Stat::Mp], 20);
+    assert_eq!(world.combat().unwrap().technique_xp_per_use, 10);
+    let encoded = serde_json::to_string(&world).unwrap();
+    assert_eq!(serde_json::from_str::<WorldSpec>(&encoded).unwrap(), world);
+    let changes: Vec<fn(&mut WorldSpec)> = vec![
+        |w| w.world.combat.as_mut().unwrap().techniques[0].ranks[1].name = " ".into(),
+        |w| w.world.combat.as_mut().unwrap().techniques[0].ranks[0].xp = 1,
+        |w| w.world.combat.as_mut().unwrap().techniques[0].ranks[2].xp = 10,
+        |w| w.world.combat.as_mut().unwrap().techniques[0].ranks.clear(),
+        |w| w.world.combat.as_mut().unwrap().techniques[0].xp_share_percent = 101,
+        |w| w.world.combat.as_mut().unwrap().techniques[1].ranks[0].skill = Some("missing".into()),
+        |w| {
+            w.world.combat.as_mut().unwrap().techniques[0].ranks[2].requires =
+                vec![Condition::Flag {
+                    flag: "missing".into(),
+                }]
+        },
+        |w| {
+            let combat = w.world.combat.as_mut().unwrap();
+            combat.techniques.push(combat.techniques[0].clone())
+        },
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .player_skills
+                .push("palm_drifting".into())
+        },
+        |w| w.world.combat.as_mut().unwrap().core_art = Some("missing".into()),
+        |w| w.world.combat.as_mut().unwrap().player_techniques[0].rank = Some(4),
+        |w| w.world.combat.as_mut().unwrap().player_techniques[0].rank = Some(0),
+        |w| w.quests[0].reward_techniques[0].technique = "missing".into(),
+        // A passive this large could lift MP past the stat bound.
+        |w| {
+            w.world.combat.as_mut().unwrap().techniques[0].ranks[2]
+                .passive
+                .insert(Stat::Mp, STAT_BOUND);
+        },
+    ];
+    for (index, change) in changes.into_iter().enumerate() {
+        let mut world = sect();
+        change(&mut world);
+        assert!(world.validate().is_err(), "invalid technique case {index}");
+    }
+    let mut renamed = sect();
+    renamed.world.combat.as_mut().unwrap().techniques[1].name = "Palm of Clouds".into();
+    assert!(renamed.validate().is_ok());
 }

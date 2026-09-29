@@ -1,0 +1,12 @@
+[
+  {
+    "id": "lost_volume",
+    "name": "The Lost Volume",
+    "giver": "wen",
+    "objective": { "kind": "flag", "flag": "scripture_found" },
+    "introduction": "Wen lowers his voice. 'The third volume of the Azure Breath is missing. Without it, nobody passes the Second Layer.'",
+    "progress": "You know where the lost volume is. Wen should hear it.",
+    "completion": "Wen unrolls the volume and reads the first column aloud. You feel your breath settle deeper than before.",
+    "reward_techniques": [{ "technique": "azure_breath", "xp": 15 }]
+  }
+]

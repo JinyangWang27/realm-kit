@@ -1,0 +1,71 @@
+{
+  "format_version": 8,
+  "id": "cloud_sect",
+  "name": "The Cloud Sect",
+  "language": "en",
+  "start": "courtyard",
+  "player": "disciple",
+  "flags": ["scripture_found"],
+  "combat": {
+    "special_name": "Qi",
+    "timeline": { "action_cost": 100000, "speed_cap": 200 },
+    "resources": { "mp_regen_percent": 3 },
+    "levels": [
+      { "xp": 0, "stats": { "hp": 50, "mp": 20, "patk": 8, "pdef": 6, "satk": 10, "sdef": 8, "speed": 100 } },
+      { "xp": 15, "stats": { "hp": 56, "mp": 22, "patk": 9, "pdef": 7, "satk": 11, "sdef": 9, "speed": 100 } },
+      { "xp": 40, "stats": { "hp": 62, "mp": 24, "patk": 10, "pdef": 8, "satk": 12, "sdef": 10, "speed": 100 } }
+    ],
+    "skills": [
+      {
+        "id": "palm_drifting",
+        "name": "Cloud Palm",
+        "power": 150,
+        "channel": "special",
+        "cost": 5,
+        "text": "{attacker} push a drifting palm into {target}: {damage} damage."
+      },
+      {
+        "id": "palm_storm",
+        "name": "Cloud Palm",
+        "power": 190,
+        "channel": "special",
+        "cost": 6,
+        "text": "{attacker} bring the storm down on {target}: {damage} damage."
+      }
+    ],
+    "techniques": [
+      {
+        "id": "azure_breath",
+        "name": "Azure Breath",
+        "xp_share_percent": 20,
+        "ranks": [
+          { "name": "First Layer", "xp": 0, "passive": { "mp": 10, "satk": 2 } },
+          { "name": "Second Layer", "xp": 10, "passive": { "mp": 20, "satk": 4 } },
+          {
+            "name": "Third Layer",
+            "xp": 30,
+            "passive": { "mp": 35, "satk": 7 },
+            "requires": [{ "kind": "flag", "flag": "scripture_found" }]
+          }
+        ]
+      },
+      {
+        "id": "cloud_palm",
+        "name": "Cloud Palm",
+        "ranks": [
+          { "name": "Drifting Cloud", "xp": 0, "skill": "palm_drifting" },
+          { "name": "Gathering Storm", "xp": 30, "skill": "palm_storm" }
+        ]
+      }
+    ],
+    "player_techniques": [{ "technique": "azure_breath" }],
+    "core_art": "azure_breath",
+    "groups": [{ "id": "drill", "repeatable": true }],
+    "narrative": {
+      "attack": ["{attacker} strike {target}: {damage} damage."],
+      "hurt": ["{attacker} knocks into {target}: {damage} damage."],
+      "victory": "{target} topples into the dust.",
+      "death": "You fall in the training yard.\nStart a new game to try again."
+    }
+  }
+}
