@@ -41,10 +41,20 @@ pub(super) fn check(
             .as_ref()
             .is_some_and(|c| c.defeated.contains(id))
     };
+    // A repeatable group's members are never recorded and reward every victory.
+    let repeatable = |id: &str| {
+        world
+            .character(id)
+            .and_then(|c| c.combat.as_ref()?.group.as_deref())
+            .and_then(|g| world.group(g))
+            .is_some_and(|g| g.repeatable)
+    };
     ensure(
         state.quests.keys().eq(fresh.quests.keys())
             && world.quests.iter().all(|quest| {
                 let done = match &quest.objective {
+                    // Any status is possible: a repeatable victory leaves no record.
+                    QuestObjective::Defeat { character } if repeatable(character) => return true,
                     QuestObjective::Defeat { character } => defeated(character),
                     QuestObjective::Flag { flag } => state.flags.contains(flag),
                 };
@@ -56,32 +66,52 @@ pub(super) fn check(
             }),
         "invalid quest state",
     )?;
-    // XP, items and quest flags are granted exactly once, from defeated
-    // characters and completed quests, so progress fixes their exact values.
-    // Anything else could not have been played, and could overflow later grants.
-    let no_flags: &[Id] = &[];
-    let defeated = world
-        .characters
-        .iter()
-        .filter(|c| defeated(&c.id))
-        .filter_map(|c| c.combat.as_ref())
-        .map(|m| (m.xp, &m.loot, no_flags));
+    // Completed quests and recorded defeats granted their items exactly once,
+    // so they fix a floor for the inventory; only a repeatable group's loot can
+    // add more. XP scales by level difference (at most 140% of a defeat's XP),
+    // and repeatable victories are unbounded, so XP gets a floor and, without
+    // repeatable groups, a ceiling. Anything else could not have been played.
+    let (mut floor, mut ceiling) = (0_u64, 0_u64);
+    let (mut inventory, mut quest_flags) = (BTreeMap::new(), BTreeSet::new());
     let completed = world
         .quests
         .iter()
-        .filter(|q| state.quests[&q.id] == QuestStatus::Completed)
-        .map(|q| (q.reward_xp, &q.reward_items, &q.completion_flags[..]));
-    let (mut xp, mut inventory, mut quest_flags) = (0_u64, BTreeMap::new(), BTreeSet::new());
-    for (reward, stacks, flags) in defeated.chain(completed) {
-        xp = xp.checked_add(reward).ok_or("impossible experience")?;
-        for stack in stacks {
-            let count: &mut u64 = inventory.entry(stack.item.clone()).or_default();
-            *count = count
-                .checked_add(stack.quantity)
-                .ok_or("impossible inventory")?;
-        }
-        quest_flags.extend(flags.iter().cloned());
+        .filter(|q| state.quests[&q.id] == QuestStatus::Completed);
+    let recorded = world
+        .characters
+        .iter()
+        .filter(|c| defeated(&c.id))
+        .filter_map(|c| c.combat.as_ref());
+    let stacks = completed
+        .clone()
+        .flat_map(|q| &q.reward_items)
+        .chain(recorded.clone().flat_map(|m| &m.loot));
+    for stack in stacks {
+        let count: &mut u64 = inventory.entry(stack.item.clone()).or_default();
+        *count = count
+            .checked_add(stack.quantity)
+            .ok_or("impossible inventory")?;
     }
+    for quest in completed {
+        floor = floor
+            .checked_add(quest.reward_xp)
+            .ok_or("impossible experience")?;
+        quest_flags.extend(quest.completion_flags.iter().cloned());
+    }
+    for fighter in recorded {
+        let most = xp_for_defeat(fighter.xp, 1, usize::MAX);
+        ceiling = ceiling.checked_add(most).ok_or("impossible experience")?;
+    }
+    let ceiling = floor.checked_add(ceiling).ok_or("impossible experience")?;
+    let any_repeatable = world.characters.iter().any(|c| repeatable(&c.id));
+    let repeatable_loot: BTreeSet<_> = world
+        .characters
+        .iter()
+        .filter(|c| repeatable(&c.id))
+        .filter_map(|c| c.combat.as_ref())
+        .flat_map(|m| &m.loot)
+        .map(|s| &s.item)
+        .collect();
     if let (Some(combat), Some(rules)) = (&state.combat, world.combat()) {
         let stats = combat
             .level
@@ -95,7 +125,8 @@ pub(super) fn check(
         )?;
         ensure(
             combat.defeated.iter().all(|id| {
-                world.character(id).is_some_and(|c| c.combat.is_some())
+                !repeatable(id)
+                    && world.character(id).is_some_and(|c| c.combat.is_some())
                     && world.locations.iter().any(|l| l.characters.contains(id))
             }),
             "invalid defeated characters",
@@ -107,12 +138,27 @@ pub(super) fn check(
             )?,
             Stance::Fighting(encounter) => encounter_state(world, state, combat, rules, encounter)?,
         }
-        ensure(combat.xp == xp, "experience does not match progress")?;
+        ensure(
+            combat.xp >= floor && (any_repeatable || combat.xp <= ceiling),
+            "experience does not match progress",
+        )?;
     }
     ensure(
-        player.inventory == inventory,
+        inventory
+            .iter()
+            .all(|(item, count)| player.inventory.get(item).is_some_and(|held| held >= count))
+            && player.inventory.iter().all(|(item, held)| {
+                inventory.get(item) == Some(held) || repeatable_loot.contains(item)
+            }),
         "inventory does not match progress",
     )?;
+    let group_flags: BTreeSet<_> = world
+        .combat()
+        .into_iter()
+        .flat_map(|c| &c.groups)
+        .flat_map(|g| g.victory_flags.iter().chain(&g.defeat_flags))
+        .cloned()
+        .collect();
     let dialogue_flags: BTreeSet<_> = world
         .dialogues
         .iter()
@@ -125,10 +171,9 @@ pub(super) fn check(
         .collect();
     ensure(
         quest_flags.is_subset(&state.flags)
-            && state
-                .flags
-                .iter()
-                .all(|f| quest_flags.contains(f) || dialogue_flags.contains(f)),
+            && state.flags.iter().all(|f| {
+                quest_flags.contains(f) || dialogue_flags.contains(f) || group_flags.contains(f)
+            }),
         "story flags do not match progress",
     )?;
     if let Some(dialogue) = &state.dialogue {
@@ -163,8 +208,13 @@ fn encounter_state(
     let player_ok = player.character == world.world.player
         && player.side == 0
         && player.control == Control::Player;
-    // Engage brings in exactly one opponent until authored groups exist.
-    let opponents_ok = opponents.len() == 1
+    // Exactly the opponents engaging the first one would bring in.
+    let expected = opponents
+        .first()
+        .filter(|p| rules::character_here(world, state, &p.character).is_some())
+        .map(|p| encounter::opponents_for(world, state, &p.character));
+    let listed: Vec<_> = opponents.iter().map(|p| p.character.clone()).collect();
+    let opponents_ok = expected.as_ref() == Some(&listed)
         && opponents.iter().all(|p| {
             p.side == 1
                 && p.control == Control::Policy
@@ -181,19 +231,34 @@ fn encounter_state(
     if !(player_ok && opponents_ok && ids.len() == encounter.participants.len()) {
         return Err(invalid());
     }
+    let yield_share = encounter::group(world, encounter).and_then(|g| g.yield_share);
     let vitals_ok = encounter.participants.iter().all(|p| {
         let max = encounter::stats(world, combat.level, p);
-        p.hp <= max.hp
+        // In a yielding group nobody dies, and a participant has yielded exactly
+        // when a hit left it at or below its threshold. An untouched participant
+        // at full HP has not yielded even if full HP is within the threshold
+        // (a 100% share). Elsewhere nobody yields.
+        let yield_ok = match yield_share {
+            Some(share) => {
+                let low = p.hp <= encounter::yield_threshold(max.hp, share);
+                p.hp > 0 && (p.yielded == low || (!p.yielded && p.hp == max.hp))
+            }
+            None => !p.yielded,
+        };
+        yield_ok
+            && p.hp <= max.hp
             && p.mp <= max.mp
             && u128::from(p.mp_remainder) < per_point
             && p.rage_remainder < u64::from(max.hp)
-            && (p.hp == 0 || p.next_time >= encounter.now)
+            // Only participants still fighting keep up with the schedule.
+            && (!p.fighting() || p.next_time >= encounter.now)
     });
     // A live encounter always rests at the player's turn: the player acts now,
     // and every opponent later or, on a tie, after the player's side.
     let paused = player.hp == 0 || player.next_time == encounter.now;
-    // A finished fight never stays open: the player is alive with an opponent, or dead.
-    let open = player.hp == 0 || opponents.iter().any(|p| p.hp > 0);
+    // A finished fight never stays open: the player still fights an opponent who
+    // still fights, or the player is dead.
+    let open = player.hp == 0 || (player.fighting() && opponents.iter().any(Participant::fighting));
     if vitals_ok && paused && open && state.dialogue.is_none() {
         Ok(())
     } else {

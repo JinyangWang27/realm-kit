@@ -1,6 +1,6 @@
-# World package format 4
+# World package format 5
 
-Format 4 makes combat optional. The level table and combat prose live in an
+Format 5 makes combat optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -17,13 +17,17 @@ there is no migration. Convert them by hand:
   replace them with a seven-stat `stats` object and add `special_name` to the
   combat block, then apply the Format 3 steps.
 - **Format 3** (M3b; no timeline): add a `timeline` to the combat block, and
-  `resources` if skills should regenerate MP or build rage in fights.
+  `resources` if skills should regenerate MP or build rage in fights, then
+  apply the Format 4 steps.
+- **Format 4** (M3c-1): give each opponent whose skills unlock above level 1 a
+  `level`, since opponents now use only skills unlocked at their level;
+  `groups` are optional.
 
 A world without combat only needs its `format_version` raised.
 
-Format 4 represents one fixed player-controlled character and one playable
+Format 5 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 4 does not serialize a route collection
+stable logical route ID `default`; Format 5 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -38,7 +42,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 4 also requires item and quest tables because they serve the current demo.
+Format 5 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -73,7 +77,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 4 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 5 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -128,7 +132,7 @@ Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags
 are monotonic in this version. Conditions govern availability/choice visibility.
 
-This flat conjunctive representation is a Format 4 limitation. The long-term
+This flat conjunctive representation is a Format 5 limitation. The long-term
 condition model uses pure typed predicates composed with `All / Any / Not`;
 predicates remain domain-specific and typed rather than becoming arbitrary
 expressions/property paths. Typed effects execute in authored order as part of the
@@ -162,16 +166,19 @@ A location's `characters` list places the others. A placed character is present
 while its `requires` conditions hold; the player can talk to it if it has a
 `dialogue` and attack it if it has a `combat` profile: its `stats` (see
 [Stats](#stats-damage-and-skills)), the `xp` granted on defeat, optional `loot`,
-optional `skills` (skill IDs; profiles have no level yet, so every listed skill
-is usable) and `basic_channel` (`physical` by default). A defeated character is gone: it is no longer
-listed and cannot be talked to. A character with a combat profile is one instance: it
-may be placed at most once, and its defeat is permanent (no respawns). Other
+optional `skills` (skill IDs, usable once the profile's `level` reaches each
+skill's unlock level), `basic_channel` (`physical` by default), `level`
+(default 1; it also scales the XP the character grants) and an optional
+`group`. A defeated character is gone: it is no longer listed and cannot be
+talked to. A character with a combat profile is one instance: it may be placed
+at most once, and its defeat is permanent (no respawns) unless its group is
+repeatable. Other
 characters may appear at several locations. Combat profiles require the world's
 `combat` block.
 
 ## Dialogue and quests
 
-Format 4 has a single flat quest collection. The long-term model should retain
+Format 5 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -315,11 +322,45 @@ one point short cannot spend what its own action earns), and by
 cumulatively. Rage never outlasts the encounter; `resources` defaults to zero,
 which leaves either resource unused.
 
-Defeating every opponent ends the encounter: the player's HP and MP return to
-exploring, each defeated opponent's loot and XP are granted once, and defeat
-objectives advance. A defeated character stays defeated. A location with
-`"safe": true` lets the player `rest` outside encounters, restoring HP and MP;
-it needs the combat block.
+The combat block's `groups` shape encounters:
+
+```json
+"groups": [
+  { "id": "pack" },
+  { "id": "warren", "repeatable": true },
+  { "id": "spar", "yield_share": 50, "victory_flags": ["spar_won"], "defeat_flags": ["spar_lost"] },
+  { "id": "pit", "no_flee": true }
+]
+```
+
+Engaging a fighter whose profile names a `group` brings in every member placed
+at the location, present under its conditions and not defeated, in the
+location's order; an ungrouped fighter comes alone. Opponents target the first
+opponent still fighting.
+
+`flee` spends the player's turn: opponents act until the player's next turn,
+and if the player is still alive then, the encounter ends with nothing granted
+or recorded; the opponents are whole again next time. A `no_flee` group
+forbids it.
+
+In a group with a `yield_share` (1–100), nobody dies: a hit stops at 1 HP, and a
+participant at or below `max(1, ⌊max HP × share / 100⌋)` yields and leaves the
+schedule alive. The player yielding ends the encounter as a loss: the group's
+`defeat_flags` are set and play continues with the HP left. A defeat objective
+cannot target a member of a yielding group.
+
+The encounter is won when every opponent has died or yielded. The player's HP
+and MP return to exploring, and each opponent that died grants its loot and XP
+and advances defeat objectives. Its XP scales by level difference: ±10% per
+level of the opponent's level above or below the player's, capped at ±40% and
+rounded down, and nothing from an opponent five or more levels below. It is
+recorded as defeated unless its group is `repeatable`, which can be fought
+again at once and rewards every victory (a defeat objective counts the first).
+Yielded opponents grant and record nothing. A victory sets the group's
+`victory_flags`. The player dying is ordinary death.
+
+A location with `"safe": true` lets the player `rest` outside encounters,
+restoring HP and MP; it needs the combat block.
 
 `attack` and `hurt` each require at least one template; they narrate basic
 attacks, while skills use their own `text`. They allow
@@ -335,7 +376,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 4 currently selects combat prose variants from the current
+Format 5 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -360,7 +401,7 @@ the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
 skill references, usable and affordable skills, loot quantities, fighter
 placement and template placeholders. `load()` reports a package whose
-`format_version` is not 4 as `SpecError::UnsupportedFormat` before parsing it.
+`format_version` is not 5 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.

@@ -7,7 +7,7 @@ mod validation;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 4;
+pub const FORMAT_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -57,6 +57,8 @@ pub struct Combat {
     pub player_skills: Vec<Id>,
     #[serde(default)]
     pub player_basic_channel: Channel,
+    #[serde(default)]
+    pub groups: Vec<Group>,
     pub narrative: Narrative,
 }
 
@@ -248,11 +250,38 @@ pub struct CombatProfile {
     pub xp: u64,
     #[serde(default)]
     pub loot: Vec<ItemStack>,
-    /// All listed skills are usable; profiles have no level yet.
+    /// Usable once the profile's level reaches each skill's unlock level.
     #[serde(default)]
     pub skills: Vec<Id>,
     #[serde(default)]
     pub basic_channel: Channel,
+    /// Gates the profile's skills and scales the XP it grants.
+    #[serde(default = "first_level")]
+    pub level: usize,
+    /// Engaging any member brings in every present, undefeated member.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<Id>,
+}
+
+/// Opponents who fight together, and how their encounters end.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Group {
+    pub id: Id,
+    /// Defeats are never recorded, so the group can be fought again at once.
+    #[serde(default)]
+    pub repeatable: bool,
+    /// Participants yield at this percentage of maximum HP instead of dying.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub yield_share: Option<u32>,
+    #[serde(default)]
+    pub no_flee: bool,
+    /// Set when the player's side wins.
+    #[serde(default)]
+    pub victory_flags: Vec<Id>,
+    /// Set when the player yields.
+    #[serde(default)]
+    pub defeat_flags: Vec<Id>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -421,6 +450,9 @@ impl WorldSpec {
     }
     pub fn combat(&self) -> Option<&Combat> {
         self.world.combat.as_ref()
+    }
+    pub fn group(&self, id: &str) -> Option<&Group> {
+        self.combat()?.groups.iter().find(|v| v.id == id)
     }
     pub fn skill(&self, id: &str) -> Option<&Skill> {
         self.combat()?.skills.iter().find(|v| v.id == id)

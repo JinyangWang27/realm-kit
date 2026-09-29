@@ -1,0 +1,26 @@
+look
+north
+engage grey_wolf
+flee
+south
+east
+engage rat
+attack rat
+engage rat
+attack rat
+inventory
+west
+rest
+west
+engage holt
+attack holt
+attack holt
+attack holt
+attack holt
+attack holt
+east
+down
+engage ogre
+flee
+status
+quit

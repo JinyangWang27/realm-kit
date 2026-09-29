@@ -1,0 +1,57 @@
+[
+  { "id": "fighter", "name": "You", "description": "A recruit with a practice sword." },
+  {
+    "id": "grey_wolf",
+    "name": "The Grey Wolf",
+    "description": "It circles to your left.",
+    "combat": {
+      "stats": { "hp": 24, "patk": 9, "pdef": 4, "satk": 0, "sdef": 4, "speed": 105 },
+      "xp": 8,
+      "group": "pack"
+    }
+  },
+  {
+    "id": "black_wolf",
+    "name": "The Black Wolf",
+    "description": "It circles to your right.",
+    "combat": {
+      "stats": { "hp": 24, "patk": 9, "pdef": 4, "satk": 0, "sdef": 4, "speed": 105 },
+      "xp": 8,
+      "group": "pack"
+    }
+  },
+  {
+    "id": "rat",
+    "name": "A Warren Rat",
+    "description": "There is always another one.",
+    "combat": {
+      "stats": { "hp": 10, "patk": 5, "pdef": 2, "satk": 0, "sdef": 2, "speed": 100 },
+      "xp": 4,
+      "loot": [{ "item": "rat_tail", "quantity": 1 }],
+      "group": "warren"
+    }
+  },
+  {
+    "id": "holt",
+    "name": "Sergeant Holt",
+    "description": "He taps his wooden sword against his palm.",
+    "combat": {
+      "stats": { "hp": 60, "patk": 10, "pdef": 8, "satk": 0, "sdef": 6, "speed": 100 },
+      "xp": 0,
+      "level": 3,
+      "group": "spar"
+    }
+  },
+  {
+    "id": "ogre",
+    "name": "The Pit Ogre",
+    "description": "Chained, but not chained enough.",
+    "combat": {
+      "stats": { "hp": 90, "patk": 14, "pdef": 8, "satk": 0, "sdef": 6, "speed": 90 },
+      "xp": 30,
+      "level": 4,
+      "skills": ["smash", "crush"],
+      "group": "pit"
+    }
+  }
+]

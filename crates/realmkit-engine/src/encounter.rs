@@ -2,7 +2,7 @@
 //! `scripts/combat_sim/encounter.py`; tests hold the two to the same numbers.
 
 use super::*;
-use realmkit_spec::Timeline;
+use realmkit_spec::{Group, Timeline};
 
 /// Ticks until an actor's next turn after an action taking `time` percent of
 /// a basic action: `max(1, ceil(action_cost × time / (100 × speed)))`, with
@@ -63,11 +63,12 @@ pub(super) fn check_skill(p: &Participant, level: usize, skill: &Skill) -> Resul
 /// The strongest affordable skill, else the basic attack. Equal power prefers
 /// the cheaper skill, then the later tier; the first listed wins a full tie.
 fn choose<'w>(world: &'w WorldSpec, p: &Participant) -> Option<&'w Skill> {
-    profile(world, &p.character)
+    let profile = profile(world, &p.character);
+    profile
         .skills
         .iter()
         .filter_map(|id| world.skill(id))
-        .filter(|s| affordable(p, s))
+        .filter(|s| s.level <= profile.level && affordable(p, s))
         .rev()
         .max_by_key(|s| (s.power, std::cmp::Reverse(s.cost), s.level))
 }
@@ -80,8 +81,7 @@ pub(super) fn engage(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let fighter = rules::character_here(world, state, &id).and_then(|c| c.combat.as_ref());
-    let (Some(profile), Some(rules), Some(combat)) =
-        (fighter, world.combat(), state.combat.as_mut())
+    let (Some(_), Some(rules), Some(combat)) = (fighter, world.combat(), state.combat.as_ref())
     else {
         return Err(EngineError::NotHere(id));
     };
@@ -92,6 +92,11 @@ pub(super) fn engage(
         return Err(EngineError::InEncounter);
     };
     let player = rules::player_stats(world, combat.level);
+    let opponents: Vec<(Id, Stats)> = opponents_for(world, state, &id)
+        .into_iter()
+        .map(|c| (c.clone(), profile(world, &c).stats))
+        .collect();
+    let combat = state.combat.as_mut().unwrap();
     // Everyone's first action comes after one opening delay, so speed matters at once.
     let joiner = |character: Id, side, control, hp, mp, speed| -> Result<_, EngineError> {
         Ok(Participant {
@@ -104,35 +109,100 @@ pub(super) fn engage(
             mp_remainder: 0,
             rage_remainder: 0,
             next_time: delay(&rules.timeline, speed, 100)?,
+            yielded: false,
         })
     };
-    let participants = vec![
-        joiner(
-            world.world.player.clone(),
-            0,
-            Control::Player,
-            vitals.hp,
-            vitals.mp,
-            player.speed,
-        )?,
-        joiner(
-            id.clone(),
+    let mut participants = vec![joiner(
+        world.world.player.clone(),
+        0,
+        Control::Player,
+        vitals.hp,
+        vitals.mp,
+        player.speed,
+    )?];
+    for (character, stats) in &opponents {
+        participants.push(joiner(
+            character.clone(),
             1,
             Control::Policy,
-            profile.stats.hp,
-            profile.stats.mp,
-            profile.stats.speed,
-        )?,
-    ];
+            stats.hp,
+            stats.mp,
+            stats.speed,
+        )?);
+    }
     combat.stance = Stance::Fighting(Encounter {
         now: 0,
         participants,
     });
     state.dialogue = None;
     events.push(Event::EncounterStarted {
-        opponents: vec![id],
+        opponents: opponents.into_iter().map(|(id, _)| id).collect(),
     });
-    advance(world, state, events)
+    advance(world, state, events, false)
+}
+
+/// Who engaging `id` brings in: `id` alone, or every member of its group
+/// placed here, present under its conditions and not defeated, in the
+/// location's authored order.
+pub(super) fn opponents_for(world: &WorldSpec, state: &GameState, id: &str) -> Vec<Id> {
+    let Some(group) = world
+        .character(id)
+        .and_then(|c| c.combat.as_ref()?.group.as_ref())
+    else {
+        return vec![id.into()];
+    };
+    let defeated = |c: &str| {
+        state
+            .combat
+            .as_ref()
+            .is_some_and(|s| s.defeated.contains(c))
+    };
+    world
+        .location(&state.player.location)
+        .unwrap()
+        .characters
+        .iter()
+        .filter(|c| !defeated(c))
+        .filter(|c| {
+            rules::character_here(world, state, c)
+                .and_then(|m| m.combat.as_ref())
+                .is_some_and(|m| m.group.as_ref() == Some(group))
+        })
+        .cloned()
+        .collect()
+}
+
+/// A participant yields at or below `max(1, ⌊max HP × share / 100⌋)`.
+pub(super) fn yield_threshold(max_hp: u32, share: u32) -> u32 {
+    (u64::from(max_hp) * u64::from(share) / 100).max(1) as u32
+}
+
+/// The group an encounter's opponents share, if any.
+pub(super) fn group<'w>(world: &'w WorldSpec, encounter: &Encounter) -> Option<&'w Group> {
+    let first = encounter.participants.get(1)?;
+    world.group(profile(world, &first.character).group.as_deref()?)
+}
+
+/// Declares a flight: the player's turn is spent, opponents act until the
+/// player's next turn, and the escape happens then if the player lives.
+pub(super) fn flee(
+    world: &WorldSpec,
+    state: &mut GameState,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let (encounter, level) = fighting(state)?;
+    if group(world, encounter).is_some_and(|g| g.no_flee) {
+        return Err(EngineError::NoFlee);
+    }
+    let speed = rules::player_stats(world, level).speed;
+    let step = delay(&world.combat().unwrap().timeline, speed, 100)?;
+    let player = &mut encounter.participants[0];
+    player.next_time = player
+        .next_time
+        .checked_add(step)
+        .ok_or(EngineError::NumericLimit)?;
+    events.push(Event::FleeStarted);
+    advance(world, state, events, true)
 }
 
 fn fighting(state: &mut GameState) -> Result<(&mut Encounter, usize), EngineError> {
@@ -157,7 +227,7 @@ pub(super) fn player_action(
     let index = encounter
         .participants
         .iter()
-        .position(|p| p.character == target && p.side != 0 && p.hp > 0)
+        .position(|p| p.character == target && p.side != 0 && p.fighting())
         .ok_or(EngineError::NotHere(target))?;
     // Advancing stops at the player's turn, already regenerated, so the
     // player acts now with the MP they see.
@@ -165,7 +235,7 @@ pub(super) fn player_action(
         check_skill(&encounter.participants[0], level, skill)?;
     }
     act(world, encounter, level, turn, 0, index, skill, events)?;
-    advance(world, state, events)
+    advance(world, state, events, false)
 }
 
 /// Regenerates everyone for the time until `actor`'s turn, then moves there.
@@ -225,6 +295,8 @@ fn act(
         None => (basic_channel(world, a), BASIC_POWER, rules.cross_share),
     };
     let dealt = damage(&attacker, &defender, channel, power, share)?;
+    // In a yielding group nobody dies: a hit stops at 1 HP.
+    let yield_share = group(world, encounter).and_then(|g| g.yield_share);
     let time = skill.map_or(100, |s| s.time);
     let next = delay(&rules.timeline, attacker.speed, time)?;
     let a = &mut encounter.participants[actor];
@@ -247,7 +319,8 @@ fn act(
         .ok_or(EngineError::NumericLimit)?;
     let source = a.character.clone();
     let t = &mut encounter.participants[target];
-    let taken = dealt.min(t.hp);
+    let floor = u32::from(yield_share.is_some());
+    let taken = dealt.min(t.hp - floor);
     t.hp -= taken;
     let progress = u128::from(t.rage_remainder)
         + u128::from(rules.resources.rage_per_max_hp) * u128::from(dealt);
@@ -255,6 +328,8 @@ fn act(
     t.rage = u32::try_from(u128::from(t.rage) + progress / max_hp).unwrap_or(u32::MAX);
     t.rage_remainder = (progress % max_hp) as u64;
     let skill = skill.map(|s| s.id.clone());
+    let threshold = yield_share.map(|share| yield_threshold(defender.hp, share));
+    let yields = threshold.is_some_and(|limit| t.hp <= limit);
     if actor == 0 {
         events.push(Event::DamageDealt {
             target: t.character.clone(),
@@ -267,6 +342,12 @@ fn act(
                 monster: t.character.clone(),
             });
         }
+        if yields {
+            t.yielded = true;
+            events.push(Event::Yielded {
+                character: t.character.clone(),
+            });
+        }
     } else {
         events.push(Event::DamageReceived {
             source,
@@ -277,6 +358,12 @@ fn act(
         if t.hp == 0 && t.control == Control::Player {
             events.push(Event::PlayerDied);
         }
+        if yields {
+            t.yielded = true;
+            events.push(Event::Yielded {
+                character: t.character.clone(),
+            });
+        }
     }
     Ok(())
 }
@@ -284,18 +371,20 @@ fn act(
 /// The living participant who acts next: `(next_time, side, position)`.
 fn next_actor(encounter: &Encounter) -> Option<usize> {
     (0..encounter.participants.len())
-        .filter(|&i| encounter.participants[i].hp > 0)
+        .filter(|&i| encounter.participants[i].fighting())
         .min_by_key(|&i| {
             let p = &encounter.participants[i];
             (p.next_time, p.side, i)
         })
 }
 
-/// Resolves policy actions until the player's turn, the player's death, or victory.
+/// Resolves policy actions until the player's turn, the player's death or
+/// yield, or victory. A declared flight escapes at the player's turn.
 fn advance(
     world: &WorldSpec,
     state: &mut GameState,
     events: &mut Vec<Event>,
+    fleeing: bool,
 ) -> Result<(), EngineError> {
     let turn = state.turn;
     loop {
@@ -304,62 +393,95 @@ fn advance(
         if player.hp == 0 {
             return Ok(());
         }
-        if encounter
-            .participants
+        if player.yielded {
+            return end(world, state, Outcome::Yielded, events);
+        }
+        if !encounter.participants[1..]
             .iter()
-            .all(|p| p.side == 0 || p.hp == 0)
+            .any(Participant::fighting)
         {
-            return end(world, state, events);
+            return end(world, state, Outcome::Victory, events);
         }
         let actor = next_actor(encounter).unwrap();
         // Everyone regenerates up to the next turn before it is taken; the
         // player's turn then waits for a command.
         tick(world, encounter, level, actor)?;
         if encounter.participants[actor].control == Control::Player {
-            return Ok(());
+            return if fleeing {
+                end(world, state, Outcome::Fled, events)
+            } else {
+                Ok(())
+            };
         }
         let side = encounter.participants[actor].side;
         let target = (0..encounter.participants.len())
-            .find(|&i| encounter.participants[i].side != side && encounter.participants[i].hp > 0)
+            .find(|&i| {
+                let p = &encounter.participants[i];
+                p.side != side && p.fighting()
+            })
             .unwrap();
         let skill = choose(world, &encounter.participants[actor]);
         act(world, encounter, level, turn, actor, target, skill, events)?;
     }
 }
 
-/// Victory: the player's vitals return to exploring, then each defeated
-/// opponent's loot and XP are granted once and defeat objectives advance.
+/// The player's vitals return to exploring. A victory then grants each
+/// opponent that died its loot and XP (scaled by level difference), records it
+/// unless its group is repeatable, advances defeat objectives and sets the
+/// group's victory flags; the player's yield sets its defeat flags; a flight
+/// grants and records nothing.
 fn end(
     world: &WorldSpec,
     state: &mut GameState,
+    outcome: Outcome,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let combat = state.combat.as_mut().unwrap();
     let Stance::Fighting(encounter) = &combat.stance else {
         unreachable!("only a running encounter ends");
     };
+    let group = group(world, encounter);
     let player = &encounter.participants[0];
     let vitals = Vitals {
         hp: player.hp,
         mp: player.mp,
     };
-    let opponents: Vec<Id> = encounter.participants[1..]
+    let fallen: Vec<Id> = encounter.participants[1..]
         .iter()
+        .filter(|p| p.hp == 0)
         .map(|p| p.character.clone())
         .collect();
     combat.stance = Stance::Exploring(vitals);
-    combat.defeated.extend(opponents.iter().cloned());
-    events.push(Event::EncounterEnded);
-    for id in opponents {
-        let profile = profile(world, &id);
-        rules::grant_items(state, &profile.loot, events)?;
-        rules::grant_xp(world, state, profile.xp, events)?;
-        let defeat = QuestObjective::Defeat { character: id };
-        for q in &world.quests {
-            if q.objective == defeat && state.quests[&q.id] == QuestStatus::Active {
-                rules::progress(state, &q.id, events);
+    events.push(Event::EncounterEnded { outcome });
+    let flags = match outcome {
+        Outcome::Victory => group.map_or(&[][..], |g| &g.victory_flags[..]),
+        Outcome::Yielded => group.map_or(&[][..], |g| &g.defeat_flags[..]),
+        Outcome::Fled => return Ok(()),
+    };
+    if outcome == Outcome::Victory {
+        let repeatable = group.is_some_and(|g| g.repeatable);
+        // Every reward scales from the level the player fought at, so a
+        // level-up from one opponent does not change the next one's XP.
+        let level = state.combat.as_ref().unwrap().level;
+        for id in fallen {
+            let profile = profile(world, &id);
+            let combat = state.combat.as_mut().unwrap();
+            if !repeatable {
+                combat.defeated.insert(id.clone());
+            }
+            let xp = xp_for_defeat(profile.xp, level, profile.level);
+            rules::grant_items(state, &profile.loot, events)?;
+            rules::grant_xp(world, state, xp, events)?;
+            let defeat = QuestObjective::Defeat { character: id };
+            for q in &world.quests {
+                if q.objective == defeat && state.quests[&q.id] == QuestStatus::Active {
+                    rules::progress(state, &q.id, events);
+                }
             }
         }
+    }
+    for flag in flags {
+        rules::set_flag(world, state, flag, events);
     }
     Ok(())
 }
