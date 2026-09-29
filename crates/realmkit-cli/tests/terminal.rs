@@ -286,3 +286,62 @@ fn resting_without_mp_mentions_only_health() {
     assert!(text.contains("You rest. Health restored."), "{text}");
     assert!(!text.contains("MP"), "{text}");
 }
+
+const ARENA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena");
+
+#[test]
+fn the_arena_plays_packs_flight_sparring_and_a_no_flee_boss() {
+    let input = [
+        "help",
+        "north",
+        "engage grey_wolf",
+        "flee",
+        "south",
+        "east",
+        "engage rat",
+        "attack rat",
+        "attack rat",
+        "engage rat",
+        "attack rat",
+        "attack rat",
+        "inventory",
+        "west",
+        "down",
+        // Hurt players yield sooner: rest before sparring.
+        "rest",
+        "west",
+        "engage holt",
+        "attack holt",
+        "attack holt",
+        "attack holt",
+        "attack holt",
+        "attack holt",
+        "east",
+        "down",
+        "engage ogre",
+        "flee",
+    ]
+    .join("\n");
+    let output = run(&["play", ARENA], &format!("{input}\n"));
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "flee\n",
+        // The pack: both wolves join and act before the player's first turn.
+        "You face The Grey Wolf, The Black Wolf.",
+        "You HP 52/60 · rage 2 | The Grey Wolf HP 24/24 · rage 1 | The Black Wolf HP 24/24 · rage 1",
+        "Flee",
+        "You turn to run.",
+        "You get away.",
+        // The warren can be fought again; each rat leaves a tail.
+        "Rat tail ×2",
+        "Sergeant Holt bars the pit until you best him in the ring.",
+        "Sergeant Holt yields.",
+        "The Pit Ogre (HP 90)",
+        "there is no running from this fight",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    let pit = &text[text.rfind("You face The Pit Ogre.").unwrap()..];
+    assert!(!pit.contains(". Flee"), "{pit}");
+}
