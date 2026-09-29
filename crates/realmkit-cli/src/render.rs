@@ -257,11 +257,15 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                         if stats.mp > 0 {
                             write!(output, " | MP {}/{}", vitals.mp, stats.mp)?;
                         }
-                        writeln!(
+                        write!(
                         output,
                         " | Attack {} | Defence {} | {special} attack {} | {special} defence {} | Speed {} | XP {}",
                         stats.patk, stats.pdef, stats.satk, stats.sdef, stats.speed, combat.xp
-                    )?
+                    )?;
+                        match engine.unspent_points() {
+                            Some(points) if points > 0 => writeln!(output, " | Points {points}")?,
+                            _ => writeln!(output)?,
+                        }
                     }
                     _ => writeln!(output, "{player}")?,
                 }

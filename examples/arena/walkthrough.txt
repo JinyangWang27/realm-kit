@@ -1,4 +1,7 @@
 look
+status
+allocate patk 2
+allocate hp
 north
 engage grey_wolf
 flee

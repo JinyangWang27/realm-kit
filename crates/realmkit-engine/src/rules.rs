@@ -293,6 +293,26 @@ pub(super) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     if state.combat.is_some() && location.safe {
         actions.push(available(Command::Rest));
     }
+    if let (Some(combat), Some(points)) = (
+        &state.combat,
+        world.combat().and_then(|c| c.stat_points.as_ref()),
+    ) {
+        // One point at a time into each stat that can still take one.
+        if unspent_points(world, combat) > 0 {
+            for stat in points.values.keys() {
+                let spent = combat.allocation.get(stat).copied().unwrap_or(0);
+                if points.caps.get(stat).is_none_or(|cap| spent < *cap) {
+                    actions.push(available(Command::Allocate {
+                        stat: *stat,
+                        points: 1,
+                    }));
+                }
+            }
+        }
+        if points.respec == Respec::Safe && location.safe && !combat.allocation.is_empty() {
+            actions.push(available(Command::Respec));
+        }
+    }
     actions.extend(panels);
     actions
 }

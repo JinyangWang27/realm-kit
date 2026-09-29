@@ -371,3 +371,31 @@ fn a_seed_reproduces_a_run_with_random_content() {
     assert!(!run(&["play", ARENA, "--seed", "five"], "").status.success());
     assert!(!run(&["play", ARENA, "--seed"], "").status.success());
 }
+
+#[test]
+fn stat_points_are_spent_from_the_menu_or_typed_and_refunded_at_the_gate() {
+    let input =
+        "help\nstatus\n7\nallocate hp 2\nstatus\nallocate satk\nallocate hp 9\nrespec\nstatus\n";
+    let output = run(&["play", ARENA, "--seed", "1"], input);
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "allocate hp|mp|patk|pdef|satk|sdef|speed [points]",
+        "Speed 100 | XP 0 | Points 3",
+        "7. Train Attack: 12 → 13",
+        "1 point into Attack.",
+        "2 points into HP.",
+        "You — Level 1 | HP 70/70 | Attack 13",
+        "you cannot spend points on that stat",
+        "not enough unspent stat points",
+        "Refund stat points",
+        "Your stat points are refunded.",
+        // After the refund, HP is back within the level's maximum.
+        "You — Level 1 | HP 60/60 | Attack 12",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    // A world without stat points neither lists nor accepts them.
+    let demo = String::from_utf8(run(&["play", WORLD], "help\nallocate hp\n").stdout).unwrap();
+    assert!(!demo.contains("allocate hp|"));
+    assert!(demo.contains("you cannot spend points on that stat"));
+}

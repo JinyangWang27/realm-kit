@@ -1,13 +1,16 @@
 use realmkit_engine::Command;
-use realmkit_spec::Direction;
+use realmkit_spec::{Direction, Stat, WorldSpec};
 
 /// Commands a player can type; fighting and resting only where the world has combat.
-pub fn help(combat: bool) -> String {
-    let attack = if combat {
-        "engage <character-id>\nattack <character-id>\nuse <skill-id> <character-id>\nflee\nrest — at a safe place\n"
-    } else {
-        ""
-    };
+pub fn help(world: &WorldSpec) -> String {
+    let combat = world.combat();
+    let mut attack = String::new();
+    if combat.is_some() {
+        attack += "engage <character-id>\nattack <character-id>\nuse <skill-id> <character-id>\nflee\nrest — at a safe place\n";
+    }
+    if combat.is_some_and(|c| c.stat_points.is_some()) {
+        attack += "allocate hp|mp|patk|pdef|satk|sdef|speed [points]\nrespec — refund stat points, where allowed\n";
+    }
     format!("<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\n{attack}talk <character-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nsave\nload [number] — list saves, or restore one\nhelp\nquit")
 }
 
@@ -22,6 +25,19 @@ pub enum Input {
     /// List saves, or restore the one-based save shown in that list.
     Load(Option<usize>),
     Blank,
+}
+
+fn stat(value: &str) -> Option<Stat> {
+    Some(match value {
+        "hp" => Stat::Hp,
+        "mp" => Stat::Mp,
+        "patk" => Stat::Patk,
+        "pdef" => Stat::Pdef,
+        "satk" => Stat::Satk,
+        "sdef" => Stat::Sdef,
+        "speed" => Stat::Speed,
+        _ => return None,
+    })
 }
 
 fn direction(value: &str) -> Option<Direction> {
@@ -67,6 +83,14 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
         },
         ("rest", []) => Command::Rest,
         ("flee", []) => Command::Flee,
+        ("respec", []) => Command::Respec,
+        ("allocate", [name, rest @ ..]) if rest.len() <= 1 => Command::Allocate {
+            stat: stat(&name.to_ascii_lowercase()).ok_or("unknown stat")?,
+            points: match rest {
+                [n] => n.parse().map_err(|_| "expected a number of points")?,
+                _ => 1,
+            },
+        },
         ("talk", [id]) => Command::Talk((*id).into()),
         ("accept", [id]) => Command::AcceptQuest((*id).into()),
         ("complete", [id]) => Command::CompleteQuest((*id).into()),
@@ -119,5 +143,22 @@ mod tests {
         );
         assert_eq!(parse("rest"), Ok(Input::Command(Command::Rest)));
         assert!(parse("use bolt").is_err());
+        assert_eq!(
+            parse("allocate HP 2"),
+            Ok(Input::Command(Command::Allocate {
+                stat: Stat::Hp,
+                points: 2
+            }))
+        );
+        assert_eq!(
+            parse("allocate speed"),
+            Ok(Input::Command(Command::Allocate {
+                stat: Stat::Speed,
+                points: 1
+            }))
+        );
+        assert!(parse("allocate luck").is_err());
+        assert!(parse("allocate hp two").is_err());
+        assert_eq!(parse("respec"), Ok(Input::Command(Command::Respec)));
     }
 }
