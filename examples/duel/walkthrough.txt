@@ -1,5 +1,6 @@
 look
 north
+engage witch
 use bolt witch
 use bolt witch
 use spark witch

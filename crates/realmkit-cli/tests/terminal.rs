@@ -260,6 +260,8 @@ fn a_mage_duels_with_skills_rests_and_levels_up() {
         "1. Engage The Hedge Witch",
         // The faster witch acts before the player's first command.
         "You face The Hedge Witch.\nThe Hedge Witch hisses a hex at You: 6 damage.",
+        // Vitals of both sides, MP only where there is some, and the projected order.
+        "You HP 28/34 · MP 24/24 | The Hedge Witch HP 30/30 · MP 5/10\nNext: You, The Hedge Witch, You, The Hedge Witch, You",
         "2. Spark on The Hedge Witch",
         "3. Bolt on The Hedge Witch — 12 MP",
         "You loose a bolt of witchlight. The Hedge Witch takes 11 damage.",

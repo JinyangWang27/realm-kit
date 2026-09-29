@@ -54,6 +54,46 @@ pub struct Menu {
     pub entries: Vec<Entry>,
     pub cursor: usize,
     dialogue: bool,
+    /// In a fight: everyone's vitals and the projected turn order.
+    header: Vec<String>,
+}
+
+const NEXT: &str = "Next";
+const TURNS_SHOWN: usize = 5;
+
+/// "You HP 36/40 · rage 2 | The Ash Wolf HP 13/20" and the next few turns.
+fn encounter_lines(engine: &Engine<'_>) -> Vec<String> {
+    let Some(encounter) = engine.encounter() else {
+        return Vec::new();
+    };
+    let world = engine.world();
+    let name = |id: &str| world.character(id).unwrap().name.as_str();
+    let resources = world.combat().unwrap().resources;
+    let rage = resources.rage_per_action > 0 || resources.rage_per_max_hp > 0;
+    let vitals: Vec<_> = encounter
+        .participants
+        .iter()
+        .map(|p| {
+            let max = match &world.character(&p.character).unwrap().combat {
+                Some(profile) => profile.stats,
+                None => engine.player_stats().unwrap(),
+            };
+            let mut line = format!("{} HP {}/{}", name(&p.character), p.hp, max.hp);
+            if max.mp > 0 {
+                line += &format!(" · {MP} {}/{}", p.mp, max.mp);
+            }
+            if rage {
+                line += &format!(" · {RAGE} {}", p.rage);
+            }
+            line
+        })
+        .collect();
+    let order: Vec<_> = engine
+        .turn_order(TURNS_SHOWN)
+        .iter()
+        .map(|id| name(id))
+        .collect();
+    vec![vitals.join(" | "), format!("{NEXT}: {}", order.join(", "))]
 }
 
 impl Menu {
@@ -142,6 +182,7 @@ impl Menu {
             entries,
             cursor: 0,
             dialogue,
+            header: encounter_lines(engine),
         }
     }
 
@@ -154,6 +195,9 @@ impl Menu {
     // ponytail: assumes labels fit one terminal row; measure widths if long labels wrap.
     pub fn write(&self, output: &mut impl Write, interactive: bool) -> io::Result<u16> {
         writeln!(output)?;
+        for line in &self.header {
+            writeln!(output, "{line}")?;
+        }
         for (i, entry) in self.entries.iter().enumerate() {
             let marker = if interactive && i == self.cursor {
                 ">"
@@ -165,9 +209,9 @@ impl Menu {
         if interactive {
             let esc = if self.dialogue { ESC_HINT } else { "" };
             writeln!(output, "\n{KEYS_HINT}{esc}")?;
-            Ok(self.entries.len() as u16 + 3)
+            Ok((self.entries.len() + self.header.len()) as u16 + 3)
         } else {
-            Ok(self.entries.len() as u16 + 1)
+            Ok((self.entries.len() + self.header.len()) as u16 + 1)
         }
     }
 
