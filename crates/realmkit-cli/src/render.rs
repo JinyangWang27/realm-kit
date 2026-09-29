@@ -1,8 +1,9 @@
 use realmkit_engine::{Engine, Event, Outcome};
-use realmkit_spec::{Direction, Stat, TextTemplate};
+use realmkit_spec::{Direction, Id, Stat, TextTemplate};
 use std::io::{self, Write};
 
 const CRITICAL: &str = "Critical hit!";
+const TECHNIQUE_XP: &str = "Technique XP";
 
 /// Single-pass interpolation: inserted values are data, never template syntax.
 fn interpolate(template: &TextTemplate, values: &[(&str, &str)]) -> io::Result<String> {
@@ -79,6 +80,62 @@ pub fn direction_name(direction: Direction) -> &'static str {
         Direction::West => "west",
         Direction::Up => "up",
         Direction::Down => "down",
+    }
+}
+
+/// Remembers technique XP gained during a fight, which is shown as one line
+/// when the fight ends instead of after every hit.
+#[derive(Default)]
+pub struct Log {
+    technique_xp: Vec<(Id, u64)>,
+}
+
+impl Log {
+    /// Forgets the tally, for when a save replaces the playthrough.
+    pub fn reset(&mut self) {
+        self.technique_xp.clear();
+    }
+
+    /// Renders one command's events, holding back technique XP until the
+    /// fight ends. A fight the player dies in never ends; the next one
+    /// starts a fresh tally.
+    pub fn events(
+        &mut self,
+        output: &mut impl Write,
+        engine: &Engine<'_>,
+        batch: &[Event],
+    ) -> io::Result<()> {
+        let ended = batch
+            .iter()
+            .any(|e| matches!(e, Event::EncounterEnded { .. }));
+        let fighting = ended || engine.encounter().is_some();
+        let mut shown = Vec::new();
+        for event in batch {
+            match event {
+                Event::EncounterStarted { .. } => {
+                    self.technique_xp.clear();
+                    shown.push(event.clone());
+                }
+                Event::TechniqueXpGained { technique, amount } if fighting => {
+                    match self.technique_xp.iter_mut().find(|(t, _)| t == technique) {
+                        Some((_, total)) => *total = total.saturating_add(*amount),
+                        None => self.technique_xp.push((technique.clone(), *amount)),
+                    }
+                }
+                _ => shown.push(event.clone()),
+            }
+        }
+        events(output, engine, &shown)?;
+        if ended && !self.technique_xp.is_empty() {
+            let world = engine.world();
+            let gains: Vec<String> = self
+                .technique_xp
+                .drain(..)
+                .map(|(id, amount)| format!("{} +{amount}", world.technique(&id).unwrap().name))
+                .collect();
+            writeln!(output, "{TECHNIQUE_XP}: {}", gains.join(", "))?;
+        }
+        Ok(())
     }
 }
 
@@ -265,6 +322,8 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 world.item(item).unwrap().name,
                 quantity
             )?,
+            // A reward without XP says nothing about XP.
+            Event::ExperienceGranted { amount: 0 } => {}
             Event::ExperienceGranted { amount } => writeln!(output, "+{amount} XP")?,
             Event::LevelUp { level, mp_restored } => {
                 let restored = if *mp_restored {
