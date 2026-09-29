@@ -24,6 +24,19 @@ pub(super) fn baseline_turn(timeline: &Timeline) -> Result<u64, EngineError> {
 pub(super) struct Me {
     pub level: usize,
     pub stats: Stats,
+    /// A worn weapon's basic-attack channel and time, if any.
+    pub basic: (Option<Channel>, Option<u32>),
+    /// Worn damage modifiers for physical and special hits on the player.
+    pub guard: [(u64, u64); 2],
+}
+
+impl Me {
+    fn guard(&self, channel: Channel) -> (u64, u64) {
+        self.guard[match channel {
+            Channel::Physical => 0,
+            Channel::Special => 1,
+        }]
+    }
 }
 
 /// A participant's stats: the player's effective stats, anyone else's
@@ -228,6 +241,11 @@ fn fighting<'s>(
     let me = Me {
         level: combat.level,
         stats: rules::player_stats(world, combat),
+        basic: gear::basic(world, combat),
+        guard: [
+            gear::modifier(world, combat, Channel::Physical),
+            gear::modifier(world, combat, Channel::Special),
+        ],
     };
     match &mut combat.stance {
         Stance::Fighting(encounter) => Ok((encounter, me)),
@@ -332,7 +350,11 @@ fn act(
             s.power,
             s.cross_share.unwrap_or(rules.cross_share),
         ),
-        None => (basic_channel(world, a), BASIC_POWER, rules.cross_share),
+        None => {
+            let weapon = me.basic.0.filter(|_| a.control == Control::Player);
+            let channel = weapon.unwrap_or_else(|| basic_channel(world, a));
+            (channel, BASIC_POWER, rules.cross_share)
+        }
     };
     // A crit draws from the combat stream only when an action that has one resolves.
     let crit = match skill {
@@ -346,10 +368,23 @@ fn act(
     let multiplier = crit
         .filter(|_| critical)
         .map_or(100, |c| c.multiplier_percent);
-    let dealt = damage_scaled(&attacker, &defender, channel, power, share, multiplier)?;
+    // Only the player wears gear, so only hits on the player are modified.
+    let guard = if t.control == Control::Player {
+        me.guard(channel)
+    } else {
+        (1, 1)
+    };
+    let dealt = damage_modified(
+        &attacker, &defender, channel, power, share, multiplier, guard,
+    )?;
     // In a yielding group nobody dies: a hit stops at 1 HP.
     let yield_share = group(world, encounter).and_then(|g| g.yield_share);
-    let time = skill.map_or(100, |s| s.time);
+    let basic_time = me
+        .basic
+        .1
+        .filter(|_| a.control == Control::Player)
+        .unwrap_or(100);
+    let time = skill.map_or(basic_time, |s| s.time);
     let next = delay(&rules.timeline, attacker.speed, time)?;
     let a = &mut encounter.participants[actor];
     if let Some(skill) = skill.filter(|s| s.cost > 0) {
@@ -536,7 +571,7 @@ fn end(
             }
             let xp = xp_for_defeat(profile.xp, level, profile.level);
             earned = earned.saturating_add(xp);
-            rules::grant_items(state, &profile.loot, events)?;
+            rules::grant_items(world, state, &profile.loot, events)?;
             rules::grant_xp(world, state, xp, events)?;
             let defeat = QuestObjective::Defeat { character: id };
             for q in &world.quests {

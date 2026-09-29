@@ -329,7 +329,7 @@ fn the_arena_plays_packs_flight_sparring_and_a_no_flee_boss() {
         "flee\n",
         // The pack: both wolves join and act before the player's first turn.
         "You face The Grey Wolf, The Black Wolf.",
-        "You HP 52/60 · rage 2 | The Grey Wolf HP 24/24 · rage 1 | The Black Wolf HP 24/24 · rage 1",
+        "You HP 54/60 · rage 2 | The Grey Wolf HP 24/24 · rage 1 | The Black Wolf HP 24/24 · rage 1",
         "Flee",
         "You turn to run.",
         "You get away.",
@@ -381,16 +381,16 @@ fn stat_points_are_spent_from_the_menu_or_typed_and_refunded_at_the_gate() {
     for passage in [
         "allocate hp|mp|patk|pdef|satk|sdef|speed [points]",
         "Speed 100 | XP 0 | Points 3",
-        "7. Train Attack: 12 → 13",
+        "7. Train Attack: 14 → 15",
         "1 point into Attack.",
         "2 points into HP.",
-        "You — Level 1 | HP 70/70 | Attack 13",
+        "You — Level 1 | HP 70/70 | Attack 15",
         "you cannot spend points on that stat",
         "not enough unspent stat points",
         "Refund stat points",
         "Your stat points are refunded.",
         // After the refund, HP is back within the level's maximum.
-        "You — Level 1 | HP 60/60 | Attack 12",
+        "You — Level 1 | HP 60/60 | Attack 14",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }

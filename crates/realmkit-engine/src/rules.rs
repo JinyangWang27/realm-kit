@@ -104,12 +104,25 @@ fn dialogue(world: &WorldSpec, state: &mut GameState, npc: Id, node: Id, events:
     }
 }
 
+/// Equipment arrives as individual pieces in the pack; other items as counts.
 pub(super) fn grant_items(
+    world: &WorldSpec,
     state: &mut GameState,
     stacks: &[ItemStack],
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     for stack in stacks {
+        let wearable = world
+            .item(&stack.item)
+            .is_some_and(|i| i.equipment.is_some());
+        if let (true, Some(combat)) = (wearable, state.combat.as_mut()) {
+            gear::receive(combat, &stack.item, stack.quantity)?;
+            events.push(Event::ItemReceived {
+                item: stack.item.clone(),
+                quantity: stack.quantity,
+            });
+            continue;
+        }
         let count = state
             .player
             .inventory
@@ -211,7 +224,7 @@ fn quest(
     if complete {
         state.quests.insert(id.into(), QuestStatus::Completed);
         events.push(Event::QuestCompleted { quest: id.into() });
-        grant_items(state, &quest.reward_items, events)?;
+        grant_items(world, state, &quest.reward_items, events)?;
         for grant in &quest.reward_techniques {
             techniques::grant(world, state, grant, events)?;
         }
@@ -324,6 +337,17 @@ pub(super) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         if points.respec == Respec::Safe && location.safe && !combat.allocation.is_empty() {
             actions.push(available(Command::Respec));
         }
+    }
+    // Pieces in the pack can be worn; removing is a typed command, since
+    // wearing another piece already swaps.
+    if let Some(combat) = &state.combat {
+        actions.extend(
+            combat
+                .gear
+                .iter()
+                .filter(|(_, g)| !g.equipped)
+                .map(|(id, _)| available(Command::Equip(*id))),
+        );
     }
     actions.extend(panels);
     actions
@@ -461,6 +485,8 @@ pub(super) fn execute(
         }
         Command::Allocate { stat, points } => allocate(world, state, stat, points, &mut events)?,
         Command::Respec => respec(world, state, &mut events)?,
+        Command::Equip(piece) => gear::equip(world, state, piece, &mut events)?,
+        Command::Unequip(piece) => gear::unequip(world, state, piece, &mut events)?,
         Command::Rest => {
             let safe = world.location(&state.player.location).unwrap().safe;
             let Some(combat) = state.combat.as_mut().filter(|_| safe) else {
@@ -496,7 +522,30 @@ pub(super) fn player_stats(world: &WorldSpec, combat: &CombatState) -> Stats {
         }
     }
     techniques::add_passives(world, combat, &mut stats);
+    gear::apply(world, combat, &mut stats);
     stats
+}
+
+/// Maxima can drop (a smaller rank bonus, removed gear), so current HP and
+/// MP never stay above the effective maxima.
+pub(super) fn clamp_vitals(world: &WorldSpec, state: &mut GameState) {
+    let combat = state.combat.as_mut().unwrap();
+    let max = rules::player_stats(world, combat);
+    let (hp, mp) = match &mut combat.stance {
+        Stance::Exploring(vitals) => (&mut vitals.hp, &mut vitals.mp),
+        Stance::Fighting(encounter) => {
+            let player = &mut encounter.participants[0];
+            // Rage progress is counted in maximum HP: carry whole points over.
+            let whole = player.rage_remainder / u64::from(max.hp);
+            player.rage = player
+                .rage
+                .saturating_add(whole.try_into().unwrap_or(u32::MAX));
+            player.rage_remainder %= u64::from(max.hp);
+            (&mut player.hp, &mut player.mp)
+        }
+    };
+    *hp = (*hp).min(max.hp);
+    *mp = (*mp).min(max.mp);
 }
 
 /// Points granted by every level reached, minus those spent.

@@ -32,6 +32,9 @@ pub enum Command {
     },
     /// Refunds every spent stat point, where the world allows it.
     Respec,
+    /// Wears a piece of equipment, returning whatever held its slots to the pack.
+    Equip(u64),
+    Unequip(u64),
     Talk(Id),
     /// One-based index into the currently visible choices.
     ChooseDialogue(usize),
@@ -104,6 +107,12 @@ pub enum Event {
         amount: u64,
     },
     TechniquesViewed,
+    Equipped {
+        gear: u64,
+    },
+    Unequipped {
+        gear: u64,
+    },
     EnemyDefeated {
         monster: Id,
     },
@@ -162,6 +171,10 @@ pub struct CombatState {
     pub allocation: BTreeMap<Stat, u32>,
     /// Learned techniques by ID.
     pub techniques: BTreeMap<Id, TechniqueState>,
+    /// Individual pieces of equipment by instance ID.
+    pub gear: BTreeMap<u64, Gear>,
+    /// The next instance ID; IDs are never reused.
+    pub next_gear: u64,
     pub stance: Stance,
 }
 
@@ -172,6 +185,14 @@ pub struct CombatState {
 pub enum Stance {
     Exploring(Vitals),
     Fighting(Encounter),
+}
+
+/// One piece of equipment: which item it is, and whether it is worn.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Gear {
+    pub item: Id,
+    pub equipped: bool,
 }
 
 /// A learned technique's 1-based rank and its technique XP.
@@ -266,7 +287,7 @@ pub struct GameState {
     pub rng: Option<RngState>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 8;
+pub const SAVE_FORMAT_VERSION: u32 = 9;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -314,6 +335,12 @@ pub enum EngineError {
     PointCap,
     #[error("stat points cannot be refunded here")]
     NoRespec,
+    #[error("you have no equipment #{0}")]
+    NoSuchGear(u64),
+    #[error("#{0} is already equipped")]
+    AlreadyEquipped(u64),
+    #[error("#{0} is not equipped")]
+    NotEquipped(u64),
     #[error("you are not fighting anyone; engage first")]
     NotFighting,
     #[error("this is not a safe place to rest")]
@@ -349,6 +376,7 @@ pub struct Engine<'w> {
 }
 
 mod encounter;
+mod gear;
 mod rng;
 mod rules;
 mod save;
@@ -374,6 +402,8 @@ impl<'w> Engine<'w> {
                 defeated: BTreeSet::new(),
                 allocation: BTreeMap::new(),
                 techniques: BTreeMap::new(),
+                gear: BTreeMap::new(),
+                next_gear: 1,
                 stance: Stance::Exploring(Vitals {
                     hp: stats.hp,
                     mp: stats.mp,
@@ -405,7 +435,19 @@ impl<'w> Engine<'w> {
             for grant in &rules.player_techniques {
                 techniques::grant(world, &mut engine.state, grant, &mut ignored)?;
             }
+            // Starting gear, worn in order while its slots are free.
             let combat = engine.state.combat.as_mut().unwrap();
+            for item in &rules.player_equipment {
+                let id = combat.next_gear;
+                gear::receive(combat, item, 1)?;
+                let slots = &world.item(item).unwrap().equipment.as_ref().unwrap().slots;
+                let taken = gear::worn(world, combat)
+                    .iter()
+                    .any(|worn| worn.slots.iter().any(|s| slots.contains(s)));
+                if !taken {
+                    combat.gear.get_mut(&id).unwrap().equipped = true;
+                }
+            }
             let max = rules::player_stats(world, combat);
             combat.stance = Stance::Exploring(Vitals {
                 hp: max.hp,
@@ -537,13 +579,40 @@ pub fn damage_scaled(
     share: u32,
     multiplier: u32,
 ) -> Result<u32, EngineError> {
+    damage_modified(
+        attacker,
+        defender,
+        channel,
+        power,
+        share,
+        multiplier,
+        (1, 1),
+    )
+}
+
+/// [`damage_scaled`] with the defender's damage modifier `num / den` for the
+/// channel, before the single rounding. Immunity (`num` 0) deals nothing, not
+/// the minimum 1.
+pub fn damage_modified(
+    attacker: &Stats,
+    defender: &Stats,
+    channel: Channel,
+    power: u32,
+    share: u32,
+    multiplier: u32,
+    (num, den): (u64, u64),
+) -> Result<u32, EngineError> {
+    if num == 0 {
+        return Ok(0);
+    }
     let a = attacker.combined(channel, share, false);
     let d = defender.combined(channel, share, true);
     let hit = a
         .checked_mul(u128::from(power))
         .and_then(|v| v.checked_mul(a))
         .and_then(|v| v.checked_mul(u128::from(multiplier)))
-        .and_then(|v| v.checked_div(100 * 100 * 100 * (a + d)))
+        .and_then(|v| v.checked_mul(u128::from(num)))
+        .and_then(|v| v.checked_div(100 * 100 * 100 * (a + d) * u128::from(den)))
         .ok_or(EngineError::NumericLimit)?;
     u32::try_from(hit.max(1)).map_err(|_| EngineError::NumericLimit)
 }

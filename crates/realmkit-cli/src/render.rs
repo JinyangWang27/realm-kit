@@ -44,6 +44,17 @@ fn hit(
     writeln!(output, "{}", interpolate(text, &values)?)
 }
 
+/// "#3 Iron mail": a piece's instance number and its item's name.
+pub fn gear_name(engine: &Engine<'_>, gear: u64) -> String {
+    let item = engine
+        .state()
+        .combat
+        .as_ref()
+        .and_then(|c| c.gear.get(&gear))
+        .and_then(|g| engine.world().item(&g.item));
+    format!("#{gear} {}", item.map_or("?", |i| i.name.as_str()))
+}
+
 /// A stat's display name; special stats use the world's special name.
 pub fn stat_name(world: &realmkit_spec::WorldSpec, stat: Stat) -> String {
     let special = world
@@ -169,6 +180,14 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 )?
             }
             Event::PointsRefunded => writeln!(output, "Your stat points are refunded.")?,
+            Event::Equipped { gear } => {
+                writeln!(output, "You equip {}.", gear_name(engine, *gear))?
+            }
+            Event::Unequipped { gear } => writeln!(
+                output,
+                "{} goes back in your pack.",
+                gear_name(engine, *gear)
+            )?,
             Event::TechniqueLearned { technique } => writeln!(
                 output,
                 "You learn {}.",
@@ -273,8 +292,15 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             }
             Event::InventoryViewed => {
                 writeln!(output, "Inventory:")?;
-                if state.player.inventory.is_empty() {
+                let gear = state.combat.as_ref().map(|c| &c.gear);
+                if state.player.inventory.is_empty() && gear.is_none_or(|g| g.is_empty()) {
                     writeln!(output, "  Empty")?;
+                }
+                // Each piece of equipment is listed on its own, by number.
+                for (id, piece) in gear.into_iter().flatten() {
+                    let item = world.item(&piece.item).unwrap();
+                    let worn = if piece.equipped { " [equipped]" } else { "" };
+                    writeln!(output, "  #{id} {}{worn} — {}", item.name, item.description)?;
                 }
                 for (id, count) in &state.player.inventory {
                     let item = world.item(id).unwrap();

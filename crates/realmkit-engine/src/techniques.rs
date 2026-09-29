@@ -77,30 +77,8 @@ pub(super) fn grant(
         });
     }
     add_xp(world, state, &technique.id, grant.xp, events)?;
-    clamp_vitals(world, state);
+    rules::clamp_vitals(world, state);
     Ok(())
-}
-
-/// A rank's bonus replaces the previous one's and may be smaller, so current
-/// HP and MP never stay above the maxima the new ranks give.
-fn clamp_vitals(world: &WorldSpec, state: &mut GameState) {
-    let combat = state.combat.as_mut().unwrap();
-    let max = rules::player_stats(world, combat);
-    let (hp, mp) = match &mut combat.stance {
-        Stance::Exploring(vitals) => (&mut vitals.hp, &mut vitals.mp),
-        Stance::Fighting(encounter) => {
-            let player = &mut encounter.participants[0];
-            // Rage progress is counted in maximum HP: carry whole points over.
-            let whole = player.rage_remainder / u64::from(max.hp);
-            player.rage = player
-                .rage
-                .saturating_add(whole.try_into().unwrap_or(u32::MAX));
-            player.rage_remainder %= u64::from(max.hp);
-            (&mut player.hp, &mut player.mp)
-        }
-    };
-    *hp = (*hp).min(max.hp);
-    *mp = (*mp).min(max.mp);
 }
 
 /// Adds technique XP, then promotes through every open rank.
@@ -186,5 +164,5 @@ pub(super) fn promote(world: &WorldSpec, state: &mut GameState, events: &mut Vec
             });
         }
     }
-    clamp_vitals(world, state);
+    rules::clamp_vitals(world, state);
 }
