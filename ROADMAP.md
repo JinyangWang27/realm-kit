@@ -906,13 +906,17 @@ every package.
   effects only alongside skills that require them.
 - Add immunity/vulnerability multipliers, specify modifier stacking and immunity precedence, choose armour speed
   penalties, and add optional caps for stats other than speed if stacking needs
-  them.
+  them. **Decided (M4c):** several modifiers on one channel multiply; any
+  immunity wins (zero damage); the combined multiplier is kept within 1/10 to
+  10. Each armour piece authors a flat speed penalty; penalties add up and
+  apply before the speed cap, and effective speed never drops below 1.
+  Consumables get their own later slice.
 - Define durations in terms of the chosen combat clock; do not casually mix
   wall-clock seconds, actor turns and timeline units.
 - Show why stats changed and what an action costs before confirming it.
 - Deliver in slices: M4a player-allocated stat points (delivered); M4b technique
-  ranks (delivered);
-  M4c equipment instances and equip/unequip; M4d stations, deterministic
+  ranks (delivered); M4c equipment instances and equip/unequip (delivered);
+  M4d stations, deterministic
   forging and authored improvement-state transitions; M4e one compatible
   learned enchantment per item. Runtime instances use deterministic
   saved IDs only when distinguishable copies need independent state; unique

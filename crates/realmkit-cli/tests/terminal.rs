@@ -329,7 +329,7 @@ fn the_arena_plays_packs_flight_sparring_and_a_no_flee_boss() {
         "flee\n",
         // The pack: both wolves join and act before the player's first turn.
         "You face The Grey Wolf, The Black Wolf.",
-        "You HP 52/60 · rage 2 | The Grey Wolf HP 24/24 · rage 1 | The Black Wolf HP 24/24 · rage 1",
+        "You HP 54/60 · rage 2 | The Grey Wolf HP 24/24 · rage 1 | The Black Wolf HP 24/24 · rage 1",
         "Flee",
         "You turn to run.",
         "You get away.",
@@ -381,16 +381,16 @@ fn stat_points_are_spent_from_the_menu_or_typed_and_refunded_at_the_gate() {
     for passage in [
         "allocate hp|mp|patk|pdef|satk|sdef|speed [points]",
         "Speed 100 | XP 0 | Points 3",
-        "7. Train Attack: 12 → 13",
+        "7. Train Attack: 14 → 15",
         "1 point into Attack.",
         "2 points into HP.",
-        "You — Level 1 | HP 70/70 | Attack 13",
+        "You — Level 1 | HP 70/70 | Attack 15",
         "you cannot spend points on that stat",
         "not enough unspent stat points",
         "Refund stat points",
         "Your stat points are refunded.",
         // After the refund, HP is back within the level's maximum.
-        "You — Level 1 | HP 60/60 | Attack 12",
+        "You — Level 1 | HP 60/60 | Attack 14",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
@@ -429,4 +429,28 @@ fn the_sect_teaches_trains_and_deepens_named_ranks() {
     assert!(help.contains("techniques — learned techniques"));
     let demo = String::from_utf8(run(&["play", WORLD], "help\n").stdout).unwrap();
     assert!(!demo.contains("techniques —"));
+}
+
+#[test]
+fn gear_is_listed_previewed_worn_and_removed() {
+    let fight = "attack grey_wolf\n".repeat(3) + &"attack black_wolf\n".repeat(4);
+    let input = format!("help\ninventory\nnorth\nengage grey_wolf\n{fight}south\nequip 5\ninventory\nunequip #5\nequip 9\n");
+    let output = run(&["play", ARENA, "--seed", "1"], &input);
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "equip <#> — wear a piece from your pack",
+        "  #1 Practice sword [equipped] — Blunt",
+        "Received: Greatsword ×1",
+        "Equip #5 Greatsword: Attack 15 → 21, Defence 13 → 11",
+        "#1 Practice sword goes back in your pack.\n#2 Buckler goes back in your pack.\nYou equip #5 Greatsword.",
+        "  #5 Greatsword [equipped] — It needs both hands",
+        "#5 Greatsword goes back in your pack.",
+        "you have no equipment #9",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    // Worlds without slots neither list nor accept equipping.
+    let demo = String::from_utf8(run(&["play", WORLD], "help\nequip 1\n").stdout).unwrap();
+    assert!(!demo.contains("equip <#>"));
+    assert!(demo.contains("you have no equipment #1"));
 }

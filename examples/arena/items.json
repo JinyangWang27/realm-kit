@@ -1,3 +1,43 @@
 [
-  { "id": "rat_tail", "name": "Rat tail", "description": "Proof of a job done, again." }
+  { "id": "rat_tail", "name": "Rat tail", "description": "Proof of a job done, again." },
+  {
+    "id": "practice_sword",
+    "name": "Practice sword",
+    "description": "Blunt, but it has taught a thousand recruits.",
+    "equipment": { "slots": ["main_hand"], "bonuses": { "patk": 2 } }
+  },
+  {
+    "id": "buckler",
+    "name": "Buckler",
+    "description": "A small round shield with a dented rim.",
+    "equipment": { "slots": ["off_hand"], "bonuses": { "pdef": 2 } }
+  },
+  {
+    "id": "greatsword",
+    "name": "Greatsword",
+    "description": "It needs both hands and a moment to swing.",
+    "equipment": { "slots": ["main_hand", "off_hand"], "bonuses": { "patk": 8 }, "basic_time": 130 }
+  },
+  {
+    "id": "leather_vest",
+    "name": "Leather vest",
+    "description": "Stiff, scuffed, and better than nothing.",
+    "equipment": { "slots": ["body"], "bonuses": { "pdef": 2 } }
+  },
+  {
+    "id": "iron_mail",
+    "name": "Iron mail",
+    "description": "Heavy rings that turn a blow and slow a step.",
+    "equipment": { "slots": ["body"], "bonuses": { "pdef": 6 }, "speed_penalty": 10 }
+  },
+  {
+    "id": "charm_of_warding",
+    "name": "Charm of warding",
+    "description": "A wolf's tooth on a cord, humming faintly.",
+    "equipment": {
+      "slots": ["neck"],
+      "bonuses": { "sdef": 1 },
+      "modifiers": { "special": { "num": 1, "den": 2 } }
+    }
+  }
 ]

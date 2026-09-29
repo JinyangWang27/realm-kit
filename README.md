@@ -125,7 +125,8 @@ fights can be repeated for grinding, you can flee most of them, and sparring
 partners yield instead of dying (`examples/arena`). Worlds can also grant stat
 points on levelling up, which you spend to shape your own build, and
 techniques mastered rank by rank, each rank named by the world
-(`examples/sect`).
+(`examples/sect`). Equipment is worn in slots, each piece its own item, with
+bonuses, heavy weapons and armour that trade speed, and wards against damage.
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting

@@ -1,9 +1,9 @@
 use crate::{
     input,
-    render::{direction_name, stat_name},
+    render::{direction_name, gear_name, stat_name},
 };
 use realmkit_engine::{Command, Engine};
-use realmkit_spec::Resource;
+use realmkit_spec::{Resource, Stat};
 use std::io::{self, Write};
 
 // Fixed interface words live here, apart from authored world text, so a locale
@@ -20,6 +20,7 @@ const REST: &str = "Rest";
 const FLEE: &str = "Flee";
 const TRAIN: &str = "Train";
 const RESPEC: &str = "Refund stat points";
+const EQUIP: &str = "Equip";
 const YIELDED: &str = "yielded";
 const INVENTORY: &str = "Inventory";
 const CHARACTER: &str = "Character";
@@ -193,6 +194,32 @@ impl Menu {
                             )
                         }
                         Command::Respec => RESPEC.into(),
+                        // "Equip #5 Greatsword: Attack 13 → 21, Defence 11 → 9", from
+                        // the engine's own calculation on a copy.
+                        Command::Equip(piece) => {
+                            let now = engine.player_stats().unwrap();
+                            let mut probe = engine.clone();
+                            probe.execute(Command::Equip(*piece)).ok()?;
+                            let then = probe.player_stats().unwrap();
+                            let changes: Vec<String> = Stat::ALL
+                                .into_iter()
+                                .filter(|s| now.get(*s) != then.get(*s))
+                                .map(|s| {
+                                    format!(
+                                        "{} {} → {}",
+                                        stat_name(world, s),
+                                        now.get(s),
+                                        then.get(s)
+                                    )
+                                })
+                                .collect();
+                            let name = gear_name(engine, *piece);
+                            if changes.is_empty() {
+                                format!("{EQUIP} {name}")
+                            } else {
+                                format!("{EQUIP} {name}: {}", changes.join(", "))
+                            }
+                        }
                         Command::Engage(id) => {
                             format!("{ENGAGE} {}", world.character(id).unwrap().name)
                         }

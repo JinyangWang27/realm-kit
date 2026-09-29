@@ -91,11 +91,15 @@ pub(super) fn check(
         .clone()
         .flat_map(|q| &q.reward_items)
         .chain(recorded.clone().flat_map(|m| &m.loot));
-    for stack in stacks {
-        let count: &mut u64 = inventory.entry(stack.item.clone()).or_default();
-        *count = count
-            .checked_add(stack.quantity)
-            .ok_or("impossible inventory")?;
+    // Starting gear counts as held from the start.
+    let starting = world
+        .combat()
+        .into_iter()
+        .flat_map(|c| &c.player_equipment)
+        .map(|item| (item, 1_u64));
+    for (item, quantity) in stacks.map(|s| (&s.item, s.quantity)).chain(starting) {
+        let count: &mut u64 = inventory.entry(item.clone()).or_default();
+        *count = count.checked_add(quantity).ok_or("impossible inventory")?;
     }
     for quest in completed {
         floor = floor
@@ -118,6 +122,22 @@ pub(super) fn check(
         .map(|s| &s.item)
         .collect();
     if let (Some(combat), Some(rules)) = (&state.combat, world.combat()) {
+        // Gear first: every stat check below derives stats from worn pieces.
+        // Pieces are real equipment with IDs below the counter, and worn
+        // pieces never share a slot.
+        let mut worn = BTreeSet::new();
+        ensure(
+            combat.gear.iter().all(|(id, piece)| {
+                *id < combat.next_gear
+                    && world
+                        .item(&piece.item)
+                        .and_then(|i| i.equipment.as_ref())
+                        .is_some_and(|e| {
+                            !piece.equipped || e.slots.iter().all(|slot| worn.insert(slot.clone()))
+                        })
+            }),
+            "invalid equipment",
+        )?;
         let stats = combat
             .level
             .checked_sub(1)
@@ -204,13 +224,26 @@ pub(super) fn check(
             "experience does not match progress",
         )?;
     }
+    // Held items: counts in the inventory, plus every piece of equipment.
+    // Equipment never sits in the counts, since it arrives as pieces.
+    let mut held = player.inventory.clone();
+    let wearable = |item: &str| world.item(item).is_some_and(|i| i.equipment.is_some());
+    ensure(
+        !held.keys().any(|item| wearable(item)),
+        "equipment cannot be held as a count",
+    )?;
+    if let Some(combat) = &state.combat {
+        for piece in combat.gear.values() {
+            *held.entry(piece.item.clone()).or_default() += 1;
+        }
+    }
     ensure(
         inventory
             .iter()
-            .all(|(item, count)| player.inventory.get(item).is_some_and(|held| held >= count))
-            && player.inventory.iter().all(|(item, held)| {
-                inventory.get(item) == Some(held) || repeatable_loot.contains(item)
-            }),
+            .all(|(item, count)| held.get(item).is_some_and(|h| h >= count))
+            && held
+                .iter()
+                .all(|(item, h)| inventory.get(item) == Some(h) || repeatable_loot.contains(item)),
         "inventory does not match progress",
     )?;
     let group_flags: BTreeSet<_> = world
