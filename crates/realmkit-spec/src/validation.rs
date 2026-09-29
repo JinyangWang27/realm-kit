@@ -620,6 +620,24 @@ fn stat_points(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
             }
         }
     }
+    // When every accepted stat is capped, the caps must be able to take every
+    // point granted, or the rest can never be spent.
+    let capacity: Option<u64> = points
+        .values
+        .keys()
+        .map(|stat| points.caps.get(stat).map(|cap| u64::from(*cap)))
+        .sum();
+    if capacity.is_some_and(|capacity| total > capacity) {
+        out.push(Diagnostic {
+            severity: Severity::Warning,
+            entity_id: Some(owner.into()),
+            code: "stranded_points".into(),
+            message: format!(
+                "levels grant {total} points, but the caps only take {}",
+                capacity.unwrap()
+            ),
+        });
+    }
 }
 
 fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &Combat) {

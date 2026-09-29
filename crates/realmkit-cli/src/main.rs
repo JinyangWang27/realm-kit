@@ -597,6 +597,28 @@ mod tests {
     }
 
     #[test]
+    fn a_level_up_mentions_mp_bought_with_points() {
+        // The arena has no base MP; buying it with a point makes level-ups restore it.
+        let mut world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena")).unwrap();
+        let points = world
+            .world
+            .combat
+            .as_mut()
+            .unwrap()
+            .stat_points
+            .as_mut()
+            .unwrap();
+        points.values.insert(realmkit_spec::Stat::Mp, 5);
+        let mut output = Vec::new();
+        let rats = "engage rat\nattack rat\n".repeat(3);
+        let input = format!("allocate mp\neast\n{rats}");
+        play(&world, None, Some(1), input.as_bytes(), &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains("Level 2! Health and MP restored."), "{text}");
+    }
+
+    #[test]
     fn death_restores_the_newest_save() {
         let mut world = WorldSpec::load(concat!(
             env!("CARGO_MANIFEST_DIR"),

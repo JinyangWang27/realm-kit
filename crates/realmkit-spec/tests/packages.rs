@@ -613,3 +613,21 @@ fn stat_points_are_validated_against_their_worst_case() {
     assert!(unused.validate().is_ok());
     assert_eq!(unused.diagnostics()[0].code, "unused_points");
 }
+
+#[test]
+fn caps_that_cannot_take_every_point_warn() {
+    let mut world = arena();
+    let points = world
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .stat_points
+        .as_mut()
+        .unwrap();
+    points.values.retain(|stat, _| *stat == Stat::Patk);
+    points.caps = [(Stat::Patk, 1)].into();
+    assert!(world.validate().is_ok());
+    let codes: Vec<_> = world.diagnostics().into_iter().map(|d| d.code).collect();
+    assert_eq!(codes, ["stranded_points"]);
+}
