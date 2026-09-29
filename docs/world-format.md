@@ -1,6 +1,6 @@
-# World package format 5
+# World package format 6
 
-Format 5 makes combat optional. The level table and combat prose live in an
+Format 6 makes combat optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -21,13 +21,14 @@ there is no migration. Convert them by hand:
   apply the Format 4 steps.
 - **Format 4** (M3c-1): give each opponent whose skills unlock above level 1 a
   `level`, since opponents now use only skills unlocked at their level;
-  `groups` are optional.
+  `groups` are optional. Then raise the number to 6.
+- **Format 5** (M3c-2): only raise the number; `crit` is optional.
 
 A world without combat only needs its `format_version` raised.
 
-Format 5 represents one fixed player-controlled character and one playable
+Format 6 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 5 does not serialize a route collection
+stable logical route ID `default`; Format 6 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -42,7 +43,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 5 also requires item and quest tables because they serve the current demo.
+Format 6 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -77,7 +78,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 5 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 6 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -132,7 +133,7 @@ Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags
 are monotonic in this version. Conditions govern availability/choice visibility.
 
-This flat conjunctive representation is a Format 5 limitation. The long-term
+This flat conjunctive representation is a Format 6 limitation. The long-term
 condition model uses pure typed predicates composed with `All / Any / Not`;
 predicates remain domain-specific and typed rather than becoming arbitrary
 expressions/property paths. Typed effects execute in authored order as part of the
@@ -178,7 +179,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 5 has a single flat quest collection. The long-term model should retain
+Format 6 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -359,6 +360,23 @@ again at once and rewards every victory (a defeat objective counts the first).
 Yielded opponents grant and record nothing. A victory sets the group's
 `victory_flags`. The player dying is ordinary death.
 
+### Critical hits
+
+A skill's `crit`, the combat block's `player_basic_crit` and a profile's
+`basic_crit` let a landed hit deal more damage:
+
+```json
+"crit": { "chance_percent": 25, "multiplier_percent": 150 }
+```
+
+The chance is 1–100% and the multiplier 101–1,000% of a normal hit, applied
+inside the damage formula before its single rounding. A world that authors any
+crit keeps a seeded random stream in its saved state (SplitMix64, versioned);
+every other world keeps none and plays exactly as it did. A draw happens only
+when an action with a crit resolves, so a refused command never consumes one,
+and the same seed and commands always replay identically. Clients choose the
+seed (the CLI takes `--seed`, else uses the clock, and prints it).
+
 A location with `"safe": true` lets the player `rest` outside encounters,
 restoring HP and MP; it needs the combat block.
 
@@ -376,12 +394,12 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 5 currently selects combat prose variants from the current
+Format 6 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
-gameplay commands may therefore affect which variant a later attack selects. No
-runtime randomness is involved.
+gameplay commands may therefore affect which variant a later attack selects.
+Variant selection uses no randomness.
 
 This remains a current implementation detail, not a content contract authors
 should depend on. A later combat implementation may keep deterministic selection
@@ -401,7 +419,7 @@ the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
 skill references, usable and affordable skills, loot quantities, fighter
 placement and template placeholders. `load()` reports a package whose
-`format_version` is not 5 as `SpecError::UnsupportedFormat` before parsing it.
+`format_version` is not 6 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.

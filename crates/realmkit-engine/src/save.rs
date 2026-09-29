@@ -35,6 +35,11 @@ pub(super) fn check(
         state.combat.is_some() == world.combat().is_some(),
         "combat state does not match the world",
     )?;
+    ensure(
+        state.rng.is_some() == world.stochastic()
+            && state.rng.is_none_or(|r| r.version == RNG_VERSION),
+        "random state does not match the world",
+    )?;
     let defeated = |id: &str| {
         state
             .combat

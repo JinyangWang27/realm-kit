@@ -143,7 +143,7 @@ route-start and currently supported progression-boundary auto-saves are
 reproducible; and a broken or mismatched save cannot corrupt a world or silently
 reset progress.
 
-## M3 — Optional combat capability: stats and meaningful speed
+## M3 — Optional combat capability: stats and meaningful speed · complete
 
 Introduce one coherent combat model for worlds that need combat rather than
 adding unrelated stat fields to every world. A combat-free package has no combat
@@ -289,10 +289,13 @@ balance decisions.
    skills, and XP falloff (`examples/arena`); package and save format 5. Flee's wind-up always completes
    within the one command that declares it, so no pending flight is saved;
    the saved `pending` field waits until turns can pause mid-wind-up (M8).
-4. **M3d — seeded RNG and critical hits (optional).** A small hand-written,
-   versioned PRNG such as SplitMix64 or PCG32 with saved state. Do not use
-   `rand`'s `StdRng`: its output is not guaranteed stable across versions, which
-   would break replay and saves.
+4. **M3d — seeded RNG and critical hits (optional) · delivered.** A small
+   hand-written, versioned PRNG such as SplitMix64 or PCG32 with saved state. Do
+   not use `rand`'s `StdRng`: its output is not guaranteed stable across
+   versions, which would break replay and saves. As delivered: SplitMix64
+   version 1 with a per-domain combat stream, present only in worlds that author
+   a crit; crits on skills and basic attacks multiply before the single rounding;
+   package and save format 6.
 
 ### Combatants and encounters · proposed
 

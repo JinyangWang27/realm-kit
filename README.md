@@ -106,7 +106,10 @@ The engine is synchronous. `Engine::new(&world)` validates its input;
 `Engine::restore(&world, snapshot)` resumes it or rejects it whole when it
 belongs to another package, revision or route, or holds impossible state.
 Given the same world and command sequence, state and events are identical.
-There are no clocks, random generators, network clients, or AI SDKs in gameplay.
+There are no clocks, network clients or AI SDKs in gameplay. Randomness exists
+only in worlds that author it (critical hits in `examples/arena`), and comes from
+a seeded, versioned generator saved with the game: `--seed <n>` replays a run
+exactly, and without it the CLI picks a seed from the clock and prints it.
 
 Combat is optional: a world without a `combat` block has no fighting, HP, XP or
 levels, and its quests complete through flags set in dialogue

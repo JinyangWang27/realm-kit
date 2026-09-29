@@ -7,7 +7,7 @@ mod validation;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 5;
+pub const FORMAT_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -57,6 +57,8 @@ pub struct Combat {
     pub player_skills: Vec<Id>,
     #[serde(default)]
     pub player_basic_channel: Channel,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_basic_crit: Option<Crit>,
     #[serde(default)]
     pub groups: Vec<Group>,
     pub narrative: Narrative,
@@ -174,6 +176,19 @@ pub struct Skill {
     pub cross_share: Option<u32>,
     /// Allows `{attacker}`, `{target}` and `{damage}`.
     pub text: TextTemplate,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crit: Option<Crit>,
+}
+
+/// A chance for a landed hit to deal more damage, drawn from the world's
+/// seeded random stream.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Crit {
+    /// 1 to 100.
+    pub chance_percent: u32,
+    /// Damage in percent of a normal hit, 101 to 1,000.
+    pub multiplier_percent: u32,
 }
 
 fn first_level() -> usize {
@@ -255,6 +270,8 @@ pub struct CombatProfile {
     pub skills: Vec<Id>,
     #[serde(default)]
     pub basic_channel: Channel,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basic_crit: Option<Crit>,
     /// Gates the profile's skills and scales the XP it grants.
     #[serde(default = "first_level")]
     pub level: usize,
@@ -450,6 +467,16 @@ impl WorldSpec {
     }
     pub fn combat(&self) -> Option<&Combat> {
         self.world.combat.as_ref()
+    }
+    /// Whether any content draws random numbers; only then does play keep a
+    /// seeded generator.
+    pub fn stochastic(&self) -> bool {
+        self.combat().is_some_and(|c| {
+            c.player_basic_crit.is_some() || c.skills.iter().any(|s| s.crit.is_some())
+        }) || self
+            .characters
+            .iter()
+            .any(|c| c.combat.as_ref().is_some_and(|p| p.basic_crit.is_some()))
     }
     pub fn group(&self, id: &str) -> Option<&Group> {
         self.combat()?.groups.iter().find(|v| v.id == id)

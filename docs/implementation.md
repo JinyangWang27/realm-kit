@@ -48,6 +48,11 @@ proves the complete single-player loop with authored content.
   defeat flags, opponent levels gate their skills, and XP falls off with level
   difference as in the simulator. Package and save format 5; saves bound variable XP and
   loot instead of fixing them. `examples/arena` exercises all of it.
+- [x] Seeded randomness (M3d): critical hits on skills and basic attacks draw
+  from a hand-written, versioned SplitMix64 stream saved with the game, only
+  in worlds that author a crit. Seeds are explicit (`Engine::new_with_seed`,
+  `--seed`); refused commands draw nothing; replays are exact. Package and
+  save format 6.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

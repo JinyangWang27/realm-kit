@@ -38,6 +38,13 @@ fn basic_channel(world: &WorldSpec, p: &Participant) -> Channel {
     }
 }
 
+fn basic_crit(world: &WorldSpec, p: &Participant) -> Option<realmkit_spec::Crit> {
+    match p.control {
+        Control::Player => world.combat().unwrap().player_basic_crit,
+        Control::Policy => profile(world, &p.character).basic_crit,
+    }
+}
+
 fn affordable(p: &Participant, skill: &Skill) -> bool {
     let pool = match skill.resource {
         Resource::Mp => p.mp,
@@ -190,7 +197,7 @@ pub(super) fn flee(
     state: &mut GameState,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
-    let (encounter, level) = fighting(state)?;
+    let (encounter, level) = fighting(&mut state.combat)?;
     if group(world, encounter).is_some_and(|g| g.no_flee) {
         return Err(EngineError::NoFlee);
     }
@@ -205,8 +212,8 @@ pub(super) fn flee(
     advance(world, state, events, true)
 }
 
-fn fighting(state: &mut GameState) -> Result<(&mut Encounter, usize), EngineError> {
-    let combat = state.combat.as_mut().ok_or(EngineError::NotFighting)?;
+fn fighting(combat: &mut Option<CombatState>) -> Result<(&mut Encounter, usize), EngineError> {
+    let combat = combat.as_mut().ok_or(EngineError::NotFighting)?;
     match &mut combat.stance {
         Stance::Fighting(encounter) => Ok((encounter, combat.level)),
         Stance::Exploring(_) => Err(EngineError::NotFighting),
@@ -223,7 +230,7 @@ pub(super) fn player_action(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let turn = state.turn;
-    let (encounter, level) = fighting(state)?;
+    let (encounter, level) = fighting(&mut state.combat)?;
     let index = encounter
         .participants
         .iter()
@@ -234,7 +241,17 @@ pub(super) fn player_action(
     if let Some(skill) = skill {
         check_skill(&encounter.participants[0], level, skill)?;
     }
-    act(world, encounter, level, turn, 0, index, skill, events)?;
+    act(
+        world,
+        encounter,
+        level,
+        turn,
+        &mut state.rng,
+        0,
+        index,
+        skill,
+        events,
+    )?;
     advance(world, state, events, false)
 }
 
@@ -275,6 +292,7 @@ fn act(
     encounter: &mut Encounter,
     level: usize,
     turn: u64,
+    rng: &mut Option<RngState>,
     actor: usize,
     target: usize,
     skill: Option<&Skill>,
@@ -294,7 +312,19 @@ fn act(
         ),
         None => (basic_channel(world, a), BASIC_POWER, rules.cross_share),
     };
-    let dealt = damage(&attacker, &defender, channel, power, share)?;
+    // A crit draws from the combat stream only when an action that has one resolves.
+    let crit = match skill {
+        Some(s) => s.crit,
+        None => basic_crit(world, a),
+    };
+    let critical = match (crit, rng.as_mut()) {
+        (Some(c), Some(rng)) => rng::chance(&mut rng.combat, c.chance_percent),
+        _ => false,
+    };
+    let multiplier = crit
+        .filter(|_| critical)
+        .map_or(100, |c| c.multiplier_percent);
+    let dealt = damage_scaled(&attacker, &defender, channel, power, share, multiplier)?;
     // In a yielding group nobody dies: a hit stops at 1 HP.
     let yield_share = group(world, encounter).and_then(|g| g.yield_share);
     let time = skill.map_or(100, |s| s.time);
@@ -336,6 +366,7 @@ fn act(
             amount: taken,
             variant: (turn % rules.narrative.attack.len() as u64) as usize,
             skill,
+            critical,
         });
         if t.hp == 0 {
             events.push(Event::EnemyDefeated {
@@ -354,6 +385,7 @@ fn act(
             amount: taken,
             variant: (turn % rules.narrative.hurt.len() as u64) as usize,
             skill,
+            critical,
         });
         if t.hp == 0 && t.control == Control::Player {
             events.push(Event::PlayerDied);
@@ -388,7 +420,7 @@ fn advance(
 ) -> Result<(), EngineError> {
     let turn = state.turn;
     loop {
-        let (encounter, level) = fighting(state)?;
+        let (encounter, level) = fighting(&mut state.combat)?;
         let player = &encounter.participants[0];
         if player.hp == 0 {
             return Ok(());
@@ -421,7 +453,17 @@ fn advance(
             })
             .unwrap();
         let skill = choose(world, &encounter.participants[actor]);
-        act(world, encounter, level, turn, actor, target, skill, events)?;
+        act(
+            world,
+            encounter,
+            level,
+            turn,
+            &mut state.rng,
+            actor,
+            target,
+            skill,
+            events,
+        )?;
     }
 }
 

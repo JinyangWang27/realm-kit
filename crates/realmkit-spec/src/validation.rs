@@ -271,6 +271,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
         conditions(&mut out, w, &character.id, &character.requires);
         if let Some(profile) = &character.combat {
             stats(&mut out, &character.id, &profile.stats);
+            crit(&mut out, &character.id, profile.basic_crit);
             items(&mut out, w, &character.id, &profile.loot);
             let usable = profile
                 .skills
@@ -489,6 +490,19 @@ fn stats(out: &mut Vec<Diagnostic>, owner: &str, stats: &Stats) {
     }
 }
 
+fn crit(out: &mut Vec<Diagnostic>, owner: &str, crit: Option<Crit>) {
+    if crit.is_some_and(|c| {
+        !(1..=100).contains(&c.chance_percent) || !(101..=1_000).contains(&c.multiplier_percent)
+    }) {
+        issue(
+            out,
+            owner,
+            "invalid_crit",
+            "a crit needs a chance from 1 to 100 percent and a multiplier from 101 to 1,000 percent",
+        );
+    }
+}
+
 fn share(out: &mut Vec<Diagnostic>, owner: &str, value: u32) {
     if value > 100 {
         issue(
@@ -553,6 +567,7 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         );
     }
     share(out, owner, combat.cross_share);
+    crit(out, owner, combat.player_basic_crit);
     let timeline = combat.timeline;
     if !(1..=ACTION_COST_BOUND).contains(&timeline.action_cost)
         || timeline.speed_cap == 0
@@ -679,6 +694,7 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         if let Some(value) = skill.cross_share {
             share(out, &skill.id, value);
         }
+        crit(out, &skill.id, skill.crit);
         if skill.name.trim().is_empty() {
             issue(out, &skill.id, "empty_name", "skills need a name");
         }

@@ -49,12 +49,14 @@ pub enum Event {
         amount: u32,
         variant: usize,
         skill: Option<Id>,
+        critical: bool,
     },
     DamageReceived {
         source: Id,
         amount: u32,
         variant: usize,
         skill: Option<Id>,
+        critical: bool,
     },
     ResourceSpent {
         character: Id,
@@ -218,9 +220,11 @@ pub struct GameState {
     pub flags: BTreeSet<Id>,
     pub dialogue: Option<DialogueState>,
     pub turn: u64,
+    /// Present only in worlds with random content.
+    pub rng: Option<RngState>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 5;
+pub const SAVE_FORMAT_VERSION: u32 = 6;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -295,11 +299,21 @@ pub struct Engine<'w> {
 }
 
 mod encounter;
+mod rng;
 mod rules;
 mod save;
 
+pub use rng::{splitmix64, RngState, RNG_VERSION};
+
 impl<'w> Engine<'w> {
+    /// A new playthrough with seed 0; see [`Engine::new_with_seed`].
     pub fn new(world: &'w WorldSpec) -> Result<Self, EngineError> {
+        Self::new_with_seed(world, 0)
+    }
+
+    /// A new playthrough whose random draws follow `seed`. The same seed and
+    /// commands always give the same events and state.
+    pub fn new_with_seed(world: &'w WorldSpec, seed: u64) -> Result<Self, EngineError> {
         world.validate()?;
         let combat = world.combat().map(|combat| {
             let stats = combat.levels[0].stats;
@@ -329,6 +343,7 @@ impl<'w> Engine<'w> {
                 flags: BTreeSet::new(),
                 dialogue: None,
                 turn: 0,
+                rng: world.stochastic().then(|| RngState::new(seed)),
             },
         })
     }
@@ -432,12 +447,26 @@ pub fn damage(
     power: u32,
     share: u32,
 ) -> Result<u32, EngineError> {
+    damage_scaled(attacker, defender, channel, power, share, 100)
+}
+
+/// [`damage`] scaled by `multiplier` percent (a critical hit) before the
+/// single final rounding.
+pub fn damage_scaled(
+    attacker: &Stats,
+    defender: &Stats,
+    channel: Channel,
+    power: u32,
+    share: u32,
+    multiplier: u32,
+) -> Result<u32, EngineError> {
     let a = attacker.combined(channel, share, false);
     let d = defender.combined(channel, share, true);
     let hit = a
         .checked_mul(u128::from(power))
         .and_then(|v| v.checked_mul(a))
-        .and_then(|v| v.checked_div(100 * 100 * (a + d)))
+        .and_then(|v| v.checked_mul(u128::from(multiplier)))
+        .and_then(|v| v.checked_div(100 * 100 * 100 * (a + d)))
         .ok_or(EngineError::NumericLimit)?;
     u32::try_from(hit.max(1)).map_err(|_| EngineError::NumericLimit)
 }

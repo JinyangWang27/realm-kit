@@ -345,3 +345,29 @@ fn the_arena_plays_packs_flight_sparring_and_a_no_flee_boss() {
     let pit = &text[text.rfind("You face The Pit Ogre.").unwrap()..];
     assert!(!pit.contains(". Flee"), "{pit}");
 }
+
+#[test]
+fn a_seed_reproduces_a_run_with_random_content() {
+    // Spar to open the pit, then trade heavy blows with the ogre: both can crit.
+    let mut script = "west\nengage holt\n".to_string() + &"attack holt\n".repeat(5);
+    script += "east\ndown\nengage ogre\n";
+    script += &"use heavy_blow ogre\nattack ogre\n".repeat(10);
+    let seeded = |seed: &str| run(&["play", ARENA, "--seed", seed], &script).stdout;
+    let first = seeded("5");
+    assert_eq!(first, seeded("5"));
+    assert!(String::from_utf8(first).unwrap().contains("Seed: 5\n"));
+    // Some seed gives a critical hit on the way through the arena.
+    assert!((0..30).any(|seed| {
+        String::from_utf8(seeded(&seed.to_string()))
+            .unwrap()
+            .contains("Critical hit!")
+    }));
+    // Without --seed the clock picks one and shows it.
+    let clocked = String::from_utf8(run(&["play", ARENA], "").stdout).unwrap();
+    assert!(clocked.contains("Seed: "), "{clocked}");
+    // Worlds without random content have no seed to show.
+    let demo = String::from_utf8(run(&["play", WORLD, "--seed", "5"], "").stdout).unwrap();
+    assert!(!demo.contains("Seed"), "{demo}");
+    assert!(!run(&["play", ARENA, "--seed", "five"], "").status.success());
+    assert!(!run(&["play", ARENA, "--seed"], "").status.success());
+}

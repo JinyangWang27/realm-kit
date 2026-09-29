@@ -47,6 +47,7 @@ fn profile() -> CombatProfile {
         loot: vec![],
         skills: vec![],
         basic_channel: Channel::Physical,
+        basic_crit: None,
         level: 1,
         group: None,
     }
@@ -265,6 +266,11 @@ fn older_packages_are_rejected_clearly() {
         (
             2,
             r#"{ "format_version": 2, "combat": { "levels": [{ "xp": 0, "hp": 1, "attack": 1 }] } }"#,
+        ),
+        // M3c-2's format, readable by runtimes that know no crits.
+        (
+            5,
+            r#"{ "format_version": 5, "combat": { "special_name": "Magic" } }"#,
         ),
         // M3c-1's opponents used every listed skill regardless of level.
         (
@@ -490,4 +496,30 @@ fn profile_skills_unlock_at_the_profile_level() {
     assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
     fighter(&mut world, "ogre").level = 5;
     assert!(world.validate().is_err());
+}
+
+#[test]
+fn crits_are_bounded_and_make_a_world_stochastic() {
+    let crit = |chance_percent, multiplier_percent| {
+        Some(Crit {
+            chance_percent,
+            multiplier_percent,
+        })
+    };
+    assert!(!duel().stochastic() && !archive().stochastic() && arena().stochastic());
+    let mut skill = duel();
+    skill.world.combat.as_mut().unwrap().skills[0].crit = crit(25, 150);
+    let mut basic = duel();
+    basic.world.combat.as_mut().unwrap().player_basic_crit = crit(100, 101);
+    let mut foe = duel();
+    fighter(&mut foe, "witch").basic_crit = crit(1, 1_000);
+    for world in [skill, basic, foe] {
+        assert!(world.stochastic());
+        assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    }
+    for (chance, multiplier) in [(0, 150), (101, 150), (25, 100), (25, 1_001)] {
+        let mut world = duel();
+        world.world.combat.as_mut().unwrap().skills[0].crit = crit(chance, multiplier);
+        assert!(world.validate().is_err(), "crit {chance}/{multiplier}");
+    }
 }

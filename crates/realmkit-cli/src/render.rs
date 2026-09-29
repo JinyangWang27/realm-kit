@@ -2,6 +2,8 @@ use realmkit_engine::{Engine, Event, Outcome};
 use realmkit_spec::{Direction, TextTemplate};
 use std::io::{self, Write};
 
+const CRITICAL: &str = "Critical hit!";
+
 /// Single-pass interpolation: inserted values are data, never template syntax.
 fn interpolate(template: &TextTemplate, values: &[(&str, &str)]) -> io::Result<String> {
     let mut output = String::new();
@@ -113,7 +115,11 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 amount,
                 variant,
                 skill,
+                critical,
             } => {
+                if *critical {
+                    writeln!(output, "{CRITICAL}")?;
+                }
                 let narrative = &world.combat().unwrap().narrative;
                 let text = skill.as_ref().map_or(&narrative.attack[*variant], |id| {
                     &world.skill(id).unwrap().text
@@ -125,7 +131,11 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 amount,
                 variant,
                 skill,
+                critical,
             } => {
+                if *critical {
+                    writeln!(output, "{CRITICAL}")?;
+                }
                 let narrative = &world.combat().unwrap().narrative;
                 let text = skill.as_ref().map_or(&narrative.hurt[*variant], |id| {
                     &world.skill(id).unwrap().text
