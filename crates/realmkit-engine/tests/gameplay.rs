@@ -163,7 +163,7 @@ fn defeating_the_target_before_accepting_does_not_softlock_the_quest() {
 #[test]
 fn death_blocks_actions_but_allows_inspection() {
     let mut world = demo();
-    world.characters[2].combat.as_mut().unwrap().attack = u32::MAX;
+    world.characters[2].combat.as_mut().unwrap().stats.patk = STAT_BOUND;
     let mut engine = Engine::new(&world).unwrap();
     engine.execute(Move(North)).unwrap();
     let events = engine.execute(Attack("wolf".into())).unwrap();

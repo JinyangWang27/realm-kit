@@ -1,0 +1,16 @@
+[
+  {
+    "id": "yard",
+    "name": "The Cottage Yard",
+    "description": "A bench, a water butt, and a gap in the hedge to the north.",
+    "exits": { "north": { "destination": "ring", "blocked_text": "The hedge is too thick." } },
+    "safe": true
+  },
+  {
+    "id": "ring",
+    "name": "The Nettle Ring",
+    "description": "Nettles grow in a perfect circle around a patch of bare earth.",
+    "exits": { "south": { "destination": "yard", "blocked_text": "The gap has closed." } },
+    "characters": ["witch"]
+  }
+]

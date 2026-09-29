@@ -95,8 +95,8 @@ pub(super) fn check(
             "experience does not match level",
         )?;
         ensure(
-            combat.max_hp == stats.hp
-                && combat.attack == stats.attack
+            combat.max_hp == stats.stats.hp
+                && combat.attack == stats.stats.patk
                 && combat.hp <= combat.max_hp,
             "player stats do not match level",
         )?;

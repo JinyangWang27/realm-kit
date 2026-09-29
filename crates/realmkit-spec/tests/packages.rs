@@ -36,6 +36,20 @@ fn wolf(w: &mut WorldSpec) -> &mut Character {
     w.characters.iter_mut().find(|c| c.id == "wolf").unwrap()
 }
 
+fn duel() -> WorldSpec {
+    WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/duel")).unwrap()
+}
+
+fn profile() -> CombatProfile {
+    CombatProfile {
+        stats: wolf(&mut demo()).combat.clone().unwrap().stats,
+        xp: 1,
+        loot: vec![],
+        skills: vec![],
+        basic_channel: Channel::Physical,
+    }
+}
+
 fn codes(w: &WorldSpec) -> Vec<String> {
     w.diagnostics().into_iter().map(|d| d.code).collect()
 }
@@ -114,10 +128,26 @@ fn refuses_unusable_rules_and_malformed_templates() {
         |w| w.world.combat.as_mut().unwrap().levels.clear(),
         |w| w.world.combat.as_mut().unwrap().levels[0].xp = 1,
         |w| w.world.combat.as_mut().unwrap().levels[1].xp = 0,
-        |w| w.world.combat.as_mut().unwrap().levels[0].hp = 0,
-        |w| w.world.combat.as_mut().unwrap().levels[0].attack = 0,
-        |w| wolf(w).combat.as_mut().unwrap().hp = 0,
-        |w| wolf(w).combat.as_mut().unwrap().attack = 0,
+        |w| w.world.combat.as_mut().unwrap().levels[0].stats.hp = 0,
+        |w| w.world.combat.as_mut().unwrap().levels[0].stats.speed = 0,
+        |w| w.world.combat.as_mut().unwrap().levels[0].stats.mp = STAT_BOUND + 1,
+        |w| w.world.combat.as_mut().unwrap().levels[1].stats.sdef = 0,
+        |w| {
+            let stats = &mut w.world.combat.as_mut().unwrap().levels[0].stats;
+            (stats.patk, stats.satk) = (0, 0)
+        },
+        |w| w.world.combat.as_mut().unwrap().special_name = " ".into(),
+        |w| w.world.combat.as_mut().unwrap().cross_share = 101,
+        |w| wolf(w).combat.as_mut().unwrap().stats.hp = 0,
+        |w| wolf(w).combat.as_mut().unwrap().stats.patk = 0,
+        |w| {
+            wolf(w)
+                .combat
+                .as_mut()
+                .unwrap()
+                .skills
+                .push("missing".into())
+        },
         |w| wolf(w).combat.as_mut().unwrap().loot[0].quantity = 0,
         |w| w.locations[0].characters.push("wolf".into()),
         |w| w.world.combat.as_mut().unwrap().narrative.attack.clear(),
@@ -137,7 +167,7 @@ fn refuses_unusable_rules_and_malformed_templates() {
 fn diagnostics_identify_entities_and_stable_codes_for_repair() {
     let mut world = demo();
     world.world.start = "missing".into();
-    wolf(&mut world).combat.as_mut().unwrap().hp = 0;
+    wolf(&mut world).combat.as_mut().unwrap().stats.hp = 0;
     let diagnostics = world.diagnostics();
     assert_eq!(diagnostics.len(), 2);
     assert!(diagnostics
@@ -174,19 +204,16 @@ fn a_world_without_combat_loads_and_roundtrips() {
 #[test]
 fn a_world_without_combat_refuses_fighting_content() {
     let mut fighter = archive();
-    fighter.characters[2].combat = Some(CombatProfile {
-        hp: 5,
-        attack: 1,
-        xp: 1,
-        loot: vec![],
-    });
+    fighter.characters[2].combat = Some(profile());
     let mut defeat = archive();
     defeat.quests[0].objective = QuestObjective::Defeat {
         character: "copyist".into(),
     };
     let mut xp = archive();
     xp.quests[0].reward_xp = 5;
-    for world in [fighter, defeat, xp] {
+    let mut rest = archive();
+    rest.locations[0].safe = true;
+    for world in [fighter, defeat, xp, rest] {
         assert!(codes(&world).contains(&"combat_disabled".to_string()));
     }
 }
@@ -195,14 +222,7 @@ fn a_world_without_combat_refuses_fighting_content() {
 fn the_player_is_an_unplaced_character_without_components() {
     let changes: Vec<fn(&mut WorldSpec)> = vec![
         |w| w.characters[0].dialogue = Some("mara".into()),
-        |w| {
-            w.characters[0].combat = Some(CombatProfile {
-                hp: 5,
-                attack: 1,
-                xp: 1,
-                loot: vec![],
-            })
-        },
+        |w| w.characters[0].combat = Some(profile()),
         |w| w.locations[0].characters.push("you".into()),
     ];
     for (index, change) in changes.into_iter().enumerate() {
@@ -243,4 +263,67 @@ fn format_1_packages_are_rejected_clearly() {
     assert!(error
         .to_string()
         .contains("Format 1 packages are no longer supported"));
+}
+
+#[test]
+fn skills_are_bounded_referenced_usable_and_affordable() {
+    let world = duel();
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    assert_eq!(world.skill("bolt").unwrap().cost, 12);
+    let changes: Vec<fn(&mut WorldSpec)> = vec![
+        |w| w.world.combat.as_mut().unwrap().skills[1].power = 0,
+        |w| w.world.combat.as_mut().unwrap().skills[1].power = POWER_BOUNDS.1 + 1,
+        |w| w.world.combat.as_mut().unwrap().skills[1].level = 0,
+        |w| w.world.combat.as_mut().unwrap().skills[1].cross_share = Some(101),
+        |w| w.world.combat.as_mut().unwrap().skills[1].text.0 = "{skill}".into(),
+        |w| w.world.combat.as_mut().unwrap().skills[1].id = "spark".into(),
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .player_skills
+                .push("missing".into())
+        },
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .player_skills
+                .push("bolt".into())
+        },
+        // Fireball unlocks at level 2; level 3 does not exist.
+        |w| w.world.combat.as_mut().unwrap().skills[2].level = 3,
+        // More MP than the player has at the level the skill unlocks.
+        |w| w.world.combat.as_mut().unwrap().skills[1].cost = 25,
+        // Hex costs 5; the witch has 10.
+        |w| w.characters[1].combat.as_mut().unwrap().stats.mp = 4,
+        // A special skill with no attack in either channel.
+        |w| {
+            let stats = &mut w.world.combat.as_mut().unwrap().levels[0].stats;
+            (stats.satk, stats.patk) = (0, 0)
+        },
+    ];
+    for (index, change) in changes.into_iter().enumerate() {
+        let mut world = duel();
+        change(&mut world);
+        assert!(world.validate().is_err(), "invalid skill case {index}");
+    }
+}
+
+#[test]
+fn the_cross_share_blends_channels_and_defaults_to_25() {
+    let world = duel();
+    assert_eq!(world.combat().unwrap().cross_share, 25);
+    let stats = world.combat().unwrap().levels[0].stats;
+    assert_eq!(
+        stats.combined(Channel::Special, 25, false),
+        100 * 10 + 25 * 3
+    );
+    assert_eq!(
+        stats.combined(Channel::Physical, 25, true),
+        100 * 4 + 25 * 6
+    );
+    assert_eq!(stats.combined(Channel::Physical, 0, false), 300);
 }

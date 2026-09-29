@@ -118,9 +118,9 @@ fn grant_xp(
             break;
         }
         combat.level += 1;
-        combat.hp = level.hp;
-        combat.max_hp = level.hp;
-        combat.attack = level.attack;
+        combat.hp = level.stats.hp;
+        combat.max_hp = level.stats.hp;
+        combat.attack = level.stats.patk;
         events.push(Event::LevelUp {
             level: combat.level,
         });
@@ -345,7 +345,7 @@ pub(super) fn execute(
                 variant: (state.turn % rules.narrative.attack.len() as u64) as usize,
             });
             if *hp > 0 {
-                let damage = profile.attack.min(combat.hp);
+                let damage = profile.stats.patk.min(combat.hp);
                 combat.hp -= damage;
                 events.push(Event::DamageReceived {
                     source: id,

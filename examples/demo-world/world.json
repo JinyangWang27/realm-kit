@@ -7,10 +7,11 @@
   "player": "you",
   "flags": ["ruins_open"],
   "combat": {
+    "special_name": "Spirit",
     "levels": [
-      { "xp": 0, "hp": 24, "attack": 5 },
-      { "xp": 10, "hp": 30, "attack": 7 },
-      { "xp": 30, "hp": 36, "attack": 9 }
+      { "xp": 0, "stats": { "hp": 24, "patk": 5, "pdef": 6, "satk": 2, "sdef": 4, "speed": 100 } },
+      { "xp": 10, "stats": { "hp": 30, "patk": 7, "pdef": 7, "satk": 2, "sdef": 5, "speed": 100 } },
+      { "xp": 30, "stats": { "hp": 36, "patk": 9, "pdef": 8, "satk": 3, "sdef": 6, "speed": 100 } }
     ],
     "narrative": {
       "attack": [

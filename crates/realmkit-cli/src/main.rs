@@ -569,7 +569,7 @@ mod tests {
             "/../../examples/demo-world"
         ))
         .unwrap();
-        world.characters[2].combat.as_mut().unwrap().attack = 100;
+        world.characters[2].combat.as_mut().unwrap().stats.patk = 100;
         let dir = std::env::temp_dir().join(format!("realmkit-death-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let saves = Saves::open(&dir).unwrap();

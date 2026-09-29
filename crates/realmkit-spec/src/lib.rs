@@ -41,8 +41,93 @@ pub struct World {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Combat {
+    /// The world's name for the special damage channel: magic, 内力, mana.
+    pub special_name: String,
+    /// Percentage of the other channel's attack and defence added to a hit.
+    #[serde(default = "default_cross_share")]
+    pub cross_share: u32,
     pub levels: Vec<Level>,
+    #[serde(default)]
+    pub skills: Vec<Skill>,
+    /// Skills the player can use once their unlock level is reached.
+    #[serde(default)]
+    pub player_skills: Vec<Id>,
+    #[serde(default)]
+    pub player_basic_channel: Channel,
     pub narrative: Narrative,
+}
+
+fn default_cross_share() -> u32 {
+    25
+}
+
+/// Engine bound for every authored stat; keeps damage arithmetic small.
+pub const STAT_BOUND: u32 = 9_999;
+/// Skill power is a percentage of a basic attack, which is 100.
+pub const POWER_BOUNDS: (u32, u32) = (1, 1_000);
+pub const BASIC_POWER: u32 = 100;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Stats {
+    pub hp: u32,
+    #[serde(default)]
+    pub mp: u32,
+    pub patk: u32,
+    pub pdef: u32,
+    pub satk: u32,
+    pub sdef: u32,
+    /// Authored now; it has no effect until encounters run on a timeline.
+    pub speed: u32,
+}
+
+impl Stats {
+    /// The channel's attack (or defence) plus `share` percent of the other
+    /// channel's, scaled by 100 so the share adds no rounding step.
+    pub fn combined(&self, channel: Channel, share: u32, defence: bool) -> u64 {
+        let (physical, special) = if defence {
+            (self.pdef, self.sdef)
+        } else {
+            (self.patk, self.satk)
+        };
+        let (main, other) = match channel {
+            Channel::Physical => (physical, special),
+            Channel::Special => (special, physical),
+        };
+        100 * u64::from(main) + u64::from(share) * u64::from(other)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Channel {
+    #[default]
+    Physical,
+    Special,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Skill {
+    pub id: Id,
+    pub name: String,
+    pub power: u32,
+    pub channel: Channel,
+    /// MP spent per use, exactly as authored.
+    #[serde(default)]
+    pub cost: u32,
+    /// Character level at which the player can use it.
+    #[serde(default = "first_level")]
+    pub level: usize,
+    /// Overrides the world's cross share for this skill.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cross_share: Option<u32>,
+    /// Allows `{attacker}`, `{target}` and `{damage}`.
+    pub text: TextTemplate,
+}
+
+fn first_level() -> usize {
+    1
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -50,8 +135,7 @@ pub struct Combat {
 pub struct Level {
     /// Cumulative experience required for this level; level one starts at zero.
     pub xp: u64,
-    pub hp: u32,
-    pub attack: u32,
+    pub stats: Stats,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -75,6 +159,9 @@ pub struct Location {
     pub exits: BTreeMap<Direction, Exit>,
     #[serde(default)]
     pub characters: Vec<Id>,
+    /// Resting here restores HP and MP. Requires combat.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub safe: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -105,11 +192,15 @@ pub struct Character {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct CombatProfile {
-    pub hp: u32,
-    pub attack: u32,
+    pub stats: Stats,
     pub xp: u64,
     #[serde(default)]
     pub loot: Vec<ItemStack>,
+    /// All listed skills are usable; profiles have no level yet.
+    #[serde(default)]
+    pub skills: Vec<Id>,
+    #[serde(default)]
+    pub basic_channel: Channel,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -278,6 +369,9 @@ impl WorldSpec {
     }
     pub fn combat(&self) -> Option<&Combat> {
         self.world.combat.as_ref()
+    }
+    pub fn skill(&self, id: &str) -> Option<&Skill> {
+        self.combat()?.skills.iter().find(|v| v.id == id)
     }
     pub fn item(&self, id: &str) -> Option<&Item> {
         self.items.iter().find(|v| v.id == id)

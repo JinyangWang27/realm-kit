@@ -184,15 +184,15 @@ impl<'w> Engine<'w> {
         let combat = world.combat().map(|combat| {
             let stats = &combat.levels[0];
             CombatState {
-                hp: stats.hp,
-                max_hp: stats.hp,
-                attack: stats.attack,
+                hp: stats.stats.hp,
+                max_hp: stats.stats.hp,
+                attack: stats.stats.patk,
                 xp: 0,
                 level: 1,
                 opponent_hp: world
                     .characters
                     .iter()
-                    .filter_map(|c| Some((c.id.clone(), c.combat.as_ref()?.hp)))
+                    .filter_map(|c| Some((c.id.clone(), c.combat.as_ref()?.stats.hp)))
                     .collect(),
             }
         });
