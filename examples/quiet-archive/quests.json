@@ -1,0 +1,13 @@
+[
+  {
+    "id": "lost_map",
+    "name": "The Missing Map",
+    "giver": "archivist",
+    "objective": { "kind": "flag", "flag": "map_found" },
+    "introduction": "Pell lowers her voice. 'A map of the old river is missing from the vault. The copyist in the stacks borrowed it last. Find out where it went.'",
+    "progress": "You know where the map is. Pell should hear it.",
+    "completion": "Pell closes her eyes in relief, then presses a brass key into your hand. 'Then the vault can be whole again. Go and see.'",
+    "reward_items": [{ "item": "vault_key", "quantity": 1 }],
+    "completion_flags": ["vault_open"]
+  }
+]

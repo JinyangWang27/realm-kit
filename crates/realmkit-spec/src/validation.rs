@@ -18,6 +18,8 @@ pub struct Diagnostic {
 
 #[derive(Debug, thiserror::Error)]
 pub enum SpecError {
+    #[error("unsupported package format {}: this RealmKit reads Format {FORMAT_VERSION} only; Format 1 packages are no longer supported, so convert the package to Format {FORMAT_VERSION}", found.map_or("(missing)".into(), |v| v.to_string()))]
+    UnsupportedFormat { found: Option<u64> },
     #[error("world validation failed: {0:?}")]
     Validation(Vec<Diagnostic>),
     #[error("{path}: {source}")]
@@ -159,12 +161,12 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
             ),
         );
     }
-    if w.world.name.trim().is_empty() || w.world.player_name.trim().is_empty() {
+    if w.world.name.trim().is_empty() || w.characters.iter().any(|c| c.name.trim().is_empty()) {
         issue(
             &mut out,
             owner,
             "empty_name",
-            "world and player names must not be empty",
+            "world and character names must not be empty",
         );
     }
     if w.world.language.trim().is_empty() {
@@ -180,11 +182,10 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
         "location",
         w.locations.iter().map(|v| v.id.as_str()),
     );
-    ids(&mut out, "NPC", w.npcs.iter().map(|v| v.id.as_str()));
     ids(
         &mut out,
-        "monster",
-        w.monsters.iter().map(|v| v.id.as_str()),
+        "character",
+        w.characters.iter().map(|v| v.id.as_str()),
     );
     ids(&mut out, "item", w.items.iter().map(|v| v.id.as_str()));
     ids(&mut out, "quest", w.quests.iter().map(|v| v.id.as_str()));
@@ -201,16 +202,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
         &w.world.start,
         w.location(&w.world.start).is_some(),
     );
-    if w.world.levels.first().map(|l| l.xp) != Some(0)
-        || w.world.levels.iter().any(|l| l.hp == 0 || l.attack == 0)
-        || w.world
-            .levels
-            .windows(2)
-            .any(|l| l[0].xp >= l[1].xp || l[0].hp > l[1].hp || l[0].attack > l[1].attack)
-    {
-        issue(&mut out, owner, "invalid_levels", "levels must start at 0 XP, have positive HP/attack, strictly increasing XP and nondecreasing stats");
-    }
-    let mut placed_monsters = BTreeSet::new();
+    let mut placed = BTreeSet::new();
     for l in &w.locations {
         for exit in l.exits.values() {
             reference(
@@ -222,48 +214,72 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
             );
             conditions(&mut out, w, &l.id, &exit.requires);
         }
-        ids(&mut out, "NPC placement", l.npcs.iter().map(String::as_str));
-        for npc in &l.npcs {
-            reference(&mut out, &l.id, "NPC", npc, w.npc(npc).is_some());
-        }
-        for monster in &l.monsters {
-            reference(
-                &mut out,
-                &l.id,
-                "monster",
-                monster,
-                w.monster(monster).is_some(),
-            );
-            if !placed_monsters.insert(monster.as_str()) {
+        ids(
+            &mut out,
+            "character placement",
+            l.characters.iter().map(String::as_str),
+        );
+        for id in &l.characters {
+            let character = w.character(id);
+            reference(&mut out, &l.id, "character", id, character.is_some());
+            // A fighter's defeat is permanent, so it can be in one place only.
+            if !placed.insert(id.as_str()) && character.is_some_and(|c| c.combat.is_some()) {
                 issue(
                     &mut out,
                     &l.id,
                     "duplicate_placement",
-                    format!("monster {monster} is placed more than once; each ID is one instance"),
+                    format!("character {id} can fight, so it is one instance and may be placed only once"),
                 );
             }
         }
     }
-    for npc in &w.npcs {
-        reference(
-            &mut out,
-            &npc.id,
-            "dialogue",
-            &npc.dialogue,
-            w.dialogue(&npc.dialogue).is_some(),
-        );
-        conditions(&mut out, w, &npc.id, &npc.requires);
+    // The player's numbers come from the level table, not from a profile.
+    match w.character(&w.world.player) {
+        None => reference(&mut out, owner, "player character", &w.world.player, false),
+        Some(player) => {
+            if player.combat.is_some()
+                || player.dialogue.is_some()
+                || placed.contains(player.id.as_str())
+            {
+                issue(
+                    &mut out,
+                    &player.id,
+                    "invalid_player",
+                    "the player character must have no combat profile or dialogue and be placed at no location",
+                );
+            }
+        }
     }
-    for monster in &w.monsters {
-        if monster.hp == 0 {
-            issue(
+    for character in &w.characters {
+        if let Some(dialogue) = &character.dialogue {
+            reference(
                 &mut out,
-                &monster.id,
-                "invalid_stats",
-                "monster HP must be positive",
+                &character.id,
+                "dialogue",
+                dialogue,
+                w.dialogue(dialogue).is_some(),
             );
         }
-        items(&mut out, w, &monster.id, &monster.loot);
+        conditions(&mut out, w, &character.id, &character.requires);
+        if let Some(profile) = &character.combat {
+            if profile.hp == 0 {
+                issue(
+                    &mut out,
+                    &character.id,
+                    "invalid_stats",
+                    "combat HP must be positive",
+                );
+            }
+            items(&mut out, w, &character.id, &profile.loot);
+            if w.combat().is_none() {
+                issue(
+                    &mut out,
+                    &character.id,
+                    "combat_disabled",
+                    "this world has no combat block, so no character can fight",
+                );
+            }
+        }
     }
     for quest in &w.quests {
         reference(
@@ -271,22 +287,67 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
             &quest.id,
             "quest giver",
             &quest.giver,
-            w.npc(&quest.giver).is_some(),
+            w.character(&quest.giver).is_some(),
         );
-        let QuestObjective::Defeat { monster } = &quest.objective;
-        reference(
-            &mut out,
-            &quest.id,
-            "quest target",
-            monster,
-            w.monster(monster).is_some(),
-        );
-        if w.monster(monster).is_some() && !placed_monsters.contains(monster.as_str()) {
+        if w.character(&quest.giver)
+            .is_some_and(|c| c.dialogue.is_none())
+        {
             issue(
                 &mut out,
                 &quest.id,
-                "unplaced_target",
-                format!("quest target {monster} has no location"),
+                "invalid_giver",
+                format!("quest giver {} has no dialogue", quest.giver),
+            );
+        }
+        match &quest.objective {
+            QuestObjective::Defeat { character } => {
+                let target = w.character(character);
+                reference(
+                    &mut out,
+                    &quest.id,
+                    "quest target",
+                    character,
+                    target.is_some(),
+                );
+                if target.is_some_and(|c| c.combat.is_none()) {
+                    issue(
+                        &mut out,
+                        &quest.id,
+                        "invalid_target",
+                        format!("quest target {character} has no combat profile"),
+                    );
+                }
+                if target.is_some() && !placed.contains(character.as_str()) {
+                    issue(
+                        &mut out,
+                        &quest.id,
+                        "unplaced_target",
+                        format!("quest target {character} has no location"),
+                    );
+                }
+                if w.combat().is_none() {
+                    issue(
+                        &mut out,
+                        &quest.id,
+                        "combat_disabled",
+                        "this world has no combat block, so no quest can require a defeat",
+                    );
+                }
+            }
+            QuestObjective::Flag { flag } => reference(
+                &mut out,
+                &quest.id,
+                "flag",
+                flag,
+                w.world.flags.contains(flag),
+            ),
+        }
+        if quest.reward_xp > 0 && w.combat().is_none() {
+            issue(
+                &mut out,
+                &quest.id,
+                "combat_disabled",
+                "this world has no combat block, so there is no XP to reward",
             );
         }
         items(&mut out, w, &quest.id, &quest.reward_items);
@@ -348,27 +409,38 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
             }
         }
     }
-    for (key, variants) in [("attack", &w.narrative.attack), ("hurt", &w.narrative.hurt)] {
+    if let Some(combat) = w.combat() {
+        combat_rules(&mut out, owner, combat);
+    }
+    out
+}
+
+fn combat_rules(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
+    let levels = &combat.levels;
+    if levels.first().map(|l| l.xp) != Some(0)
+        || levels.iter().any(|l| l.hp == 0 || l.attack == 0)
+        || levels
+            .windows(2)
+            .any(|l| l[0].xp >= l[1].xp || l[0].hp > l[1].hp || l[0].attack > l[1].attack)
+    {
+        issue(out, owner, "invalid_levels", "levels must start at 0 XP, have positive HP/attack, strictly increasing XP and nondecreasing stats");
+    }
+    let narrative = &combat.narrative;
+    for (key, variants) in [("attack", &narrative.attack), ("hurt", &narrative.hurt)] {
         if variants.is_empty() {
             issue(
-                &mut out,
+                out,
                 key,
                 "empty_variants",
                 "at least one narrative variant is required",
             );
         }
         for text in variants {
-            template(&mut out, key, &text.0, &["attacker", "target", "damage"]);
+            template(out, key, &text.0, &["attacker", "target", "damage"]);
         }
     }
-    template(&mut out, "victory", &w.narrative.victory.0, &["target"]);
-    if w.narrative.death.trim().is_empty() {
-        issue(
-            &mut out,
-            "death",
-            "empty_narrative",
-            "death text is required",
-        );
+    template(out, "victory", &narrative.victory.0, &["target"]);
+    if narrative.death.trim().is_empty() {
+        issue(out, "death", "empty_narrative", "death text is required");
     }
-    out
 }

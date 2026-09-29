@@ -11,12 +11,12 @@ pub(super) fn npc_here(world: &WorldSpec, state: &GameState, id: &str) -> bool {
     world
         .location(&state.player.location)
         .unwrap()
-        .npcs
+        .characters
         .iter()
         .any(|n| n == id)
         && world
-            .npc(id)
-            .is_some_and(|n| conditions_met(state, &n.requires))
+            .character(id)
+            .is_some_and(|n| n.dialogue.is_some() && conditions_met(state, &n.requires))
 }
 
 pub(super) fn choices<'a>(
@@ -26,7 +26,7 @@ pub(super) fn choices<'a>(
     node: &str,
 ) -> Vec<&'a DialogueChoice> {
     world
-        .dialogue(&world.npc(npc).unwrap().dialogue)
+        .dialogue(world.character(npc).unwrap().dialogue.as_ref().unwrap())
         .unwrap()
         .nodes
         .iter()
@@ -92,7 +92,7 @@ fn grant_xp(
         .checked_add(amount)
         .ok_or(EngineError::NumericLimit)?;
     events.push(Event::ExperienceGranted { amount });
-    while let Some(level) = world.world.levels.get(state.player.level) {
+    while let Some(level) = world.combat().unwrap().levels.get(state.player.level) {
         if state.player.xp < level.xp {
             break;
         }
@@ -145,9 +145,11 @@ fn quest(
     } else {
         state.quests.insert(id.into(), QuestStatus::Active);
         events.push(Event::QuestAccepted { quest: id.into() });
-        let QuestObjective::Defeat { monster } = &quest.objective;
+        let QuestObjective::Defeat { character } = &quest.objective else {
+            return Ok(());
+        };
         // The world remembers earlier kills so accepting late cannot strand this quest.
-        if state.monster_hp[monster] == 0 {
+        if state.monster_hp[character] == 0 {
             state.quests.insert(id.into(), QuestStatus::Ready);
             events.push(Event::QuestProgressed { quest: id.into() });
         }
@@ -162,16 +164,16 @@ pub(super) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         available: true,
     };
     let mut actions: Vec<_> = location
-        .npcs
+        .characters
         .iter()
         .filter(|id| npc_here(world, state, id))
         .map(|id| available(Command::Talk(id.clone())))
         .collect();
     actions.extend(
         location
-            .monsters
+            .characters
             .iter()
-            .filter(|id| state.monster_hp[*id] > 0)
+            .filter(|id| state.monster_hp.get(*id).is_some_and(|hp| *hp > 0))
             .map(|id| available(Command::Attack(id.clone()))),
     );
     actions.extend(location.exits.iter().map(|(direction, exit)| Action {
@@ -235,8 +237,12 @@ pub(super) fn execute(
             if !npc_here(world, state, &id) {
                 return Err(EngineError::NotHere(id));
             }
-            let npc = world.npc(&id).unwrap();
-            let start = world.dialogue(&npc.dialogue).unwrap().start.clone();
+            let npc = world.character(&id).unwrap();
+            let start = world
+                .dialogue(npc.dialogue.as_ref().unwrap())
+                .unwrap()
+                .start
+                .clone();
             dialogue(world, state, id, start, &mut events);
         }
         Command::ChooseDialogue(number) => {
@@ -282,11 +288,13 @@ pub(super) fn execute(
             if !world
                 .location(&state.player.location)
                 .unwrap()
-                .monsters
+                .characters
                 .contains(&id)
+                || !state.monster_hp.contains_key(&id)
             {
                 return Err(EngineError::NotHere(id));
             }
+            let narrative = &world.combat().unwrap().narrative;
             let hp = state.monster_hp.get_mut(&id).unwrap();
             if *hp == 0 {
                 return Err(EngineError::AlreadyDefeated(id));
@@ -297,9 +305,9 @@ pub(super) fn execute(
             events.push(Event::DamageDealt {
                 target: id.clone(),
                 amount: damage,
-                variant: (state.turn % world.narrative.attack.len() as u64) as usize,
+                variant: (state.turn % narrative.attack.len() as u64) as usize,
             });
-            let monster = world.monster(&id).unwrap();
+            let monster = world.character(&id).unwrap().combat.as_ref().unwrap();
             if *hp == 0 {
                 events.push(Event::EnemyDefeated {
                     monster: id.clone(),
@@ -307,8 +315,12 @@ pub(super) fn execute(
                 grant_items(state, &monster.loot, &mut events)?;
                 grant_xp(world, state, monster.xp, &mut events)?;
                 for q in &world.quests {
-                    let QuestObjective::Defeat { monster } = &q.objective;
-                    if monster == &id && state.quests[&q.id] == QuestStatus::Active {
+                    if q.objective
+                        == (QuestObjective::Defeat {
+                            character: id.clone(),
+                        })
+                        && state.quests[&q.id] == QuestStatus::Active
+                    {
                         state.quests.insert(q.id.clone(), QuestStatus::Ready);
                         events.push(Event::QuestProgressed {
                             quest: q.id.clone(),
@@ -321,7 +333,7 @@ pub(super) fn execute(
                 events.push(Event::DamageReceived {
                     source: id,
                     amount: damage,
-                    variant: (state.turn % world.narrative.hurt.len() as u64) as usize,
+                    variant: (state.turn % narrative.hurt.len() as u64) as usize,
                 });
                 if state.player.hp == 0 {
                     events.push(Event::PlayerDied);

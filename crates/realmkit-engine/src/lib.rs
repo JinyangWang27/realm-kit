@@ -172,7 +172,7 @@ mod save;
 impl<'w> Engine<'w> {
     pub fn new(world: &'w WorldSpec) -> Result<Self, EngineError> {
         world.validate()?;
-        let stats = &world.world.levels[0];
+        let stats = &world.combat().expect("combat world").levels[0];
         Ok(Self {
             world,
             state: GameState {
@@ -186,9 +186,9 @@ impl<'w> Engine<'w> {
                     inventory: BTreeMap::new(),
                 },
                 monster_hp: world
-                    .monsters
+                    .characters
                     .iter()
-                    .map(|m| (m.id.clone(), m.hp))
+                    .filter_map(|c| Some((c.id.clone(), c.combat.as_ref()?.hp)))
                     .collect(),
                 quests: world
                     .quests

@@ -1,0 +1,19 @@
+[
+  {
+    "id": "visitor",
+    "name": "You",
+    "description": "A visitor with a borrowed reader's card."
+  },
+  {
+    "id": "archivist",
+    "name": "Archivist Pell",
+    "description": "Pell wears cotton gloves and speaks as if the books might overhear.",
+    "dialogue": "pell"
+  },
+  {
+    "id": "copyist",
+    "name": "Old Copyist",
+    "description": "Ink has stained his cuffs the blue of deep water.",
+    "dialogue": "copyist"
+  }
+]

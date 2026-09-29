@@ -15,7 +15,7 @@ fn typed_edits_link_locations_and_report_repairable_diagnostics() {
     let world = demo();
     let mut location = world.locations[0].clone();
     location.id = "garden".into();
-    location.npcs.clear();
+    location.characters.clear();
     location.exits.clear();
     let mut draft = WorldDraft::new(world);
     draft.create_location(location.clone()).unwrap();
@@ -57,7 +57,7 @@ fn typed_edits_link_locations_and_report_repairable_diagnostics() {
     assert_eq!(draft.get_world(), &before);
     assert!(draft.validate_world().is_empty());
     let mut broken = draft.get_world().location("garden").unwrap().clone();
-    broken.npcs.push("missing".into());
+    broken.characters.push("missing".into());
     draft.update_location(broken).unwrap();
     assert!(draft
         .validate_world()

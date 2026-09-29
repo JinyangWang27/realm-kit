@@ -72,7 +72,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let world = WorldSpec::load(Path::new(&args[1]))?;
     match action {
         "validate" => writeln!(output, "{}: valid (format {})", world.world.name, world.world.format_version)?,
-        "inspect" => writeln!(output, "{} [{}]\nLanguage: {}\n{} locations, {} NPCs, {} monsters, {} items, {} quests, {} dialogues\nStart: {}", world.world.name, world.world.id, world.world.language, world.locations.len(), world.npcs.len(), world.monsters.len(), world.items.len(), world.quests.len(), world.dialogues.len(), world.world.start)?,
+        "inspect" => writeln!(output, "{} [{}]\nLanguage: {}\n{} locations, {} characters, {} items, {} quests, {} dialogues\nStart: {}", world.world.name, world.world.id, world.world.language, world.locations.len(), world.characters.len(), world.items.len(), world.quests.len(), world.dialogues.len(), world.world.start)?,
         "play" if !line_mode && io::stdin().is_terminal() && output.is_terminal() => {
             play_keys(&world, saves, terminal_keys(), &mut output)?
         }
@@ -569,7 +569,7 @@ mod tests {
             "/../../examples/demo-world"
         ))
         .unwrap();
-        world.monsters[0].attack = 100;
+        world.characters[2].combat.as_mut().unwrap().attack = 100;
         let dir = std::env::temp_dir().join(format!("realmkit-death-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let saves = Saves::open(&dir).unwrap();

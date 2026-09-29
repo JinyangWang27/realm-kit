@@ -151,7 +151,7 @@ fn defeating_the_target_before_accepting_does_not_softlock_the_quest() {
 #[test]
 fn death_blocks_actions_but_allows_inspection() {
     let mut world = demo();
-    world.monsters[0].attack = u32::MAX;
+    world.characters[2].combat.as_mut().unwrap().attack = u32::MAX;
     let mut engine = Engine::new(&world).unwrap();
     engine.execute(Move(North)).unwrap();
     let events = engine.execute(Attack("wolf".into())).unwrap();
@@ -171,7 +171,7 @@ fn death_blocks_actions_but_allows_inspection() {
 #[test]
 fn overflowing_rewards_roll_back_the_entire_command() {
     let mut world = demo();
-    world.monsters[0].xp = u64::MAX;
+    world.characters[2].combat.as_mut().unwrap().xp = u64::MAX;
     let mut engine = Engine::new(&world).unwrap();
     accept(&mut engine);
     kill(&mut engine);
@@ -393,7 +393,7 @@ fn mismatched_or_corrupt_saves_are_rejected() {
 #[test]
 fn a_choice_that_makes_the_speaker_unavailable_ends_the_conversation() {
     let mut world = demo();
-    world.npcs[0].requires = vec![Condition::Quest {
+    world.characters[1].requires = vec![Condition::Quest {
         quest: "quiet_the_track".into(),
         status: QuestStatus::Available,
     }];

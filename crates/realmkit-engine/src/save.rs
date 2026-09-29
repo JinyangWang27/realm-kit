@@ -34,9 +34,9 @@ pub(super) fn check(
     let stats = player
         .level
         .checked_sub(1)
-        .and_then(|i| world.world.levels.get(i))
+        .and_then(|i| world.combat().unwrap().levels.get(i))
         .ok_or("invalid player level")?;
-    let next = world.world.levels.get(player.level);
+    let next = world.combat().unwrap().levels.get(player.level);
     ensure(
         player.xp >= stats.xp && next.is_none_or(|next| player.xp < next.xp),
         "experience does not match level",
@@ -56,8 +56,10 @@ pub(super) fn check(
     ensure(
         state.quests.keys().eq(fresh.quests.keys())
             && world.quests.iter().all(|quest| {
-                let QuestObjective::Defeat { monster } = &quest.objective;
-                let defeated = state.monster_hp.get(monster) == Some(&0);
+                let QuestObjective::Defeat { character } = &quest.objective else {
+                    return true;
+                };
+                let defeated = state.monster_hp.get(character) == Some(&0);
                 match state.quests[&quest.id] {
                     QuestStatus::Available => true,
                     QuestStatus::Active => !defeated,
@@ -71,9 +73,10 @@ pub(super) fn check(
     // Anything else could not have been played, and could overflow later grants.
     let no_flags: &[Id] = &[];
     let defeated = world
-        .monsters
+        .characters
         .iter()
-        .filter(|m| state.monster_hp[&m.id] == 0)
+        .filter(|c| state.monster_hp.get(&c.id) == Some(&0))
+        .map(|c| c.combat.as_ref().unwrap())
         .map(|m| (m.xp, &m.loot, no_flags));
     let completed = world
         .quests
@@ -116,8 +119,8 @@ pub(super) fn check(
     )?;
     if let Some(dialogue) = &state.dialogue {
         let node_exists = world
-            .npc(&dialogue.npc)
-            .and_then(|npc| world.dialogue(&npc.dialogue))
+            .character(&dialogue.npc)
+            .and_then(|npc| world.dialogue(npc.dialogue.as_ref()?))
             .is_some_and(|d| d.nodes.iter().any(|n| n.id == dialogue.node));
         ensure(
             node_exists

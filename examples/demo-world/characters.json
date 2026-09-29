@@ -1,0 +1,24 @@
+[
+  {
+    "id": "you",
+    "name": "You",
+    "description": "A stranger in Ashbell, rain still on your coat."
+  },
+  {
+    "id": "elder",
+    "name": "Elder Mara",
+    "description": "Mara holds an unlit candle in both hands. Wax has filled the creases of her palms.",
+    "dialogue": "mara"
+  },
+  {
+    "id": "wolf",
+    "name": "The Ash Wolf",
+    "description": "Its coat is the colour of cold hearths. A length of red thread is caught between its teeth.",
+    "combat": {
+      "hp": 12,
+      "attack": 4,
+      "xp": 10,
+      "loot": [{ "item": "ash_pelt", "quantity": 1 }]
+    }
+  }
+]

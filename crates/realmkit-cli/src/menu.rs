@@ -87,9 +87,11 @@ impl Menu {
                         ),
                         // Other unavailable actions (e.g. after death) are not offered.
                         _ if !action.available => return None,
-                        Command::Talk(id) => format!("{TALK} {}", world.npc(id).unwrap().name),
+                        Command::Talk(id) => {
+                            format!("{TALK} {}", world.character(id).unwrap().name)
+                        }
                         Command::Attack(id) => {
-                            format!("{ATTACK} {}", world.monster(id).unwrap().name)
+                            format!("{ATTACK} {}", world.character(id).unwrap().name)
                         }
                         Command::Inventory => INVENTORY.into(),
                         Command::Status => CHARACTER.into(),

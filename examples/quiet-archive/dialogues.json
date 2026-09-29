@@ -1,0 +1,60 @@
+[
+  {
+    "id": "pell",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "'Quietly, please,' Pell says, without looking up.",
+        "choices": [
+          {
+            "text": "Is something wrong?",
+            "next": "request",
+            "requires": [{ "kind": "quest", "quest": "lost_map", "status": "available" }]
+          },
+          {
+            "text": "The copyist has the map. He was only mending it.",
+            "next": "thanks",
+            "requires": [{ "kind": "quest", "quest": "lost_map", "status": "ready" }],
+            "effect": { "kind": "complete_quest", "quest": "lost_map" }
+          },
+          {
+            "text": "Where should I look?",
+            "next": "reminder",
+            "requires": [{ "kind": "quest", "quest": "lost_map", "status": "active" }]
+          },
+          { "text": "Leave her to her work." }
+        ]
+      },
+      {
+        "id": "request",
+        "text": "'A map is missing. Would you ask after it? I cannot leave the desk.'",
+        "choices": [
+          { "text": "I will find it.", "next": "accepted", "effect": { "kind": "accept_quest", "quest": "lost_map" } },
+          { "text": "Not now." }
+        ]
+      },
+      { "id": "accepted", "text": "'The stacks, to the north. Mind the ladders.'" },
+      { "id": "reminder", "text": "'Ask the copyist. He never returns anything on time.'" },
+      { "id": "thanks", "text": "'Mending it,' she repeats, and almost smiles." }
+    ]
+  },
+  {
+    "id": "copyist",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "The copyist does not stop writing. 'Yes?'",
+        "choices": [
+          { "text": "Have you seen the river map?", "next": "confession", "effect": { "kind": "set_flag", "flag": "map_found" } },
+          { "text": "Nothing. Sorry to disturb you." }
+        ]
+      },
+      {
+        "id": "confession",
+        "text": "He lifts a blotter. The map lies beneath it, its torn edge newly stitched. 'Tell Pell it will be back tomorrow.'"
+      }
+    ]
+  }
+]
