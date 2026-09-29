@@ -9,7 +9,7 @@ from fractions import Fraction
 from .encounter import Encounter
 from .model import (POWER_BOUNDS, STAT_BOUND, Channel, Combatant, Formula, Kind, Profile, Resource, Rules,
                     Skill, exact)
-from .simulator import Simulator
+from .simulator import U64_MAX, Simulator
 
 class TargetMissed(Exception):
     """A balance target does not hold."""
@@ -21,7 +21,7 @@ def require(condition: object, message: str) -> None:
         raise TargetMissed(message)
 
 
-XP_BOUND = 2**64 - 1  # XP is stored as u64 in the engine
+XP_BOUND = U64_MAX  # XP is stored as u64 in the engine
 SAME_LEVEL_ACTIONS = (3, 6)  # player actions to beat a same-level ordinary monster
 BOSS_LEVEL_GAP = 1  # most levels one build may need beyond another to beat the same boss
 

@@ -8,6 +8,9 @@ from .encounter import Encounter, FightResult
 from .model import Combatant, Kind, Profile, Rules
 
 
+U64_MAX = 2**64 - 1  # the engine stores XP as u64 and adds it with overflow checks
+
+
 @dataclass(frozen=True)
 class XpRules:
     """The proposed XP rules. The amounts themselves are authored content (`Content`)."""
@@ -138,6 +141,8 @@ class Simulator:
                     if not result.won:  # unbeatable even from full health: grinding stops here
                         return GrindResult(level, kills, rests)
                 hp, mp = result.hp, result.mp
+                if total + gain > U64_MAX:  # the engine's checked addition refuses this reward
+                    return GrindResult(level, kills, rests)
                 kills += 1
                 total += gain
             level += 1

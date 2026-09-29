@@ -200,6 +200,8 @@ def knobs(content: Content) -> dict[str, Knob]:
     for name, slot in all_slots.items():
         skills = slot[0](content).skills
         for i, skill in enumerate(skills):
+            if skill.level > content.max_level:
+                continue  # never unlocked within the table: nudging it could change nothing
             shared = sum(s.name == skill.name for s in skills) > 1
             label = f"{name} {skill.name}" + (f" [{i}]" if shared else "")
             add(found, f"{label} power", _skill_knob(slot, i, "power"))
