@@ -1,0 +1,61 @@
+//! Why a command or a save was refused.
+
+use super::*;
+
+#[derive(Debug, thiserror::Error)]
+pub enum EngineError {
+    #[error(transparent)]
+    World(#[from] SpecError),
+    #[error("there is no exit in that direction")]
+    NoExit,
+    #[error("that exit is locked")]
+    ExitLocked { location: Id, direction: Direction },
+    #[error("{0} is not available here")]
+    NotHere(Id),
+    #[error("{0} has already been defeated")]
+    AlreadyDefeated(Id),
+    #[error("you do not know that skill: {0}")]
+    UnknownSkill(Id),
+    #[error("you have not reached the level for {0}")]
+    SkillLocked(Id),
+    #[error("not enough MP for {0}")]
+    NotEnoughMp(Id),
+    #[error("not enough rage for {0}")]
+    NotEnoughRage(Id),
+    #[error("finish the fight first")]
+    InEncounter,
+    #[error("there is no running from this fight")]
+    NoFlee,
+    #[error("you cannot spend points on that stat")]
+    NoSuchStat,
+    #[error("not enough unspent stat points")]
+    NotEnoughPoints,
+    #[error("that stat cannot take more points")]
+    PointCap,
+    #[error("stat points cannot be refunded here")]
+    NoRespec,
+    #[error("you have no equipment #{0}")]
+    NoSuchGear(u64),
+    #[error("#{0} is already equipped")]
+    AlreadyEquipped(u64),
+    #[error("#{0} is not equipped")]
+    NotEquipped(u64),
+    #[error("you are not fighting anyone; engage first")]
+    NotFighting,
+    #[error("this is not a safe place to rest")]
+    NotSafe,
+    #[error("there is no active conversation")]
+    NoDialogue,
+    #[error("choose one of the displayed options")]
+    InvalidChoice,
+    #[error("quest cannot be accepted or completed in its current state: {0}")]
+    QuestState(Id),
+    #[error("unknown quest: {0}")]
+    UnknownQuest(Id),
+    #[error("the player is dead; start a new game")]
+    PlayerDead,
+    #[error("numeric limit exceeded; command was not applied")]
+    NumericLimit,
+    #[error("save cannot be loaded: {0}")]
+    InvalidSave(String),
+}

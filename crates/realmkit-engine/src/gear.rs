@@ -99,6 +99,25 @@ pub(super) fn receive(
     Ok(())
 }
 
+/// The world's starting gear, each piece worn in order while its slots are free.
+pub(super) fn receive_starting(
+    world: &WorldSpec,
+    combat: &mut CombatState,
+) -> Result<(), EngineError> {
+    for item in &world.combat().unwrap().player_equipment {
+        let id = combat.next_gear;
+        receive(combat, item, 1)?;
+        let slots = &equipment(world, item).slots;
+        let taken = worn(world, combat)
+            .iter()
+            .any(|worn| worn.slots.iter().any(|s| slots.contains(s)));
+        if !taken {
+            combat.gear.get_mut(&id).unwrap().equipped = true;
+        }
+    }
+    Ok(())
+}
+
 /// Wears a piece; whatever occupies any of its slots returns to the pack.
 pub(super) fn equip(
     world: &WorldSpec,

@@ -1,0 +1,165 @@
+//! What clients ask for and what the engine reports back.
+
+use super::*;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Command {
+    Look,
+    Move(Direction),
+    /// Starts an encounter with a fighter at the current location.
+    Engage(Id),
+    /// In an encounter: a basic attack in the player's basic-attack channel.
+    Attack(Id),
+    UseSkill {
+        skill: Id,
+        target: Id,
+    },
+    /// In an encounter: spend this turn turning to run; the escape happens
+    /// at the player's next turn if they live.
+    Flee,
+    /// Restores HP and MP at a safe location.
+    Rest,
+    /// Spends unspent stat points on one stat.
+    Allocate {
+        stat: Stat,
+        points: u32,
+    },
+    /// Refunds every spent stat point, where the world allows it.
+    Respec,
+    /// Wears a piece of equipment, returning whatever held its slots to the pack.
+    Equip(u64),
+    Unequip(u64),
+    Talk(Id),
+    /// One-based index into the currently visible choices.
+    ChooseDialogue(usize),
+    AcceptQuest(Id),
+    CompleteQuest(Id),
+    Inventory,
+    Status,
+    Quests,
+    /// Lists learned techniques and their ranks; only in worlds with techniques.
+    Techniques,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Event {
+    LocationViewed {
+        location: Id,
+    },
+    Moved {
+        from: Id,
+        to: Id,
+    },
+    /// `skill` is `None` for a basic attack, which uses narrative `variant`.
+    DamageDealt {
+        target: Id,
+        amount: u32,
+        variant: usize,
+        skill: Option<Id>,
+        critical: bool,
+    },
+    DamageReceived {
+        source: Id,
+        amount: u32,
+        variant: usize,
+        skill: Option<Id>,
+        critical: bool,
+    },
+    ResourceSpent {
+        character: Id,
+        resource: Resource,
+        amount: u32,
+    },
+    EncounterStarted {
+        opponents: Vec<Id>,
+    },
+    FleeStarted,
+    /// A participant in a yielding group stops fighting, alive.
+    Yielded {
+        character: Id,
+    },
+    /// Any rewards follow a victory.
+    EncounterEnded {
+        outcome: Outcome,
+    },
+    Rested,
+    PointsAllocated {
+        stat: Stat,
+        points: u32,
+    },
+    PointsRefunded,
+    TechniqueLearned {
+        technique: Id,
+    },
+    /// `rank` is 1-based; its authored name is shown.
+    TechniqueRankUp {
+        technique: Id,
+        rank: usize,
+    },
+    TechniqueXpGained {
+        technique: Id,
+        amount: u64,
+    },
+    TechniquesViewed,
+    Equipped {
+        gear: u64,
+    },
+    Unequipped {
+        gear: u64,
+    },
+    EnemyDefeated {
+        monster: Id,
+    },
+    ItemReceived {
+        item: Id,
+        quantity: u64,
+    },
+    ExperienceGranted {
+        amount: u64,
+    },
+    /// Levelling up restores HP, and MP when the player has any.
+    LevelUp {
+        level: usize,
+        mp_restored: bool,
+    },
+    PlayerDied,
+    Dialogue {
+        npc: Id,
+        node: Id,
+        choices: Vec<String>,
+    },
+    DialogueEnded,
+    QuestAccepted {
+        quest: Id,
+    },
+    QuestProgressed {
+        quest: Id,
+    },
+    QuestCompleted {
+        quest: Id,
+    },
+    StoryFlagSet {
+        flag: Id,
+    },
+    InventoryViewed,
+    StatusViewed,
+    QuestsViewed,
+}
+
+/// How an encounter ended; the player's death leaves it open instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Outcome {
+    /// Every opponent died or yielded.
+    Victory,
+    /// The player yielded.
+    Yielded,
+    Fled,
+}
+
+/// A command a client may offer in the current scene. Unavailable actions are
+/// shown for explanation; the engine still rechecks legality on execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Action {
+    pub command: Command,
+    pub available: bool,
+}
