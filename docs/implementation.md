@@ -42,6 +42,12 @@ proves the complete single-player loop with authored content.
   affordable skill. The player's vitals live in one place at a time
   (`Stance::Exploring` or `Stance::Fighting`), encounters save and resume
   exactly, and results match `scripts/combat_sim`. Package and save format 4.
+- [x] Grinding (M3c-2): authored groups bring packs into one encounter,
+  repeatable groups can be fought again, `Flee` escapes at the player's next
+  turn unless forbidden, yielding groups end fights alive with victory or
+  defeat flags, opponent levels gate their skills, and XP falls off with level
+  difference as in the simulator. Save format 5; saves bound variable XP and
+  loot instead of fixing them. `examples/arena` exercises all of it.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

@@ -284,8 +284,11 @@ balance decisions.
    rage and in-fight MP regeneration, the projected turn order and
    mid-encounter saves, matching `scripts/combat_sim` exactly (package and save
    format 4); defeated characters replace M3a's persistent opponent vitals.
-   **M3c-2:** groups and packs, repeatable groups, `Flee`, yielding, opponent
-   levels with level-gated skills, and XP falloff.
+   **M3c-2 · delivered:** groups and packs, repeatable groups, `Flee`,
+   yielding with victory and defeat flags, opponent levels with level-gated
+   skills, and XP falloff (`examples/arena`). Flee's wind-up always completes
+   within the one command that declares it, so no pending flight is saved;
+   the saved `pending` field waits until turns can pause mid-wind-up (M8).
 4. **M3d — seeded RNG and critical hits (optional).** A small hand-written,
    versioned PRNG such as SplitMix64 or PCG32 with saved state. Do not use
    `rand`'s `StdRng`: its output is not guaranteed stable across versions, which

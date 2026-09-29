@@ -162,10 +162,13 @@ A location's `characters` list places the others. A placed character is present
 while its `requires` conditions hold; the player can talk to it if it has a
 `dialogue` and attack it if it has a `combat` profile: its `stats` (see
 [Stats](#stats-damage-and-skills)), the `xp` granted on defeat, optional `loot`,
-optional `skills` (skill IDs; profiles have no level yet, so every listed skill
-is usable) and `basic_channel` (`physical` by default). A defeated character is gone: it is no longer
-listed and cannot be talked to. A character with a combat profile is one instance: it
-may be placed at most once, and its defeat is permanent (no respawns). Other
+optional `skills` (skill IDs, usable once the profile's `level` reaches each
+skill's unlock level), `basic_channel` (`physical` by default), `level`
+(default 1; it also scales the XP the character grants) and an optional
+`group`. A defeated character is gone: it is no longer listed and cannot be
+talked to. A character with a combat profile is one instance: it may be placed
+at most once, and its defeat is permanent (no respawns) unless its group is
+repeatable. Other
 characters may appear at several locations. Combat profiles require the world's
 `combat` block.
 
@@ -315,11 +318,45 @@ one point short cannot spend what its own action earns), and by
 cumulatively. Rage never outlasts the encounter; `resources` defaults to zero,
 which leaves either resource unused.
 
-Defeating every opponent ends the encounter: the player's HP and MP return to
-exploring, each defeated opponent's loot and XP are granted once, and defeat
-objectives advance. A defeated character stays defeated. A location with
-`"safe": true` lets the player `rest` outside encounters, restoring HP and MP;
-it needs the combat block.
+The combat block's `groups` shape encounters:
+
+```json
+"groups": [
+  { "id": "pack" },
+  { "id": "warren", "repeatable": true },
+  { "id": "spar", "yield_share": 50, "victory_flags": ["spar_won"], "defeat_flags": ["spar_lost"] },
+  { "id": "pit", "no_flee": true }
+]
+```
+
+Engaging a fighter whose profile names a `group` brings in every member placed
+at the location, present under its conditions and not defeated, in the
+location's order; an ungrouped fighter comes alone. Opponents target the first
+opponent still fighting.
+
+`flee` spends the player's turn: opponents act until the player's next turn,
+and if the player is still alive then, the encounter ends with nothing granted
+or recorded; the opponents are whole again next time. A `no_flee` group
+forbids it.
+
+In a group with a `yield_share` (1–100), nobody dies: a hit stops at 1 HP, and a
+participant at or below `max(1, ⌊max HP × share / 100⌋)` yields and leaves the
+schedule alive. The player yielding ends the encounter as a loss: the group's
+`defeat_flags` are set and play continues with the HP left. A defeat objective
+cannot target a member of a yielding group.
+
+The encounter is won when every opponent has died or yielded. The player's HP
+and MP return to exploring, and each opponent that died grants its loot and XP
+and advances defeat objectives. Its XP scales by level difference: ±10% per
+level of the opponent's level above or below the player's, capped at ±40% and
+rounded down, and nothing from an opponent five or more levels below. It is
+recorded as defeated unless its group is `repeatable`, which can be fought
+again at once and rewards every victory (a defeat objective counts the first).
+Yielded opponents grant and record nothing. A victory sets the group's
+`victory_flags`. The player dying is ordinary death.
+
+A location with `"safe": true` lets the player `rest` outside encounters,
+restoring HP and MP; it needs the combat block.
 
 `attack` and `hurt` each require at least one template; they narrate basic
 attacks, while skills use their own `text`. They allow

@@ -117,7 +117,9 @@ gradually. Fights are encounters on a paused initiative timeline: speed decides
 who acts first and how often, and the game waits for each of your commands.
 Skills spend MP, which regenerates as the fight goes on, or rage, which builds
 from acting and being hit; opponents answer with their own skills, and the
-player can rest at safe places (`examples/duel`).
+player can rest at safe places (`examples/duel`). Packs fight together, some
+fights can be repeated for grinding, you can flee most of them, and sparring
+partners yield instead of dying (`examples/arena`).
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting
