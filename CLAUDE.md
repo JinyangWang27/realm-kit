@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
-cargo test -p realmkit-engine --test gameplay <name_substring>   # one integration test
+cargo test -p realmkit-engine --test techniques <name_substring>   # one test file, filtered
 cargo test -p realmkit-cli menu::tests                            # unit tests in one module
 
 cargo run -p realmkit-cli -- play examples/arena --seed 1 --line < examples/arena/walkthrough.txt
@@ -36,7 +36,7 @@ Invariants the code relies on:
 - **Derived, never saved.** Effective player stats (level table + allocated points + technique passives + worn gear) always come from `rules::player_stats`. The player's HP and MP live in exactly one place, `Stance::Exploring(Vitals)` or `Stance::Fighting(Encounter)`.
 - **Formats.** Package and save formats share one version number (`FORMAT_VERSION` in spec, `SAVE_FORMAT_VERSION` in engine). A shape change bumps both and updates every `examples/*` package. Older packages and saves are rejected, never migrated. A save is bound to the package's content hash (`WorldSpec::revision`), so any content edit makes older saves unloadable.
 - **Validation guards the engine.** Numeric bounds such as `STAT_BOUND`, `TIME_BOUNDS`, `SLOT_BOUND` and `GEAR_STACK_BOUND` let the engine use `unwrap()` on validated references and keep its arithmetic small. The engine still uses checked arithmetic and returns `EngineError::NumericLimit` instead of wrapping. A new content field needs both a validation check and a save check.
-- **Simulator parity.** The damage, timeline and XP formulas mirror `scripts/combat_sim`. Tests in `engine/tests/gameplay.rs` pin numbers produced by the simulator, so formula changes must keep both in step.
+- **Simulator parity.** The damage, timeline and XP formulas mirror `scripts/combat_sim`. Tests in `engine/tests/encounters.rs` pin numbers produced by the simulator, so formula changes must keep both in step.
 - **Language.** Player-facing text comes from the world package, in the world's declared language. IDs and typed-command tokens stay ASCII.
 
 `examples/` holds the test worlds: `demo-world` (the quest loop), `quiet-archive` (no combat), `duel` (skills, MP, resting), `arena` (groups, flee, yielding, crits, stat points, gear) and `sect` (technique ranks). Each has a `walkthrough.txt`, except `quiet-archive`. The CLI terminal tests in `crates/realmkit-cli/tests/terminal.rs` run the real binary.
