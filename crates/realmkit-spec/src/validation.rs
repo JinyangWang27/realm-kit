@@ -494,7 +494,8 @@ fn usable_skills<'a>(
                 format!("{} needs attack in its channel", skill.id),
             );
         }
-        if skill.cost > stats.mp {
+        // Rage accumulates during a fight, so only MP has a ceiling to check.
+        if skill.resource == Resource::Mp && skill.cost > stats.mp {
             issue(
                 out,
                 owner,
@@ -518,6 +519,44 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         );
     }
     share(out, owner, combat.cross_share);
+    let timeline = combat.timeline;
+    if timeline.action_cost == 0 || timeline.speed_cap == 0 || timeline.speed_cap > STAT_BOUND {
+        issue(
+            out,
+            owner,
+            "invalid_timeline",
+            format!("action cost must be positive and the speed cap from 1 to {STAT_BOUND}"),
+        );
+    }
+    // Unused constants are harmless, so they only warn.
+    let uses = |resource| {
+        combat
+            .skills
+            .iter()
+            .any(|s| s.resource == resource && s.cost > 0)
+    };
+    let r = combat.resources;
+    for (set, used, what) in [
+        (
+            r.mp_regen_percent > 0,
+            uses(Resource::Mp),
+            "MP regeneration",
+        ),
+        (
+            r.rage_per_action > 0 || r.rage_per_max_hp > 0,
+            uses(Resource::Rage),
+            "rage",
+        ),
+    ] {
+        if set && !used {
+            out.push(Diagnostic {
+                severity: Severity::Warning,
+                entity_id: Some(owner.into()),
+                code: "unused_resource".into(),
+                message: format!("{what} is configured but no skill spends it"),
+            });
+        }
+    }
     let levels = &combat.levels;
     for level in levels {
         stats(out, owner, &level.stats);
@@ -558,6 +597,14 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
                 &skill.id,
                 "invalid_level",
                 "skills unlock at level 1 or later",
+            );
+        }
+        if skill.time == 0 {
+            issue(
+                out,
+                &skill.id,
+                "invalid_time",
+                "an action takes a positive time",
             );
         }
         if let Some(value) = skill.cross_share {

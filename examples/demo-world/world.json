@@ -1,5 +1,5 @@
 {
-  "format_version": 3,
+  "format_version": 4,
   "id": "bell_in_the_pines",
   "name": "The Bell in the Pines",
   "language": "en",
@@ -8,6 +8,7 @@
   "flags": ["ruins_open"],
   "combat": {
     "special_name": "Spirit",
+    "timeline": { "action_cost": 100000, "speed_cap": 200 },
     "levels": [
       { "xp": 0, "stats": { "hp": 40, "patk": 10, "pdef": 6, "satk": 2, "sdef": 4, "speed": 100 } },
       { "xp": 10, "stats": { "hp": 48, "patk": 12, "pdef": 7, "satk": 2, "sdef": 5, "speed": 100 } },

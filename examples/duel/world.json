@@ -1,5 +1,5 @@
 {
-  "format_version": 3,
+  "format_version": 4,
   "id": "hedge_duel",
   "name": "A Duel at the Hedge",
   "language": "en",
@@ -7,6 +7,7 @@
   "player": "apprentice",
   "combat": {
     "special_name": "Witchcraft",
+    "timeline": { "action_cost": 100000, "speed_cap": 200 },
     "levels": [
       { "xp": 0, "stats": { "hp": 34, "mp": 24, "patk": 3, "pdef": 4, "satk": 10, "sdef": 6, "speed": 100 } },
       { "xp": 12, "stats": { "hp": 40, "mp": 30, "patk": 3, "pdef": 5, "satk": 12, "sdef": 7, "speed": 100 } }

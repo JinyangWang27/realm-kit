@@ -264,6 +264,11 @@ fn older_packages_are_rejected_clearly() {
             2,
             r#"{ "format_version": 2, "combat": { "levels": [{ "xp": 0, "hp": 1, "attack": 1 }] } }"#,
         ),
+        // M3b's combat block has no timeline.
+        (
+            3,
+            r#"{ "format_version": 3, "combat": { "special_name": "Magic" } }"#,
+        ),
     ] {
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir(&temp).unwrap();
@@ -309,6 +314,10 @@ fn skills_are_bounded_referenced_usable_and_affordable() {
         |w| w.world.combat.as_mut().unwrap().skills[2].level = 3,
         // More MP than the player has at the level the skill unlocks.
         |w| w.world.combat.as_mut().unwrap().skills[1].cost = 25,
+        |w| w.world.combat.as_mut().unwrap().skills[1].time = 0,
+        |w| w.world.combat.as_mut().unwrap().timeline.action_cost = 0,
+        |w| w.world.combat.as_mut().unwrap().timeline.speed_cap = 0,
+        |w| w.world.combat.as_mut().unwrap().timeline.speed_cap = STAT_BOUND + 1,
         // Hex costs 5; the witch has 10.
         |w| w.characters[1].combat.as_mut().unwrap().stats.mp = 4,
         // A special skill with no attack in either channel.
@@ -338,4 +347,31 @@ fn the_cross_share_blends_channels_and_defaults_to_25() {
         100 * 4 + 25 * 6
     );
     assert_eq!(stats.combined(Channel::Physical, 0, false), 300);
+}
+
+#[test]
+fn rage_skills_need_no_mp_and_unused_resources_only_warn() {
+    // A rage cost above every MP pool is fine: rage accumulates in a fight.
+    let mut world = duel();
+    let combat = world.world.combat.as_mut().unwrap();
+    let bolt = &mut combat.skills[1];
+    (bolt.resource, bolt.cost) = (Resource::Rage, 99);
+    combat.resources.rage_per_action = 1;
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    // Rage constants with no rage skill are harmless, so they only warn.
+    let mut unused = duel();
+    unused
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .resources
+        .rage_per_action = 1;
+    assert!(unused.validate().is_ok());
+    let warnings = unused.diagnostics();
+    assert_eq!(warnings.len(), 1);
+    assert_eq!(
+        (warnings[0].code.as_str(), warnings[0].severity),
+        ("unused_resource", Severity::Warning)
+    );
 }
