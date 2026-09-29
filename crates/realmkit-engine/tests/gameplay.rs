@@ -1135,6 +1135,24 @@ fn a_skill_paid_for_by_regeneration_up_to_the_players_turn_is_usable() {
 }
 
 #[test]
+fn rage_saturates_instead_of_failing_the_encounter() {
+    let mut world = demo();
+    world
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .resources
+        .rage_per_action = u32::MAX;
+    combatant(&mut world, "wolf").stats.speed = 200;
+    // The wolf acts twice before the player's first turn, overflowing rage.
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("wolf".into())).unwrap();
+    assert_eq!(foe(&engine).rage, u32::MAX);
+}
+
+#[test]
 fn the_largest_action_cost_saves_and_restores_without_overflow() {
     let mut world = duel();
     world.world.combat.as_mut().unwrap().timeline.action_cost = ACTION_COST_BOUND;

@@ -315,6 +315,7 @@ fn skills_are_bounded_referenced_usable_and_affordable() {
         // More MP than the player has at the level the skill unlocks.
         |w| w.world.combat.as_mut().unwrap().skills[1].cost = 25,
         |w| w.world.combat.as_mut().unwrap().skills[1].time = 0,
+        |w| w.world.combat.as_mut().unwrap().skills[1].time = TIME_BOUNDS.1 + 1,
         |w| w.world.combat.as_mut().unwrap().timeline.action_cost = 0,
         |w| w.world.combat.as_mut().unwrap().timeline.action_cost = ACTION_COST_BOUND + 1,
         |w| w.world.combat.as_mut().unwrap().timeline.speed_cap = 0,
@@ -374,5 +375,16 @@ fn rage_skills_need_no_mp_and_unused_resources_only_warn() {
     assert_eq!(
         (warnings[0].code.as_str(), warnings[0].severity),
         ("unused_resource", Severity::Warning)
+    );
+    // A rage skill in a world with no rage source can never be paid for.
+    let mut sourceless = duel();
+    let bolt = &mut sourceless.world.combat.as_mut().unwrap().skills[1];
+    (bolt.resource, bolt.cost) = (Resource::Rage, 5);
+    assert!(sourceless.validate().is_ok());
+    let warnings = sourceless.diagnostics();
+    assert_eq!(warnings.len(), 1);
+    assert_eq!(
+        (warnings[0].code.as_str(), warnings[0].entity_id.as_deref()),
+        ("unusable_skill", Some("bolt"))
     );
 }

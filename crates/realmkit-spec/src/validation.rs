@@ -539,25 +539,40 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
             .any(|s| s.resource == resource && s.cost > 0)
     };
     let r = combat.resources;
+    let rage = r.rage_per_action > 0 || r.rage_per_max_hp > 0;
+    let mut warn = |entity: &str, code: &str, message: String| {
+        out.push(Diagnostic {
+            severity: Severity::Warning,
+            entity_id: Some(entity.into()),
+            code: code.into(),
+            message,
+        })
+    };
     for (set, used, what) in [
         (
             r.mp_regen_percent > 0,
             uses(Resource::Mp),
             "MP regeneration",
         ),
-        (
-            r.rage_per_action > 0 || r.rage_per_max_hp > 0,
-            uses(Resource::Rage),
-            "rage",
-        ),
+        (rage, uses(Resource::Rage), "rage"),
     ] {
         if set && !used {
-            out.push(Diagnostic {
-                severity: Severity::Warning,
-                entity_id: Some(owner.into()),
-                code: "unused_resource".into(),
-                message: format!("{what} is configured but no skill spends it"),
-            });
+            warn(
+                owner,
+                "unused_resource",
+                format!("{what} is configured but no skill spends it"),
+            );
+        }
+    }
+    // Rage starts at 0 in every fight, so without a source a rage cost is never met.
+    if !rage {
+        for skill in combat
+            .skills
+            .iter()
+            .filter(|s| s.resource == Resource::Rage && s.cost > 0)
+        {
+            let message = "costs rage, but this world has no rage_per_action or rage_per_max_hp";
+            warn(&skill.id, "unusable_skill", message.into());
         }
     }
     let levels = &combat.levels;
@@ -602,12 +617,15 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
                 "skills unlock at level 1 or later",
             );
         }
-        if skill.time == 0 {
+        if !(TIME_BOUNDS.0..=TIME_BOUNDS.1).contains(&skill.time) {
             issue(
                 out,
                 &skill.id,
                 "invalid_time",
-                "an action takes a positive time",
+                format!(
+                    "action time must be from {} to {} percent",
+                    TIME_BOUNDS.0, TIME_BOUNDS.1
+                ),
             );
         }
         if let Some(value) = skill.cross_share {

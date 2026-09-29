@@ -239,10 +239,8 @@ fn act(
             amount: skill.cost,
         });
     }
-    a.rage = a
-        .rage
-        .checked_add(rules.resources.rage_per_action)
-        .ok_or(EngineError::NumericLimit)?;
+    // Rage beyond u32 buys nothing more, so it saturates rather than failing.
+    a.rage = a.rage.saturating_add(rules.resources.rage_per_action);
     a.next_time = a
         .next_time
         .checked_add(next)
@@ -254,8 +252,7 @@ fn act(
     let progress = u128::from(t.rage_remainder)
         + u128::from(rules.resources.rage_per_max_hp) * u128::from(dealt);
     let max_hp = u128::from(defender.hp);
-    t.rage = u32::try_from(u128::from(t.rage) + progress / max_hp)
-        .map_err(|_| EngineError::NumericLimit)?;
+    t.rage = u32::try_from(u128::from(t.rage) + progress / max_hp).unwrap_or(u32::MAX);
     t.rage_remainder = (progress % max_hp) as u64;
     let skill = skill.map(|s| s.id.clone());
     if actor == 0 {
