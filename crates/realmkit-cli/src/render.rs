@@ -169,6 +169,45 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 )?
             }
             Event::PointsRefunded => writeln!(output, "Your stat points are refunded.")?,
+            Event::TechniqueLearned { technique } => writeln!(
+                output,
+                "You learn {}.",
+                world.technique(technique).unwrap().name
+            )?,
+            Event::TechniqueRankUp { technique, rank } => {
+                let technique = world.technique(technique).unwrap();
+                let name = &technique.ranks[rank - 1].name;
+                writeln!(output, "{}: {name}!", technique.name)?
+            }
+            Event::TechniqueXpGained { technique, amount } => writeln!(
+                output,
+                "{} +{amount}",
+                world.technique(technique).unwrap().name
+            )?,
+            Event::TechniquesViewed => {
+                writeln!(output, "Techniques:")?;
+                let learned = state.combat.as_ref().map(|c| &c.techniques);
+                if learned.is_none_or(|l| l.is_empty()) {
+                    writeln!(output, "  None yet")?;
+                }
+                for (id, progress) in learned.into_iter().flatten() {
+                    let technique = world.technique(id).unwrap();
+                    let rank = &technique.ranks[progress.rank - 1];
+                    write!(output, "  {} — {}", technique.name, rank.name)?;
+                    match technique.ranks.get(progress.rank) {
+                        // A closed gate holds XP at the next threshold.
+                        Some(next) if progress.xp >= next.xp => writeln!(
+                            output,
+                            " ({}/{} to {}, sealed)",
+                            progress.xp, next.xp, next.name
+                        )?,
+                        Some(next) => {
+                            writeln!(output, " ({}/{} to {})", progress.xp, next.xp, next.name)?
+                        }
+                        None => writeln!(output, " (mastered)")?,
+                    }
+                }
+            }
             Event::EncounterStarted { opponents } => {
                 let names: Vec<_> = opponents.iter().map(|id| name(id).as_str()).collect();
                 writeln!(output, "You face {}.", names.join(", "))?

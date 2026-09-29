@@ -250,7 +250,7 @@ pub(super) fn player_action(
         .participants
         .iter()
         .position(|p| p.character == target && p.side != 0 && p.fighting())
-        .ok_or(EngineError::NotHere(target))?;
+        .ok_or_else(|| EngineError::NotHere(target.clone()))?;
     // Advancing stops at the player's turn, already regenerated, so the
     // player acts now with the MP they see.
     if let Some(skill) = skill {
@@ -267,6 +267,13 @@ pub(super) fn player_action(
         skill,
         events,
     )?;
+    // Using a technique trains it, less so against much weaker opponents.
+    let combat = state.combat.as_ref().unwrap();
+    if let Some(technique) = skill.and_then(|s| techniques::of_skill(world, combat, &s.id)) {
+        let per_use = u64::from(world.combat().unwrap().technique_xp_per_use);
+        let gain = xp_for_defeat(per_use, me.level, profile(world, &target).level);
+        techniques::add_xp(world, state, technique, gain, events)?;
+    }
     advance(world, state, events, false)
 }
 
@@ -520,6 +527,7 @@ fn end(
         // Every reward scales from the level the player fought at, so a
         // level-up from one opponent does not change the next one's XP.
         let level = state.combat.as_ref().unwrap().level;
+        let mut earned = 0_u64;
         for id in fallen {
             let profile = profile(world, &id);
             let combat = state.combat.as_mut().unwrap();
@@ -527,6 +535,7 @@ fn end(
                 combat.defeated.insert(id.clone());
             }
             let xp = xp_for_defeat(profile.xp, level, profile.level);
+            earned = earned.saturating_add(xp);
             rules::grant_items(state, &profile.loot, events)?;
             rules::grant_xp(world, state, xp, events)?;
             let defeat = QuestObjective::Defeat { character: id };
@@ -535,6 +544,21 @@ fn end(
                     rules::progress(state, &q.id, events);
                 }
             }
+        }
+        // Passive arts deepen by their share of the victory's XP.
+        let shares: Vec<(Id, u64)> = state
+            .combat
+            .as_ref()
+            .unwrap()
+            .techniques
+            .keys()
+            .map(|id| {
+                let share = u128::from(world.technique(id).unwrap().xp_share_percent);
+                (id.clone(), (u128::from(earned) * share / 100) as u64)
+            })
+            .collect();
+        for (id, gain) in shares {
+            techniques::add_xp(world, state, &id, gain, events)?;
         }
     }
     for flag in flags {

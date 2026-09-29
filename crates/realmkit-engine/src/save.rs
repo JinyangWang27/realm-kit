@@ -148,6 +148,31 @@ pub(super) fn check(
             }) && spent <= rules::granted_points(world, combat.level),
             "invalid stat point allocation",
         )?;
+        // Techniques: known ones at an existing rank, XP at least that rank's
+        // threshold, and at the next threshold only while its gate is closed.
+        // Starting techniques are never forgotten.
+        ensure(
+            combat.techniques.iter().all(|(id, learned)| {
+                world.technique(id).is_some_and(|t| {
+                    let Some(rank) = learned.rank.checked_sub(1).and_then(|i| t.ranks.get(i))
+                    else {
+                        return false;
+                    };
+                    learned.xp >= rank.xp
+                        && t.ranks.get(learned.rank).is_none_or(|next| {
+                            learned.xp < next.xp
+                                || (learned.xp == next.xp
+                                    && !rules::conditions_met(state, &next.requires))
+                        })
+                })
+            }) && rules.player_techniques.iter().all(|grant| {
+                combat
+                    .techniques
+                    .get(&grant.technique)
+                    .is_some_and(|t| t.rank >= grant.rank.unwrap_or(1))
+            }),
+            "invalid technique state",
+        )?;
         let max = rules::player_stats(world, combat);
         match &combat.stance {
             Stance::Exploring(v) => ensure(

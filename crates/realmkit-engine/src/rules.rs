@@ -206,6 +206,9 @@ fn quest(
         state.quests.insert(id.into(), QuestStatus::Completed);
         events.push(Event::QuestCompleted { quest: id.into() });
         grant_items(state, &quest.reward_items, events)?;
+        for grant in &quest.reward_techniques {
+            techniques::grant(world, state, grant, events)?;
+        }
         grant_xp(world, state, quest.reward_xp, events)?;
         for flag in &quest.completion_flags {
             set_flag(world, state, flag, events);
@@ -231,20 +234,23 @@ pub(super) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         command,
         available: true,
     };
-    let panels = [Command::Inventory, Command::Status, Command::Quests].map(available);
+    let mut panels = vec![
+        available(Command::Inventory),
+        available(Command::Status),
+        available(Command::Quests),
+    ];
+    if world.combat().is_some_and(|c| !c.techniques.is_empty()) {
+        panels.push(available(Command::Techniques));
+    }
     // Death is not a locked door: offer only what can still be done.
     if dead(state) {
-        return panels.into();
+        return panels;
     }
     if let Some(encounter) = fighting(state) {
         let level = state.combat.as_ref().unwrap().level;
         let player = &encounter.participants[0];
-        let skills: Vec<_> = world
-            .combat()
-            .unwrap()
-            .player_skills
-            .iter()
-            .filter_map(|id| world.skill(id))
+        let skills: Vec<_> = techniques::player_skills(world, state.combat.as_ref().unwrap())
+            .into_iter()
             .filter(|s| s.level <= level)
             .collect();
         let mut actions = Vec::new();
@@ -325,14 +331,22 @@ pub(super) fn execute(
     if dead(state)
         && !matches!(
             command,
-            Command::Look | Command::Status | Command::Inventory | Command::Quests
+            Command::Look
+                | Command::Status
+                | Command::Inventory
+                | Command::Quests
+                | Command::Techniques
         )
     {
         return Err(EngineError::PlayerDead);
     }
     let panel = matches!(
         command,
-        Command::Look | Command::Status | Command::Inventory | Command::Quests
+        Command::Look
+            | Command::Status
+            | Command::Inventory
+            | Command::Quests
+            | Command::Techniques
     );
     let combat_action = matches!(
         command,
@@ -350,6 +364,7 @@ pub(super) fn execute(
         Command::Inventory => events.push(Event::InventoryViewed),
         Command::Status => events.push(Event::StatusViewed),
         Command::Quests => events.push(Event::QuestsViewed),
+        Command::Techniques => events.push(Event::TechniquesViewed),
         Command::Move(direction) => {
             let location = world.location(&state.player.location).unwrap();
             let exit = location.exits.get(&direction).ok_or(EngineError::NoExit)?;
@@ -399,8 +414,9 @@ pub(super) fn execute(
                     quest(world, state, id, true, &mut events)?
                 }
                 Some(DialogueEffect::SetFlag { flag }) => set_flag(world, state, flag, &mut events),
-                // Techniques arrive with the engine's next commit.
-                Some(DialogueEffect::GrantTechnique(_)) => {}
+                Some(DialogueEffect::GrantTechnique(grant)) => {
+                    techniques::grant(world, state, grant, &mut events)?
+                }
                 None => {}
             }
             // An effect can make the speaker unavailable; the conversation ends then.
@@ -426,9 +442,11 @@ pub(super) fn execute(
         Command::Flee => encounter::flee(world, state, &mut events)?,
         Command::Attack(id) => encounter::player_action(world, state, id, None, &mut events)?,
         Command::UseSkill { skill, target } => {
-            let known = world
-                .combat()
-                .is_some_and(|c| c.player_skills.contains(&skill));
+            let known = state.combat.as_ref().is_some_and(|c| {
+                techniques::player_skills(world, c)
+                    .iter()
+                    .any(|s| s.id == skill)
+            });
             let skill = world
                 .skill(&skill)
                 .filter(|_| known)
@@ -451,10 +469,15 @@ pub(super) fn execute(
             events.push(Event::Rested);
         }
     }
+    // A flag or quest this command changed may open a breakthrough gate.
+    if !panel {
+        techniques::promote(world, state, &mut events);
+    }
     Ok(events)
 }
 
-/// Effective stats: the level table plus allocated stat points. Derived
+/// Effective stats: the level table plus allocated stat points plus learned
+/// techniques' current rank bonuses. Derived
 /// whenever needed, never saved, so no bonus can be counted twice.
 pub(super) fn player_stats(world: &WorldSpec, combat: &CombatState) -> Stats {
     let rules = world.combat().unwrap();
@@ -466,6 +489,7 @@ pub(super) fn player_stats(world: &WorldSpec, combat: &CombatState) -> Stats {
             *total = total.saturating_add(spent.saturating_mul(value));
         }
     }
+    techniques::add_passives(world, combat, &mut stats);
     stats
 }
 

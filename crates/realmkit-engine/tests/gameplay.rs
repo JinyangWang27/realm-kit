@@ -1834,3 +1834,222 @@ fn saves_reject_allocations_the_rules_could_not_make() {
         );
     }
 }
+
+fn sect() -> WorldSpec {
+    WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect")).unwrap()
+}
+
+fn learned(engine: &Engine<'_>, technique: &str) -> Option<TechniqueState> {
+    combat(engine).techniques.get(technique).copied()
+}
+
+fn palm(skill: &str) -> Command {
+    UseSkill {
+        skill: skill.into(),
+        target: "dummy".into(),
+    }
+}
+
+/// Talks to Elder Qing and takes the Cloud Palm lesson.
+fn learn_palm(engine: &mut Engine<'_>) -> Vec<Event> {
+    engine.execute(Talk("qing".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap()
+}
+
+#[test]
+fn a_starting_internal_art_adds_its_rank_bonus() {
+    let world = sect();
+    let engine = Engine::new(&world).unwrap();
+    assert_eq!(
+        learned(&engine, "azure_breath"),
+        Some(TechniqueState { rank: 1, xp: 0 })
+    );
+    // First Layer: +10 MP, +2 Qi attack, and play starts at the full pool.
+    let stats = engine.player_stats().unwrap();
+    assert_eq!((stats.mp, stats.satk), (30, 12));
+    assert_eq!(vitals(&engine).mp, 30);
+}
+
+#[test]
+fn teaching_a_technique_makes_its_rank_skill_usable() {
+    let world = sect();
+    let mut engine = Engine::new(&world).unwrap();
+    let events = learn_palm(&mut engine);
+    assert!(events.contains(&Event::TechniqueLearned {
+        technique: "cloud_palm".into()
+    }));
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("dummy".into())).unwrap();
+    assert!(offered(&engine).contains(&(palm("palm_drifting"), true)));
+    assert!(matches!(
+        engine.execute(palm("palm_storm")),
+        Err(EngineError::UnknownSkill(_))
+    ));
+}
+
+#[test]
+fn use_trains_a_technique_through_its_named_ranks() {
+    let world = sect();
+    let mut engine = Engine::new(&world).unwrap();
+    learn_palm(&mut engine);
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("dummy".into())).unwrap();
+    let events = engine.execute(palm("palm_drifting")).unwrap();
+    assert!(events.contains(&Event::TechniqueXpGained {
+        technique: "cloud_palm".into(),
+        amount: 10
+    }));
+    let mut all = events;
+    while learned(&engine, "cloud_palm").unwrap().rank == 1 {
+        if engine.encounter().is_none() {
+            engine.execute(Engage("dummy".into())).unwrap();
+        }
+        all.extend(engine.execute(palm("palm_drifting")).unwrap());
+    }
+    // Three uses reach 30 XP: Gathering Storm, whose skill replaces the old one.
+    assert!(all.contains(&Event::TechniqueRankUp {
+        technique: "cloud_palm".into(),
+        rank: 2
+    }));
+    assert_eq!(learned(&engine, "cloud_palm").unwrap().xp, 30);
+    if engine.encounter().is_none() {
+        engine.execute(Engage("dummy".into())).unwrap();
+    }
+    assert!(matches!(
+        engine.execute(palm("palm_drifting")),
+        Err(EngineError::UnknownSkill(_))
+    ));
+    engine.execute(palm("palm_storm")).unwrap();
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn technique_xp_from_use_falls_off_like_character_xp() {
+    let mut world = sect();
+    combatant(&mut world, "dummy").level = 3;
+    let mut engine = Engine::new(&world).unwrap();
+    learn_palm(&mut engine);
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("dummy".into())).unwrap();
+    // Two levels above the player: 120% of 10.
+    let events = engine.execute(palm("palm_drifting")).unwrap();
+    assert!(events.contains(&Event::TechniqueXpGained {
+        technique: "cloud_palm".into(),
+        amount: 12
+    }));
+}
+
+#[test]
+fn an_internal_art_rises_by_a_small_share_of_victory_xp() {
+    let world = sect();
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Engage("dummy".into())).unwrap();
+    let events = fight_out(&mut engine);
+    // A 5-XP dummy at a 20% share: one point of Azure Breath.
+    assert!(events.contains(&Event::ExperienceGranted { amount: 5 }));
+    assert!(events.contains(&Event::TechniqueXpGained {
+        technique: "azure_breath".into(),
+        amount: 1
+    }));
+    assert_eq!(learned(&engine, "azure_breath").unwrap().xp, 1);
+}
+
+#[test]
+fn a_breakthrough_gate_holds_xp_until_it_opens() {
+    // Start with 40 XP of Azure Breath: Second Layer, waiting at the sealed third.
+    let mut world = sect();
+    world.world.combat.as_mut().unwrap().player_techniques[0].xp = 40;
+    let mut engine = Engine::new(&world).unwrap();
+    assert_eq!(
+        learned(&engine, "azure_breath"),
+        Some(TechniqueState { rank: 2, xp: 30 })
+    );
+    assert_eq!(engine.player_stats().unwrap().mp, 20 + 20);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+    // Accept Wen's quest, then learn from Qing where the volume is: the flag
+    // opens the gate at once.
+    engine.execute(Move(East)).unwrap();
+    engine.execute(Talk("wen".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(Move(West)).unwrap();
+    engine.execute(Talk("qing".into())).unwrap();
+    let events = engine.execute(ChooseDialogue(2)).unwrap();
+    assert!(events.contains(&Event::TechniqueRankUp {
+        technique: "azure_breath".into(),
+        rank: 3
+    }));
+    assert_eq!(engine.player_stats().unwrap().mp, 20 + 35);
+}
+
+#[test]
+fn a_quest_reward_can_teach_technique_xp() {
+    let world = sect();
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(East)).unwrap();
+    engine.execute(Talk("wen".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(Move(West)).unwrap();
+    engine.execute(Talk("qing".into())).unwrap();
+    engine.execute(ChooseDialogue(2)).unwrap();
+    engine.execute(Move(East)).unwrap();
+    engine.execute(Talk("wen".into())).unwrap();
+    let events = engine.execute(ChooseDialogue(1)).unwrap();
+    assert!(events.contains(&Event::TechniqueXpGained {
+        technique: "azure_breath".into(),
+        amount: 15
+    }));
+    assert_eq!(learned(&engine, "azure_breath").unwrap().rank, 2);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn saves_reject_technique_states_the_rules_could_not_reach() {
+    let world = sect();
+    let mut engine = Engine::new(&world).unwrap();
+    learn_palm(&mut engine);
+    let good = engine.snapshot();
+    let broken: Vec<fn(&mut SaveSnapshot)> = vec![
+        |s| {
+            let t = &mut s.state.combat.as_mut().unwrap().techniques;
+            t.insert("missing".into(), TechniqueState { rank: 1, xp: 0 });
+        },
+        |s| {
+            let t = &mut s.state.combat.as_mut().unwrap().techniques;
+            t.insert("cloud_palm".into(), TechniqueState { rank: 0, xp: 0 });
+        },
+        |s| {
+            let t = &mut s.state.combat.as_mut().unwrap().techniques;
+            t.insert("cloud_palm".into(), TechniqueState { rank: 3, xp: 99 });
+        },
+        // Second Layer needs 10 XP.
+        |s| {
+            let t = &mut s.state.combat.as_mut().unwrap().techniques;
+            t.insert("azure_breath".into(), TechniqueState { rank: 2, xp: 5 });
+        },
+        // At an open threshold the rank would already have risen.
+        |s| {
+            let t = &mut s.state.combat.as_mut().unwrap().techniques;
+            t.insert("cloud_palm".into(), TechniqueState { rank: 1, xp: 30 });
+        },
+        // The starting art is never forgotten.
+        |s| {
+            s.state
+                .combat
+                .as_mut()
+                .unwrap()
+                .techniques
+                .remove("azure_breath");
+        },
+    ];
+    for (i, corrupt) in broken.into_iter().enumerate() {
+        let mut snapshot = good.clone();
+        corrupt(&mut snapshot);
+        assert!(
+            Engine::restore(&world, snapshot).is_err(),
+            "corruption {i} was accepted"
+        );
+    }
+}
