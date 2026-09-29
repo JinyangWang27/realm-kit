@@ -111,6 +111,20 @@ qualitative periods.
 A local deterministic scheduler used to order actions inside an encounter. Its
 units have no implicit conversion to real time or optional World Time.
 
+## Encounter
+
+Proposed for M3. Active local combat state: an ordered list of participants,
+each a Character with a combat profile, a side, a controller (player or authored
+policy), HP/MP, rage and a next action time on the Encounter Timeline. While
+active, it is the sole owner of its participants' HP and MP. Rage exists only
+inside an encounter.
+
+## Combat Profile
+
+Proposed for M3. The optional component that lets a Character take part in
+encounters: its combat stats plus any loot/XP granted when it is defeated. A
+character without one cannot be engaged.
+
 ## Canon Anchor
 
 A protected major source fact or event that a source-backed adaptation must not

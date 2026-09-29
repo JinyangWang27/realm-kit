@@ -58,9 +58,9 @@ instances arrive.
 
 ## Authoring equipment
 
-Authors describe a weapon's category, compatible slots, physical/magical attack
+Authors describe a weapon's category, compatible slots, physical/special attack
 bonuses and the action cost of its basic attack. Armour describes its slots,
-physical/magical defence, speed penalty and any explicit damage-type modifiers.
+physical/special defence, speed penalty and any explicit damage-type modifiers.
 Items may also grant bounded HP/MP or other supported stat bonuses.
 
 Equipment-enabled worlds define the small set of slot IDs their content needs.

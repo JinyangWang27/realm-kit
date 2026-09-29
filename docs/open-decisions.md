@@ -1417,6 +1417,60 @@ Exact network protocol, authentication, database design, timeout values, fallbac
 commands, party ownership rules and horizontal scaling are implementation/server
 policy to decide with the first real multiplayer consumer.
 
+## 17. Combat encounters
+
+**Proposed; confirm before M3c.**
+
+The roadmap holds the details under
+[Combatants and encounters](../ROADMAP.md#combatants-and-encounters--proposed)
+and [Stat ranges and caps](../ROADMAP.md#stat-ranges-and-caps--proposed). In
+summary:
+
+- Combat is a component of the shared Character model, not a monster type.
+  `Engage(character)` starts an encounter with any engageable character that has a
+  combat profile. An authored group brings in its undefeated members present at
+  the location.
+- Encounter state holds any number of participants on any number of sides. M3
+  content exercises one player against one or more opponents; allies (XvY) reuse
+  the same state when a world needs companions or party play.
+- Each participant is controlled by the player, which pauses the timeline, or by
+  an authored policy enum. M3's only policy uses the strongest affordable skill,
+  or the basic attack, on the first living opponent.
+- Ties resolve by `(next_time, side order, participant order)`. MP is checked at
+  validation and spent on resolution. A speed change applies from the actor's next
+  action. Dead participants lose pending actions.
+- While an encounter is active it solely owns every participant's HP and MP.
+  Opponent vitals never persist outside an encounter.
+- Grinding uses repeatable groups, which grant rewards on every victory and
+  record no defeats, and `Flee`, which takes effect at the player's next turn.
+  Copies within one encounter are told apart by participant position; Section 10
+  instance IDs are only for copies with persistent state.
+- Skills spend MP or rage. MP regenerates over encounter time and by resting,
+  and MP costs grow with level; rage starts at zero in each encounter and builds
+  from actions and damage taken. The
+  [balance simulation](../ROADMAP.md#balance-simulation--proposed) tunes both
+  against grinding-oriented targets.
+- Most parts of combat are optional and exist only when content uses them:
+  character levels and XP, MP, rage, skills, technique ranks, realms and seeded
+  RNG. Power comes from stats, never from character level.
+- Damage has two channels, physical and special; each world names special
+  (magic, 内力, mana). The matching stats dominate and the other channel adds an
+  authored share (25% proposed), so deep 内力 also blocks some physical damage.
+  The proposed formula has no K: defence equal to the combined attack halves
+  damage.
+- An authored group may yield at a share of maximum HP instead of fighting to the
+  death, for sparring, jousts and canonical duels; the player losing such a
+  fight is not death recovery.
+- In M4, learned techniques have ranks that rise through use, teaching and
+  authored breakthrough gates; a world's realm (境界) is the rank of its core
+  internal art. This replaces a separate realm-tier system.
+- Combat stats have a 9,999 engine safety bound. Speed has a required authored cap
+  (candidate 200 at baseline 100). Other stat caps wait for equipment stacking in
+  M4. Action cost 100,000 gives every integer speed up to 255 a distinct delay.
+- Still open: policies richer than basic attack, relationships between three or
+  more sides, respawn delays in World Time (M5), downed/revive rules, and immunity,
+  vulnerability and stacking (M4).
+
 ## Discussion order
 
 Discuss decisions immediately before their first consumer:

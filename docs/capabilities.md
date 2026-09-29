@@ -141,6 +141,68 @@ an evidence definition as obtained; testimony may do the same with no inventory
 object. Cross-capability effects must be declared and validated rather than
 inferred from generic tags or hidden global state.
 
+## Combat across sources
+
+One combat capability should serve very different sources through authored
+names and data. These four worked examples show where the shared model fits and
+which typed mechanics each source would add.
+
+| | 神雕侠侣 | 天龙八部 | Arthurian legend | 雪中悍刀行 |
+| --- | --- | --- | --- | --- |
+| Damage channels | 外功 physical, 内功 special | Same | Arms physical, enchantment special | Arms physical, 气机 and 剑气 special |
+| Skill resource | 内力 as MP, restored by 打坐 as rest | 内力, which can be absorbed or dissolved | None for knights; mana for Merlin and Morgan | 气机 as MP; a rage-style 刀意 suits 徐凤年 |
+| Growth | Techniques from 秘籍 and 奇遇 | Techniques and absorbed 内力 | Deeds and renown | Realms from 三品 to 陆地神仙 |
+| Signature mechanics | 点穴 stun, poison, 双剑合璧 combo, mood-gated 黯然销魂掌 | 斗转星移 reflection, 内力 attacks, unreliable 六脉神剑, 生死符 | Excalibur's scabbard, Gawain's strength until noon, the Green Knight | 金刚 toughness, 指玄 insight, summoned swords |
+| How fights end | Often sparring that stops short (点到为止) | Duels and one-against-many sieges | Jousts and duels of honour | Duels and armies |
+
+### Weapons
+
+Weapons are equipment (M4) with world-authored categories rather than a
+universal list. A small closed set of typed properties covers these sources. Special attack
+and defence carry the world's own name, such as 内力 in wuxia:
+
+- a category that techniques can require, so a 剑法 needs a 剑;
+- stat modifiers, including a speed penalty for heavy weapons;
+- basic-attack power and action time, so a dagger is quick and light and a
+  heavy sword slow and powerful;
+- optional defence bypass or a damage channel;
+- the authored slots it occupies, so a one-armed 杨过 has one hand slot.
+
+独孤求败's sword tomb (剑冢) is a ready-made progression: a sharp sword with normal
+power and time, a faster soft sword, 玄铁重剑 ("重剑无锋，大巧不工") as a slow,
+heavy strike that bypasses some defence, then 木剑 and 无剑, where techniques
+stop requiring a weapon at all.
+
+Weapons with equal damage per unit of time still change fights at hits-to-kill
+breakpoints, so each weapon tier needs the balance simulation's checks, not only
+matching damage rates.
+
+### Mechanics by demand
+
+Each mechanic is a typed engine rule with authored parameters, added only with a
+world that needs it:
+
+1. **Yielding** (all four): a fight ends at an authored HP share without death.
+   Planned for M3c; also protects canon anchors.
+2. **Technique ranks** (the wuxia sources): ranked techniques with breakthrough
+   gates, where a realm is the rank of a core internal art. Planned for M4.
+3. **Status effects** (three sources): stun from 点穴, poison, enchanted sleep,
+   with durations in encounter time. Planned for M4.
+4. **Defence bypass and immunity** (雪中悍刀行, Arthurian legend): planned for M4.
+   Illusion or mind attacks, such as Morgan's, become special hits with an
+   explicit bypass or immunity rule rather than a third channel.
+5. **Resource attacks** (天龙八部): skills that absorb or dissolve MP.
+6. **Conditional techniques:** Gawain's noon strength needs World Time,
+   黯然销魂掌 depends on a story flag, and 六脉神剑's unreliability uses the
+   seeded RNG or an authored condition.
+7. **One source each:** reflecting attacks (斗转星移), ally combo techniques
+   (双剑合璧, which needs allies), mounted charges, and techniques that injure
+   their user.
+
+Mass battles, such as 北凉铁骑 or Camlann, are not personal combat. They remain
+authored story outcomes or a later separate capability. A siege like 聚贤庄 fits
+personal combat as one against many minion-tier opponents.
+
 ## World-generation selection
 
 Select capabilities after canon extraction and before detailed gameplay
