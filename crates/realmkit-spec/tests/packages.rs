@@ -138,6 +138,13 @@ fn refuses_unusable_rules_and_malformed_templates() {
         },
         |w| w.world.combat.as_mut().unwrap().special_name = " ".into(),
         |w| w.world.combat.as_mut().unwrap().cross_share = 101,
+        // Out-of-range stats and share together must report, not overflow.
+        |w| {
+            let combat = w.world.combat.as_mut().unwrap();
+            combat.cross_share = u32::MAX;
+            combat.levels[0].stats.satk = u32::MAX;
+            wolf(w).combat.as_mut().unwrap().stats.satk = u32::MAX;
+        },
         |w| wolf(w).combat.as_mut().unwrap().stats.hp = 0,
         |w| wolf(w).combat.as_mut().unwrap().stats.patk = 0,
         |w| {
@@ -245,24 +252,29 @@ fn quest_givers_talk_and_defeat_targets_fight() {
 }
 
 #[test]
-fn format_1_packages_are_rejected_clearly() {
-    let temp = std::env::temp_dir().join(format!("realmkit-format1-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&temp);
-    std::fs::create_dir(&temp).unwrap();
-    std::fs::write(
-        temp.join("world.json"),
-        r#"{ "format_version": 1, "id": "old", "player_name": "You", "levels": [] }"#,
-    )
-    .unwrap();
-    let error = WorldSpec::load(&temp).unwrap_err();
-    std::fs::remove_dir_all(&temp).unwrap();
-    assert!(matches!(
-        error,
-        SpecError::UnsupportedFormat { found: Some(1) }
-    ));
-    assert!(error
-        .to_string()
-        .contains("Format 1 packages are no longer supported"));
+fn older_packages_are_rejected_clearly() {
+    let temp = std::env::temp_dir().join(format!("realmkit-older-{}", std::process::id()));
+    for (version, world) in [
+        (
+            1,
+            r#"{ "format_version": 1, "id": "old", "player_name": "You", "levels": [] }"#,
+        ),
+        // M3a's combat block, which this format no longer accepts.
+        (
+            2,
+            r#"{ "format_version": 2, "combat": { "levels": [{ "xp": 0, "hp": 1, "attack": 1 }] } }"#,
+        ),
+    ] {
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir(&temp).unwrap();
+        std::fs::write(temp.join("world.json"), world).unwrap();
+        let error = WorldSpec::load(&temp).unwrap_err();
+        std::fs::remove_dir_all(&temp).unwrap();
+        assert!(matches!(error, SpecError::UnsupportedFormat { found: Some(v) } if v == version));
+        assert!(error
+            .to_string()
+            .contains("older packages are not migrated"));
+    }
 }
 
 #[test]

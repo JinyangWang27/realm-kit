@@ -123,7 +123,11 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             }
             // Costs are shown in the menu and remaining MP in the status line.
             Event::MpSpent { .. } => {}
-            Event::Rested => writeln!(output, "You rest. Health and MP restored.")?,
+            Event::Rested => {
+                let mp = engine.player_stats().is_some_and(|s| s.mp > 0);
+                let restored = if mp { "Health and MP" } else { "Health" };
+                writeln!(output, "You rest. {restored} restored.")?
+            }
             Event::EnemyDefeated { monster } => writeln!(
                 output,
                 "{}",

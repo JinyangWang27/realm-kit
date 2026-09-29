@@ -108,6 +108,10 @@ class Profile:
     xp: int = 0
     xp_per_level: int = 0
 
+    def growth_for(self, stat: str) -> float | None:
+        """This profile's growth for one stat; None means the world's."""
+        return self.mp_growth if stat == "mp" and self.mp_growth is not None else self.growth
+
     def at_level(self, rules: Rules, level: int, speed: int | None = None) -> Combatant:
         # Sample content generation, not an engine rule: the engine reads authored
         # per-level stats. Speed does not grow.
@@ -118,7 +122,7 @@ class Profile:
             name=self.name,
             level=level,
             hp=grow(self.hp),
-            mp=rules.grow(self.mp, level, self.growth if self.mp_growth is None else self.mp_growth),
+            mp=rules.grow(self.mp, level, self.growth_for("mp")),
             patk=grow(self.patk),
             pdef=grow(self.pdef),
             satk=grow(self.satk),

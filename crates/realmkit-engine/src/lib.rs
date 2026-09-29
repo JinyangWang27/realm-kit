@@ -334,8 +334,8 @@ pub fn damage(
     power: u32,
     share: u32,
 ) -> Result<u32, EngineError> {
-    let a = u128::from(attacker.combined(channel, share, false));
-    let d = u128::from(defender.combined(channel, share, true));
+    let a = attacker.combined(channel, share, false);
+    let d = defender.combined(channel, share, true);
     let hit = a
         .checked_mul(u128::from(power))
         .and_then(|v| v.checked_mul(a))

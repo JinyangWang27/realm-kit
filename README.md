@@ -5,8 +5,8 @@ A small, deterministic text-RPG engine for authored or generated worlds.
 
 “RPG” does not require combat. RealmKit's long-term model is a narrative world
 plus source-grounded capabilities: a detective story may use interviews, clues,
-deductions and accusations while omitting combat completely. Package Format 2
-makes combat an optional block: the demo uses it, while
+deductions and accusations while omitting combat completely. Since package Format 2,
+combat is an optional block: the demo uses it, while
 `examples/quiet-archive` is a small world without it.
 See the [architecture glossary](docs/glossary.md) and
 [optional capability catalog](docs/capabilities.md).

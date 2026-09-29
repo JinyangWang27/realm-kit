@@ -7,7 +7,7 @@ mod validation;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 2;
+pub const FORMAT_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -84,7 +84,8 @@ pub struct Stats {
 impl Stats {
     /// The channel's attack (or defence) plus `share` percent of the other
     /// channel's, scaled by 100 so the share adds no rounding step.
-    pub fn combined(&self, channel: Channel, share: u32, defence: bool) -> u64 {
+    /// Wide enough that unvalidated stats and shares cannot overflow.
+    pub fn combined(&self, channel: Channel, share: u32, defence: bool) -> u128 {
         let (physical, special) = if defence {
             (self.pdef, self.sdef)
         } else {
@@ -94,7 +95,7 @@ impl Stats {
             Channel::Physical => (physical, special),
             Channel::Special => (special, physical),
         };
-        100 * u64::from(main) + u64::from(share) * u64::from(other)
+        100 * u128::from(main) + u128::from(share) * u128::from(other)
     }
 }
 

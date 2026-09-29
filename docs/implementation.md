@@ -33,7 +33,9 @@ proves the complete single-player loop with authored content.
   a world-named special channel, two-channel damage with no scale constant,
   skills with flat MP costs and unlock levels, opponents answering with their
   strongest affordable skill, and resting at safe locations. Saves hold only
-  current vitals, XP and level. `examples/duel` exercises a mage build.
+  current vitals, XP and level. The combat block's new shape makes this package
+  Format 3; older packages are rejected, not migrated. `examples/duel`
+  exercises a mage build.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

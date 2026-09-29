@@ -237,8 +237,7 @@ fn format_1_packages_are_refused_with_a_clear_message() {
     .unwrap();
     let output = run(&["validate", &dir], "");
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr)
-        .contains("Format 1 packages are no longer supported"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("older packages are not migrated"));
     std::fs::remove_dir_all(dir).unwrap();
 }
 
@@ -270,4 +269,11 @@ fn a_mage_duels_with_skills_rests_and_levels_up() {
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
+}
+
+#[test]
+fn resting_without_mp_mentions_only_health() {
+    let text = String::from_utf8(run(&["play", WORLD], "rest\n").stdout).unwrap();
+    assert!(text.contains("You rest. Health restored."), "{text}");
+    assert!(!text.contains("MP"), "{text}");
 }
