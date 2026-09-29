@@ -525,7 +525,7 @@ mod tests {
             "> 1. Talk to Elder Mara",
             "Esc back",
             ": status",
-            "HP 24/24",
+            "HP 40/40",
             "> Attack The Ash Wolf",
             "Level 2",
             "She opens the chapel gate",
@@ -563,13 +563,30 @@ mod tests {
     }
 
     #[test]
+    fn each_level_up_reports_the_mp_of_its_own_level() {
+        let mut world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/demo-world"
+        ))
+        .unwrap();
+        world.world.combat.as_mut().unwrap().levels[2].stats.mp = 5;
+        world.characters[2].combat.as_mut().unwrap().xp = 30;
+        let mut output = Vec::new();
+        let input = "north\nattack wolf\nattack wolf\nattack wolf\n".as_bytes();
+        play(&world, None, input, &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains("Level 2! Health restored."), "{text}");
+        assert!(text.contains("Level 3! Health and MP restored."), "{text}");
+    }
+
+    #[test]
     fn death_restores_the_newest_save() {
         let mut world = WorldSpec::load(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../examples/demo-world"
         ))
         .unwrap();
-        world.characters[2].combat.as_mut().unwrap().attack = 100;
+        world.characters[2].combat.as_mut().unwrap().stats.patk = 100;
         let dir = std::env::temp_dir().join(format!("realmkit-death-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let saves = Saves::open(&dir).unwrap();
@@ -581,7 +598,7 @@ mod tests {
         let after = &text[died..];
         assert!(after.contains("Loaded save 2."), "{after}");
         assert!(after.contains("The Pine Track"), "{after}");
-        assert!(after.contains("HP 24/24"), "{after}");
+        assert!(after.contains("HP 40/40"), "{after}");
         assert!(!after.contains("You cannot save now"), "{after}");
 
         let mut dead = Engine::new(&world).unwrap();

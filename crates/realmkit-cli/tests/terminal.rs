@@ -79,7 +79,7 @@ fn eof_and_bad_input_do_not_crash_or_mutate_gameplay() {
     );
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
-    assert!(text.contains("HP 24/24"));
+    assert!(text.contains("HP 40/40"));
     assert!(text.contains("XP 0"));
     assert!(text.contains("Invalid command"));
     assert!(!text.contains("panicked"));
@@ -154,7 +154,7 @@ fn a_corrupt_newest_save_is_reported_and_older_saves_are_offered() {
         // The fresh start is auto-saved, so death recovery cannot hit the bad save.
         "  3. auto-save",
         "Loaded save 1.",
-        "HP 24/24",
+        "HP 40/40",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
@@ -237,7 +237,43 @@ fn format_1_packages_are_refused_with_a_clear_message() {
     .unwrap();
     let output = run(&["validate", &dir], "");
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr)
-        .contains("Format 1 packages are no longer supported"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("older packages are not migrated"));
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+const DUEL: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/duel");
+
+#[test]
+fn a_mage_duels_with_skills_rests_and_levels_up() {
+    let input =
+        "help\nnorth\nuse bolt witch\n3\nuse fireball witch\n2\n2\nstatus\nsouth\nrest\nstatus\n";
+    let output = run(&["play", DUEL], input);
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "use <skill-id> <character-id>",
+        "rest",
+        "2. Spark on The Hedge Witch",
+        "3. Bolt on The Hedge Witch — 12 MP",
+        "You loose a bolt of witchlight. The Hedge Witch takes 11 damage.",
+        "The Hedge Witch hisses a hex at You: 6 damage.",
+        "you have not reached the level for fireball",
+        "3. Bolt on The Hedge Witch — 12 MP [not enough MP]",
+        "You flick a spark at The Hedge Witch: 5 damage.",
+        "The Hedge Witch rakes You with a cold touch: 4 damage.",
+        "concedes the hedge",
+        "Level 2! Health and MP restored.",
+        "Witchcraft attack 12 | Witchcraft defence 7",
+        "You rest. Health and MP restored.",
+        "HP 40/40 | MP 30/30",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+}
+
+#[test]
+fn resting_without_mp_mentions_only_health() {
+    let text = String::from_utf8(run(&["play", WORLD], "rest\n").stdout).unwrap();
+    assert!(text.contains("You rest. Health restored."), "{text}");
+    assert!(!text.contains("MP"), "{text}");
 }

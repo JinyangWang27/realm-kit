@@ -93,7 +93,8 @@ def check_sizes(sim: Simulator) -> None:
         fields += [("a tier multiplier", tier.hp), ("a tier multiplier", tier.attack)]
     for profile in (*sim.content.builds, *sim.content.monsters):
         fields += [(f"{profile.name} {name}", getattr(profile, name))
-                   for name in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed", "growth", "xp", "xp_per_level")]
+                   for name in ("hp", "mp", "patk", "pdef", "satk", "sdef", "speed", "growth", "mp_growth",
+                                "xp", "xp_per_level")]
         for skill in (*profile.skills, profile.basic):
             fields += [(f"{profile.name} {skill.name} {name}", getattr(skill, name))
                        for name in ("power", "cost", "time", "level", "cross_share")]
@@ -144,8 +145,9 @@ def check_finite(sim: Simulator) -> None:
     for profile in (*sim.content.builds, *sim.content.monsters):
         amounts += [(f"{profile.name} {stat}", getattr(profile, stat))
                     for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef")]
-        if profile.growth is not None:
-            amounts.append((f"{profile.name} growth", profile.growth))
+        for name in ("growth", "mp_growth"):
+            if getattr(profile, name) is not None:
+                amounts.append((f"{profile.name} {name}", getattr(profile, name)))
     for key, tier in sim.content.tiers.items():
         label = key.value if isinstance(key, Kind) else key
         amounts += [(f"{label} tier hp", tier.hp), (f"{label} tier attack", tier.attack)]
@@ -173,14 +175,21 @@ def check_bounds(sim: Simulator) -> None:
             require(skill.cost >= 0 and skill.time >= 1,
                     f"{profile.name} {skill.name} needs a nonnegative cost and positive action time")
             require(skill.level >= 1, f"{profile.name} {skill.name} unlocks below level 1")
-        if sim.rules.grow(profile.mp, 1, profile.growth) == 0:
-            paid = [s.name for s in profile.skills if s.resource is Resource.MP and s.cost > 0]
-            require(not paid, f"{profile.name} has MP-costing {', '.join(paid)} but no MP at level 1 to scale costs from")
+        # Costs are flat, so a skill must be affordable with the MP its user has when it unlocks.
+        for skill in profile.skills:
+            # Unreachable skills are check_unlocks' concern; skipping them also keeps a huge
+            # authored level from making the exact growth below enormous.
+            if skill.resource is Resource.MP and skill.cost > 0 and skill.level <= sim.content.max_level:
+                mp = sim.rules.grow(profile.mp, skill.level, profile.growth_for("mp"))
+                require(skill.cost <= mp, f"{profile.name} {skill.name} costs {skill.cost} MP but "
+                        f"{profile.name} has only {mp} at level {skill.level}")
         require(profile.basic.cost == 0 and profile.basic.level == 1,
                 f"{profile.name}'s basic attack must be free and available from level 1")
         check_exact_stats(profile, "authored")
-        require(profile.growth is None or profile.growth >= 1,
-                f"{profile.name} growth {profile.growth} would lower stats as levels rise")
+        for name in ("growth", "mp_growth"):
+            value = getattr(profile, name)
+            require(value is None or value >= 1,
+                    f"{profile.name} {name} {value} would lower stats as levels rise")
     unknown = [key for key in sim.content.tiers if not isinstance(key, Kind)]
     require(not unknown, f"unknown tier keys {unknown!r}")
     missing = [kind.value for kind in Kind if kind not in sim.content.tiers]
@@ -204,7 +213,7 @@ def check_bounds(sim: Simulator) -> None:
     for profile in (*sim.content.builds,
                     *(sim.content.scaled(foe, kind) for foe in sim.content.monsters for kind in Kind)):
         for stat in ("hp", "mp", "patk", "pdef", "satk", "sdef"):
-            value = sim.rules.grown(getattr(profile, stat), top, profile.growth)
+            value = sim.rules.grown(getattr(profile, stat), top, profile.growth_for(stat))
             require(value <= STAT_BOUND,
                     f"{profile.name} {stat} grows to {decimal(value)} at level {top}, above {STAT_BOUND}")
     for level in (1, sim.content.max_level):  # growth >= 1 keeps stats monotonic: both ends suffice

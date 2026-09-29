@@ -15,8 +15,7 @@
     "name": "The Ash Wolf",
     "description": "Its coat is the colour of cold hearths. A length of red thread is caught between its teeth.",
     "combat": {
-      "hp": 12,
-      "attack": 4,
+      "stats": { "hp": 20, "patk": 8, "pdef": 4, "satk": 0, "sdef": 4, "speed": 110 },
       "xp": 10,
       "loot": [{ "item": "ash_pelt", "quantity": 1 }]
     }

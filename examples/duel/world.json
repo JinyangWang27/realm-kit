@@ -1,0 +1,56 @@
+{
+  "format_version": 3,
+  "id": "hedge_duel",
+  "name": "A Duel at the Hedge",
+  "language": "en",
+  "start": "yard",
+  "player": "apprentice",
+  "combat": {
+    "special_name": "Witchcraft",
+    "levels": [
+      { "xp": 0, "stats": { "hp": 34, "mp": 24, "patk": 3, "pdef": 4, "satk": 10, "sdef": 6, "speed": 100 } },
+      { "xp": 12, "stats": { "hp": 40, "mp": 30, "patk": 3, "pdef": 5, "satk": 12, "sdef": 7, "speed": 100 } }
+    ],
+    "skills": [
+      {
+        "id": "spark",
+        "name": "Spark",
+        "power": 80,
+        "channel": "special",
+        "text": "{attacker} flick a spark at {target}: {damage} damage."
+      },
+      {
+        "id": "bolt",
+        "name": "Bolt",
+        "power": 170,
+        "channel": "special",
+        "cost": 12,
+        "text": "{attacker} loose a bolt of witchlight. {target} takes {damage} damage."
+      },
+      {
+        "id": "fireball",
+        "name": "Fireball",
+        "power": 210,
+        "channel": "special",
+        "cost": 12,
+        "level": 2,
+        "text": "{attacker} hurl a fireball; {target} burns for {damage} damage."
+      },
+      {
+        "id": "hex",
+        "name": "Hex",
+        "power": 130,
+        "channel": "special",
+        "cost": 5,
+        "text": "{attacker} hisses a hex at {target}: {damage} damage."
+      }
+    ],
+    "player_skills": ["spark", "bolt", "fireball"],
+    "narrative": {
+      "attack": ["{attacker} swing the staff. {target} takes {damage} damage."],
+      "hurt": ["{attacker} rakes {target} with a cold touch: {damage} damage."],
+      "victory": "{target} kneels in the nettles and concedes the hedge.",
+      "death": "The hedge closes over you.\nThe duel is lost. Start a new game to try again."
+    }
+  }
+}

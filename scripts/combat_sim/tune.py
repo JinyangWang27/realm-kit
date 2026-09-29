@@ -131,15 +131,18 @@ def _growth_knob(rules: Rules, content: Content, factor: float) -> tuple[Rules, 
     return replace(rules, growth=after), content, before, after
 
 
-def _profile_growth_knob(slot: Slot) -> Knob:
-    """A profile's own growth override, which shadows the world's."""
+def _profile_growth_knob(slot: Slot, name: str = "growth") -> Knob:
+    """A profile's own growth override (`growth`, or `mp_growth` for maximum MP alone),
+    which shadows the world's."""
     get, put = slot
 
     def apply(rules: Rules, content: Content, factor: float) -> tuple[Rules, Content, float, float]:
         profile = get(content)
-        before = profile.growth if profile.growth is not None else rules.growth
+        own = getattr(profile, name)
+        before = own if own is not None else rules.growth
         after = scale_rate(before, factor)
-        return rules, put(content, replace(profile, growth=after)), before, after
+        changed = replace(profile, mp_growth=after) if name == "mp_growth" else replace(profile, growth=after)
+        return rules, put(content, changed), before, after
     return apply
 
 
@@ -216,8 +219,9 @@ def knobs(content: Content) -> dict[str, Knob]:
     profiles = [slot[0](content) for slot in all_slots.values()]
     for name, slot in all_slots.items():
         profile = slot[0](content)
-        if profile.growth is not None:
-            add(found, f"{name} growth", _profile_growth_knob(slot))
+        for growth in ("growth", "mp_growth"):
+            if getattr(profile, growth) is not None:
+                add(found, f"{name} {growth}", _profile_growth_knob(slot, growth))
         for i, skill in enumerate(profile.skills):
             if skill.cross_share is not None and skill.level <= content.max_level:
                 add(found, f"{name} {skill.name} cross_share", _share_knob(slot, i))

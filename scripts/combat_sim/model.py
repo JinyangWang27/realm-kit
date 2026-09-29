@@ -36,7 +36,7 @@ class Skill:
     name: str
     power: int  # percent; a basic attack is 100
     channel: Channel
-    cost: int = 0  # level-1 cost for MP; flat for rage
+    cost: int = 0  # flat, exactly as authored: a deeper MP pool means more casts
     resource: Resource = Resource.MP
     time: int = 100  # action cost in percent of a basic attack; delays the next turn
     cross_share: int | None = None  # overrides the world's share, e.g. a 内力-heavy palm
@@ -86,7 +86,6 @@ class Combatant:
     basic: Skill = BASIC_ATTACK  # free fallback action; its channel belongs to the character
     growth: float | None = None  # this character's per-level growth; None means the world's
     xp: int = 0  # XP granted when defeated, authored on the combat profile
-    base_mp: int = 0  # maximum MP at level 1, which MP costs scale from
 
 
 @dataclass(frozen=True)
@@ -104,9 +103,14 @@ class Profile:
     skills: tuple[Skill, ...] = ()
     basic: Skill = BASIC_ATTACK  # free fallback action; its channel belongs to the character
     growth: float | None = None  # overrides the world's per-level growth for this profile
+    mp_growth: float | None = None  # overrides `growth` for maximum MP alone
     # XP granted when defeated: `xp` at level 1 plus `xp_per_level` for each level above.
     xp: int = 0
     xp_per_level: int = 0
+
+    def growth_for(self, stat: str) -> float | None:
+        """This profile's growth for one stat; None means the world's."""
+        return self.mp_growth if stat == "mp" and self.mp_growth is not None else self.growth
 
     def at_level(self, rules: Rules, level: int, speed: int | None = None) -> Combatant:
         # Sample content generation, not an engine rule: the engine reads authored
@@ -118,7 +122,7 @@ class Profile:
             name=self.name,
             level=level,
             hp=grow(self.hp),
-            mp=grow(self.mp),
+            mp=rules.grow(self.mp, level, self.growth_for("mp")),
             patk=grow(self.patk),
             pdef=grow(self.pdef),
             satk=grow(self.satk),
@@ -128,7 +132,6 @@ class Profile:
             basic=self.basic,
             growth=self.growth,
             xp=self.xp + self.xp_per_level * (level - 1),
-            base_mp=rules.grow(self.mp, 1, self.growth),
         )
 
 
@@ -184,14 +187,6 @@ class Rules:
             return max(1, (a * skill.power * a) // (100 * 100 * (a + d)))
         k = self.k_for(attacker.level)
         return max(1, (a * skill.power * k) // (100 * (100 * k + d)))
-
-    def skill_cost(self, skill: Skill, user: Combatant) -> int:
-        """MP costs scale with the user's MP pool, so casts per rest stay level: the level-1
-        cost × maximum MP now ÷ maximum MP at level 1, rounded half up. The engine can compute
-        this from the authored level table alone."""
-        if skill.resource is not Resource.MP or user.base_mp == 0:
-            return skill.cost
-        return round_half_up(Fraction(skill.cost * user.mp, user.base_mp))
 
     def delay(self, speed: int, time: int = 100) -> int:
         """Recovery before the actor's next turn; `time` is the action's cost in percent.

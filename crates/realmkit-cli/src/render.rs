@@ -26,6 +26,22 @@ fn interpolate(template: &TextTemplate, values: &[(&str, &str)]) -> io::Result<S
     Ok(output)
 }
 
+fn hit(
+    output: &mut impl Write,
+    text: &TextTemplate,
+    attacker: &str,
+    target: &str,
+    amount: u32,
+) -> io::Result<()> {
+    let amount = amount.to_string();
+    let values = [
+        ("attacker", attacker),
+        ("target", target),
+        ("damage", &amount),
+    ];
+    writeln!(output, "{}", interpolate(text, &values)?)
+}
+
 pub fn direction_name(direction: Direction) -> &'static str {
     match direction {
         Direction::North => "north",
@@ -69,8 +85,8 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     if !engine.conditions_met(&character.requires) {
                         continue;
                     }
-                    let hp = state.combat.as_ref().and_then(|c| c.opponent_hp.get(id));
-                    match hp {
+                    let hp = state.combat.as_ref().and_then(|c| c.opponents.get(id));
+                    match hp.map(|v| v.hp) {
                         Some(0) => {}
                         Some(hp) => writeln!(
                             output,
@@ -85,39 +101,32 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 target,
                 amount,
                 variant,
+                skill,
             } => {
-                let amount = amount.to_string();
-                writeln!(
-                    output,
-                    "{}",
-                    interpolate(
-                        &world.combat().unwrap().narrative.attack[*variant],
-                        &[
-                            ("attacker", player),
-                            ("target", name(target)),
-                            ("damage", &amount)
-                        ]
-                    )?
-                )?;
+                let narrative = &world.combat().unwrap().narrative;
+                let text = skill.as_ref().map_or(&narrative.attack[*variant], |id| {
+                    &world.skill(id).unwrap().text
+                });
+                hit(output, text, player, name(target), *amount)?;
             }
             Event::DamageReceived {
                 source,
                 amount,
                 variant,
+                skill,
             } => {
-                let amount = amount.to_string();
-                writeln!(
-                    output,
-                    "{}",
-                    interpolate(
-                        &world.combat().unwrap().narrative.hurt[*variant],
-                        &[
-                            ("attacker", name(source)),
-                            ("target", player),
-                            ("damage", &amount)
-                        ]
-                    )?
-                )?;
+                let narrative = &world.combat().unwrap().narrative;
+                let text = skill.as_ref().map_or(&narrative.hurt[*variant], |id| {
+                    &world.skill(id).unwrap().text
+                });
+                hit(output, text, name(source), player, *amount)?;
+            }
+            // Costs are shown in the menu and remaining MP in the status line.
+            Event::MpSpent { .. } => {}
+            Event::Rested => {
+                let mp = engine.player_stats().is_some_and(|s| s.mp > 0);
+                let restored = if mp { "Health and MP" } else { "Health" };
+                writeln!(output, "You rest. {restored} restored.")?
             }
             Event::EnemyDefeated { monster } => writeln!(
                 output,
@@ -135,7 +144,12 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 quantity
             )?,
             Event::ExperienceGranted { amount } => writeln!(output, "+{amount} XP")?,
-            Event::LevelUp { level } => writeln!(output, "Level {level}! Health restored.")?,
+            Event::LevelUp { level } => {
+                // One grant can pass several levels; each restores that level's MP.
+                let mp = world.combat().unwrap().levels[level - 1].stats.mp > 0;
+                let restored = if mp { "Health and MP" } else { "Health" };
+                writeln!(output, "Level {level}! {restored} restored.")?
+            }
             // Choices are shown by the menu, which also numbers them.
             Event::Dialogue { npc, node, .. } => {
                 let npc = world.character(npc).unwrap();
@@ -166,13 +180,25 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     )?;
                 }
             }
-            Event::StatusViewed => match &state.combat {
-                Some(combat) => writeln!(
-                    output,
-                    "{} — Level {} | HP {}/{} | Attack {} | XP {}",
-                    player, combat.level, combat.hp, combat.max_hp, combat.attack, combat.xp
-                )?,
-                None => writeln!(output, "{player}")?,
+            Event::StatusViewed => match (&state.combat, engine.player_stats()) {
+                (Some(combat), Some(stats)) => {
+                    let special = &world.combat().unwrap().special_name;
+                    write!(
+                        output,
+                        "{player} — Level {} | HP {}/{}",
+                        combat.level, combat.hp, stats.hp
+                    )?;
+                    // A world or build without MP shows none.
+                    if stats.mp > 0 {
+                        write!(output, " | MP {}/{}", combat.mp, stats.mp)?;
+                    }
+                    writeln!(
+                        output,
+                        " | Attack {} | Defence {} | {special} attack {} | {special} defence {} | Speed {} | XP {}",
+                        stats.patk, stats.pdef, stats.satk, stats.sdef, stats.speed, combat.xp
+                    )?
+                }
+                _ => writeln!(output, "{player}")?,
             },
             Event::QuestsViewed => {
                 writeln!(output, "Quests:")?;

@@ -11,7 +11,8 @@
         "blocked_text": "The elder keeps the chapel gate locked. Speak with her first."
       }
     },
-    "characters": ["elder"]
+    "characters": ["elder"],
+    "safe": true
   },
   {
     "id": "forest",

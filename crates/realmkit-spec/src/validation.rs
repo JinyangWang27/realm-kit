@@ -18,7 +18,7 @@ pub struct Diagnostic {
 
 #[derive(Debug, thiserror::Error)]
 pub enum SpecError {
-    #[error("unsupported package format {}: this RealmKit reads Format {FORMAT_VERSION} only; Format 1 packages are no longer supported, so convert the package to Format {FORMAT_VERSION}", found.map_or("(missing)".into(), |v| v.to_string()))]
+    #[error("unsupported package format {}: this RealmKit reads Format {FORMAT_VERSION} only; older packages are not migrated, so convert the package to Format {FORMAT_VERSION} (see docs/world-format.md)", found.map_or("(missing)".into(), |v| v.to_string()))]
     UnsupportedFormat { found: Option<u64> },
     #[error("world validation failed: {0:?}")]
     Validation(Vec<Diagnostic>),
@@ -204,6 +204,14 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     );
     let mut placed = BTreeSet::new();
     for l in &w.locations {
+        if l.safe && w.combat().is_none() {
+            issue(
+                &mut out,
+                &l.id,
+                "combat_disabled",
+                "this world has no combat block, so there is nothing to rest from",
+            );
+        }
         for exit in l.exits.values() {
             reference(
                 &mut out,
@@ -262,15 +270,27 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
         }
         conditions(&mut out, w, &character.id, &character.requires);
         if let Some(profile) = &character.combat {
-            if profile.hp == 0 || profile.attack == 0 {
-                issue(
+            stats(&mut out, &character.id, &profile.stats);
+            items(&mut out, w, &character.id, &profile.loot);
+            let usable = profile.skills.iter().filter_map(|id| w.skill(id));
+            if let Some(combat) = w.combat() {
+                ids(
                     &mut out,
+                    "skill reference",
+                    profile.skills.iter().map(String::as_str),
+                );
+                for id in &profile.skills {
+                    reference(&mut out, &character.id, "skill", id, w.skill(id).is_some());
+                }
+                usable_skills(
+                    &mut out,
+                    combat,
                     &character.id,
-                    "invalid_stats",
-                    "combat HP and attack must be positive",
+                    profile.basic_channel,
+                    usable.map(|s| (s, &profile.stats)),
+                    &profile.stats,
                 );
             }
-            items(&mut out, w, &character.id, &profile.loot);
             if w.combat().is_none() {
                 issue(
                     &mut out,
@@ -410,20 +430,179 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
         }
     }
     if let Some(combat) = w.combat() {
-        combat_rules(&mut out, owner, combat);
+        combat_rules(&mut out, w, owner, combat);
     }
     out
 }
 
-fn combat_rules(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
+fn stats(out: &mut Vec<Diagnostic>, owner: &str, stats: &Stats) {
+    let values = [
+        stats.hp,
+        stats.mp,
+        stats.patk,
+        stats.pdef,
+        stats.satk,
+        stats.sdef,
+        stats.speed,
+    ];
+    if stats.hp == 0 || stats.speed == 0 || values.iter().any(|v| *v > STAT_BOUND) {
+        issue(
+            out,
+            owner,
+            "invalid_stats",
+            format!("stats must be at most {STAT_BOUND}, with HP and speed at least 1"),
+        );
+    }
+}
+
+fn share(out: &mut Vec<Diagnostic>, owner: &str, value: u32) {
+    if value > 100 {
+        issue(
+            out,
+            owner,
+            "invalid_share",
+            "a cross share is a percentage from 0 to 100",
+        );
+    }
+}
+
+/// Every skill a character can use, and its basic attack, needs attack in its
+/// channel and MP enough to use it once at the stats it unlocks with.
+fn usable_skills<'a>(
+    out: &mut Vec<Diagnostic>,
+    combat: &Combat,
+    owner: &str,
+    basic: Channel,
+    skills: impl Iterator<Item = (&'a Skill, &'a Stats)>,
+    first: &Stats,
+) {
+    if first.combined(basic, combat.cross_share, false) == 0 {
+        issue(
+            out,
+            owner,
+            "no_attack",
+            "the basic attack needs attack in its channel",
+        );
+    }
+    for (skill, stats) in skills {
+        let share = skill.cross_share.unwrap_or(combat.cross_share);
+        if stats.combined(skill.channel, share, false) == 0 {
+            issue(
+                out,
+                owner,
+                "no_attack",
+                format!("{} needs attack in its channel", skill.id),
+            );
+        }
+        if skill.cost > stats.mp {
+            issue(
+                out,
+                owner,
+                "unaffordable_skill",
+                format!(
+                    "{} costs more MP than the character has when it can use it",
+                    skill.id
+                ),
+            );
+        }
+    }
+}
+
+fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &Combat) {
+    if combat.special_name.trim().is_empty() {
+        issue(
+            out,
+            owner,
+            "empty_name",
+            "name the special damage channel, for example magic or 内力",
+        );
+    }
+    share(out, owner, combat.cross_share);
     let levels = &combat.levels;
+    for level in levels {
+        stats(out, owner, &level.stats);
+    }
+    let fields = |s: &Stats| [s.hp, s.mp, s.patk, s.pdef, s.satk, s.sdef, s.speed];
     if levels.first().map(|l| l.xp) != Some(0)
-        || levels.iter().any(|l| l.hp == 0 || l.attack == 0)
-        || levels
-            .windows(2)
-            .any(|l| l[0].xp >= l[1].xp || l[0].hp > l[1].hp || l[0].attack > l[1].attack)
+        || levels.windows(2).any(|l| {
+            l[0].xp >= l[1].xp
+                || fields(&l[0].stats)
+                    .iter()
+                    .zip(fields(&l[1].stats))
+                    .any(|(a, b)| *a > b)
+        })
     {
-        issue(out, owner, "invalid_levels", "levels must start at 0 XP, have positive HP/attack, strictly increasing XP and nondecreasing stats");
+        issue(
+            out,
+            owner,
+            "invalid_levels",
+            "levels must start at 0 XP, with strictly increasing XP and stats that never fall",
+        );
+    }
+    ids(out, "skill", combat.skills.iter().map(|s| s.id.as_str()));
+    for skill in &combat.skills {
+        if !(POWER_BOUNDS.0..=POWER_BOUNDS.1).contains(&skill.power) {
+            issue(
+                out,
+                &skill.id,
+                "invalid_power",
+                format!(
+                    "skill power must be from {} to {}",
+                    POWER_BOUNDS.0, POWER_BOUNDS.1
+                ),
+            );
+        }
+        if skill.level == 0 {
+            issue(
+                out,
+                &skill.id,
+                "invalid_level",
+                "skills unlock at level 1 or later",
+            );
+        }
+        if let Some(value) = skill.cross_share {
+            share(out, &skill.id, value);
+        }
+        if skill.name.trim().is_empty() {
+            issue(out, &skill.id, "empty_name", "skills need a name");
+        }
+        template(
+            out,
+            &skill.id,
+            &skill.text.0,
+            &["attacker", "target", "damage"],
+        );
+    }
+    ids(
+        out,
+        "skill reference",
+        combat.player_skills.iter().map(String::as_str),
+    );
+    for id in &combat.player_skills {
+        reference(out, owner, "skill", id, w.skill(id).is_some());
+        if w.skill(id).is_some_and(|s| s.level > levels.len()) {
+            issue(
+                out,
+                id,
+                "invalid_level",
+                "the player never reaches this skill's level",
+            );
+        }
+    }
+    if let Some(first) = levels.first() {
+        let unlocked = combat
+            .player_skills
+            .iter()
+            .filter_map(|id| w.skill(id))
+            .filter_map(|s| Some((s, &levels.get(s.level.checked_sub(1)?)?.stats)));
+        usable_skills(
+            out,
+            combat,
+            &w.world.player,
+            combat.player_basic_channel,
+            unlocked,
+            &first.stats,
+        );
     }
     let narrative = &combat.narrative;
     for (key, variants) in [("attack", &narrative.attack), ("hurt", &narrative.hurt)] {

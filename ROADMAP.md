@@ -162,7 +162,7 @@ plugin framework or ECS.
 | MP / maximum MP | Resource for skills |
 | Physical attack | Strength of physical damage |
 | Physical defence | Mitigation of physical damage |
-| Special attack | Strength of special damage: magic, 内力, mana, as the world names it |
+| Special attack | Strength of special damage: magic, 内力, mana, as the world's `special_name` says |
 | Special defence | Mitigation of special damage |
 | Speed | Action timing; exact model discussed below |
 
@@ -194,9 +194,13 @@ resistance, accuracy and critical chance can come later when builds need them.
   with saved RNG state. Keep semantically unrelated random domains independent
   where incidental draw coupling would produce surprising gameplay changes.
 
-**Done when:** a small duel demonstrates distinct physical/special builds, MP
-and rage expenditure and recovery, and a measurable benefit from increased speed. In M3,
-builds are fixture stat blocks; player-chosen builds arrive with equipment in M4.
+**Done when:** a small duel demonstrates physical and special builds that play
+differently, MP and rage expenditure and recovery, and, once the M3c timeline
+exists, a measurable benefit from increased speed. "Differently" means distinct
+actions and resources, not passing the balance targets: tuning waits until the
+systems are complete (see [Balance simulation](#balance-simulation--proposed)).
+In M3, builds are fixture stat blocks; player-chosen builds arrive with
+equipment in M4.
 A one-against-two fixture exercises several opponents, explicit targeting and
 tie order. Tests cover formulas, scheduling, ties, death, resource rejection,
 replay and save/load, including a save made mid-encounter. A combat-free fixture
@@ -253,7 +257,7 @@ balance decisions.
    between separate attacks, inside the optional combat state as
    `CombatState.opponent_hp` (0 means defeated), because nothing else owns it
    until M3c encounters do; M3c replaces it with the defeated set.
-2. **M3b — stats, damage and skills.** The seven-stat block, gradual defence
+2. **M3b — stats, damage and skills · delivered.** The seven-stat block, gradual defence
    reduction by the damage formula confirmed in decision 3, the skills and MP
    costs listed under
    [Tuned values](#tuned-values), and a `Rest` command at authored safe locations
@@ -262,6 +266,14 @@ balance decisions.
    level and XP; derive maximums and attack/defence values from the level so no
    bonus can be saved twice. Decide explicitly whether level-up still restores
    HP/MP fully, as it does today. Enemies keep counterattacking immediately.
+   The combat block gains a required `special_name`, the world's name for the
+   special channel, which clients show in place of "special". Speed is authored
+   from M3b so M3c needs no format change, but it has no effect until the M3c
+   timeline; the docs say so. MP costs are flat, exactly as authored.
+   As delivered, level-up keeps restoring HP and MP fully; opponents keep HP
+   and MP between attacks until M3c encounters own them; a combat profile has
+   no level yet, so every skill it lists is usable; rage is not implemented, so
+   the rage skills in [Tuned values](#tuned-values) wait for M3c.
 3. **M3c — encounters on the timeline.** `Engage`, participants and sides,
    timeline scheduling, the projected turn order, and mid-encounter save/load, as
    described in [Combatants and encounters](#combatants-and-encounters--proposed).
@@ -437,6 +449,12 @@ lie between starting and final values. Stats are not stored in 8 bits, so a cap 
 
 ### Balance simulation · proposed
 
+Balancing is deferred until the combat, build and equipment systems are all
+implemented. Until then the simulator and its targets are a guide for choosing
+starting numbers and spotting structural problems, not a gate: a slice may ship
+with fixture numbers that miss a target, and final tuning happens once over the
+complete system.
+
 The `scripts/combat_sim` package models these rules: the damage formula, the
 timeline, tie order and the basic enemy behaviour, not the engine itself. From
 the repository root, `python3 -m scripts.combat_sim` prints a report, `check`
@@ -477,13 +495,13 @@ different limits:
 - **MP regeneration follows encounter time, not actions.** A baseline turn is one
   basic action at speed 100. A faster actor regenerates at the same rate per unit
   of time, as the speed rules require, but gets more actions to spend it on.
-- **In worlds with character levels, MP costs scale with the user's MP pool:**
-  the authored level-1 cost × maximum MP at the current level ÷ maximum MP at
-  level 1, computed exactly and rounded half up. The engine needs only the
-  authored level table for this. With flat costs, a growing pool lets casters
-  cast more per rest at every level, and sustain drifts upward.
-  Technique ranks (M4) author their own costs instead, so a deep 内力 pool from
-  a high-rank internal art genuinely means more casts.
+- **MP costs are flat, exactly as authored** · decided. The engine never
+  derives a cost, so the menu shows the number the author wrote, and a deeper
+  pool from any source (levels, a 内力 grant, a technique rank) genuinely means
+  more casts. Authors control sustain with the content they already write:
+  how fast maximum MP grows in the level table, and each tier's cost. An
+  earlier proposal scaled costs with the level table's MP pool; see
+  [Findings](#findings) for why authored MP growth replaces it.
 - **Rage never persists outside an encounter** and is not saved between fights.
   It is part of the saved encounter state during one.
 - **Rage from an action is credited after the action resolves.** A skill's cost
@@ -497,8 +515,9 @@ different limits:
 
 #### Tuned values
 
-Level-1 values that meet every target. HP, MP, attack and defence grow 10% per
-level for players and opponents alike; speed does not grow. Growth is only how
+Level-1 values that meet every target. HP, attack and defence grow 10% per
+level for players and opponents alike; speed does not grow, and neither does the
+mage's maximum MP. Growth is only how
 the sample per-level tables are generated: the engine reads authored per-level
 values and computes no growth. Generated values are exact and rounded half up,
 since Python's `round()` rounds halves to even and Rust's `f64::round` rounds
@@ -521,7 +540,7 @@ attack needs to hurt anyone.
 | --- | --- | --- | --- | --- | --- |
 | Basic attack | Everyone | Physical, or special for the spirit | 1 | 100 | — |
 | Spark | Mage | Special | 1 | 80 | — |
-| Bolt / fireball / starfall | Mage | Special | 1 / 10 / 20 | 170 / 210 / 250 | 12 MP at level 1 |
+| Bolt / fireball / starfall | Mage | Special | 1 / 10 / 20 | 170 / 210 / 250 | 12 MP |
 | Rage strike / cleave / execute | Warrior | Physical | 1 / 10 / 20 | 150 / 185 / 220 | 5 rage |
 | Rend / maul / savage | Beast | Physical | 1 / 10 / 20 | 130 / 155 / 180 | 5 rage |
 | Hex / curse / wither | Spirit | Special | 1 / 10 / 20 | 130 / 155 / 180 | 5 rage |
@@ -547,10 +566,11 @@ level-20 fights fell to 3 actions and 18% HP, and opponents four levels higher
 became easy.
 
 `tune` nudges player and opponent stats, skill and basic-attack power, cost and
-action time, tier multipliers, the growth rate, the speed cap and the resource
-rules, and 107 of 168 nudges keep every target. Zero stats and costs are nudged upward only, since
+action time, tier multipliers, the growth rates (including the mage's MP
+growth), the speed cap and the resource rules, and 107 of 169 nudges keep every
+target. Zero stats and costs are nudged upward only, since
 0 → 1 can matter: a beast with 1 special attack already breaks boss parity. It
-reports the first target each nudge breaks. Half of the 61 breaks (30) are boss
+reports the first target each nudge breaks. Half of the 62 breaks (31) are boss
 parity against beasts, each a two-level gap where one is
 allowed; allowing two levels (`BOSS_LEVEL_GAP` in `targets.py`) is a design
 choice, not a tuning fix. Not every break is a near miss, though: lowering the
@@ -630,6 +650,17 @@ computes it. Rules of thumb for authors, to be verified with `check` and `tune`:
   attack and its bosses were trivial.
 - **Packs need a minion tier.** Two same-level ordinary monsters cost a level-5
   warrior 63% of its HP; two minions cost 12%.
+- **Flat MP costs need authored MP growth to match.** With costs flat and the
+  mage's pool growing 10% a level, a level-20 mage fits about six times as many
+  bolts per rest; the warrior then won only 1 of 13 comparisons. Keeping the
+  mage's maximum MP at 75 on every level restores the balance: casts per rest
+  and regeneration per cast depend only on pool ÷ cost, so this is the same
+  sustain the earlier level-scaled costs produced, and the report is unchanged
+  but for one rest in two grinding lines. A world that wants casters to gain
+  sustain with level lets MP grow; one that grants 内力 lets it grow by grant.
+  With the sample content, MP growth of 1% a level keeps every target; at 1.5%
+  the warrior already wins only 5 of 16 comparisons, so faster MP growth needs
+  compensation elsewhere, such as costlier later tiers or more for the warrior.
 - **Grinding needs XP that falls off with level difference.** With ±10% XP per
   level of difference, capped at ±40% and rounded down, and nothing from monsters
   five or more levels below,
@@ -874,6 +905,15 @@ every package.
   identical resources remain definition + quantity. Materials/quality are concrete
   authored data rather than a universal runtime hierarchy. Preserve authored
   source-language names and prose throughout crafting.
+- Optionally let players allocate stat points: content authors points gained
+  per level, which stats accept them and how much one point is worth, plus a
+  respec policy. Saves store the allocation, and effective stats are derived as
+  progression + allocation + equipment. With flat MP costs, points poured into
+  MP mean unlimited casting, so allocation needs per-stat caps or a low MP value
+  per point, and the balance simulation should first gain a target that no
+  single-stat build dominates. The capability suits worlds whose sources have
+  it; wuxia worlds grow 内力 through technique ranks instead. Proposed, not
+  decided.
 - Keep recipe knowledge separate from proficiency: authored teachers, plans,
   quests or discoveries grant recipes, while smithing determines whether a known
   recipe can be used. Proficiency alone does not reveal recipes initially.
@@ -1081,15 +1121,17 @@ maintained in the [open-decisions register](docs/open-decisions.md).
    stats, never level. Confirm repeatable groups and `Flee` in M3c for
    grinding.
 4. Confirm the [skill resources](#skill-resources): MP regenerating over
-   encounter time and by resting, rage built from actions and damage taken, and
-   MP costs that grow with level.
-5. Confirm the two channels, physical and special, with a world-named special
-   channel and a 25% cross share. Immunity, vulnerability and modifier stacking
-   are deferred to M4.
+   encounter time and by resting, and rage built from actions and damage taken.
+   MP costs are flat, exactly as authored (decided).
+5. Confirm the two channels, physical and special, and a 25% cross share. The
+   world names the special channel with a required `special_name` (decided).
+   Immunity, vulnerability and modifier stacking are deferred to M4.
 6. The M3 combat menu shows exact damage after each action and the projected turn
    order. Qualitative previews wait for a client that needs them.
 7. For M4, confirm [technique ranks](#technique-ranks--proposed) in place of
    realm tiers, and extend the balance simulation to ranks before choosing their
    numbers.
 
-M3a is delivered. Settle 2 and 3 before M3b, and 1 and 4 before M3c.
+M3a and M3b are delivered; M3b implemented decisions 3 and 5 as proposed.
+Settle 1, 2 and 4 before M3c: the speed cap and action cost only matter once
+the timeline exists.

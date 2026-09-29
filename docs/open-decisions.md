@@ -1446,7 +1446,7 @@ summary:
   Copies within one encounter are told apart by participant position; Section 10
   instance IDs are only for copies with persistent state.
 - Skills spend MP or rage. MP regenerates over encounter time and by resting,
-  and MP costs grow with level; rage starts at zero in each encounter and builds
+  and MP costs are flat as authored; rage starts at zero in each encounter and builds
   from actions and damage taken. The
   [balance simulation](../ROADMAP.md#balance-simulation--proposed) tunes both
   against grinding-oriented targets.
@@ -1454,7 +1454,7 @@ summary:
   character levels and XP, MP, rage, skills, technique ranks, realms and seeded
   RNG. Power comes from stats, never from character level.
 - Damage has two channels, physical and special; each world names special
-  (magic, 内力, mana). The matching stats dominate and the other channel adds an
+  (magic, 内力, mana) with a required `special_name` in its combat block. The matching stats dominate and the other channel adds an
   authored share (25% proposed), so deep 内力 also blocks some physical damage.
   The proposed formula has no K: defence equal to the combined attack halves
   damage.

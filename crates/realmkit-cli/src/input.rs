@@ -1,10 +1,10 @@
 use realmkit_engine::Command;
 use realmkit_spec::Direction;
 
-/// Commands a player can type; `attack` only where the world has combat.
+/// Commands a player can type; fighting and resting only where the world has combat.
 pub fn help(combat: bool) -> String {
     let attack = if combat {
-        "attack <character-id>\n"
+        "attack <character-id>\nuse <skill-id> <character-id>\nrest — at a safe place\n"
     } else {
         ""
     };
@@ -60,6 +60,11 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
             Command::Move(direction(&value.to_ascii_lowercase()).ok_or("unknown direction")?)
         }
         ("attack", [id]) => Command::Attack((*id).into()),
+        ("use", [skill, target]) => Command::UseSkill {
+            skill: (*skill).into(),
+            target: (*target).into(),
+        },
+        ("rest", []) => Command::Rest,
         ("talk", [id]) => Command::Talk((*id).into()),
         ("accept", [id]) => Command::AcceptQuest((*id).into()),
         ("complete", [id]) => Command::CompleteQuest((*id).into()),
@@ -103,5 +108,14 @@ mod tests {
         assert_eq!(parse("load"), Ok(Input::Load(None)));
         assert_eq!(parse("load 2"), Ok(Input::Load(Some(2))));
         assert!(parse("load two").is_err());
+        assert_eq!(
+            parse("use Bolt witch"),
+            Ok(Input::Command(Command::UseSkill {
+                skill: "Bolt".into(),
+                target: "witch".into()
+            }))
+        );
+        assert_eq!(parse("rest"), Ok(Input::Command(Command::Rest)));
+        assert!(parse("use bolt").is_err());
     }
 }
