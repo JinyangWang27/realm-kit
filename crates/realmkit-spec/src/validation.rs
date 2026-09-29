@@ -272,7 +272,28 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
         if let Some(profile) = &character.combat {
             stats(&mut out, &character.id, &profile.stats);
             items(&mut out, w, &character.id, &profile.loot);
-            let usable = profile.skills.iter().filter_map(|id| w.skill(id));
+            let usable = profile
+                .skills
+                .iter()
+                .filter_map(|id| w.skill(id))
+                .filter(|s| s.level <= profile.level);
+            if profile.level == 0 {
+                issue(
+                    &mut out,
+                    &character.id,
+                    "invalid_level",
+                    "a combat profile's level is 1 or more",
+                );
+            }
+            if let Some(group) = &profile.group {
+                reference(
+                    &mut out,
+                    &character.id,
+                    "group",
+                    group,
+                    w.group(group).is_some(),
+                );
+            }
             if let Some(combat) = w.combat() {
                 ids(
                     &mut out,
@@ -329,6 +350,19 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
                     character,
                     target.is_some(),
                 );
+                // Yielders stop at 1 HP, so a yielding group's members never die.
+                let yields = target
+                    .and_then(|c| c.combat.as_ref()?.group.as_deref())
+                    .and_then(|g| w.group(g))
+                    .is_some_and(|g| g.yield_share.is_some());
+                if yields {
+                    issue(
+                        &mut out,
+                        &quest.id,
+                        "invalid_target",
+                        format!("quest target {character} yields instead of being defeated"),
+                    );
+                }
                 if target.is_some_and(|c| c.combat.is_none()) {
                     issue(
                         &mut out,
@@ -595,6 +629,20 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
             "invalid_levels",
             "levels must start at 0 XP, with strictly increasing XP and stats that never fall",
         );
+    }
+    ids(out, "group", combat.groups.iter().map(|g| g.id.as_str()));
+    for group in &combat.groups {
+        if group.yield_share.is_some_and(|s| !(1..=100).contains(&s)) {
+            issue(
+                out,
+                &group.id,
+                "invalid_share",
+                "a yield share is a percentage from 1 to 100",
+            );
+        }
+        for flag in group.victory_flags.iter().chain(&group.defeat_flags) {
+            reference(out, &group.id, "flag", flag, w.world.flags.contains(flag));
+        }
     }
     ids(out, "skill", combat.skills.iter().map(|s| s.id.as_str()));
     for skill in &combat.skills {

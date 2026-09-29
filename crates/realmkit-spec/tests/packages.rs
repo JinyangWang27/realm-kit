@@ -47,6 +47,8 @@ fn profile() -> CombatProfile {
         loot: vec![],
         skills: vec![],
         basic_channel: Channel::Physical,
+        level: 1,
+        group: None,
     }
 }
 
@@ -387,4 +389,100 @@ fn rage_skills_need_no_mp_and_unused_resources_only_warn() {
         (warnings[0].code.as_str(), warnings[0].entity_id.as_deref()),
         ("unusable_skill", Some("bolt"))
     );
+}
+
+fn arena() -> WorldSpec {
+    WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena")).unwrap()
+}
+
+fn fighter<'w>(w: &'w mut WorldSpec, id: &str) -> &'w mut CombatProfile {
+    w.characters
+        .iter_mut()
+        .find(|c| c.id == id)
+        .unwrap()
+        .combat
+        .as_mut()
+        .unwrap()
+}
+
+#[test]
+fn groups_and_profile_levels_are_validated() {
+    let world = arena();
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    assert!(world.group("warren").unwrap().repeatable);
+    assert_eq!(fighter(&mut arena(), "ogre").level, 4);
+    let encoded = serde_json::to_string(&world).unwrap();
+    assert_eq!(serde_json::from_str::<WorldSpec>(&encoded).unwrap(), world);
+    let changes: Vec<fn(&mut WorldSpec)> = vec![
+        |w| fighter(w, "rat").group = Some("missing".into()),
+        |w| fighter(w, "rat").level = 0,
+        |w| {
+            let groups = &mut w.world.combat.as_mut().unwrap().groups;
+            groups.push(groups[0].clone())
+        },
+        |w| w.world.combat.as_mut().unwrap().groups[2].yield_share = Some(0),
+        |w| w.world.combat.as_mut().unwrap().groups[2].yield_share = Some(101),
+        |w| {
+            w.world.combat.as_mut().unwrap().groups[2]
+                .victory_flags
+                .push("missing".into())
+        },
+        |w| {
+            w.world.combat.as_mut().unwrap().groups[2]
+                .defeat_flags
+                .push("missing".into())
+        },
+        // A yielder never dies, so defeating it can never complete a quest.
+        |w| {
+            w.characters.push(Character {
+                id: "sarge".into(),
+                name: "Sarge".into(),
+                description: "Gives orders.".into(),
+                requires: vec![],
+                dialogue: Some("orders".into()),
+                combat: None,
+            });
+            w.dialogues.push(Dialogue {
+                id: "orders".into(),
+                start: "hello".into(),
+                nodes: vec![DialogueNode {
+                    id: "hello".into(),
+                    text: "Beat Holt.".into(),
+                    choices: vec![],
+                }],
+            });
+            w.locations[0].characters.push("sarge".into());
+            w.quests.push(Quest {
+                id: "beat_holt".into(),
+                name: "Beat Holt".into(),
+                giver: "sarge".into(),
+                objective: QuestObjective::Defeat {
+                    character: "holt".into(),
+                },
+                introduction: "Go.".into(),
+                progress: "Done.".into(),
+                completion: "Well done.".into(),
+                reward_xp: 0,
+                reward_items: vec![],
+                completion_flags: vec![],
+            })
+        },
+    ];
+    for (index, change) in changes.into_iter().enumerate() {
+        let mut world = arena();
+        change(&mut world);
+        assert!(world.validate().is_err(), "invalid group case {index}");
+    }
+}
+
+#[test]
+fn profile_skills_unlock_at_the_profile_level() {
+    // The ogre is level 4: crush (level 5) is locked, so its affordability is not checked.
+    let mut world = arena();
+    let combat = world.world.combat.as_mut().unwrap();
+    let crush = combat.skills.iter_mut().find(|s| s.id == "crush").unwrap();
+    (crush.resource, crush.cost) = (Resource::Mp, 50);
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    fighter(&mut world, "ogre").level = 5;
+    assert!(world.validate().is_err());
 }

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "gate",
+    "name": "The Arena Gate",
+    "description": "Racks of practice swords, a water trough, and four ways in.",
+    "exits": {
+      "north": { "destination": "den", "blocked_text": "The den is closed." },
+      "east": { "destination": "warren", "blocked_text": "The warren is closed." },
+      "west": { "destination": "ring", "blocked_text": "The ring is closed." },
+      "down": {
+        "destination": "pit",
+        "requires": [{ "kind": "flag", "flag": "spar_won" }],
+        "blocked_text": "Sergeant Holt bars the pit until you best him in the ring."
+      }
+    },
+    "safe": true
+  },
+  {
+    "id": "den",
+    "name": "The Wolf Den",
+    "description": "Straw, bones, and two sets of eyes.",
+    "exits": { "south": { "destination": "gate", "blocked_text": "The gate is shut." } },
+    "characters": ["grey_wolf", "black_wolf"]
+  },
+  {
+    "id": "warren",
+    "name": "The Rat Warren",
+    "description": "The walls are more hole than wall.",
+    "exits": { "west": { "destination": "gate", "blocked_text": "The gate is shut." } },
+    "characters": ["rat"]
+  },
+  {
+    "id": "ring",
+    "name": "The Sparring Ring",
+    "description": "A circle of raked sand.",
+    "exits": { "east": { "destination": "gate", "blocked_text": "The gate is shut." } },
+    "characters": ["holt"]
+  },
+  {
+    "id": "pit",
+    "name": "The Pit",
+    "description": "The chains rattle. There is no running from here.",
+    "exits": { "up": { "destination": "gate", "blocked_text": "The ladder is gone." } },
+    "characters": ["ogre"]
+  }
+]
