@@ -90,6 +90,12 @@ fn clamp_vitals(world: &WorldSpec, state: &mut GameState) {
         Stance::Exploring(vitals) => (&mut vitals.hp, &mut vitals.mp),
         Stance::Fighting(encounter) => {
             let player = &mut encounter.participants[0];
+            // Rage progress is counted in maximum HP: carry whole points over.
+            let whole = player.rage_remainder / u64::from(max.hp);
+            player.rage = player
+                .rage
+                .saturating_add(whole.try_into().unwrap_or(u32::MAX));
+            player.rage_remainder %= u64::from(max.hp);
             (&mut player.hp, &mut player.mp)
         }
     };
@@ -108,8 +114,12 @@ pub(super) fn add_xp(
     if amount == 0 {
         return Ok(());
     }
-    // XP stops at the first closed gate it reaches; only what is kept counts.
+    // A mastered technique has nothing left to learn.
     let learned = state.combat.as_ref().unwrap().techniques[technique];
+    if learned.rank == spec(world, technique).ranks.len() {
+        return Ok(());
+    }
+    // XP stops at the first closed gate it reaches; only what is kept counts.
     let raw = learned.xp.checked_add(amount);
     let mut kept = raw.unwrap_or(u64::MAX);
     let mut capped = false;

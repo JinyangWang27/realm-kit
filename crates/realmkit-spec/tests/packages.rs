@@ -698,6 +698,27 @@ fn techniques_have_named_rising_ranks_and_valid_grants() {
                 xp: 5,
             }))
         },
+        // Technique conditions name a technique and one of its ranks.
+        |w| {
+            w.locations[0]
+                .exits
+                .get_mut(&Direction::North)
+                .unwrap()
+                .requires = vec![Condition::Technique {
+                technique: "missing".into(),
+                rank: 1,
+            }]
+        },
+        |w| {
+            w.locations[0]
+                .exits
+                .get_mut(&Direction::North)
+                .unwrap()
+                .requires = vec![Condition::Technique {
+                technique: "cloud_palm".into(),
+                rank: 3,
+            }]
+        },
         // A core art nothing can teach would never show a realm.
         |w| {
             let combat = w.world.combat.as_mut().unwrap();
@@ -742,5 +763,17 @@ fn a_rank_skill_may_rely_on_its_own_rank_bonus() {
         .ranks
         .iter_mut()
         .for_each(|r| r.passive.clear());
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+}
+
+#[test]
+fn a_starting_art_can_supply_the_attack_the_player_fights_with() {
+    // No attack in the level table: Azure Breath's First Layer gives the Qi
+    // attack that the physical basic attack blends in.
+    let mut world = sect();
+    let combat = world.world.combat.as_mut().unwrap();
+    for level in &mut combat.levels {
+        (level.stats.patk, level.stats.satk) = (0, 0);
+    }
     assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
 }

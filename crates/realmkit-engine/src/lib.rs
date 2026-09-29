@@ -114,8 +114,10 @@ pub enum Event {
     ExperienceGranted {
         amount: u64,
     },
+    /// Levelling up restores HP, and MP when the player has any.
     LevelUp {
         level: usize,
+        mp_restored: bool,
     },
     PlayerDied,
     Dialogue {

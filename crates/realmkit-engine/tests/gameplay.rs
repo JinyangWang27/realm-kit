@@ -87,7 +87,10 @@ fn full_quest_loop_and_replay_produce_identical_state_and_events() {
     assert!(events.contains(&Event::QuestProgressed {
         quest: "quiet_the_track".into()
     }));
-    assert!(events.contains(&Event::LevelUp { level: 2 }));
+    assert!(events.contains(&Event::LevelUp {
+        level: 2,
+        mp_restored: false
+    }));
 }
 
 #[test]
@@ -2121,4 +2124,81 @@ fn a_save_cannot_hold_a_technique_nothing_teaches() {
         .techniques
         .insert("hidden_art".into(), TechniqueState { rank: 1, xp: 0 });
     assert!(Engine::restore(&world, snapshot).is_err());
+}
+
+#[test]
+fn a_technique_condition_tests_the_rank_reached() {
+    let world = sect();
+    let mut engine = Engine::new(&world).unwrap();
+    let storm = [Condition::Technique {
+        technique: "cloud_palm".into(),
+        rank: 2,
+    }];
+    let breath = [Condition::Technique {
+        technique: "azure_breath".into(),
+        rank: 1,
+    }];
+    assert!(engine.conditions_met(&breath));
+    assert!(!engine.conditions_met(&storm));
+    learn_palm(&mut engine);
+    engine.execute(Move(North)).unwrap();
+    while learned(&engine, "cloud_palm").unwrap().rank == 1 {
+        if engine.encounter().is_none() {
+            engine.execute(Engage("dummy".into())).unwrap();
+        }
+        engine.execute(palm("palm_drifting")).unwrap();
+    }
+    assert!(engine.conditions_met(&storm));
+}
+
+#[test]
+fn a_mastered_technique_gains_no_more_xp() {
+    let world = sect();
+    let mut engine = Engine::new(&world).unwrap();
+    learn_palm(&mut engine);
+    engine.execute(Move(North)).unwrap();
+    while learned(&engine, "cloud_palm").unwrap().rank == 1 {
+        if engine.encounter().is_none() {
+            engine.execute(Engage("dummy".into())).unwrap();
+        }
+        engine.execute(palm("palm_drifting")).unwrap();
+    }
+    if engine.encounter().is_none() {
+        engine.execute(Engage("dummy".into())).unwrap();
+    }
+    let events = engine.execute(palm("palm_storm")).unwrap();
+    assert!(!events.iter().any(
+        |e| matches!(e, Event::TechniqueXpGained { technique, .. } if technique == "cloud_palm")
+    ));
+    assert_eq!(learned(&engine, "cloud_palm").unwrap().xp, 30);
+}
+
+#[test]
+fn a_rank_that_lowers_max_hp_carries_rage_progress_over() {
+    // Drifting Cloud adds 30 HP; Gathering Storm adds none, so the rank-up
+    // mid-fight shrinks the maximum that rage progress is counted in.
+    let mut world = sect();
+    let combat = world.world.combat.as_mut().unwrap();
+    // Each 1-damage bite adds 30/80 of a rage point; three palms fit in one
+    // fight, so 60 progress meets the rank-up's new maximum of 50.
+    combat.resources.rage_per_max_hp = 30;
+    combat.techniques[1].ranks[0].passive.insert(Stat::Hp, 30);
+    // At speed 70 the dummy bites at ticks 1429 and 2858; the third palm lands
+    // at 3000, and the player's next turn (4000) comes before its next bite.
+    let dummy = combatant(&mut world, "dummy");
+    (dummy.stats.hp, dummy.stats.speed) = (60, 70);
+    let mut engine = Engine::new(&world).unwrap();
+    learn_palm(&mut engine);
+    engine.execute(Move(North)).unwrap();
+    while learned(&engine, "cloud_palm").unwrap().rank == 1 {
+        if engine.encounter().is_none() {
+            engine.execute(Engage("dummy".into())).unwrap();
+        }
+        engine.execute(palm("palm_drifting")).unwrap();
+        if let Some(encounter) = engine.encounter() {
+            let max = engine.player_stats().unwrap().hp;
+            assert!(encounter.participants[0].rage_remainder < u64::from(max));
+            assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+        }
+    }
 }

@@ -89,6 +89,18 @@ fn conditions(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, values: &[C
             Condition::Quest { quest, .. } => {
                 reference(out, owner, "quest", quest, w.quest(quest).is_some())
             }
+            Condition::Technique { technique, rank } => {
+                let known = w.technique(technique);
+                reference(out, owner, "technique", technique, known.is_some());
+                if known.is_some_and(|t| *rank == 0 || *rank > t.ranks.len()) {
+                    issue(
+                        out,
+                        owner,
+                        "invalid_rank",
+                        format!("{technique} has no rank {rank}"),
+                    );
+                }
+            }
         }
     }
 }
@@ -988,36 +1000,54 @@ fn combat_rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &
         }
     }
     if let Some(first) = levels.first() {
-        // A rank skill is usable with at least that rank's own passive bonus.
-        let none = BTreeMap::new();
-        let with_rank: Vec<(&Skill, Stats)> = combat
-            .player_skills
+        // Starting techniques guarantee their passives from the first moment;
+        // a rank skill also has its own rank's passive in place of its
+        // technique's starting one.
+        let starting: Vec<(&Id, &BTreeMap<Stat, u32>)> = combat
+            .player_techniques
             .iter()
-            .filter_map(|id| Some((w.skill(id)?, &none)))
-            .chain(
-                combat
-                    .techniques
-                    .iter()
-                    .flat_map(|t| &t.ranks)
-                    .filter_map(|r| Some((w.skill(r.skill.as_ref()?)?, &r.passive))),
-            )
-            .filter_map(|(skill, passive)| {
-                let mut stats = levels.get(skill.level.checked_sub(1)?)?.stats;
+            .filter_map(|g| {
+                let technique = w.technique(&g.technique)?;
+                let rank = technique.ranks.get(g.rank.unwrap_or(1).checked_sub(1)?)?;
+                Some((&technique.id, &rank.passive))
+            })
+            .collect();
+        let boosted = |base: Stats, own: Option<(&Id, &BTreeMap<Stat, u32>)>| {
+            let mut stats = base;
+            let others = starting
+                .iter()
+                .filter(|(id, _)| own.is_none_or(|(o, _)| o != *id));
+            for (_, passive) in others.map(|(id, p)| (*id, *p)).chain(own) {
                 for (stat, bonus) in passive {
                     let total = stats.get_mut(*stat);
                     *total = total.saturating_add(*bonus);
                 }
-                Some((skill, stats))
+            }
+            stats
+        };
+        let with_rank: Vec<(&Skill, Stats)> = combat
+            .player_skills
+            .iter()
+            .filter_map(|id| Some((w.skill(id)?, None)))
+            .chain(combat.techniques.iter().flat_map(|t| {
+                t.ranks.iter().filter_map(move |r| {
+                    Some((w.skill(r.skill.as_ref()?)?, Some((&t.id, &r.passive))))
+                })
+            }))
+            .filter_map(|(skill, own)| {
+                let base = levels.get(skill.level.checked_sub(1)?)?.stats;
+                Some((skill, boosted(base, own)))
             })
             .collect();
         let unlocked = with_rank.iter().map(|(skill, stats)| (*skill, stats));
+        let first = boosted(first.stats, None);
         usable_skills(
             out,
             combat,
             &w.world.player,
             combat.player_basic_channel,
             unlocked,
-            &first.stats,
+            &first,
         );
     }
     let narrative = &combat.narrative;

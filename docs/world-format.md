@@ -128,7 +128,12 @@ quest state:
 
 ```json
 { "kind": "quest", "quest": "quiet_the_track", "status": "ready" }
+{ "kind": "technique", "technique": "azure_breath", "rank": 2 }
 ```
+
+A technique condition holds once the player has learned the technique at
+least to that rank (see [Techniques](#techniques)), so a realm can gate an
+exit, a dialogue choice or a character.
 
 Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags

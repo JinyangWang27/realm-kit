@@ -498,8 +498,18 @@ pub enum QuestStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Condition {
-    Flag { flag: Id },
-    Quest { quest: Id, status: QuestStatus },
+    Flag {
+        flag: Id,
+    },
+    Quest {
+        quest: Id,
+        status: QuestStatus,
+    },
+    /// The player has learned `technique` at least to `rank` (1-based).
+    Technique {
+        technique: Id,
+        rank: usize,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -4,6 +4,11 @@ pub(super) fn conditions_met(state: &GameState, conditions: &[Condition]) -> boo
     conditions.iter().all(|condition| match condition {
         Condition::Flag { flag } => state.flags.contains(flag),
         Condition::Quest { quest, status } => state.quests.get(quest) == Some(status),
+        Condition::Technique { technique, rank } => state
+            .combat
+            .as_ref()
+            .and_then(|c| c.techniques.get(technique))
+            .is_some_and(|learned| learned.rank >= *rank),
     })
 }
 
@@ -150,6 +155,7 @@ pub(super) fn grant_xp(
         });
         events.push(Event::LevelUp {
             level: combat.level,
+            mp_restored: max.mp > 0,
         });
     }
     Ok(())
