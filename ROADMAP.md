@@ -952,8 +952,13 @@ has a rank.
 - **Rising through use.** Using a technique in an encounter earns technique XP,
   with the same falloff by level difference as character XP, so practising on
   weak opponents stops paying. Nothing is earned outside encounters.
-- **Rising through teaching.** Authored effects from masters, manuals and
-  奇遇 grant a technique or set its rank directly.
+- **Passive arts rise slowly with experience** (decided). An internal art has
+  no skill to use, so each victory gives it an authored share of the character
+  XP earned, typically small, so cultivation deepens much more slowly than
+  levels.
+- **Rising through teaching and events.** Authored effects from masters,
+  manuals, quests and 奇遇 grant a technique, set its rank directly, or grant
+  technique XP.
 - **Breakthrough gates.** Reaching a rank may require authored conditions such as
   a flag, quest state or story phase: 九阴真经's later layers need the second
   volume. Technique XP stops at the gated threshold until the gate opens, so the
