@@ -213,7 +213,7 @@ fn nothing_is_forged_in_a_fight() {
 }
 
 #[test]
-fn spent_materials_can_fall_below_their_grants_but_never_exceed_them() {
+fn materials_never_exceed_their_grants() {
     let mut world = smithy();
     // Beetles that stay dead: their ingots are a finite grant.
     world.world.combat.as_mut().unwrap().groups[0].repeatable = false;
@@ -229,7 +229,6 @@ fn spent_materials_can_fall_below_their_grants_but_never_exceed_them() {
         Engine::restore(&world, changed).is_ok()
     };
     assert!(with(1));
-    assert!(with(0), "spending may leave fewer than were granted");
     assert!(!with(2), "no crafting makes ingots");
 }
 
@@ -306,4 +305,15 @@ fn a_save_cannot_hold_more_crafting_than_its_materials_paid_for() {
     assert!(!loads(|s| {
         s.player.inventory.insert("iron_ingot".into(), 1);
     }));
+}
+
+#[test]
+fn a_save_cannot_drop_materials_nothing_spent() {
+    let mut world = smithy();
+    world.world.combat.as_mut().unwrap().groups[0].repeatable = false;
+    let engine = at_the_anvil(&world, 1);
+    // The one ingot, unspent: only crafting takes materials away.
+    let mut dropped = engine.snapshot();
+    dropped.state.player.inventory.remove("iron_ingot");
+    assert!(Engine::restore(&world, dropped).is_err());
 }
