@@ -26,7 +26,9 @@ and when they must be settled.
   state/location, exactly one main questline and one or more authored outcomes.
   Side questlines are optional, but
   main-story progress unlocks them in bounded waves so exploration remains open
-  without making the main story irrelevant.
+  without making the main story irrelevant. Repeatable offers, such as a guild's
+  delivery jobs in a sandbox world, are activities rather than side questlines,
+  so they sit outside those waves.
 - Time models stay separate: story phase is core narrative progression; an
   in-world clock/calendar is optional; encounter timelines are local schedulers;
   real-world thinking time advances none of them.
@@ -289,7 +291,7 @@ balance decisions.
    yielding with victory and defeat flags, opponent levels with level-gated
    skills, and XP falloff (`examples/arena`); package and save format 5. Flee's wind-up always completes
    within the one command that declares it, so no pending flight is saved;
-   the saved `pending` field waits until turns can pause mid-wind-up (M8).
+   the saved `pending` field waits until turns can pause mid-wind-up (M9).
 4. **M3d — seeded RNG and critical hits (optional) · delivered.** A small
    hand-written, versioned PRNG such as SplitMix64 or PCG32 with saved state. Do
    not use `rand`'s `StdRng`: its output is not guaranteed stable across
@@ -342,7 +344,7 @@ Encounter           active local state; at most one per playthrough
   matter; the balance simulation depends on this. Richer policies, such as
   targeting lowest HP, saving resources or random targeting through the RNG, are
   authored enum variants added with content that needs them, never scripts. Multiplayer adds more player controllers; each
-  pending human turn pauses only its own encounter (M8).
+  pending human turn pauses only its own encounter (M9).
 - **Commands.** One player command resolves that participant's action, then every
   policy-controlled action until a player-controlled participant is next or the
   encounter ends. Actions name targets explicitly, as in `Attack(target)` and
@@ -1059,13 +1061,106 @@ milestones. They change how play reads, never the engine or its rules.
   progression without fake rooms or directional traversal merely to satisfy the
   engine. See [the non-spatial simulation note](docs/simulation-worlds.md).
 
+### Delivery slices · proposed
+
+M5 also lays the general foundations that
+[living sandbox worlds](docs/sandbox-worlds.md) need, and M6 depends on these
+four slices. The investigation fixture, optional Inventory and authored endings
+above are delivered alongside them, in whichever order a fixture needs them.
+
+1. **M5a — condition tree and effect lists.** `requires` becomes one condition
+   composed with `All / Any / Not` over typed leaf predicates, and a dialogue
+   choice carries an ordered list of `effects` in place of one optional
+   `effect`, applied atomically. Numeric predicates stay domain-typed, as
+   [decided](docs/open-decisions.md#6-conditions-and-effects).
+2. **M5b — world time, travel and recurring schedules.** Optional World Time
+   as specified above; roads with authored travel durations and exits beyond
+   the six compass directions; wait and rest actions that consume time; and
+   recurring schedules that the dispatch cursor expands lazily, one due
+   occurrence at a time.
+3. **M5c — quest lifecycle.** Quests that fail, carry world-time deadlines or
+   are abandoned, plus repeatable offers: job templates whose parameters the
+   saved RNG draws from authored candidate lists at an explicit gameplay
+   transition, such as a recurring refresh, never when a menu opens.
+4. **M5d — runtime instances** for spawned copies and parties whose state
+   outlives one encounter, as in the first bullet above. Unique authored
+   characters keep their authored IDs and carry state such as wounds or
+   captivity under them.
+
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and tested paths to completion, can be saved/resumed, and include at least one
 inventory-free non-combat fixture that loads and plays with no inventory state,
 definitions/placeholders, Inventory command or inventory UI. A dungeon is useful
 only for a world that needs one.
 
-## M6 — Authoring feedback and deterministic simulation
+## M6 — Living sandbox worlds · proposed
+
+Let a world keep moving without the player: an overland realm of rival
+kingdoms where the player trades, hires soldiers, earns standing, holds fiefs
+and joins orders while lords, bandits and caravans act on their own. The
+[sandbox design direction](docs/sandbox-worlds.md) describes each capability;
+[Section 18](docs/open-decisions.md#18-living-sandbox-worlds) of the register
+tracks its open questions. Every capability, and every part inside one, stays
+optional and ships with the slice of the reference fixture that proves it.
+Hard dependencies between capabilities are few and validated, interactions
+happen only when both sides are present, and the full sandbox is simply the
+world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
+
+Depends on M5a–M5d. Deliver in slices, each bumping the package and save
+format as usual:
+
+1. **M6a — economy.** Currency, markets with engine-computed integer prices
+   from authored base prices, modifiers and stock, buy and sell with a price
+   preview, and upkeep on recurring schedules.
+2. **M6b — factions and standing.** War and peace between factions, authored
+   standing tracks such as renown and relation, and the conditions and effects
+   that read and change them. Authored personality traits steer dialogue and
+   drive reactions to player deeds, either detected by the engine or reported
+   by an authored `ReportDeed` effect. Proficiencies such as trading,
+   leadership and surgery belong to the capability that uses them.
+3. **M6c — retinue.** Troop definitions with wages and upgrade paths, a roster
+   of counts and saved XP pools per troop type, companions as unique
+   characters who wear their own gear from a shared stash, recruiting, an
+   engine-computed roster limit, an upkeep tick with its own RNG domain for
+   wages, provisions, wounded recovery, morale and desertion, and travel speed
+   from the slowest troops and the party's load.
+4. **M6d — mass battle.** Army-against-army resolution from rosters, leaders and
+   ground (authored on locations and roads), with seeded casualties and an
+   optional champion duel. The formula is mirrored in `scripts/combat_sim`
+   before tests pin its numbers. Losses split into killed and wounded, and
+   wounded troops recover on the retinue's upkeep tick or, for agent parties,
+   the world-agent tick. Battles take prisoners: troop prisoners to sell or
+   recruit, captured lords to ransom, escapes on a schedule, and player
+   captivity as a setback rather than an ending. Holding prisons arrive with
+   M6e.
+5. **M6e — holdings and sieges.** Ownership that changes during play, income,
+   garrisons, authored buildings, sieges as mass battles after a preparation
+   time, and raiding enemy villages for loot at the cost of their income.
+6. **M6f — world agents.** Party instances on the road graph that apply a
+   closed set of engine policies on recurring world ticks, with priorities
+   that may test the leader's traits, routing by shortest travel time with ties
+   broken by authored road order, spawners with caps, interception of the
+   player, off-screen battles, weighted diplomacy events, and an
+   `AGENT_BOUND`.
+7. **M6g — politics and orders by composition.** Faction membership ranks for
+   vassalage and knightly orders, chapter houses as buildings, courtship and
+   marriage on relation tracks and dialogue, and a player-founded kingdom as an
+   authored dormant faction.
+
+**Done when:** a small original fixture (`examples/marches`) plays 30 or more
+in-world days in which parties move and a war changes a holding's owner
+without the player, while the player trades, recruits, wins a mass battle and
+receives a fief. In the fixture the fief is the top ambition, so it records the
+route's completed, non-terminal outcome, and play continues. Lower rungs of the
+ambition ladder are ordinary main-questline quests, because a playthrough
+records at most one outcome. The
+same seed and commands reproduce it exactly, including across save and load.
+Trimmed variants of the fixture that drop capabilities, such as one with only
+travel, time and the economy, and one without world agents, still validate and
+play, and a world missing a hard prerequisite is rejected with a stable
+diagnostic.
+
+## M7 — Authoring feedback and deterministic simulation
 
 - Extend typed authoring operations where real content workflows need them.
 - Add structured diagnostics for unreachable objectives, unavailable required
@@ -1086,7 +1181,7 @@ only for a world that needs one.
 feedback, repair, and export a playable package without editing serialized text
 as its primary API. A small combat simulator may be brought forward to tune M3.
 
-## M7 — Source-grounded world generation
+## M8 — Source-grounded world generation
 
 - Provide world-builder instructions for external agents; keep model providers
   optional and outside gameplay.
@@ -1132,7 +1227,7 @@ successful real-engine simulation to a completion outcome. For a two-route
 fixture, both routes are selectable from New Game, share the intended world/canon
 data, and validate and simulate independently from their own starts.
 
-## M8 — Additional clients and shared play · optional later
+## M9 — Additional clients and shared play · optional later
 
 Add a richer TUI or web/mobile client over the same command model when useful.
 Introduce an authoritative server and party play as a separate milestone once

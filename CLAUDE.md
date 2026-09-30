@@ -48,7 +48,7 @@ Invariants the code relies on:
 - `ROADMAP.md`: milestones and the presentation track.
 - `README.md`: player-facing behaviour.
 
-Longer design reasoning lives in `docs/open-decisions.md`, `docs/equipment.md` and `docs/glossary.md`.
+Longer design reasoning lives in `docs/open-decisions.md`, `docs/equipment.md`, `docs/sandbox-worlds.md` and `docs/glossary.md`.
 
 ## Workflow in this repo
 

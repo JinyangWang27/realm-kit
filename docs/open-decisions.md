@@ -514,7 +514,9 @@ Decisions:
 - Do not introduce a generic numeric-comparison abstraction until repeated
   capability implementations prove it useful. A predicate should initially expose
   domain-appropriate semantics such as `RelationshipAtLeast` or
-  `HasItem { quantity }`.
+  `HasItem { quantity }`. Living sandbox worlds bring the first repeated numeric
+  predicates (currency, standing, holdings, world time); they still stay
+  domain-typed, as [Section 18](#18-living-sandbox-worlds) proposes.
 - Effects remain closed typed variants. No generic `set(path, value)`,
   `eval(...)` or executable scripts.
 - Effects in one authored transition execute in authored order against staged
@@ -1471,6 +1473,152 @@ summary:
   more sides, respawn delays in World Time (M5), downed/revive rules, and immunity,
   vulnerability and stacking (M4).
 
+## 18. Living sandbox worlds
+
+**Open; decide each item before the M5 or M6 slice that first needs it.**
+
+The [sandbox design direction](sandbox-worlds.md) proposes the capabilities,
+and the roadmap schedules them as
+[M5 slices](../ROADMAP.md#delivery-slices--proposed-1) and
+[M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). Each question below has
+a proposed answer that still needs to be confirmed:
+
+- **Recurring schedules (M5b).** Proposed: a schedule authors a period of at
+  least one minute, checked by validation, and a first occurrence strictly after
+  the route's initial world time. A zero period would make each occurrence due
+  again at its own minute and break the no-loop guarantee above. The dispatch
+  cursor from [Section 9](#9-time-models) expands a schedule lazily, one due
+  occurrence at a time. Only the next occurrence is saved, never an expanded
+  list. Ties with one-shot events keep stable authored declaration order. Still
+  open: whether an effect may start or stop a schedule, or only authored
+  conditions gate what each occurrence does.
+- **Exits beyond compass directions (M5b).** Proposed: roads are named exits
+  keyed by an ASCII ID, with an authored travel duration. Compass directions
+  remain for worlds that use them. Still open: whether one world may mix the
+  two.
+- **Offers (M5c).** Proposed: the saved RNG draws an offer's parameters from
+  authored candidate lists only at an explicit gameplay transition, such as the
+  giver's recurring refresh or the player's arrival, and the drawn offer is
+  saved. Menus and dialogue only read existing offers, so inspecting jobs
+  consumes no randomness ([Section 7](#7-randomness-and-reproducibility)).
+  Still open: how many offers a
+  giver holds at once, and when a refused offer comes back.
+- **Proficiencies (M6).** Proposed: following [Section 8](#8-checks-and-proficiencies),
+  each capability owns the proficiencies it needs (trading in the economy,
+  leadership in the retinue, surgery in mass battle), with its own ranks and
+  checks. A technique rank is not such a proficiency. Still open: M4d gates
+  recipes on a Smithing *technique*, which blurs that separation. Either keep
+  it as a deliberate exception or move crafting to a crafting-owned proficiency
+  before sandbox proficiencies copy the pattern.
+- **Price model (M6a).** Proposed: integer price = base × market modifier ×
+  stock factor, each a bounded percentage, with one final rounding. The selling
+  price sits below the buying price by an authored spread that the economy's
+  trading proficiency can narrow. Still open: whether player sales feed stock
+  immediately or only at restock.
+- **Standing tracks (M6b).** Proposed: each track is authored with bounds,
+  named thresholds and a scope: global, per faction or per character. There is
+  no fixed list of tracks such as renown or honour.
+- **Mass-battle formula (M6d).** Proposed: one integer strength formula over
+  rosters, leaders and an authored ground modifier that both locations and
+  roads carry (neutral when omitted), resolved in a fixed
+  number of rounds with one RNG draw per round from a dedicated domain. It
+  follows the simulator-parity rule: `scripts/combat_sim` mirrors it before
+  tests pin its numbers. Still open: how troop quality beyond combat stats
+  counts, and whether a champion duel can end a battle outright.
+- **Agent policies (M6f).** Proposed: a closed enum (patrol, raid, escort,
+  besiege, return home), chosen by authored priority rules over typed
+  conditions. Parties act in stable instance order. "Nearest" and every route
+  a party takes are shortest total travel time on the road graph, with ties
+  broken by authored road order; there is no free-space pathfinding. Agents
+  draw from their own RNG domain, separate from combat and offers.
+- **Interception (M6f).** Proposed: travel along one road is atomic, but a tick
+  that falls during the journey can stop the player at the road's midpoint when
+  a hostile party shares that road; a battle there uses the road's ground.
+  Arriving at a location where a hostile party stands also intercepts. Still
+  open: whether a party can pursue the
+  player across more than one road.
+- **Runtime-created entities.** Proposed: none beyond instances of authored
+  definitions, and instances only for spawned copies and parties. Unique
+  authored characters keep their authored IDs, and state such as wounds or
+  captivity is keyed by them ([Section 10](#10-definitions-instances-and-identity)).
+  A player-founded kingdom is an authored, dormant faction that an
+  effect activates, so validation sees every faction that can exist.
+- **Ambition ladders.** Proposed: a sandbox route's rungs below the top are
+  ordinary main-questline quests; only the top rung is the route's completed,
+  non-terminal outcome, because a playthrough records at most one outcome
+  ([Section 3](#3-outcomes-failure-and-replay)).
+- **Retinue XP (M6c).** Proposed: the roster saves an XP pool per troop type.
+  Battles add to it and recruits add none. Every troop leaving a type (upgrade,
+  casualty, desertion) takes its share, the pool divided by the count rounded
+  down; an upgrading troop pays the next step's authored XP from that share
+  and carries the rest into its new type's pool. A type with no troops left has
+  an empty pool, so XP is only moved or spent, never farmed.
+- **Roster limit (M6c).** Proposed: an integer the engine computes from an
+  authored base plus authored contributions from standing tracks and the
+  leadership proficiency. Companions count; prisoners have a separate limit. A
+  lower limit refuses recruiting but never removes troops.
+- **Companion progression and gear (M6c).** Proposed: equipment instances save
+  one optional wearer, the retinue shares one stash, and every retinue
+  character's effective stats come from one derivation function and are never
+  saved. Still open: whether companions level from the world's level table and
+  allocate points like the player, or keep fixed profile stats and grow only
+  through techniques and gear.
+- **Prisoners (M6d).** Proposed: captures are an authored share of the losing
+  side's casualties, drawn from the battle's RNG domain and capped by the
+  winner's prisoner limit; unique leaders are captured rather than killed by
+  default; captivity of a unique character is state keyed by its ID. Player
+  captivity is an ordinary setback, not an outcome. Escapes run on the world's
+  prison schedule with their own `captivity` RNG domain. Still open: what
+  happens to the player's retinue and stash when the player is captured.
+- **Personalities (M6b).** Proposed: a world declares a closed list of named
+  traits and each character authors a few; traits never change during play.
+  Agent policy priorities and diplomacy weights may test a leader's traits.
+  Reactions are authored rules of the form trait × deed → standing change.
+  Deeds are either a closed set the engine detects (raiding a village, which is
+  a holdings action, releasing or ransoming a prisoner, unpaid wages) or world-declared IDs that an authored
+  `ReportDeed` effect reports, such as a tournament win or a broken promise.
+  Companion friction takes effect in the transition that lowers the relation,
+  with no tick. Still open: whether any world needs traits that change.
+- **Wounded, provisions and morale (M6c, M6d).** Proposed: the roster saves a
+  healthy and a wounded count per troop type; battle losses split into killed
+  and wounded by an authored share that surgery raises; an authored share of the
+  wounded recovers on each upkeep tick. Provisions are a value on trade goods,
+  eaten per head, prisoners included. Morale is one bounded integer per retinue;
+  low morale lowers battle strength and causes desertion. Wages, provisions,
+  recovery, morale drift and desertion run in that fixed order on the retinue's
+  own upkeep schedule, with desertion drawn from a `retinue` RNG domain, so
+  these rules work without world agents and never shift agent draws. Agent
+  parties keep the same two counts, and their wounded recover by an authored
+  share on each world-agent tick, without randomness. Still open: whether food
+  variety matters, and whether carried goods have a weight limit.
+- **Travel speed (M6c).** Proposed: a road's authored duration scaled by the
+  party's speed: the slowest of a world-authored base party speed and each
+  healthy troop type's authored speed, with penalties for size, wounded and
+  prisoners and a bonus from pathfinding, in integers with one rounding. A
+  party with no healthy troops moves at the base speed. Roads with an authored
+  duration take at least one minute; roads without one take no time. Agent
+  parties use the same rule.
+- **Marriage (M6g).** Proposed: courtship is authored dialogue over relation
+  tracks, and `Marry` records at most one spouse per character, keyed by ID. No
+  children, heirs or dynasties. Still open: whether a spouse can act for the
+  player, for example running a holding while the player travels.
+- **Culture.** Proposed: no runtime concept. Troop lines, recruit pools and
+  naming are referenced directly by locations and factions; authoring tools may
+  group them as a culture before export. Still open: whether any world needs
+  culture to change during play, which would make it holding state.
+- **Capability boundaries.** Proposed: every sandbox capability and every
+  part inside one is optional, per the
+  [Modularity](sandbox-worlds.md#modularity) rules: presence decides, hard
+  dependencies are few and validated with stable codes, cross-capability
+  interactions occur only when both sides are present, and each absent part
+  has a defined behaviour instead of placeholder data. Still open: whether a
+  part's presence is marked by its own block or by optional fields inside the
+  capability's block.
+- **Bounds and save size.** Proposed: a new `AGENT_BOUND` caps live parties,
+  and validation keeps party rosters within the existing numeric bounds, so a
+  save stays small and ticks stay cheap. The concrete value waits for the
+  reference fixture.
+
 ## Discussion order
 
 Discuss decisions immediately before their first consumer:
@@ -1479,6 +1627,7 @@ Discuss decisions immediately before their first consumer:
 2. M2: outcomes, definitions/instances, and save compatibility.
 3. First non-combat fixture: universal core, conditions/effects, skills/checks.
 4. M3/M4: time, combat values, equipment and crafting details.
-5. M7: canon divergence, original characters, capability provenance and generation
+5. M5/M6: sandbox foundations and capabilities ([Section 18](#18-living-sandbox-worlds)).
+6. M8: canon divergence, original characters, capability provenance and generation
    completion criteria.
-6. Multiplayer only when an authoritative server becomes active work.
+7. Multiplayer only when an authoritative server becomes active work.
