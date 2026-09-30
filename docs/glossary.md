@@ -88,6 +88,13 @@ back into later main-quest content.
 
 A quest required for main progression is not a side quest.
 
+## Offer
+
+Proposed for M5. A repeatable job template, such as a delivery or a bandit hunt,
+whose parameters the saved RNG draws from authored candidate lists. An offer is
+an activity rather than a side questline, so the bounded waves that gate side
+questlines do not apply to it.
+
 ## Story Phase
 
 A discrete narrative/canonical progression period shared by the world. Story
@@ -105,6 +112,13 @@ encounter scheduling.
 
 Presentation may render the same scalar using setting-appropriate clocks, dates or
 qualitative periods.
+
+## Recurring Schedule
+
+Proposed for M5. An authored period and first occurrence in World Time. The
+dispatch cursor expands it lazily, one due occurrence at a time, alongside
+one-shot scheduled events. Upkeep, restocking and world-agent ticks run on
+recurring schedules.
 
 ## Encounter Timeline
 
@@ -200,6 +214,35 @@ inventory or crafting.
 The existence of an entity in the fiction does not require its corresponding
 mechanical capability. For example, factions can exist as world entities without
 a faction/reputation system.
+
+## Standing
+
+Proposed for M6. An authored, bounded integer track with named thresholds,
+scoped globally, per faction or per character, such as renown or a lord's
+relation with the player. Conditions read it and effects change it.
+
+## Market
+
+Proposed for M6. A location that trades an authored set of goods. The engine
+computes its integer prices from authored base prices, the market's modifier and
+its current stock.
+
+## Retinue
+
+Proposed for M6. The player's troops, held as a count per troop definition, plus
+any companions, who are unique characters. Wages fall due on a recurring
+schedule.
+
+## Holding
+
+Proposed for M6. A location owned by a faction or character that can change
+hands during play, with income, a garrison and authored buildings.
+
+## World Agent
+
+Proposed for M6. A runtime party instance, such as a lord's war party, a bandit
+gang or a caravan, that acts on world ticks by applying a policy from a closed,
+engine-defined set. Agents move the world without the player.
 
 ## Proficiency
 

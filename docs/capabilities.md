@@ -54,8 +54,11 @@ capability is present.
 | Puzzles and mechanisms | Mechanism state, known facts, attempts | Inspect, manipulate, combine, answer |
 | Debate and courtroom | Claims, admitted evidence, credibility | Present, challenge, defend, rule |
 | Politics and intrigue | Influence, offices, secrets, alliances | Scheme, expose, support, blackmail |
-| Party and companions | Membership, role, morale, approval | Recruit, assign, counsel, dismiss |
+| Party and companions | Membership, role, morale, approval, troop rosters and wages | Recruit, assign, counsel, dismiss, upgrade troops |
 | Romance | Affection, boundaries, commitments | Court, respond, commit, separate |
+| Mass battle | Army rosters, strength, casualties | Give battle, retreat, besiege |
+| Holdings | Ownership, income, garrisons, buildings | Garrison, build, collect, besiege |
+| World agents | Roaming party instances, goals, spawners | None directly; they act on world ticks and can intercept the player |
 | Leadership and settlement | Population, safety, resources, assignments | Assign, build, ration, defend |
 | Business or estate | Staff, stock, income, upkeep | Hire, invest, price, expand |
 | Collection and scholarship | Texts, artifacts, translations, knowledge | Study, translate, catalogue, compare |
@@ -127,6 +130,18 @@ It should not acquire combat, inventory or fake spatial traversal merely because
 the first RealmKit fixture uses them. Repeated domain rules may justify one small
 typed institution/career capability later; isolated cases should remain authored
 events. See [non-spatial simulation worlds](simulation-worlds.md).
+
+A living sandbox of rival kingdoms might use:
+
+```text
+travel + time + economy + factions/standing + party (retinue)
++ mass battle + holdings + world agents + combat + equipment
+```
+
+Its main questline is a ladder of ambitions with completed, non-terminal
+outcomes, while lords, bandits and caravans act on world ticks. Politics and
+knightly orders compose factions, standing and holdings rather than adding
+capabilities of their own. See [living sandbox worlds](sandbox-worlds.md).
 
 Crafting belongs only if the source supports characters making or improving
 things. Combat belongs only if physical or magical conflict is an important
@@ -201,7 +216,8 @@ world that needs it:
    their user.
 
 Mass battles, such as 北凉铁骑 or Camlann, are not personal combat. They remain
-authored story outcomes or a later separate capability. A siege like 聚贤庄 fits
+authored story outcomes or use the separate mass-battle capability proposed for
+[living sandbox worlds](sandbox-worlds.md#mass-battle). A siege like 聚贤庄 fits
 personal combat as one against many minion-tier opponents.
 
 ## World-generation selection

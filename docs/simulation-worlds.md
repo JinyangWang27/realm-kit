@@ -16,6 +16,11 @@ The goal is not to reproduce one game. The goal is to ensure RealmKit's
 abstractions do not accidentally make directional map traversal, combat, or
 inventory universal.
 
+[Living sandbox worlds](sandbox-worlds.md) are a sibling architecture test. They
+keep the location graph but add a world that moves without the player: world
+agents, economy, standing and holdings on recurring schedules. Both tests share
+the scheduling and randomness rules below.
+
 ## Architecture test
 
 A mature RealmKit should be able to express a non-spatial simulation using the
