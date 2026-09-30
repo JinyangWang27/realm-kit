@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::Path};
 
 mod combat;
+mod crafting;
 mod items;
 mod places;
 mod stats;
@@ -11,6 +12,7 @@ mod story;
 mod techniques;
 mod validation;
 pub use combat::*;
+pub use crafting::*;
 pub use items::*;
 pub use places::*;
 pub use stats::*;
@@ -19,7 +21,7 @@ pub use techniques::*;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 9;
+pub const FORMAT_VERSION: u32 = 10;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -140,6 +142,9 @@ impl WorldSpec {
     }
     pub fn skill(&self, id: &str) -> Option<&Skill> {
         self.combat()?.skills.iter().find(|v| v.id == id)
+    }
+    pub fn recipe(&self, id: &str) -> Option<&Recipe> {
+        self.combat()?.recipes.iter().find(|v| v.id == id)
     }
     pub fn item(&self, id: &str) -> Option<&Item> {
         self.items.iter().find(|v| v.id == id)

@@ -1,0 +1,57 @@
+{
+  "format_version": 10,
+  "id": "low_ford_smithy",
+  "name": "The Smithy at Low Ford",
+  "language": "en",
+  "start": "yard",
+  "player": "apprentice",
+  "flags": ["taught_forging"],
+  "combat": {
+    "special_name": "Spirit",
+    "timeline": { "action_cost": 100000, "speed_cap": 200 },
+    "levels": [
+      { "xp": 0, "stats": { "hp": 50, "patk": 10, "pdef": 6, "satk": 1, "sdef": 4, "speed": 100 } },
+      { "xp": 12, "stats": { "hp": 56, "patk": 11, "pdef": 7, "satk": 1, "sdef": 4, "speed": 100 } },
+      { "xp": 30, "stats": { "hp": 62, "patk": 12, "pdef": 8, "satk": 1, "sdef": 5, "speed": 100 } }
+    ],
+    "techniques": [
+      {
+        "id": "smithing",
+        "name": "Smithing",
+        "ranks": [
+          { "name": "Apprentice", "xp": 0 },
+          { "name": "Journeyman", "xp": 20 },
+          { "name": "Master", "xp": 50 }
+        ]
+      }
+    ],
+    "slots": ["hand", "body"],
+    "recipes": [
+      {
+        "id": "iron_sword",
+        "station": "anvil",
+        "inputs": [{ "item": "iron_ingot", "quantity": 2 }],
+        "output": "iron_sword",
+        "known_when": [{ "kind": "flag", "flag": "taught_forging" }],
+        "requires": [{ "kind": "technique", "technique": "smithing", "rank": 1 }],
+        "trains": { "technique": "smithing", "xp": 10 }
+      },
+      {
+        "id": "iron_mail",
+        "station": "anvil",
+        "inputs": [{ "item": "iron_ingot", "quantity": 3 }],
+        "output": "iron_mail",
+        "known_when": [{ "kind": "flag", "flag": "taught_forging" }],
+        "requires": [{ "kind": "technique", "technique": "smithing", "rank": 2 }],
+        "trains": { "technique": "smithing", "xp": 15 }
+      }
+    ],
+    "groups": [{ "id": "slag", "repeatable": true }],
+    "narrative": {
+      "attack": ["{attacker} strike {target}: {damage} damage."],
+      "hurt": ["{attacker} bites {target}: {damage} damage."],
+      "victory": "{target} cracks apart.",
+      "death": "The mine goes dark around you."
+    }
+  }
+}

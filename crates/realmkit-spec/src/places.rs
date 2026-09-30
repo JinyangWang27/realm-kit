@@ -26,6 +26,9 @@ pub struct Location {
     /// Resting here restores HP and MP. Requires combat.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub safe: bool,
+    /// Crafting stations here, such as an anvil. Requires combat.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub stations: Vec<Id>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

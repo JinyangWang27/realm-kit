@@ -326,6 +326,7 @@ fn many_worn_modifiers_combine_exactly() {
                     basic_channel: None,
                     basic_time: None,
                     modifiers,
+                    tiers: Vec::new(),
                 }),
             });
         }

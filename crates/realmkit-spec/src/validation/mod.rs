@@ -4,6 +4,7 @@ use crate::*;
 use std::collections::BTreeSet;
 
 mod combat;
+mod crafting;
 mod equipment;
 mod progression;
 mod story;

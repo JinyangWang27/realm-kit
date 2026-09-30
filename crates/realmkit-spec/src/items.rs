@@ -40,6 +40,9 @@ pub struct Equipment {
     /// Damage taken on a channel is multiplied by `num / den`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub modifiers: BTreeMap<Channel, Modifier>,
+    /// Improvement tiers, in order; a piece rises one tier at a time.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tiers: Vec<Tier>,
 }
 
 /// A damage multiplier: 0/1 is immunity, 1/2 resistance, 2/1 vulnerability.
