@@ -1553,6 +1553,26 @@ a proposed answer that still needs to be confirmed:
   down; an upgrading troop pays the next step's authored XP from that share
   and carries the rest into its new type's pool. A type with no troops left has
   an empty pool, so XP is only moved or spent, never farmed.
+- **Roster limit (M6c).** Proposed: an integer the engine computes from an
+  authored base plus authored contributions from standing tracks and the
+  leadership proficiency. Companions count; prisoners have a separate limit. A
+  lower limit refuses recruiting but never removes troops.
+- **Companion progression and gear (M6c).** Proposed: equipment instances save
+  one optional wearer, the retinue shares one stash, and every retinue
+  character's effective stats come from one derivation function and are never
+  saved. Still open: whether companions level from the world's level table and
+  allocate points like the player, or keep fixed profile stats and grow only
+  through techniques and gear.
+- **Prisoners (M6d).** Proposed: captures are an authored share of the losing
+  side's casualties, drawn from the battle's RNG domain and capped by the
+  winner's prisoner limit; unique leaders are captured rather than killed by
+  default; captivity of a unique character is state keyed by its ID. Player
+  captivity is an ordinary setback, not an outcome. Still open: what happens to
+  the player's retinue and stash when the player is captured.
+- **Culture.** Proposed: no runtime concept. Troop lines, recruit pools and
+  naming are referenced directly by locations and factions; authoring tools may
+  group them as a culture before export. Still open: whether any world needs
+  culture to change during play, which would make it holding state.
 - **Bounds and save size.** Proposed: a new `AGENT_BOUND` caps live parties,
   and validation keeps party rosters within the existing numeric bounds, so a
   save stays small and ticks stay cheap. The concrete value waits for the

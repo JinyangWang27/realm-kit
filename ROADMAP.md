@@ -1115,10 +1115,14 @@ format as usual:
    surgery belong to the capability that uses them.
 3. **M6c — retinue.** Troop definitions with wages and upgrade paths, a roster
    of counts and saved XP pools per troop type, companions as unique
-   characters, recruiting and a roster limit.
+   characters who wear their own gear from a shared stash, recruiting, and an
+   engine-computed roster limit.
 4. **M6d — mass battle.** Army-against-army resolution from rosters, leaders
    and ground (authored on locations and roads), with seeded casualties and an optional champion duel. The
    formula is mirrored in `scripts/combat_sim` before tests pin its numbers.
+   Battles take prisoners: troop prisoners to sell or recruit, captured lords
+   to ransom, escapes on a schedule, and player captivity as a setback rather
+   than an ending. Holding prisons arrive with M6e.
 5. **M6e — holdings and sieges.** Ownership that changes during play, income,
    garrisons, authored buildings, and sieges as mass battles after a
    preparation time.

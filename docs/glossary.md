@@ -230,9 +230,17 @@ its current stock.
 
 ## Retinue
 
-Proposed for M6. The player's troops, held as a count per troop definition, plus
-any companions, who are unique characters. Wages fall due on a recurring
-schedule.
+Proposed for M6. The player's troops, held as a count and an XP pool per troop
+definition, plus any companions, who are unique characters wearing gear from a
+shared stash. An engine-computed limit caps its size, and wages fall due on a
+recurring schedule.
+
+## Prisoner
+
+Proposed for M6. A captured troop, counted per troop definition, or a captured
+unique character whose captivity is state keyed by its character ID. Prisoners
+are held by the player, an agent party or a holding, within that holder's
+prisoner limit, and may be sold, recruited, ransomed, released or escape.
 
 ## Holding
 

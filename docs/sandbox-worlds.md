@@ -184,12 +184,21 @@ the world authors it, and it arrives with a fixture that proves it.
   upgrade path (recruit → footman → sergeant).
 - **Roster.** The player's roster holds, per troop definition, a count and an
   XP pool: troops are fungible, not instances. Both are saved.
-- **Companions.** Companions are unique characters who join the retinue. They
-  keep their own gear and technique ranks.
-- **Rules.** Recruiting happens at locations that offer it. An authored rule,
-  typically a standing threshold or the retinue's own leadership proficiency,
-  sets the roster size limit. Wages fall due on a recurring schedule. What
-  happens when they go unpaid (desertion, lost standing) is authored.
+- **Companions.** Companions are unique characters who join the retinue through
+  authored dialogue effects and leave the same way. Each keeps its authored ID
+  and its own state: wounds, technique ranks and, in worlds with levels, its
+  own XP and level. See [Companion gear](#companion-gear).
+- **Recruiting and wages.** Recruiting happens at locations that offer it.
+  Wages fall due on a recurring schedule. What happens when they go unpaid
+  (desertion, lost standing) is authored.
+- **Size limit.** The engine computes the roster limit as an integer: an
+  authored base plus authored contributions from standing tracks and the
+  retinue's leadership proficiency. Companions count towards it; prisoners have
+  their own limit (see [Prisoners and ransom](#prisoners-and-ransom)). A command
+  that would exceed the limit is refused. If the limit later drops, for example
+  after lost renown, nobody leaves; recruiting is refused until the roster is
+  back under it. Agent party templates author their own fixed limits, and a
+  validation bound caps every roster.
 - **Upgrades.** Battles add XP to the pool of each surviving troop type, and
   recruits join with no XP. Every troop that leaves a type, whether by upgrade,
   casualty or desertion, takes its share of that type's pool: the pool divided
@@ -199,6 +208,59 @@ the world authors it, and it arrives with a fixture that proves it.
   type whose last troop leaves also drops any rounding remainder. XP is only
   moved or spent, never created outside battle, so a pool never outlives its
   troops and upgrades available after a save are the same as before it.
+
+### Companion gear
+
+Equipment today is worn by the player alone. With a retinue, every retinue
+character can wear gear:
+
+- **Wearer.** Each equipment instance has at most one wearer, the player or a
+  companion, and the retinue shares one stash for unworn pieces. The saved
+  instance records its wearer; moving a piece between characters keeps its
+  instance ID, tier and enchantment.
+- **Equipping.** The equip command names the wearer. Slots, swaps and the
+  before → after preview work exactly as for the player, against that
+  character's slots.
+- **Derived stats.** Every retinue character's effective stats are derived by
+  one function, like `rules::player_stats` today: the character's base
+  (combat profile, or level table plus allocated points where the world gives
+  companions levels), technique passives and worn gear. They are never saved.
+- **In fights.** Companions join personal encounters as allies on the player's
+  side, which the encounter state already supports, and count as leaders in a
+  mass battle. They are wounded rather than killed unless an authored rule says
+  otherwise.
+- **Leaving.** A companion who leaves takes nothing with them by default; their
+  worn pieces return to the stash unless an authored effect says otherwise.
+
+### Prisoners and ransom
+
+- **State.** A prisoner roster held by the player, by an agent party or by a
+  holding's prison: a count per troop definition, plus unique characters whose
+  captivity is state keyed by their character ID (held by whom, since when).
+  Prisoners have their own authored limit per holder.
+- **Taking prisoners.** When a mass battle ends, an authored share of the
+  losing side's casualties, drawn from the battle's RNG domain, become the
+  winner's prisoners instead of dying, up to the winner's limit. A defeated
+  unique leader is captured, not killed, unless an authored rule says
+  otherwise. A personal encounter can capture a yielding opponent the same way.
+- **Using prisoners.**
+  - Sell troop prisoners to a ransom broker at a location, for an engine-computed
+    price per troop definition (economy).
+  - Recruit prisoners into the retinue when an authored condition allows it,
+    which counts against the roster limit.
+  - Ransom a captured lord: an authored offer from the lord's faction, drawn at
+    a gameplay transition like any offer, pays currency for the release.
+  - Release a prisoner, with authored standing effects.
+- **Escape.** On a recurring schedule, prisoners may escape with an authored
+  chance from the agents' RNG domain; a holding's garrison and buildings lower
+  it.
+- **The player captured.** Losing a mass battle may capture the player instead
+  of ending the route. Captivity is an ordinary setback
+  ([Section 3](open-decisions.md#3-outcomes-failure-and-replay)): travel and
+  most actions are refused until an authored release (time served, ransom paid,
+  or escape) ends it. The retinue is scattered or captured as authored.
+- **Conditions and effects.** `HoldsPrisoner`, `IsCaptive`; `CapturePrisoner`,
+  `ReleasePrisoner`, `RansomPrisoner`.
 
 ### Mass battle
 
@@ -225,6 +287,8 @@ battles out of personal combat. This capability resolves army against army.
   character, that can change during play.
 - **Income.** A holding produces income and supplies on a recurring schedule.
 - **Garrison.** It keeps a garrison roster.
+- **Prison.** It holds prisoners within an authored limit that buildings can
+  raise, and a captured lord taken there waits for ransom or escape.
 - **Buildings.** Authored improvements (a mill, walls, a chapter house) cost
   currency and world time and change the holding's numbers.
 - **Sieges.** A siege is a mass battle against the garrison after an authored
@@ -242,6 +306,14 @@ Politics composes the capabilities above rather than adding a new one.
 - **Orders.** An order is a faction with ranks and its own troop definitions.
   Its chapter house is a building on a holding.
 - **Courtship and marriage.** Relationships plus authored dialogue.
+- **Culture is not a runtime concept.** Culture decides which troops a village
+  offers, the troop line a faction fields, and its names and prose, but none of
+  that changes during play. Locations and factions reference their troop
+  lines and recruit pools directly; an authoring tool may group those
+  references as a "culture" before export. Culture becomes runtime state only
+  if a world lets it change, such as a conquered town slowly taking its new
+  owner's culture; [Section 18](open-decisions.md#18-living-sandbox-worlds)
+  keeps that question open.
 - **Founding a kingdom.** The player's own kingdom is an authored, dormant
   faction that an effect activates. Nothing is created at runtime beyond
   instances, so validation still sees every faction that can ever exist.
