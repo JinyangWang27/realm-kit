@@ -1574,23 +1574,23 @@ a proposed answer that still needs to be confirmed:
   traits and each character authors a few; traits never change during play.
   Agent policy priorities and diplomacy weights may test a leader's traits.
   Reactions are authored rules of the form trait × deed → standing change.
-  Deeds are either a closed set the engine detects (raiding a village, releasing
-  or ransoming a prisoner, unpaid wages) or world-declared IDs that an authored
+  Deeds are either a closed set the engine detects (raiding a village, which is
+  a holdings action, releasing or ransoming a prisoner, unpaid wages) or world-declared IDs that an authored
   `ReportDeed` effect reports, such as a tournament win or a broken promise.
   Companion friction takes effect in the transition that lowers the relation,
   with no tick. Still open: whether any world needs traits that change.
 - **Wounded, provisions and morale (M6c, M6d).** Proposed: the roster saves a
   healthy and a wounded count per troop type; battle losses split into killed
-  and wounded by an authored share that surgery raises; an authored share of
-  the wounded recovers on each upkeep tick. Provisions are a value on trade
-  goods, eaten per head, prisoners included. Morale is one bounded integer per
-  retinue; low morale lowers battle strength and causes desertion. Wages,
-  provisions, recovery, morale drift and desertion run in that fixed order on
-  the retinue's own upkeep schedule, with desertion drawn from a `retinue` RNG
-  domain, so these rules work without world agents and never shift agent
-  draws.
-  Still open: whether food variety matters, and whether carried goods have a
-  weight limit.
+  and wounded by an authored share that surgery raises; an authored share of the
+  wounded recovers on each upkeep tick. Provisions are a value on trade goods,
+  eaten per head, prisoners included. Morale is one bounded integer per retinue;
+  low morale lowers battle strength and causes desertion. Wages, provisions,
+  recovery, morale drift and desertion run in that fixed order on the retinue's
+  own upkeep schedule, with desertion drawn from a `retinue` RNG domain, so
+  these rules work without world agents and never shift agent draws. Agent
+  parties keep the same two counts, and their wounded recover by an authored
+  share on each world-agent tick, without randomness. Still open: whether food
+  variety matters, and whether carried goods have a weight limit.
 - **Travel speed (M6c).** Proposed: a road's authored duration scaled by the
   party's speed: the slowest of a world-authored base party speed and each
   healthy troop type's authored speed, with penalties for size, wounded and

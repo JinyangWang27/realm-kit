@@ -90,7 +90,7 @@ quest deadlines, offers, runtime instances) is optional.
 | Companion gear | retinue, equipment | None. Companions fight in encounters only where personal combat exists. |
 | Mass battle | retinue | Without morale or proficiencies, those terms leave the formula; without prisoners, losses are never captured; champion duels need personal combat. |
 | Prisoners | retinue, and mass battle or personal combat | Ransom needs the economy; escapes run on a prison tick, so they need recurring schedules; holding prisons need holdings. |
-| Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time. Without factions, owners are characters. |
+| Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time; raiding needs factions at war. Without factions, owners are characters. |
 | Politics and orders | factions and standing | Membership ranks, orders, marriage and a founded kingdom are separate parts. Marriage needs per-character relation tracks. |
 | World agents | recurring schedules | Without a retinue, parties carry no rosters and cannot fight; without mass battle, they never fight each other; without factions, there is no diplomacy. |
 
@@ -247,8 +247,9 @@ they do, without scripting each character.
   engine still offers only its closed set of policies; traits only choose
   among them.
 - **Reactions to deeds.** Deeds come from two sources:
-  - The engine reports a closed set it can detect itself: raiding a village,
-    releasing or ransoming a prisoner, and leaving wages unpaid.
+  - The engine reports a closed set it can detect itself: raiding a village
+    (with holdings), releasing or ransoming a prisoner, and leaving wages
+    unpaid. A deed whose capability is absent never occurs.
   - The world declares its own deed IDs, such as winning a tournament or
     breaking a promise, and reports them with an authored `ReportDeed` effect
     wherever its dialogue or quests decide the deed happened.
@@ -309,9 +310,9 @@ they do, without scripting each character.
   upgrade once its share reaches the next step's authored XP. It pays that XP
   from its share and carries the rest into its new type's pool. Any other
   leaver's share is lost, and a type whose last troop leaves also drops any
-  rounding remainder. XP is only
-  moved or spent, never created outside battle, so a pool never outlives its
-  troops and upgrades available after a save are the same as before it.
+  rounding remainder. XP is only moved or spent, never created outside battle,
+  so a pool never outlives its troops and upgrades available after a save are
+  the same as before it.
 - **Provisions.** Trade goods may author a provisions value. On each upkeep
   tick the retinue eats provisions per head, prisoners included, from its
   carried goods in authored goods order. A hungry retinue
@@ -325,12 +326,11 @@ they do, without scripting each character.
 - **Travel speed.** A road's authored duration is scaled by the party's speed:
   the slowest of the world's authored base party speed (which covers the player
   and companions) and each healthy troop type's speed, minus authored penalties
-  for roster size, wounded troops and prisoners, plus a pathfinding
-  proficiency. A party with no healthy troops moves at the base speed. The
-  engine computes it in integers with one rounding. A road with an authored
-  duration never takes less than one minute; a road without one still takes no
-  time. Agent parties use the same rule, so light
-  raiders can catch a slow caravan on the road.
+  for roster size, wounded troops and prisoners, plus a pathfinding proficiency.
+  A party with no healthy troops moves at the base speed. The engine computes it
+  in integers with one rounding. A road with an authored duration never takes
+  less than one minute; a road without one still takes no time. Agent parties
+  use the same rule, so light raiders can catch a slow caravan on the road.
 
 ### Companion gear
 
@@ -376,8 +376,7 @@ character can wear gear:
   - Release a prisoner, with authored standing effects.
 - **Escape.** On a prison tick, a recurring schedule the world authors for
   prisoners, they may escape with an authored chance drawn from their own
-  `captivity` RNG domain; a holding's garrison and buildings lower
-  it.
+  `captivity` RNG domain; a holding's garrison and buildings lower it.
 - **The player captured.** Losing a mass battle may capture the player instead
   of ending the route. Captivity is an ordinary setback
   ([Section 3](open-decisions.md#3-outcomes-failure-and-replay)): travel and
@@ -421,6 +420,12 @@ battles out of personal combat. This capability resolves army against army.
   currency and world time and change the holding's numbers.
 - **Sieges.** A siege is a mass battle against the garrison after an authored
   preparation time. The walls improve the defenders.
+- **Raiding.** The player may raid a village holding whose owner's faction is
+  at war with the player's. The raid takes authored world time, is resisted by
+  the garrison through mass battle where the world has one, yields the
+  holding's authored loot of goods and currency, and stops its income for an
+  authored period. It is the engine-detected deed "raiding a village". An
+  agent's raid policy applies the same rule.
 - **Conditions and effects.** `HoldsLocation`; `GrantHolding`,
   `TransferHolding`.
 
@@ -482,6 +487,10 @@ World agents are what make the world move without the player.
   - Their random choices draw from their own RNG domain, so adding a bandit
     gang does not change the player's critical hits, desertions or prison
     escapes.
+- **Agent wounded.** An agent party's roster keeps healthy and wounded counts
+  like the player's. Its wounded recover on each world-agent tick by the
+  template's authored share, with no randomness, so battles between agents
+  wear parties down without leaving them crippled for good.
 - **Spawners.** Locations spawn parties from templates, with authored caps and
   intervals. A destroyed party is removed; its instance ID is never reused
   within the same history.
