@@ -11,6 +11,9 @@ pub fn help(world: &WorldSpec) -> String {
     if combat.is_some_and(|c| !c.slots.is_empty()) {
         attack += "equip <#> — wear a piece from your pack\nunequip <#>\n";
     }
+    if combat.is_some_and(|c| !c.recipes.is_empty()) {
+        attack += "forge <recipe> — at its station\nimprove <#> — raise a piece one tier\n";
+    }
     if combat.is_some_and(|c| !c.techniques.is_empty()) {
         attack += "techniques — learned techniques and their ranks\n";
     }
@@ -101,6 +104,8 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
         ("respec", []) => Command::Respec,
         ("equip", [piece]) => Command::Equip(gear(piece)?),
         ("unequip", [piece]) => Command::Unequip(gear(piece)?),
+        ("forge", [recipe]) => Command::Forge((*recipe).into()),
+        ("improve", [piece]) => Command::Improve(gear(piece)?),
         ("allocate", [name, rest @ ..]) if rest.len() <= 1 => Command::Allocate {
             stat: stat(&name.to_ascii_lowercase()).ok_or("unknown stat")?,
             points: match rest {
@@ -180,5 +185,10 @@ mod tests {
         assert_eq!(parse("equip #3"), Ok(Input::Command(Command::Equip(3))));
         assert_eq!(parse("unequip 3"), Ok(Input::Command(Command::Unequip(3))));
         assert!(parse("equip sword").is_err());
+        assert_eq!(
+            parse("forge iron_sword"),
+            Ok(Input::Command(Command::Forge("iron_sword".into())))
+        );
+        assert_eq!(parse("improve #1"), Ok(Input::Command(Command::Improve(1))));
     }
 }

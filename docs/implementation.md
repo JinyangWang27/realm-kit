@@ -67,6 +67,12 @@ proves the complete single-player loop with authored content.
   immunity wins, clamped to 1/10–10). Every piece is an individual saved
   instance; equip swaps out whatever held its slots, with a before → after
   preview from the engine. Package and save format 9.
+- [x] Forging and improvement (M4d): locations offer stations; recipes,
+  hidden until known and gated by requirements such as a Smithing technique
+  rank, forge new pieces from counted materials; improvement tiers replace a
+  piece's bonuses (and speed penalty) one tier at a time. Checks precede any
+  change, results are guaranteed, and crafting trains its technique.
+  `examples/smithy` exercises it. Package and save format 10.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

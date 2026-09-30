@@ -10,6 +10,7 @@ pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
     progression::stat_points(out, w, owner, combat);
     progression::techniques(out, w, combat);
     equipment::equipment(out, w, combat);
+    crafting::crafting(out, w, combat);
     levels(out, owner, &combat.levels);
     groups(out, w, combat);
     skills(out, combat);

@@ -1,7 +1,7 @@
 use crate::{
     input,
     render::Paint,
-    render::{direction_name, gear_name, stat_name},
+    render::{direction_name, gear_name, piece_name, stat_name},
 };
 use realmkit_engine::{Command, Engine};
 use realmkit_spec::{Resource, Stat};
@@ -23,6 +23,10 @@ const TRAIN: &str = "Train";
 const RESPEC: &str = "Refund stat points";
 const TRAIN_GROUP: &str = "Train stats";
 const EQUIPMENT_GROUP: &str = "Equipment";
+const SMITHING_GROUP: &str = "Smithing";
+const FORGE: &str = "Forge";
+const IMPROVE: &str = "Improve";
+const NEEDS: &str = "needs";
 const OPENS: &str = "›";
 const BACK: &str = "Back";
 const EQUIP: &str = "Equip";
@@ -63,6 +67,7 @@ pub enum Outcome {
 pub enum Group {
     Train,
     Equipment,
+    Smithing,
 }
 
 impl Group {
@@ -70,6 +75,7 @@ impl Group {
         match command {
             Command::Allocate { .. } | Command::Respec => Some(Self::Train),
             Command::Equip(_) => Some(Self::Equipment),
+            Command::Forge(_) | Command::Improve(_) => Some(Self::Smithing),
             _ => None,
         }
     }
@@ -188,6 +194,7 @@ fn group_label(engine: &Engine<'_>, group: Group) -> String {
             n => format!("{TRAIN_GROUP} — {n} points {OPENS}"),
         },
         Group::Equipment => format!("{EQUIPMENT_GROUP} {OPENS}"),
+        Group::Smithing => format!("{SMITHING_GROUP} {OPENS}"),
     }
 }
 
@@ -244,6 +251,31 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             )
         }
         // Other unavailable actions (e.g. after death) are not offered.
+        // "Forge Iron mail — 3 Iron ingot [needs Journeyman Smithing]".
+        Command::Forge(id) => {
+            let recipe = world.recipe(id).unwrap();
+            let output = &world.item(&recipe.output).unwrap().name;
+            let cost = materials(world, &recipe.inputs);
+            let why = missing(engine, &recipe.requires, &recipe.inputs);
+            format!("{FORGE} {output} — {cost}{why}")
+        }
+        // "Improve #1 Iron sword → Fine Iron sword (Attack +4 → +6) — 1 Iron
+        // ingot": what the piece itself gains, shown before it is affordable.
+        Command::Improve(piece) => {
+            let gear = &engine.state().combat.as_ref()?.gear[piece];
+            let equipment = world.item(&gear.item)?.equipment.as_ref()?;
+            let tier = equipment.tiers.get(gear.tier)?;
+            let mut next = gear.clone();
+            next.tier += 1;
+            let changes = tier_changes(world, equipment, gear.tier);
+            let cost = materials(world, &tier.cost);
+            let why = missing(engine, &tier.requires, &tier.cost);
+            format!(
+                "{IMPROVE} {} → {}{changes} — {cost}{why}",
+                gear_name(engine, *piece),
+                piece_name(world, &next)
+            )
+        }
         _ if !action.available => return None,
         Command::Rest => REST.into(),
         Command::Flee => FLEE.into(),
@@ -261,21 +293,10 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         // "Equip #5 Greatsword: Attack 13 → 21, Defence 11 → 9", from
         // the engine's own calculation on a copy.
         Command::Equip(piece) => {
-            let now = engine.player_stats().unwrap();
             let mut probe = engine.clone();
             probe.execute(Command::Equip(*piece)).ok()?;
-            let then = probe.player_stats().unwrap();
-            let changes: Vec<String> = Stat::ALL
-                .into_iter()
-                .filter(|s| now.get(*s) != then.get(*s))
-                .map(|s| format!("{} {} → {}", stat_name(world, s), now.get(s), then.get(s)))
-                .collect();
-            let name = gear_name(engine, *piece);
-            if changes.is_empty() {
-                format!("{EQUIP} {name}")
-            } else {
-                format!("{EQUIP} {name}: {}", changes.join(", "))
-            }
+            let changes = stat_changes(engine, &probe);
+            format!("{EQUIP} {}{changes}", gear_name(engine, *piece))
         }
         Command::Engage(id) => {
             format!("{ENGAGE} {}", world.character(id).unwrap().name)
@@ -292,6 +313,111 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Techniques => TECHNIQUES.into(),
         _ => return None,
     })
+}
+
+/// "2 Iron ingot, 1 Leather strip".
+fn materials(world: &realmkit_spec::WorldSpec, stacks: &[realmkit_spec::ItemStack]) -> String {
+    let parts: Vec<String> = stacks
+        .iter()
+        .map(|s| format!("{} {}", s.quantity, world.item(&s.item).unwrap().name))
+        .collect();
+    parts.join(", ")
+}
+
+/// Why crafting cannot happen yet, in the order the engine checks:
+/// " [needs Journeyman Smithing]", " [needs 2 Iron ingot]", or nothing.
+fn missing(
+    engine: &Engine<'_>,
+    requires: &[realmkit_spec::Condition],
+    stacks: &[realmkit_spec::ItemStack],
+) -> String {
+    let world = engine.world();
+    let unmet = requires
+        .iter()
+        .find(|c| !engine.conditions_met(std::slice::from_ref(*c)));
+    if let Some(condition) = unmet {
+        return match condition {
+            realmkit_spec::Condition::Technique { technique, rank } => {
+                let technique = world.technique(technique).unwrap();
+                let rank = &technique.ranks[rank - 1].name;
+                format!(" [{NEEDS} {rank} {}]", technique.name)
+            }
+            _ => format!(" {LOCKED}"),
+        };
+    }
+    let inventory = &engine.state().player.inventory;
+    let short = stacks
+        .iter()
+        .find(|s| inventory.get(&s.item).copied().unwrap_or(0) < s.quantity);
+    match short {
+        Some(s) => format!(
+            " [{NEEDS} {} {}]",
+            s.quantity,
+            world.item(&s.item).unwrap().name
+        ),
+        None => String::new(),
+    }
+}
+
+/// " (Attack +4 → +6, Speed −10 → −5)": how the piece changes a tier up.
+fn tier_changes(
+    world: &realmkit_spec::WorldSpec,
+    equipment: &realmkit_spec::Equipment,
+    tier: usize,
+) -> String {
+    let bonus = |t: usize, stat| equipment.bonuses_at(t).get(&stat).copied().unwrap_or(0);
+    let mut changes: Vec<String> = Stat::ALL
+        .into_iter()
+        .filter(|s| bonus(tier, *s) != bonus(tier + 1, *s))
+        .map(|s| {
+            format!(
+                "{} +{} → +{}",
+                stat_name(world, s),
+                bonus(tier, s),
+                bonus(tier + 1, s)
+            )
+        })
+        .collect();
+    let (before, after) = (
+        equipment.speed_penalty_at(tier),
+        equipment.speed_penalty_at(tier + 1),
+    );
+    if before != after {
+        changes.push(format!(
+            "{} −{before} → −{after}",
+            stat_name(world, Stat::Speed)
+        ));
+    }
+    if changes.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", changes.join(", "))
+    }
+}
+
+/// ": Attack 15 → 17, Speed 90 → 95" between two engines' effective stats.
+fn stat_changes(before: &Engine<'_>, after: &Engine<'_>) -> String {
+    let (now, then) = (
+        before.player_stats().unwrap(),
+        after.player_stats().unwrap(),
+    );
+    let changes: Vec<String> = Stat::ALL
+        .into_iter()
+        .filter(|s| now.get(*s) != then.get(*s))
+        .map(|s| {
+            format!(
+                "{} {} → {}",
+                stat_name(before.world(), s),
+                now.get(s),
+                then.get(s)
+            )
+        })
+        .collect();
+    if changes.is_empty() {
+        String::new()
+    } else {
+        format!(": {}", changes.join(", "))
+    }
 }
 
 impl Menu {
@@ -561,5 +687,45 @@ mod tests {
         assert_eq!(labels(&menu)[0], "Train HP: 65 → 70");
         // A command from elsewhere closes it.
         assert_eq!(menu.stays_open(&Command::Rest), None);
+    }
+
+    #[test]
+    fn an_improvement_previews_the_piece_even_before_it_is_affordable() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/smithy"
+        ))
+        .unwrap();
+        let mut engine = Engine::new(&world).unwrap();
+        for command in [
+            Command::Talk("bran".into()),
+            Command::ChooseDialogue(1),
+            Command::ChooseDialogue(1),
+            Command::Move(Direction::Down),
+        ] {
+            engine.execute(command).unwrap();
+        }
+        for _ in 0..2 {
+            engine.execute(Command::Engage("beetle".into())).unwrap();
+            while engine.encounter().is_some() {
+                engine.execute(Command::Attack("beetle".into())).unwrap();
+            }
+        }
+        engine.execute(Command::Move(Direction::Up)).unwrap();
+        engine.execute(Command::Move(Direction::East)).unwrap();
+        engine.execute(Command::Forge("iron_sword".into())).unwrap();
+        let mut menu = Menu::new(&engine, false, None);
+        let smithing = menu
+            .entries()
+            .iter()
+            .position(|e| e.label == "Smithing ›")
+            .unwrap();
+        menu.choose(smithing + 1);
+        let labels: Vec<_> = menu.entries().iter().map(|e| e.label.as_str()).collect();
+        // The piece's own change, shown although an Apprentice with no ingot
+        // cannot make it yet.
+        assert!(labels.contains(
+            &"Improve #1 Iron sword → Fine Iron sword (Attack +4 → +6) — 1 Iron ingot [needs Journeyman Smithing]"
+        ), "{labels:?}");
     }
 }

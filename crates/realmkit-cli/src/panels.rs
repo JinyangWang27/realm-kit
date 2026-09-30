@@ -1,6 +1,6 @@
 //! Panels: views of the current state that spend no time.
 
-use crate::render::{direction_name, stat_name, Paint};
+use crate::render::{direction_name, piece_name, stat_name, Paint};
 use realmkit_engine::Engine;
 use realmkit_spec::Stat;
 use std::io::{self, Write};
@@ -81,7 +81,8 @@ pub fn inventory(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> 
     for (id, piece) in gear.into_iter().flatten() {
         let item = world.item(&piece.item).unwrap();
         let worn = if piece.equipped { " [equipped]" } else { "" };
-        writeln!(output, "  #{id} {}{worn} — {}", item.name, item.description)?;
+        let name = piece_name(world, piece);
+        writeln!(output, "  #{id} {name}{worn} — {}", item.description)?;
     }
     for (id, count) in &state.player.inventory {
         let item = world.item(id).unwrap();

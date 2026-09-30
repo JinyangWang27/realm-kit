@@ -17,6 +17,7 @@ pub(super) fn check(
     defeats(world, combat)?;
     allocation(world, combat, rules)?;
     techniques(world, state, combat, rules)?;
+    crafting(world, state, combat, rules, progress)?;
     let max = rules::player_stats(world, combat);
     match &combat.stance {
         Stance::Exploring(v) => ensure(
@@ -32,8 +33,8 @@ pub(super) fn check(
     )
 }
 
-/// Pieces are real equipment with IDs below the counter, and worn pieces
-/// never share a slot.
+/// Pieces are real equipment at a tier it has, with IDs below the counter,
+/// and worn pieces never share a slot.
 fn gear(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
     let mut worn = BTreeSet::new();
     ensure(
@@ -43,7 +44,9 @@ fn gear(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
                     .item(&piece.item)
                     .and_then(|i| i.equipment.as_ref())
                     .is_some_and(|e| {
-                        !piece.equipped || e.slots.iter().all(|slot| worn.insert(slot.clone()))
+                        piece.tier <= e.tiers.len()
+                            && (!piece.equipped
+                                || e.slots.iter().all(|slot| worn.insert(slot.clone())))
                     })
         }),
         "invalid equipment",
@@ -98,9 +101,23 @@ fn techniques(
     combat: &CombatState,
     rules: &Combat,
 ) -> Result<(), String> {
+    // Crafting trains techniques too, and teaches one it names.
+    let crafting = rules
+        .recipes
+        .iter()
+        .filter_map(|r| r.trains.as_ref())
+        .chain(
+            world
+                .items
+                .iter()
+                .filter_map(|i| i.equipment.as_ref())
+                .flat_map(|e| &e.tiers)
+                .filter_map(|t| t.trains.as_ref()),
+        );
     let teachable: BTreeSet<&Id> = rules
         .player_techniques
         .iter()
+        .chain(crafting)
         .chain(world.quests.iter().flat_map(|q| &q.reward_techniques))
         .chain(
             world
@@ -137,6 +154,44 @@ fn techniques(
                 .is_some_and(|t| t.rank >= grant.rank.unwrap_or(1))
         }),
         "invalid technique state",
+    )
+}
+
+/// Crafting the player qualified for: every tier a piece rose through, and
+/// some recipe for each piece forged beyond the grants, had its lasting
+/// conditions met and its trained technique learned.
+fn crafting(
+    world: &WorldSpec,
+    state: &GameState,
+    combat: &CombatState,
+    rules: &Combat,
+    progress: &Progress,
+) -> Result<(), String> {
+    let tiers_ok = combat.gear.values().all(|gear| {
+        let tiers = &world
+            .item(&gear.item)
+            .unwrap()
+            .equipment
+            .as_ref()
+            .unwrap()
+            .tiers;
+        tiers[..gear.tier.min(tiers.len())]
+            .iter()
+            .all(|t| lasting(state, &t.requires) && trained(state, t.trains.as_ref()))
+    });
+    let forged_ok = progress.forged.iter().all(|output| {
+        let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
+        let granted = progress.inventory.get(*output).copied().unwrap_or(0);
+        pieces <= granted
+            || progress.repeatable_loot.contains(output)
+            || rules
+                .recipes
+                .iter()
+                .any(|r| &&r.output == output && qualified(state, r))
+    });
+    ensure(
+        tiers_ok && forged_ok,
+        "crafting the player was not able to do",
     )
 }
 

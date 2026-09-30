@@ -71,6 +71,34 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     )
 }
 
+/// Conditions that, once true, stay true: flags are never cleared and ranks
+/// never fall. A quest's status moves on, so it proves nothing later.
+fn lasting(state: &GameState, conditions: &[Condition]) -> bool {
+    let lasting: Vec<_> = conditions
+        .iter()
+        .filter(|c| !matches!(c, Condition::Quest { .. }))
+        .cloned()
+        .collect();
+    rules::conditions_met(state, &lasting)
+}
+
+/// Crafting that trains a technique teaches it, so it must be learned.
+fn trained(state: &GameState, grant: Option<&realmkit_spec::TechniqueGrant>) -> bool {
+    grant.is_none_or(|g| {
+        state
+            .combat
+            .as_ref()
+            .is_some_and(|c| c.techniques.contains_key(&g.technique))
+    })
+}
+
+/// A recipe the player could have used, as far as a snapshot can tell.
+fn qualified(state: &GameState, recipe: &realmkit_spec::Recipe) -> bool {
+    lasting(state, &recipe.known_when)
+        && lasting(state, &recipe.requires)
+        && trained(state, recipe.trains.as_ref())
+}
+
 fn defeated(state: &GameState, id: &str) -> bool {
     state
         .combat
@@ -124,6 +152,10 @@ struct Progress<'w> {
     xp_ceiling: u64,
     any_repeatable: bool,
     repeatable_loot: BTreeSet<&'w Id>,
+    /// Materials crafting spends: at most what progress granted, maybe less.
+    spendable: BTreeSet<&'w Id>,
+    /// Items crafting makes: at least what progress granted, maybe more.
+    forged: BTreeSet<&'w Id>,
 }
 
 impl<'w> Progress<'w> {
@@ -165,7 +197,21 @@ impl<'w> Progress<'w> {
         }
         let ceiling = floor.checked_add(ceiling).ok_or("impossible experience")?;
         let repeaters = world.characters.iter().filter(|c| repeatable(world, &c.id));
+        let recipes = world.combat().into_iter().flat_map(|c| &c.recipes);
+        let tiers = world
+            .items
+            .iter()
+            .filter_map(|i| i.equipment.as_ref())
+            .flat_map(|e| &e.tiers);
+        let spendable = recipes
+            .clone()
+            .flat_map(|r| &r.inputs)
+            .chain(tiers.flat_map(|t| &t.cost))
+            .map(|s| &s.item)
+            .collect();
         Ok(Self {
+            spendable,
+            forged: recipes.map(|r| &r.output).collect(),
             inventory,
             quest_flags,
             xp_floor: floor,
@@ -198,12 +244,103 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
         progress
             .inventory
             .iter()
+            .filter(|(item, _)| !progress.spendable.contains(item))
             .all(|(item, count)| held.get(item).is_some_and(|h| h >= count))
             && held.iter().all(|(item, h)| {
-                progress.inventory.get(item) == Some(h) || progress.repeatable_loot.contains(item)
+                let granted = progress.inventory.get(item).copied().unwrap_or(0);
+                *h == granted
+                    || progress.repeatable_loot.contains(item)
+                    || (progress.spendable.contains(item) && *h < granted)
+                    || progress.forged.contains(item)
             }),
         "inventory does not match progress",
+    )?;
+    // Only crafting takes materials away: what is held plus what crafting
+    // spent matches what was granted, between the cheapest and dearest
+    // recipes that could have made each forged piece.
+    let (least, most) = spent(world, state, progress);
+    ensure(
+        progress.spendable.iter().all(|item| {
+            let held = held.get(*item).copied().unwrap_or(0);
+            let granted = progress.inventory.get(*item).copied().unwrap_or(0);
+            let at = |spent: &BTreeMap<&Id, u64>| {
+                held.saturating_add(spent.get(*item).copied().unwrap_or(0))
+            };
+            progress.repeatable_loot.contains(item)
+                || (at(&least) <= granted && at(&most) >= granted)
+        }),
+        "crafting does not match the materials it needed",
     )
+}
+
+/// The fewest and the most materials that could have made the pieces held:
+/// the cheapest and the dearest recipe for each piece beyond those granted,
+/// plus every tier each piece has risen through.
+fn spent<'w>(
+    world: &'w WorldSpec,
+    state: &GameState,
+    progress: &Progress,
+) -> (BTreeMap<&'w Id, u64>, BTreeMap<&'w Id, u64>) {
+    let (mut least, mut most): (BTreeMap<&Id, u64>, BTreeMap<&Id, u64>) = Default::default();
+    let (Some(combat), Some(rules)) = (&state.combat, world.combat()) else {
+        return (least, most);
+    };
+    let add = |spent: &mut BTreeMap<&'w Id, u64>, item: &'w Id, quantity: u64| {
+        let total = spent.entry(item).or_default();
+        *total = total.saturating_add(quantity);
+    };
+    for output in &progress.forged {
+        // Pieces are never lost, so those beyond the grants were forged;
+        // with repeatable loot, any number of them may have dropped instead.
+        let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
+        let granted = progress.inventory.get(*output).copied().unwrap_or(0);
+        let forged = pieces.saturating_sub(granted);
+        // Only recipes the player could have used explain a piece.
+        let recipes: Vec<_> = rules
+            .recipes
+            .iter()
+            .filter(|r| &&r.output == output && qualified(state, r))
+            .collect();
+        let materials: BTreeSet<&Id> = recipes
+            .iter()
+            .flat_map(|r| &r.inputs)
+            .map(|s| &s.item)
+            .collect();
+        for material in materials {
+            let cost = |r: &&realmkit_spec::Recipe| {
+                r.inputs
+                    .iter()
+                    .find(|s| &s.item == material)
+                    .map_or(0, |s| s.quantity)
+            };
+            // ponytail: per-material bounds are loose when several recipes make
+            // one item (a recipe without a material counts as 0 of it); an
+            // exact check searches assignments of recipes to pieces.
+            let cheapest = recipes.iter().map(cost).min().unwrap_or(0);
+            let dearest = recipes.iter().map(cost).max().unwrap_or(0);
+            if !progress.repeatable_loot.contains(output) {
+                add(&mut least, material, cheapest.saturating_mul(forged));
+            }
+            add(&mut most, material, dearest.saturating_mul(forged));
+        }
+    }
+    for gear in combat.gear.values() {
+        let tiers = &world
+            .item(&gear.item)
+            .unwrap()
+            .equipment
+            .as_ref()
+            .unwrap()
+            .tiers;
+        for stack in tiers[..gear.tier.min(tiers.len())]
+            .iter()
+            .flat_map(|t| &t.cost)
+        {
+            add(&mut least, &stack.item, stack.quantity);
+            add(&mut most, &stack.item, stack.quantity);
+        }
+    }
+    (least, most)
 }
 
 /// Completed quests' flags are set, and every flag has something that sets it.

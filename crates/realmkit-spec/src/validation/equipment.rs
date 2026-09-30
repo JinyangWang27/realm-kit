@@ -115,12 +115,16 @@ pub(super) fn weapon_channels(
         let Some(channel) = gear.basic_channel else {
             continue;
         };
-        let mut stats = first;
-        for (stat, bonus) in &gear.bonuses {
-            let total = stats.get_mut(*stat);
-            *total = total.saturating_add(*bonus);
-        }
-        if stats.combined(channel, combat.cross_share, false) == 0 {
+        // Every tier, since a tier's bonuses replace the ones before.
+        let unarmed = (0..=gear.tiers.len()).any(|tier| {
+            let mut stats = first;
+            for (stat, bonus) in gear.bonuses_at(tier) {
+                let total = stats.get_mut(*stat);
+                *total = total.saturating_add(*bonus);
+            }
+            stats.combined(channel, combat.cross_share, false) == 0
+        });
+        if unarmed {
             issue(
                 out,
                 &item.id,

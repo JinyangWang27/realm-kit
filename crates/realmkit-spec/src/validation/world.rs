@@ -62,6 +62,15 @@ pub(super) fn header(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 pub(super) fn locations<'w>(out: &mut Vec<Diagnostic>, w: &'w WorldSpec) -> BTreeSet<&'w str> {
     let mut placed = BTreeSet::new();
     for l in &w.locations {
+        ids(out, "station", l.stations.iter().map(String::as_str));
+        if !l.stations.is_empty() && w.combat().is_none() {
+            issue(
+                out,
+                &l.id,
+                "combat_disabled",
+                "this world has no combat block, so there is nothing to forge",
+            );
+        }
         if l.safe && w.combat().is_none() {
             issue(
                 out,

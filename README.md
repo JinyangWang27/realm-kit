@@ -131,6 +131,9 @@ points on levelling up, which you spend to shape your own build, and
 techniques mastered rank by rank, each rank named by the world
 (`examples/sect`). Equipment is worn in slots, each piece its own item, with
 bonuses, heavy weapons and armour that trade speed, and wards against damage.
+At a station such as an anvil, known recipes forge new pieces from materials
+and improvement tiers make a piece better one step at a time, trained by a
+smithing technique (`examples/smithy`).
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting

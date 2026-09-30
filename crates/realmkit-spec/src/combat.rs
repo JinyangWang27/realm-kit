@@ -44,6 +44,9 @@ pub struct Combat {
     /// Gear the player starts with, equipped in order while its slots are free.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_equipment: Vec<Id>,
+    /// What can be forged, and at which stations.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recipes: Vec<Recipe>,
     pub narrative: Narrative,
 }
 

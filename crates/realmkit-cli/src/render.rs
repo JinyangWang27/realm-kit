@@ -47,15 +47,31 @@ fn hit(
     writeln!(output, "{}", interpolate(text, &values)?)
 }
 
-/// "#3 Iron mail": a piece's instance number and its item's name.
+/// A piece's name at its tier: "Iron sword", or "Fine Iron sword" from the
+/// tier's authored template.
+pub fn piece_name(world: &realmkit_spec::WorldSpec, gear: &realmkit_engine::Gear) -> String {
+    let Some(item) = world.item(&gear.item) else {
+        return "?".into();
+    };
+    let tier = gear
+        .tier
+        .checked_sub(1)
+        .and_then(|i| item.equipment.as_ref()?.tiers.get(i));
+    match tier {
+        Some(tier) => interpolate(&tier.name, &[("item", &item.name)]).unwrap_or(item.name.clone()),
+        None => item.name.clone(),
+    }
+}
+
+/// "#3 Fine Iron mail": a piece's instance number and its name at its tier.
 pub fn gear_name(engine: &Engine<'_>, gear: u64) -> String {
-    let item = engine
+    let piece = engine
         .state()
         .combat
         .as_ref()
-        .and_then(|c| c.gear.get(&gear))
-        .and_then(|g| engine.world().item(&g.item));
-    format!("#{gear} {}", item.map_or("?", |i| i.name.as_str()))
+        .and_then(|c| c.gear.get(&gear));
+    let name = piece.map_or("?".into(), |g| piece_name(engine.world(), g));
+    format!("#{gear} {name}")
 }
 
 /// A stat's display name; special stats use the world's special name.
@@ -246,6 +262,17 @@ pub fn events(
             Event::PointsRefunded => writeln!(output, "Your stat points are refunded.")?,
             Event::Equipped { gear } => {
                 writeln!(output, "You equip {}.", gear_name(engine, *gear))?
+            }
+            Event::ItemsSpent { item, quantity } => writeln!(
+                output,
+                "Spent: {} ×{quantity}",
+                world.item(item).unwrap().name
+            )?,
+            Event::Forged { gear, .. } => {
+                writeln!(output, "You forge {}.", gear_name(engine, *gear))?
+            }
+            Event::Improved { gear, .. } => {
+                writeln!(output, "It is now {}.", gear_name(engine, *gear))?
             }
             Event::Unequipped { gear } => writeln!(
                 output,

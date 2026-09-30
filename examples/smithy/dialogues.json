@@ -1,0 +1,30 @@
+[
+  {
+    "id": "bran",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "'Hands first, questions after,' Bran says.",
+        "choices": [
+          {
+            "text": "Teach me to forge.",
+            "next": "hammer",
+            "effect": { "kind": "set_flag", "flag": "taught_forging" }
+          },
+          { "text": "Later." }
+        ]
+      },
+      {
+        "id": "hammer",
+        "text": "'Swords from two ingots, mail from three when your hands are ready. The beetles in the mine carry the iron.'",
+        "choices": [
+          {
+            "text": "Take the hammer.",
+            "effect": { "kind": "grant_technique", "technique": "smithing" }
+          }
+        ]
+      }
+    ]
+  }
+]

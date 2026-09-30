@@ -43,6 +43,8 @@ pub enum Stance {
 pub struct Gear {
     pub item: Id,
     pub equipped: bool,
+    /// Improvement tier; 0 is the item as defined.
+    pub tier: usize,
 }
 
 /// A learned technique's 1-based rank and its technique XP.
@@ -127,7 +129,7 @@ pub struct GameState {
     pub rng: Option<RngState>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 9;
+pub const SAVE_FORMAT_VERSION: u32 = 10;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 

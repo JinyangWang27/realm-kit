@@ -1,0 +1,30 @@
+talk bran
+choose 1
+choose 1
+techniques
+down
+engage beetle
+attack beetle
+attack beetle
+engage beetle
+attack beetle
+attack beetle
+engage beetle
+attack beetle
+attack beetle
+engage beetle
+attack beetle
+attack beetle
+engage beetle
+attack beetle
+attack beetle
+up
+east
+forge iron_sword
+forge iron_sword
+techniques
+equip 1
+improve 1
+inventory
+status
+quit
