@@ -1,16 +1,26 @@
 //! Panels: views of the current state that spend no time.
 
-use crate::render::{direction_name, stat_name};
+use crate::render::{direction_name, stat_name, Paint};
 use realmkit_engine::Engine;
 use realmkit_spec::Stat;
 use std::io::{self, Write};
 
 /// The location: its name, description, exits (locked or not) and who is here.
-pub fn location(output: &mut impl Write, engine: &Engine<'_>, location: &str) -> io::Result<()> {
+pub fn location(
+    output: &mut impl Write,
+    engine: &Engine<'_>,
+    location: &str,
+    paint: Paint,
+) -> io::Result<()> {
     let world = engine.world();
     let state = engine.state();
     let location = world.location(location).unwrap();
-    writeln!(output, "{}\n{}", location.name, location.description)?;
+    writeln!(
+        output,
+        "{}\n{}",
+        paint.title(&location.name),
+        location.description
+    )?;
     write!(output, "Exits:")?;
     for (direction, exit) in &location.exits {
         write!(
@@ -59,10 +69,10 @@ pub fn location(output: &mut impl Write, engine: &Engine<'_>, location: &str) ->
 }
 
 /// Pieces of equipment by number, then counted items.
-pub fn inventory(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
+pub fn inventory(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();
     let state = engine.state();
-    writeln!(output, "Inventory:")?;
+    writeln!(output, "{}", paint.title("Inventory:"))?;
     let gear = state.combat.as_ref().map(|c| &c.gear);
     if state.player.inventory.is_empty() && gear.is_none_or(|g| g.is_empty()) {
         writeln!(output, "  Empty")?;
@@ -85,7 +95,7 @@ pub fn inventory(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()>
 }
 
 /// The player's level, realm, vitals, stats, XP and unspent points.
-pub fn status(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
+pub fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();
     let player = &world.character(&world.world.player).unwrap().name;
     let (Some(combat), Some(stats), Some(vitals), Some(rules)) = (
@@ -94,18 +104,18 @@ pub fn status(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
         engine.player_vitals(),
         world.combat(),
     ) else {
-        return writeln!(output, "{player}");
+        return writeln!(output, "{}", paint.title(player));
     };
     // Who and where: the level, and the core internal art's rank as the realm.
-    write!(output, "{player} — Level {}", combat.level)?;
+    let mut heading = format!("{player} — Level {}", combat.level);
     let realm = rules.core_art.as_ref().and_then(|core| {
         let learned = combat.techniques.get(core)?;
         Some(&world.technique(core)?.ranks[learned.rank - 1].name)
     });
-    match realm {
-        Some(realm) => writeln!(output, " · Realm {realm}")?,
-        None => writeln!(output)?,
+    if let Some(realm) = realm {
+        heading += &format!(" · Realm {realm}");
     }
+    writeln!(output, "{}", paint.title(&heading))?;
     // Vitals; a world or build without MP shows none.
     write!(output, "  HP {}/{}", vitals.hp, stats.hp)?;
     match stats.mp {
@@ -131,10 +141,10 @@ pub fn status(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
 }
 
 /// Every quest and its status.
-pub fn quests(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
+pub fn quests(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();
     let state = engine.state();
-    writeln!(output, "Quests:")?;
+    writeln!(output, "{}", paint.title("Quests:"))?;
     for quest in &world.quests {
         writeln!(
             output,
@@ -146,10 +156,10 @@ pub fn quests(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
 }
 
 /// Learned techniques, their ranks and progress toward the next.
-pub fn techniques(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
+pub fn techniques(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();
     let state = engine.state();
-    writeln!(output, "Techniques:")?;
+    writeln!(output, "{}", paint.title("Techniques:"))?;
     let learned = state.combat.as_ref().map(|c| &c.techniques);
     if learned.is_none_or(|l| l.is_empty()) {
         writeln!(output, "  None yet")?;

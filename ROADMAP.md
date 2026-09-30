@@ -1004,8 +1004,9 @@ milestones. They change how play reads, never the engine or its rules.
 3. **Multi-line status** · delivered. The character panel shows the level and
    realm, then vitals, stats and progression on their own lines, with the XP
    the next level needs and any points waiting to be spent.
-4. **Light styling** · proposed. Emphasis and colour in a terminal, plain text
-   for pipes and `--line`.
+4. **Light styling** · delivered. In a terminal, names, headings and the
+   selected entry are bold, growth is green, criticals yellow and death red,
+   and key hints are dimmed. Pipes, `--line` and `NO_COLOR` get plain text.
 
 ## M5 — Longer authored adventures and source-specific mechanics
 

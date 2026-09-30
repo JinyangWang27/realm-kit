@@ -1,5 +1,6 @@
 use crate::{
     input,
+    render::Paint,
     render::{direction_name, gear_name, stat_name},
 };
 use realmkit_engine::{Command, Engine};
@@ -357,7 +358,12 @@ impl Menu {
 
     /// Writes the menu and returns how many lines it occupies.
     // ponytail: assumes labels fit one terminal row; measure widths if long labels wrap.
-    pub fn write(&self, output: &mut impl Write, interactive: bool) -> io::Result<u16> {
+    pub fn write(
+        &self,
+        output: &mut impl Write,
+        interactive: bool,
+        paint: Paint,
+    ) -> io::Result<u16> {
         writeln!(output)?;
         let mut header = self.header.clone();
         // A submenu is headed by the entry that opened it: "Train stats — 1 point".
@@ -366,18 +372,19 @@ impl Menu {
             .iter()
             .find(|e| Some(&e.pick) == self.open.map(Pick::Open).as_ref());
         if let Some(entry) = opener {
-            header.push(entry.label.trim_end_matches(OPENS).trim_end().into());
+            let title = entry.label.trim_end_matches(OPENS).trim_end();
+            header.push(paint.title(title));
         }
         for line in &header {
             writeln!(output, "{line}")?;
         }
         for (i, entry) in self.entries().iter().enumerate() {
-            let marker = if interactive && i == self.cursor {
-                ">"
+            let line = format!("{}. {}", i + 1, entry.label);
+            if interactive && i == self.cursor {
+                writeln!(output, "> {}", paint.title(&line))?;
             } else {
-                " "
-            };
-            writeln!(output, "{marker} {}. {}", i + 1, entry.label)?;
+                writeln!(output, "  {line}")?;
+            }
         }
         if interactive {
             let esc = if self.dialogue || self.open.is_some() {
@@ -385,7 +392,7 @@ impl Menu {
             } else {
                 ""
             };
-            writeln!(output, "\n{KEYS_HINT}{esc}")?;
+            writeln!(output, "\n{}", paint.dim(&format!("{KEYS_HINT}{esc}")))?;
             Ok((self.entries().len() + header.len()) as u16 + 3)
         } else {
             Ok((self.entries().len() + header.len()) as u16 + 1)

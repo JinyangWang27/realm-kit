@@ -1,4 +1,5 @@
 use crate::panels;
+use crossterm::style::Stylize;
 use realmkit_engine::{Engine, Event, Outcome};
 use realmkit_spec::{Direction, Id, Stat, TextTemplate};
 use std::io::{self, Write};
@@ -84,14 +85,60 @@ pub fn direction_name(direction: Direction) -> &'static str {
     }
 }
 
+/// Emphasis for a terminal; plain text for pipes, line mode and `NO_COLOR`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Paint {
+    pub styled: bool,
+}
+
+impl Paint {
+    fn apply(
+        self,
+        text: &str,
+        style: fn(String) -> crossterm::style::StyledContent<String>,
+    ) -> String {
+        if self.styled {
+            style(text.into()).to_string()
+        } else {
+            text.into()
+        }
+    }
+    /// Names and headings.
+    pub fn title(self, text: &str) -> String {
+        self.apply(text, |t| t.bold())
+    }
+    /// Growth: level-ups, new ranks and techniques.
+    pub fn good(self, text: &str) -> String {
+        self.apply(text, |t| t.green().bold())
+    }
+    pub fn critical(self, text: &str) -> String {
+        self.apply(text, |t| t.yellow().bold())
+    }
+    pub fn bad(self, text: &str) -> String {
+        self.apply(text, |t| t.red().bold())
+    }
+    /// Hints and other secondary text.
+    pub fn dim(self, text: &str) -> String {
+        self.apply(text, |t| t.dim())
+    }
+}
+
 /// Remembers technique XP gained during a fight, which is shown as one line
 /// when the fight ends instead of after every hit.
 #[derive(Default)]
 pub struct Log {
     technique_xp: Vec<(Id, u64)>,
+    pub paint: Paint,
 }
 
 impl Log {
+    pub fn new(paint: Paint) -> Self {
+        Self {
+            technique_xp: Vec::new(),
+            paint,
+        }
+    }
+
     /// Forgets the tally, for when a save replaces the playthrough.
     pub fn reset(&mut self) {
         self.technique_xp.clear();
@@ -126,7 +173,7 @@ impl Log {
                 _ => shown.push(event.clone()),
             }
         }
-        events(output, engine, &shown)?;
+        events(output, engine, &shown, self.paint)?;
         if ended && !self.technique_xp.is_empty() {
             let world = engine.world();
             let gains: Vec<String> = self
@@ -140,13 +187,20 @@ impl Log {
     }
 }
 
-pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) -> io::Result<()> {
+pub fn events(
+    output: &mut impl Write,
+    engine: &Engine<'_>,
+    events: &[Event],
+    paint: Paint,
+) -> io::Result<()> {
     let world = engine.world();
     let name = |id: &str| &world.character(id).unwrap().name;
     let player = name(&world.world.player);
     for event in events {
         match event {
-            Event::LocationViewed { location } => panels::location(output, engine, location)?,
+            Event::LocationViewed { location } => {
+                panels::location(output, engine, location, paint)?
+            }
             Event::DamageDealt {
                 target,
                 amount,
@@ -155,7 +209,7 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 critical,
             } => {
                 if *critical {
-                    writeln!(output, "{CRITICAL}")?;
+                    writeln!(output, "{}", paint.critical(CRITICAL))?;
                 }
                 let narrative = &world.combat().unwrap().narrative;
                 let text = skill.as_ref().map_or(&narrative.attack[*variant], |id| {
@@ -171,7 +225,7 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 critical,
             } => {
                 if *critical {
-                    writeln!(output, "{CRITICAL}")?;
+                    writeln!(output, "{}", paint.critical(CRITICAL))?;
                 }
                 let narrative = &world.combat().unwrap().narrative;
                 let text = skill.as_ref().map_or(&narrative.hurt[*variant], |id| {
@@ -198,22 +252,25 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 "{} goes back in your pack.",
                 gear_name(engine, *gear)
             )?,
-            Event::TechniqueLearned { technique } => writeln!(
-                output,
-                "You learn {}.",
-                world.technique(technique).unwrap().name
-            )?,
+            Event::TechniqueLearned { technique } => {
+                let name = &world.technique(technique).unwrap().name;
+                writeln!(output, "{}", paint.good(&format!("You learn {name}.")))?
+            }
             Event::TechniqueRankUp { technique, rank } => {
                 let technique = world.technique(technique).unwrap();
                 let name = &technique.ranks[rank - 1].name;
-                writeln!(output, "{}: {name}!", technique.name)?
+                writeln!(
+                    output,
+                    "{}",
+                    paint.good(&format!("{}: {name}!", technique.name))
+                )?
             }
             Event::TechniqueXpGained { technique, amount } => writeln!(
                 output,
                 "{} +{amount}",
                 world.technique(technique).unwrap().name
             )?,
-            Event::TechniquesViewed => panels::techniques(output, engine)?,
+            Event::TechniquesViewed => panels::techniques(output, engine, paint)?,
             Event::EncounterStarted { opponents } => {
                 let names: Vec<_> = opponents.iter().map(|id| name(id).as_str()).collect();
                 writeln!(output, "You face {}.", names.join(", "))?
@@ -245,7 +302,11 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                     &[("target", name(monster))]
                 )?
             )?,
-            Event::PlayerDied => writeln!(output, "{}", world.combat().unwrap().narrative.death)?,
+            Event::PlayerDied => writeln!(
+                output,
+                "{}",
+                paint.bad(&world.combat().unwrap().narrative.death)
+            )?,
             Event::ItemReceived { item, quantity } => writeln!(
                 output,
                 "Received: {} ×{}",
@@ -261,7 +322,8 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
                 } else {
                     "Health"
                 };
-                writeln!(output, "Level {level}! {restored} restored.")?
+                let line = format!("Level {level}! {restored} restored.");
+                writeln!(output, "{}", paint.good(&line))?
             }
             // Choices are shown by the menu, which also numbers them.
             Event::Dialogue { npc, node, .. } => {
@@ -279,9 +341,9 @@ pub fn events(output: &mut impl Write, engine: &Engine<'_>, events: &[Event]) ->
             Event::QuestCompleted { quest } => {
                 writeln!(output, "{}", world.quest(quest).unwrap().completion)?
             }
-            Event::InventoryViewed => panels::inventory(output, engine)?,
-            Event::StatusViewed => panels::status(output, engine)?,
-            Event::QuestsViewed => panels::quests(output, engine)?,
+            Event::InventoryViewed => panels::inventory(output, engine, paint)?,
+            Event::StatusViewed => panels::status(output, engine, paint)?,
+            Event::QuestsViewed => panels::quests(output, engine, paint)?,
             Event::Moved { .. } | Event::DialogueEnded | Event::StoryFlagSet { .. } => {}
         }
     }

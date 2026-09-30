@@ -73,7 +73,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         "validate" => writeln!(output, "{}: valid (format {})", world.world.name, world.world.format_version)?,
         "inspect" => writeln!(output, "{} [{}]\nLanguage: {}\n{} locations, {} characters, {} items, {} quests, {} dialogues\nStart: {}", world.world.name, world.world.id, world.world.language, world.locations.len(), world.characters.len(), world.items.len(), world.quests.len(), world.dialogues.len(), world.world.start)?,
         "play" if !line_mode && io::stdin().is_terminal() && output.is_terminal() => {
-            play::play_keys(&world, saves, seed, keys::terminal_keys(), &mut output)?
+            // NO_COLOR (no-color.org) asks for plain text even in a terminal.
+            let paint = render::Paint {
+                styled: std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty()),
+            };
+            play::play_keys(&world, saves, seed, paint, keys::terminal_keys(), &mut output)?
         }
         "play" => play::play(&world, saves, seed, io::stdin().lock(), &mut output)?,
         _ => unreachable!(),

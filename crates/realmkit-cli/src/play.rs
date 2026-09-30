@@ -4,7 +4,7 @@
 use crate::{
     input,
     menu::{self, Key, Menu, Outcome, Pick},
-    render,
+    render::{self, Paint},
     saves::Saves,
     session::{apply, persist, start},
 };
@@ -31,7 +31,7 @@ pub(crate) fn play(
     let mut log = render::Log::default();
     let mut engine = start(world, saves, seed, &mut log, output)?;
     let mut menu = Menu::new(&engine, false, None);
-    menu.write(output, false)?;
+    menu.write(output, false, Paint::default())?;
     writeln!(output, "{}", menu::LINE_HINT)?;
     let mut line = String::new();
     loop {
@@ -52,13 +52,13 @@ pub(crate) fn play(
             Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
                 persist(&mut engine, saves, &mut log, request, output)?;
                 menu = Menu::new(&engine, false, None);
-                menu.write(output, false)?;
+                menu.write(output, false, Paint::default())?;
                 continue;
             }
             Ok(input::Input::Select(number)) => match menu.choose(number) {
                 Outcome::Run(command) => command,
                 Outcome::Redraw => {
-                    menu.write(output, false)?;
+                    menu.write(output, false, Paint::default())?;
                     continue;
                 }
                 _ => {
@@ -78,7 +78,7 @@ pub(crate) fn play(
         let open = menu.stays_open(&command);
         apply(&mut engine, saves, &mut log, command, output)?;
         menu = Menu::new(&engine, false, open);
-        menu.write(output, false)?;
+        menu.write(output, false, Paint::default())?;
     }
     Ok(())
 }
@@ -126,15 +126,16 @@ pub(crate) fn play_keys(
     world: &WorldSpec,
     saves: Option<&Saves>,
     seed: Option<u64>,
+    paint: Paint,
     mut keys: impl Iterator<Item = io::Result<Key>>,
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
-    let mut log = render::Log::default();
+    let mut log = render::Log::new(paint);
     let mut engine = start(world, saves, seed, &mut log, output)?;
     let (mut leave_dialogue, mut open) = (false, None);
     'scene: loop {
         let mut menu = Menu::new(&engine, leave_dialogue, open.take());
-        let mut lines = menu.write(output, true)?;
+        let mut lines = menu.write(output, true, paint)?;
         loop {
             output.flush()?;
             let key = match keys.next().transpose()? {
@@ -145,7 +146,7 @@ pub(crate) fn play_keys(
                 Outcome::Ignore => continue,
                 Outcome::Redraw => {
                     erase(output, lines)?;
-                    lines = menu.write(output, true)?;
+                    lines = menu.write(output, true, paint)?;
                     continue;
                 }
                 Outcome::Back => {
@@ -244,7 +245,15 @@ mod tests {
             Down, Enter, // down
         ]);
         let mut output = Vec::new();
-        play_keys(&world, None, None, keys.into_iter().map(Ok), &mut output).unwrap();
+        play_keys(
+            &world,
+            None,
+            None,
+            Paint::default(),
+            keys.into_iter().map(Ok),
+            &mut output,
+        )
+        .unwrap();
         let text = String::from_utf8(output).unwrap();
         for passage in [
             "> 1. Talk to Elder Mara",
@@ -269,7 +278,15 @@ mod tests {
         .unwrap();
         let mut output = Vec::new();
         let keys = [Char(':'), Char('x'), Quit, Enter];
-        play_keys(&world, None, None, keys.into_iter().map(Ok), &mut output).unwrap();
+        play_keys(
+            &world,
+            None,
+            None,
+            Paint::default(),
+            keys.into_iter().map(Ok),
+            &mut output,
+        )
+        .unwrap();
         assert!(!String::from_utf8(output)
             .unwrap()
             .contains("looking at the bell"));
@@ -283,7 +300,15 @@ mod tests {
         ))
         .unwrap();
         let keys = [Ok(Down), Err(io::Error::other("tty lost"))];
-        let error = play_keys(&world, None, None, keys.into_iter(), &mut Vec::new()).unwrap_err();
+        let error = play_keys(
+            &world,
+            None,
+            None,
+            Paint::default(),
+            keys.into_iter(),
+            &mut Vec::new(),
+        )
+        .unwrap_err();
         assert_eq!(error.to_string(), "tty lost");
     }
 
@@ -427,5 +452,41 @@ mod tests {
         let fled = text.find("You get away.").expect(&text);
         assert!(!text[fled..].contains("Technique XP"), "{text}");
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_terminal_gets_emphasis_and_plain_play_gets_none() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/demo-world"
+        ))
+        .unwrap();
+        let play = |paint| {
+            let mut output = Vec::new();
+            let keys = [Enter, Char(':'), Char('c'), Enter, Quit];
+            play_keys(
+                &world,
+                None,
+                None,
+                paint,
+                keys.into_iter().map(Ok),
+                &mut output,
+            )
+            .unwrap();
+            String::from_utf8(output).unwrap()
+        };
+        let styled = play(Paint { styled: true });
+        // The location name is bold, and the key hints are dimmed.
+        assert!(
+            styled.contains("\u{1b}[1mAshbell Village\u{1b}[0m"),
+            "{styled:?}"
+        );
+        assert!(styled.contains("\u{1b}[2m↑/↓ select"), "{styled:?}");
+        // Plain play keeps only the cursor movement that redraws the menu.
+        let plain = play(Paint::default());
+        assert!(
+            !plain.contains("\u{1b}[1m") && !plain.contains("\u{1b}[2m"),
+            "{plain:?}"
+        );
     }
 }
