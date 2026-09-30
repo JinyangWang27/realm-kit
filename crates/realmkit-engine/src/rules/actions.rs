@@ -77,6 +77,7 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 .map(|(id, _)| available(Command::Equip(*id))),
         );
     }
+    actions.extend(crafting::offered(world, state));
     actions.extend(panels);
     actions
 }

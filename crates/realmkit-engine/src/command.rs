@@ -29,6 +29,10 @@ pub enum Command {
     /// Wears a piece of equipment, returning whatever held its slots to the pack.
     Equip(u64),
     Unequip(u64),
+    /// Forges a new piece from a known recipe at its station.
+    Forge(Id),
+    /// Raises a piece one improvement tier at the tier's station.
+    Improve(u64),
     Talk(Id),
     /// One-based index into the currently visible choices.
     ChooseDialogue(usize),
@@ -106,6 +110,19 @@ pub enum Event {
     },
     Unequipped {
         gear: u64,
+    },
+    /// Materials used up by forging or improving.
+    ItemsSpent {
+        item: Id,
+        quantity: u64,
+    },
+    Forged {
+        recipe: Id,
+        gear: u64,
+    },
+    Improved {
+        gear: u64,
+        tier: usize,
     },
     EnemyDefeated {
         monster: Id,

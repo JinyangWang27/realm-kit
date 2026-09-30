@@ -241,6 +241,7 @@ fn saves_reject_equipment_the_rules_could_not_produce() {
                 Gear {
                     item: "iron_mail".into(),
                     equipped: false,
+                    tier: 0,
                 },
             );
             c.next_gear = 7;

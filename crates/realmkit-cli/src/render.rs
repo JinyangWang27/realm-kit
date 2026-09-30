@@ -247,6 +247,17 @@ pub fn events(
             Event::Equipped { gear } => {
                 writeln!(output, "You equip {}.", gear_name(engine, *gear))?
             }
+            Event::ItemsSpent { item, quantity } => writeln!(
+                output,
+                "Spent: {} ×{quantity}",
+                world.item(item).unwrap().name
+            )?,
+            Event::Forged { gear, .. } => {
+                writeln!(output, "You forge {}.", gear_name(engine, *gear))?
+            }
+            Event::Improved { gear, .. } => {
+                writeln!(output, "It is now {}.", gear_name(engine, *gear))?
+            }
             Event::Unequipped { gear } => writeln!(
                 output,
                 "{} goes back in your pack.",

@@ -1,0 +1,213 @@
+//! Forging pieces from recipes and improving them tier by tier.
+
+mod common;
+
+use common::*;
+use realmkit_engine::{Command::*, *};
+use realmkit_spec::{Direction::*, *};
+
+fn smithy() -> WorldSpec {
+    WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/smithy"
+    ))
+    .unwrap()
+}
+
+/// Learns from Bran, beats `ingots` beetles in the mine, and stands at the anvil.
+fn at_the_anvil(world: &WorldSpec, ingots: u64) -> Engine<'_> {
+    let mut engine = Engine::new(world).unwrap();
+    engine.execute(Talk("bran".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(Move(Down)).unwrap();
+    for _ in 0..ingots {
+        engine.execute(Engage("beetle".into())).unwrap();
+        fight_out(&mut engine);
+    }
+    engine.execute(Move(Up)).unwrap();
+    engine.execute(Move(East)).unwrap();
+    engine
+}
+
+fn ingots(engine: &Engine<'_>) -> u64 {
+    engine
+        .state()
+        .player
+        .inventory
+        .get("iron_ingot")
+        .copied()
+        .unwrap_or(0)
+}
+
+fn tier(engine: &Engine<'_>, piece: u64) -> usize {
+    combat(engine).gear[&piece].tier
+}
+
+fn smithing(engine: &Engine<'_>) -> TechniqueState {
+    combat(engine).techniques["smithing"]
+}
+
+#[test]
+fn forging_spends_the_inputs_once_and_makes_a_new_piece() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    assert_eq!(ingots(&engine), 5);
+    let events = engine.execute(Forge("iron_sword".into())).unwrap();
+    assert_eq!(ingots(&engine), 3);
+    assert!(events.contains(&Event::ItemsSpent {
+        item: "iron_ingot".into(),
+        quantity: 2
+    }));
+    assert!(events.contains(&Event::Forged {
+        recipe: "iron_sword".into(),
+        gear: 1
+    }));
+    let piece = &combat(&engine).gear[&1];
+    assert_eq!(
+        (piece.item.as_str(), piece.equipped, piece.tier),
+        ("iron_sword", false, 0)
+    );
+    // Forging trains the technique it names.
+    assert_eq!(smithing(&engine).xp, 10);
+}
+
+#[test]
+fn a_recipe_is_hidden_until_known_and_refused_without_its_needs() {
+    let world = smithy();
+    // Untaught: the recipe is neither offered nor usable.
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(Move(East)).unwrap();
+    assert!(!offered(&engine).iter().any(|(c, _)| matches!(c, Forge(_))));
+    assert!(matches!(
+        engine.execute(Forge("iron_sword".into())),
+        Err(EngineError::UnknownRecipe(_))
+    ));
+
+    let mut engine = at_the_anvil(&world, 1);
+    let before = engine.state().clone();
+    // Too few ingots, and mail needs a Journeyman: offered but unavailable.
+    assert!(offered(&engine).contains(&(Forge("iron_sword".into()), false)));
+    assert!(offered(&engine).contains(&(Forge("iron_mail".into()), false)));
+    assert!(matches!(
+        engine.execute(Forge("iron_sword".into())),
+        Err(EngineError::NotEnoughMaterials(item)) if item == "iron_ingot"
+    ));
+    assert!(matches!(
+        engine.execute(Forge("iron_mail".into())),
+        Err(EngineError::RequirementsUnmet)
+    ));
+    // Away from the anvil nothing is forged either.
+    engine.execute(Move(West)).unwrap();
+    let away = engine.state().clone();
+    assert!(matches!(
+        engine.execute(Forge("iron_sword".into())),
+        Err(EngineError::NoStation(station)) if station == "anvil"
+    ));
+    assert_eq!(engine.state(), &away);
+    assert_eq!(before.player.inventory, away.player.inventory);
+}
+
+#[test]
+fn improving_replaces_the_tier_bonus_and_leaves_other_copies_alone() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    // The second forge makes a Journeyman, who can improve.
+    let events = engine.execute(Forge("iron_sword".into())).unwrap();
+    assert!(events.contains(&Event::TechniqueRankUp {
+        technique: "smithing".into(),
+        rank: 2
+    }));
+    engine.execute(Equip(1)).unwrap();
+    let base = engine.player_stats().unwrap().patk;
+    let events = engine.execute(Improve(1)).unwrap();
+    assert!(events.contains(&Event::Improved { gear: 1, tier: 1 }));
+    // Fine replaces the sword's +4 with +6: two more, not six.
+    assert_eq!(engine.player_stats().unwrap().patk, base + 2);
+    assert_eq!((tier(&engine, 1), tier(&engine, 2)), (1, 0));
+    assert_eq!(ingots(&engine), 0);
+    // Superior needs a Master; nothing changes when refused.
+    let before = engine.state().clone();
+    assert!(matches!(
+        engine.execute(Improve(1)),
+        Err(EngineError::RequirementsUnmet | EngineError::NotEnoughMaterials(_))
+    ));
+    assert_eq!(engine.state(), &before);
+    assert!(matches!(
+        engine.execute(Improve(9)),
+        Err(EngineError::NoSuchGear(9))
+    ));
+}
+
+#[test]
+fn an_improved_mail_keeps_its_lighter_penalty() {
+    let mut world = smithy();
+    // Make mail an apprentice's work so the test needs only ingots.
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.recipes[1].requires.clear();
+    let mail = world
+        .items
+        .iter_mut()
+        .find(|i| i.id == "iron_mail")
+        .unwrap();
+    mail.equipment.as_mut().unwrap().tiers[0].requires.clear();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_mail".into())).unwrap();
+    engine.execute(Equip(1)).unwrap();
+    assert_eq!(engine.player_stats().unwrap().speed, 90);
+    engine.execute(Improve(1)).unwrap();
+    assert_eq!(engine.player_stats().unwrap().speed, 95);
+    // The top tier has nothing above it.
+    assert!(matches!(
+        engine.execute(Improve(1)),
+        Err(EngineError::NoHigherTier(1))
+    ));
+}
+
+#[test]
+fn crafting_saves_and_loads_and_impossible_crafting_state_is_rejected() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    engine.execute(Improve(1)).unwrap();
+    let snapshot = engine.snapshot();
+    let restored = Engine::restore(&world, snapshot.clone()).unwrap();
+    assert_eq!(restored.state(), engine.state());
+
+    let broken = |change: fn(&mut GameState)| {
+        let mut bad = snapshot.clone();
+        change(&mut bad.state);
+        Engine::restore(&world, bad).is_err()
+    };
+    // A tier the item does not have.
+    assert!(broken(|s| s
+        .combat
+        .as_mut()
+        .unwrap()
+        .gear
+        .get_mut(&1)
+        .unwrap()
+        .tier = 3));
+    // A technique nothing teaches.
+    assert!(broken(|s| {
+        let combat = s.combat.as_mut().unwrap();
+        combat
+            .techniques
+            .insert("archery".into(), TechniqueState { rank: 1, xp: 0 });
+    }));
+}
+
+#[test]
+fn nothing_is_forged_in_a_fight() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 0);
+    engine.execute(Move(West)).unwrap();
+    engine.execute(Move(Down)).unwrap();
+    engine.execute(Engage("beetle".into())).unwrap();
+    assert!(matches!(
+        engine.execute(Forge("iron_sword".into())),
+        Err(EngineError::InEncounter)
+    ));
+}

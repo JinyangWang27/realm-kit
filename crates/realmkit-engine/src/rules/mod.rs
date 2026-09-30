@@ -3,6 +3,7 @@
 use super::*;
 
 mod actions;
+mod crafting;
 mod player;
 mod story;
 
@@ -134,6 +135,8 @@ pub(super) fn execute(
         Command::Respec => player::respec(world, state, &mut events)?,
         Command::Equip(piece) => gear::equip(world, state, piece, &mut events)?,
         Command::Unequip(piece) => gear::unequip(world, state, piece, &mut events)?,
+        Command::Forge(recipe) => crafting::forge(world, state, &recipe, &mut events)?,
+        Command::Improve(piece) => crafting::improve(world, state, piece, &mut events)?,
         Command::Rest => player::rest(world, state, &mut events)?,
     }
     // A flag or quest this command changed may open a breakthrough gate.

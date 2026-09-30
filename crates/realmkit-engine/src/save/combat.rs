@@ -32,8 +32,8 @@ pub(super) fn check(
     )
 }
 
-/// Pieces are real equipment with IDs below the counter, and worn pieces
-/// never share a slot.
+/// Pieces are real equipment at a tier it has, with IDs below the counter,
+/// and worn pieces never share a slot.
 fn gear(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
     let mut worn = BTreeSet::new();
     ensure(
@@ -43,7 +43,9 @@ fn gear(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
                     .item(&piece.item)
                     .and_then(|i| i.equipment.as_ref())
                     .is_some_and(|e| {
-                        !piece.equipped || e.slots.iter().all(|slot| worn.insert(slot.clone()))
+                        piece.tier <= e.tiers.len()
+                            && (!piece.equipped
+                                || e.slots.iter().all(|slot| worn.insert(slot.clone())))
                     })
         }),
         "invalid equipment",
@@ -98,9 +100,23 @@ fn techniques(
     combat: &CombatState,
     rules: &Combat,
 ) -> Result<(), String> {
+    // Crafting trains techniques too, and teaches one it names.
+    let crafting = rules
+        .recipes
+        .iter()
+        .filter_map(|r| r.trains.as_ref())
+        .chain(
+            world
+                .items
+                .iter()
+                .filter_map(|i| i.equipment.as_ref())
+                .flat_map(|e| &e.tiers)
+                .filter_map(|t| t.trains.as_ref()),
+        );
     let teachable: BTreeSet<&Id> = rules
         .player_techniques
         .iter()
+        .chain(crafting)
         .chain(world.quests.iter().flat_map(|q| &q.reward_techniques))
         .chain(
             world

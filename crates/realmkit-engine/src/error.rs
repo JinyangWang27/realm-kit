@@ -40,6 +40,16 @@ pub enum EngineError {
     AlreadyEquipped(u64),
     #[error("#{0} is not equipped")]
     NotEquipped(u64),
+    #[error("you do not know that recipe")]
+    UnknownRecipe(Id),
+    #[error("there is no {0} here")]
+    NoStation(Id),
+    #[error("you are not yet able to do that")]
+    RequirementsUnmet,
+    #[error("you do not have enough {0}")]
+    NotEnoughMaterials(Id),
+    #[error("#{0} cannot be improved further")]
+    NoHigherTier(u64),
     #[error("you are not fighting anyone; engage first")]
     NotFighting,
     #[error("this is not a safe place to rest")]

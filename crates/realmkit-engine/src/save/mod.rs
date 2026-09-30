@@ -124,6 +124,9 @@ struct Progress<'w> {
     xp_ceiling: u64,
     any_repeatable: bool,
     repeatable_loot: BTreeSet<&'w Id>,
+    /// Materials crafting spends and items it makes: their counts follow
+    /// crafting, not only recorded progress.
+    crafted: BTreeSet<&'w Id>,
 }
 
 impl<'w> Progress<'w> {
@@ -165,7 +168,21 @@ impl<'w> Progress<'w> {
         }
         let ceiling = floor.checked_add(ceiling).ok_or("impossible experience")?;
         let repeaters = world.characters.iter().filter(|c| repeatable(world, &c.id));
+        let recipes = world.combat().into_iter().flat_map(|c| &c.recipes);
+        let tiers = world
+            .items
+            .iter()
+            .filter_map(|i| i.equipment.as_ref())
+            .flat_map(|e| &e.tiers);
+        let crafted = recipes
+            .clone()
+            .flat_map(|r| &r.inputs)
+            .chain(tiers.flat_map(|t| &t.cost))
+            .map(|s| &s.item)
+            .chain(recipes.map(|r| &r.output))
+            .collect();
         Ok(Self {
+            crafted,
             inventory,
             quest_flags,
             xp_floor: floor,
@@ -198,9 +215,12 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
         progress
             .inventory
             .iter()
+            .filter(|(item, _)| !progress.crafted.contains(item))
             .all(|(item, count)| held.get(item).is_some_and(|h| h >= count))
             && held.iter().all(|(item, h)| {
-                progress.inventory.get(item) == Some(h) || progress.repeatable_loot.contains(item)
+                progress.inventory.get(item) == Some(h)
+                    || progress.repeatable_loot.contains(item)
+                    || progress.crafted.contains(item)
             }),
         "inventory does not match progress",
     )
