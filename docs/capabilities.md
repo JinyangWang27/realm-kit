@@ -54,7 +54,7 @@ capability is present.
 | Puzzles and mechanisms | Mechanism state, known facts, attempts | Inspect, manipulate, combine, answer |
 | Debate and courtroom | Claims, admitted evidence, credibility | Present, challenge, defend, rule |
 | Politics and intrigue | Influence, offices, secrets, alliances | Scheme, expose, support, blackmail |
-| Party and companions | Membership, role, morale, approval, troop rosters, wages, companion gear, prisoners | Recruit, assign, counsel, dismiss, upgrade troops, equip companions, ransom |
+| Party and companions | Membership, role, morale, approval, troop rosters, wages, companion gear, prisoners, wounded, provisions | Recruit, assign, counsel, dismiss, upgrade troops, equip companions, ransom |
 | Romance | Affection, boundaries, commitments | Court, respond, commit, separate |
 | Mass battle | Army rosters, strength, casualties | Give battle, retreat, besiege |
 | Holdings | Ownership, income, garrisons, buildings | Garrison, build, collect, besiege |
@@ -134,7 +134,7 @@ events. See [non-spatial simulation worlds](simulation-worlds.md).
 A living sandbox of rival kingdoms might use:
 
 ```text
-travel + time + economy + factions/standing + party (retinue)
+travel + time + economy + factions/standing + relationships + party (retinue)
 + mass battle + holdings + world agents + combat + equipment
 ```
 

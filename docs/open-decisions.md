@@ -1569,6 +1569,28 @@ a proposed answer that still needs to be confirmed:
   default; captivity of a unique character is state keyed by its ID. Player
   captivity is an ordinary setback, not an outcome. Still open: what happens to
   the player's retinue and stash when the player is captured.
+- **Personalities (M6b).** Proposed: a world declares a closed list of named
+  traits and each character authors a few; traits never change during play.
+  Agent policy priorities and diplomacy weights may test a leader's traits.
+  Reactions are authored rules of the form trait × deed → standing change over
+  a closed, engine-defined set of player deeds. Still open: the first set of
+  deeds, and whether any world needs traits that change.
+- **Wounded, provisions and morale (M6c, M6d).** Proposed: the roster saves a
+  healthy and a wounded count per troop type; battle losses split into killed
+  and wounded by an authored share that surgery raises; an authored share of
+  the wounded recovers on each tick. Provisions are a value on trade goods,
+  eaten per head, prisoners included, on daily ticks. Morale is one bounded
+  integer per retinue; low morale lowers battle strength and causes desertion.
+  Still open: whether food variety matters, and whether carried goods have a
+  weight limit.
+- **Travel speed (M6c).** Proposed: a road's authored duration scaled by the
+  party's speed, from its slowest healthy troop type with penalties for size,
+  wounded and prisoners and a bonus from pathfinding, in integers with one
+  rounding and a one-minute floor. Agent parties use the same rule.
+- **Marriage (M6g).** Proposed: courtship is authored dialogue over relation
+  tracks, and `Marry` records at most one spouse per character, keyed by ID. No
+  children, heirs or dynasties. Still open: whether a spouse can act for the
+  player, for example running a holding while the player travels.
 - **Culture.** Proposed: no runtime concept. Troop lines, recruit pools and
   naming are referenced directly by locations and factions; authoring tools may
   group them as a culture before export. Still open: whether any world needs

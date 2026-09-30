@@ -242,6 +242,13 @@ unique character whose captivity is state keyed by its character ID. Prisoners
 are held by the player, an agent party or a holding, within that holder's
 prisoner limit, and may be sold, recruited, ransomed, released or escape.
 
+## Trait
+
+Proposed for M6. An authored personality trait from a world's closed list, such
+as cautious or cruel. Characters author a few; traits never change during play.
+Agent policies, diplomacy weights, dialogue and reactions to the player's deeds
+may test them.
+
 ## Holding
 
 Proposed for M6. A location owned by a faction or character that can change

@@ -178,12 +178,46 @@ the world authors it, and it arrives with a fixture that proves it.
   tracks.
 - **Conditions and effects.** `StandingAtLeast`, `AtWar`; `ChangeStanding`.
 
+### Personalities
+
+Lords and companions differ in temperament, and that temperament shows in what
+they do, without scripting each character.
+
+- **Traits.** A world declares a closed list of traits with names in its own
+  language (honourable, cruel, cautious, ambitious, quarrelsome, …), and each
+  character authors a few. Traits are authored data and do not change during
+  play.
+- **Behaviour.** A world agent's authored policy priorities may test its
+  leader's traits (`LeaderHasTrait`). A cautious lord declines battle below
+  authored odds, a cruel one raids villages, and an ambitious one besieges
+  first. Diplomacy event weights may test a ruler's traits the same way. The
+  engine still offers only its closed set of policies; traits only choose
+  among them.
+- **Reactions to deeds.** The engine reports a closed set of player deeds:
+  raiding a village, releasing or ransoming a prisoner, leaving wages unpaid,
+  winning a tournament, breaking an authored promise. The world authors
+  reaction rules of the form trait × deed → standing change, applied to the
+  characters with that trait whom the rule names by scope (the retinue's
+  companions, the lords of an affected faction). Reactions are ordinary
+  effects, applied in authored order and reported as events.
+- **Companion friction.** A companion whose relation with the player falls
+  below an authored threshold leaves on the next tick, taking nothing by
+  default. Pairs of traits may author a mutual dislike that lowers morale while
+  both companions ride together.
+- **Dialogue.** `HasTrait` conditions let conversations and offers differ by
+  temperament.
+
 ### Retinue
 
 - **Troops.** Troop definitions carry a combat profile, wages and an optional
   upgrade path (recruit → footman → sergeant).
-- **Roster.** The player's roster holds, per troop definition, a count and an
-  XP pool: troops are fungible, not instances. Both are saved.
+- **Roster.** The player's roster holds, per troop definition, a count of
+  healthy troops, a count of wounded troops and an XP pool: troops are
+  fungible, not instances. All three are saved.
+- **Wounded troops.** Wounded troops do not fight, still draw wages and count
+  towards the size limit. On each world tick an authored share recovers, more
+  at a location that authors rest or healing, and the retinue's surgery
+  proficiency raises it.
 - **Companions.** Companions are unique characters who join the retinue through
   authored dialogue effects and leave the same way. Each keeps its authored ID
   and its own state: wounds, technique ranks and, in worlds with levels, its
@@ -201,13 +235,29 @@ the world authors it, and it arrives with a fixture that proves it.
   validation bound caps every roster.
 - **Upgrades.** Battles add XP to the pool of each surviving troop type, and
   recruits join with no XP. Every troop that leaves a type, whether by upgrade,
-  casualty or desertion, takes its share of that type's pool: the pool divided
-  by the count, rounded down. A troop can upgrade once its share reaches the
+  death, capture or desertion, takes its share of that type's pool: the pool
+  divided by the type's healthy and wounded count, rounded down. A troop can upgrade once its share reaches the
   next step's authored XP. It pays that XP from its share and carries the rest
-  into its new type's pool. A casualty's or deserter's share is lost, and a
+  into its new type's pool. Any other leaver's share is lost, and a
   type whose last troop leaves also drops any rounding remainder. XP is only
   moved or spent, never created outside battle, so a pool never outlives its
   troops and upgrades available after a save are the same as before it.
+- **Provisions.** Trade goods may author a provisions value. On each daily
+  tick the retinue eats provisions per head, prisoners included, from its
+  carried goods, oldest stock first in authored goods order. A hungry retinue
+  loses morale, and starvation is authored (desertion, wounds).
+- **Morale.** A bounded integer for the whole retinue, raised and lowered by
+  authored amounts for meals, variety of food, paid or missed wages, victories
+  and defeats, companion friction and the leadership proficiency. Low morale
+  lowers mass-battle strength, and below an authored threshold troops desert on
+  ticks, drawn from the agents' RNG domain. Agent parties use their template's
+  fixed morale unless a world authors more.
+- **Travel speed.** A road's authored duration is scaled by the party's speed:
+  the slowest healthy troop type's authored speed, minus authored penalties for
+  roster size, wounded troops and prisoners, plus a pathfinding proficiency.
+  The engine computes it in integers with one rounding, and a journey never
+  takes less than one minute. Agent parties use the same rule, so light
+  raiders can catch a slow caravan on the road.
 
 ### Companion gear
 
@@ -267,9 +317,13 @@ character can wear gear:
 The [capability catalog](capabilities.md#combat-across-sources) keeps mass
 battles out of personal combat. This capability resolves army against army.
 
-- **Resolution.** The engine computes each side's strength from its roster, its
-  leaders and the ground. It draws from the RNG and distributes casualties over
-  several rounds. The player sees the result and the losses, not a
+- **Resolution.** The engine computes each side's strength from its healthy
+  roster, its leaders, its morale and the ground. It draws from the RNG and
+  distributes losses over several rounds.
+- **Losses.** Each loss is killed or wounded by an authored share that the
+  side's surgery proficiency raises. Wounded winners stay in their roster;
+  the losing side's losses may instead become the winner's prisoners (see
+  [Prisoners and ransom](#prisoners-and-ransom)). The player sees the result and the losses, not a
   blow-by-blow fight.
 - **Ground.** Locations and roads both author a ground modifier, neutral when
   omitted, so a battle has ground wherever parties can meet: at a location or
@@ -305,7 +359,19 @@ Politics composes the capabilities above rather than adding a new one.
   membership of a knightly order.
 - **Orders.** An order is a faction with ranks and its own troop definitions.
   Its chapter house is a building on a holding.
-- **Courtship and marriage.** Relationships plus authored dialogue.
+- **Courtship and marriage.** Built on the relation tracks above and authored
+  dialogue, not a separate capability.
+  - An unmarried character may author that it can be courted, and names a
+    guardian, typically a parent or the head of the house.
+  - Courtship is authored dialogue gated on the player's relation with that
+    character and standing with the guardian; visits, gifts and feasts raise that relation
+    through ordinary effects.
+  - Marriage is an effect, `Marry`, that records at most one spouse for each
+    side, keyed by character ID. A spouse's house then counts as kin through
+    authored standing changes, and the spouse may live at, and help run, one of
+    the player's holdings through authored modifiers.
+  - Condition: `IsSpouse`. Children, heirs and dynasties are not modelled;
+    marriages between other characters are authored state or world events.
 - **Culture is not a runtime concept.** Culture decides which troops a village
   offers, the troop line a faction fields, and its names and prose, but none of
   that changes during play. Locations and factions reference their troop
@@ -352,7 +418,8 @@ World agents are what make the world move without the player.
 - **Off-screen battles.** Parties that meet away from the player resolve through
   mass battle.
 - **Diplomacy.** Kingdoms change diplomacy through authored, weighted world
-  events that are checked on ticks. Lords are not scripted individually.
+  events that are checked on ticks. Lords are not scripted individually; their
+  [personalities](#personalities) choose among authored rules.
 - **Bounds.** A new `AGENT_BOUND` caps the number of live parties, so ticks
   and saves stay small.
 
