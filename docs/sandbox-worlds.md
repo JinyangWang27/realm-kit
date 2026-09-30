@@ -388,7 +388,8 @@ they do, without scripting each character.
 - **Reactions to deeds.** Deeds come from two sources:
   - The engine reports a closed set it can detect itself: raiding a village,
     demanding its supplies or driving off its livestock (with holdings),
-    releasing or ransoming a prisoner, and leaving wages unpaid. A deed whose capability is absent never occurs.
+    releasing or ransoming a prisoner, and leaving wages unpaid. A deed
+    whose capability is absent never occurs.
   - The world declares its own deed IDs, such as winning a tournament or
     breaking a promise, and reports them with an authored `ReportDeed` effect
     wherever its dialogue or quests decide the deed happened.
