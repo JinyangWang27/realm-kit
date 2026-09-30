@@ -1483,10 +1483,12 @@ and the roadmap schedules them as
 [M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). Each question below has
 a proposed answer that still needs to be confirmed:
 
-- **Recurring schedules (M5b).** Proposed: a schedule authors a period and a
-  first occurrence strictly after the route's initial world time. The dispatch
-  cursor from [Section 9](#9-time-models) expands a schedule lazily, one due
-  occurrence at a time. Only the next occurrence is saved, never an expanded
+- **Recurring schedules (M5b).** Proposed: a schedule authors a period of at
+  least one minute, checked by validation, and a first occurrence strictly
+  after the route's initial world time. A zero period would make each
+  occurrence due again at its own minute and break the no-loop guarantee
+  above. The dispatch cursor from [Section 9](#9-time-models) expands a
+  schedule lazily, one due occurrence at a time. Only the next occurrence is saved, never an expanded
   list. Ties with one-shot events keep stable authored declaration order.
   Still open: whether an effect may start or stop a schedule, or only authored
   conditions gate what each occurrence does.
@@ -1531,7 +1533,9 @@ a proposed answer that still needs to be confirmed:
   draw from their own RNG domain, separate from combat and offers.
 - **Interception (M6f).** Proposed: travel along one road is atomic, but a tick
   that falls during the journey can stop the player at the road's midpoint when
-  a hostile party shares that road. Still open: whether a party can pursue the
+  a hostile party shares that road; a battle there uses the road's ground.
+  Arriving at a location where a hostile party stands also intercepts. Still
+  open: whether a party can pursue the
   player across more than one road.
 - **Runtime-created entities.** Proposed: none beyond instances of authored
   definitions, and instances only for spawned copies and parties. Unique
@@ -1544,8 +1548,11 @@ a proposed answer that still needs to be confirmed:
   non-terminal outcome, because a playthrough records at most one outcome
   ([Section 3](#3-outcomes-failure-and-replay)).
 - **Retinue XP (M6c).** Proposed: the roster saves an XP pool per troop type.
-  Battles add to it, an upgrade spends the next step's authored XP, recruits
-  add none, and casualties remove a proportional share, rounded down.
+  Battles add to it and recruits add none. Every troop leaving a type (upgrade,
+  casualty, desertion) takes its share, the pool divided by the count rounded
+  down; an upgrading troop pays the next step's authored XP from that share
+  and carries the rest into its new type's pool. A type with no troops left has
+  an empty pool, so XP is only moved or spent, never farmed.
 - **Bounds and save size.** Proposed: a new `AGENT_BOUND` caps live parties,
   and validation keeps party rosters within the existing numeric bounds, so a
   save stays small and ticks stay cheap. The concrete value waits for the

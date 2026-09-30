@@ -116,9 +116,9 @@ qualitative periods.
 
 ## Recurring Schedule
 
-Proposed for M5. An authored period and first occurrence in World Time. The
-dispatch cursor expands it lazily, one due occurrence at a time, alongside
-one-shot scheduled events. Upkeep, restocking and world-agent ticks run on
+Proposed for M5. An authored period of at least one minute and a first
+occurrence in World Time. The dispatch cursor expands it lazily, one due
+occurrence at a time, alongside one-shot scheduled events. Upkeep, restocking and world-agent ticks run on
 recurring schedules.
 
 ## Encounter Timeline

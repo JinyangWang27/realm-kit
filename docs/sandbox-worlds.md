@@ -95,7 +95,8 @@ M5 slices.
    - Actions that pass time: wait for a duration and rest until an hour.
 
    One-shot scheduled events are already specified. The new proposal is
-   **recurring schedules**, such as "every 1,440 minutes from minute 360". The
+   **recurring schedules**, such as "every 1,440 minutes from minute 360", with
+   a period of at least one minute. The
    dispatch cursor expands them lazily, one due occurrence at a time, in the
    same chronological order as one-shot events. Wages, taxes, market restocking
    and world-agent ticks all run on recurring schedules. The engine never polls
@@ -189,11 +190,15 @@ the world authors it, and it arrives with a fixture that proves it.
   typically a standing threshold or the retinue's own leadership proficiency,
   sets the roster size limit. Wages fall due on a recurring schedule. What
   happens when they go unpaid (desertion, lost standing) is authored.
-- **Upgrades.** Battles add XP to the pool of each surviving troop type.
-  Upgrading one troop to the next step of its path spends that step's authored
-  XP from the pool, so upgrades available after a save are the same as before
-  it. Recruits join with no XP. Casualties remove a proportional share of the
-  pool, rounded down, so the pool never outlives its troops.
+- **Upgrades.** Battles add XP to the pool of each surviving troop type, and
+  recruits join with no XP. Every troop that leaves a type, whether by upgrade,
+  casualty or desertion, takes its share of that type's pool: the pool divided
+  by the count, rounded down. A troop can upgrade once its share reaches the
+  next step's authored XP. It pays that XP from its share and carries the rest
+  into its new type's pool. A casualty's or deserter's share is lost, and a
+  type whose last troop leaves also drops any rounding remainder. XP is only
+  moved or spent, never created outside battle, so a pool never outlives its
+  troops and upgrades available after a save are the same as before it.
 
 ### Mass battle
 
@@ -267,9 +272,11 @@ World agents are what make the world move without the player.
 - **Spawners.** Locations spawn parties from templates, with authored caps and
   intervals. A destroyed party is removed; its instance ID is never reused
   within the same history.
-- **Interception.** When the player and a hostile party share a road or arrive
-  at the same place, the player's travel stops there. The player chooses to
-  fight, talk or flee.
+- **Interception.** Travel along one road is a single step, except when a world
+  tick falls during the journey while a hostile party is on the same road. The
+  player then stops at the road's midpoint, and any battle there uses that
+  road's ground. Arriving at a location where a hostile party stands also
+  intercepts. Either way, the player chooses to fight, talk or flee.
 - **Off-screen battles.** Parties that meet away from the player resolve through
   mass battle.
 - **Diplomacy.** Kingdoms change diplomacy through authored, weighted world
