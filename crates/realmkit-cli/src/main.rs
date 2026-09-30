@@ -6,6 +6,7 @@ use std::{
     path::Path,
 };
 
+mod fight;
 mod input;
 mod keys;
 mod menu;

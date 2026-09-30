@@ -2,6 +2,7 @@
 //! for pipes, scripts and `--line`.
 
 use crate::{
+    fight::{self, FightScreen},
     input,
     menu::{self, Key, Menu, Outcome, Pick},
     render::{self, Paint},
@@ -13,7 +14,7 @@ use crossterm::{
     queue,
     terminal::{Clear, ClearType},
 };
-use realmkit_engine::Command;
+use realmkit_engine::{Command, Engine};
 use realmkit_spec::WorldSpec;
 use std::{
     error::Error,
@@ -133,9 +134,20 @@ pub(crate) fn play_keys(
     let mut log = render::Log::new(paint);
     let mut engine = start(world, saves, seed, &mut log, output)?;
     let (mut leave_dialogue, mut open) = (false, None);
+    // What the last command printed, shown on whichever screen play is on.
+    let mut pending = Vec::new();
+    let mut screen: Option<FightScreen> = None;
     'scene: loop {
+        settle(&engine, &mut screen, &mut pending, output)?;
         let mut menu = Menu::new(&engine, leave_dialogue, open.take());
-        let mut lines = menu.write(output, true, paint)?;
+        let mut lines = 0;
+        match &screen {
+            Some(fight) => {
+                menu = menu.without_header();
+                fight.draw(output, &engine, &menu, paint)?;
+            }
+            None => lines = menu.write(output, true, paint)?,
+        }
         loop {
             output.flush()?;
             let key = match keys.next().transpose()? {
@@ -145,8 +157,13 @@ pub(crate) fn play_keys(
             let command = match menu.handle(key) {
                 Outcome::Ignore => continue,
                 Outcome::Redraw => {
-                    erase(output, lines)?;
-                    lines = menu.write(output, true, paint)?;
+                    match &screen {
+                        Some(fight) => fight.draw(output, &engine, &menu, paint)?,
+                        None => {
+                            erase(output, lines)?;
+                            lines = menu.write(output, true, paint)?;
+                        }
+                    }
                     continue;
                 }
                 Outcome::Back => {
@@ -155,7 +172,7 @@ pub(crate) fn play_keys(
                     continue 'scene;
                 }
                 Outcome::Help => {
-                    writeln!(output, "{}", input::help(world))?;
+                    writeln!(pending, "{}", input::help(world))?;
                     continue 'scene;
                 }
                 Outcome::Run(command) => {
@@ -163,9 +180,12 @@ pub(crate) fn play_keys(
                         .entries()
                         .iter()
                         .find(|e| e.pick == Pick::Run(command.clone()));
-                    erase(output, lines)?;
-                    if let Some(entry) = label {
-                        writeln!(output, "> {}", entry.label)?;
+                    // The fight screen shows what happened instead of what was chosen.
+                    if screen.is_none() {
+                        erase(output, lines)?;
+                        if let Some(entry) = label {
+                            writeln!(output, "> {}", entry.label)?;
+                        }
                     }
                     command
                 }
@@ -183,22 +203,22 @@ pub(crate) fn play_keys(
                                 continue 'scene;
                             }
                             _ => {
-                                writeln!(output, "{}", menu::NOT_LISTED)?;
+                                writeln!(pending, "{}", menu::NOT_LISTED)?;
                                 continue 'scene;
                             }
                         },
                         Ok(input::Input::Help) => {
-                            writeln!(output, "{}", input::help(world))?;
+                            writeln!(pending, "{}", input::help(world))?;
                             continue 'scene;
                         }
                         Ok(input::Input::Blank) => continue 'scene,
                         Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
-                            persist(&mut engine, saves, &mut log, request, output)?;
+                            persist(&mut engine, saves, &mut log, request, &mut pending)?;
                             leave_dialogue = false;
                             continue 'scene;
                         }
                         Err(message) => {
-                            writeln!(output, "Invalid command: {message}.")?;
+                            writeln!(pending, "Invalid command: {message}.")?;
                             continue 'scene;
                         }
                     }
@@ -208,13 +228,44 @@ pub(crate) fn play_keys(
             // Stepping back from a conversation lasts until the player speaks again.
             leave_dialogue &= !matches!(command, Command::Talk(_) | Command::ChooseDialogue(_));
             // A restored save may be mid-conversation; show its choices again.
-            if apply(&mut engine, saves, &mut log, command, output)? {
+            if apply(&mut engine, saves, &mut log, command, &mut pending)? {
                 leave_dialogue = false;
             }
             continue 'scene;
         }
     }
+    // Quitting mid-fight still returns the terminal to its normal screen.
+    match screen.take() {
+        Some(fight) => fight.leave(output, &pending)?,
+        None => output.write_all(&pending)?,
+    }
     writeln!(output)?;
+    Ok(())
+}
+
+/// Shows what the last command printed: on the normal screen, or as the
+/// fight screen's latest turn. Starting a fight enters the fight screen;
+/// ending one (or dying) leaves it with the final turn.
+fn settle(
+    engine: &Engine<'_>,
+    screen: &mut Option<FightScreen>,
+    pending: &mut Vec<u8>,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    match (screen.take(), fight::active(engine)) {
+        (None, false) => output.write_all(pending)?,
+        (None, true) => {
+            let mut fight = FightScreen::enter(output)?;
+            fight.record(pending);
+            *screen = Some(fight);
+        }
+        (Some(mut fight), true) => {
+            fight.record(pending);
+            *screen = Some(fight);
+        }
+        (Some(fight), false) => fight.leave(output, pending)?,
+    }
+    pending.clear();
     Ok(())
 }
 
@@ -260,13 +311,24 @@ mod tests {
             "Esc back",
             ": status",
             "HP 40/40",
-            "> Attack The Ash Wolf",
             "Level 2",
             "She opens the chapel gate",
             "Your journey through the demo is complete.",
         ] {
             assert!(text.contains(passage), "missing {passage:?} in {text}");
         }
+        // The fight has the alternate screen to itself: bars, the next
+        // turns, and the latest turn marked.
+        let (before, fight) = text.split_once("\u{1b}[?1049h").expect(&text);
+        let (fight, after) = fight.split_once("\u{1b}[?1049l").expect(&text);
+        assert!(before.ends_with("> Engage The Ash Wolf\n"), "{before}");
+        for passage in ["The Ash Wolf  ██████████", "Next: You", "› "] {
+            assert!(fight.contains(passage), "missing {passage:?} in {fight}");
+        }
+        // Scrollback keeps the opening line and the final turn only.
+        assert!(after.starts_with("You face The Ash Wolf.\n"), "{after}");
+        assert!(after.contains("Level 2"), "{after}");
+        assert_eq!(after.matches("damage").count(), 1, "{after}");
     }
 
     #[test]

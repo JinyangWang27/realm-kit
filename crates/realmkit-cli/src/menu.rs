@@ -337,6 +337,12 @@ impl Menu {
             .map_or(&self.top, |(_, entries)| entries)
     }
 
+    /// Drops the fight's vitals and turn order, for a screen that shows its own.
+    pub fn without_header(mut self) -> Self {
+        self.header.clear();
+        self
+    }
+
     /// One-based selection, as shown to the player.
     pub fn select(&self, number: usize) -> Option<&Entry> {
         number.checked_sub(1).and_then(|i| self.entries().get(i))
