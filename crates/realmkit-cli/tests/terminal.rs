@@ -465,3 +465,40 @@ fn gear_is_listed_previewed_worn_and_removed() {
     assert!(!demo.contains("equip <#>"));
     assert!(demo.contains("you have no equipment #1"));
 }
+
+const SMITHY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/smithy");
+
+#[test]
+fn the_smithy_forges_improves_and_keeps_copies_apart() {
+    let walkthrough = std::fs::read_to_string(format!("{SMITHY}/walkthrough.txt")).unwrap();
+    let output = run(&["play", SMITHY, "--line"], &walkthrough);
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "You learn Smithing.",
+        "Received: Iron ingot ×1",
+        "Spent: Iron ingot ×2\nYou forge #1 Iron sword.\nSmithing +10\n",
+        "You forge #2 Iron sword.",
+        "Smithing: Journeyman!",
+        "Spent: Iron ingot ×1\nIt is now #1 Fine Iron sword.\n",
+        "  #1 Fine Iron sword [equipped] — Plain, straight and honest.",
+        "  #2 Iron sword — Plain, straight and honest.",
+        "  Smithing — Journeyman",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    // At the anvil, forging and improving wait behind one entry, and what
+    // cannot be done yet says why.
+    let input = "talk bran\nchoose 1\nchoose 1\neast\n2\n";
+    let text = String::from_utf8(run(&["play", SMITHY, "--line"], input).stdout).unwrap();
+    for passage in [
+        "2. Smithing ›",
+        "1. Forge Iron sword — 2 Iron ingot [needs 2 Iron ingot]",
+        "2. Forge Iron mail — 3 Iron ingot [needs Journeyman Smithing]",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    let help = String::from_utf8(run(&["play", SMITHY], "help\n").stdout).unwrap();
+    assert!(help.contains("forge <recipe>"), "{help}");
+    assert!(help.contains("improve <#>"), "{help}");
+}
