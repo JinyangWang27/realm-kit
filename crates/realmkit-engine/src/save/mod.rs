@@ -71,6 +71,34 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     )
 }
 
+/// Conditions that, once true, stay true: flags are never cleared and ranks
+/// never fall. A quest's status moves on, so it proves nothing later.
+fn lasting(state: &GameState, conditions: &[Condition]) -> bool {
+    let lasting: Vec<_> = conditions
+        .iter()
+        .filter(|c| !matches!(c, Condition::Quest { .. }))
+        .cloned()
+        .collect();
+    rules::conditions_met(state, &lasting)
+}
+
+/// Crafting that trains a technique teaches it, so it must be learned.
+fn trained(state: &GameState, grant: Option<&realmkit_spec::TechniqueGrant>) -> bool {
+    grant.is_none_or(|g| {
+        state
+            .combat
+            .as_ref()
+            .is_some_and(|c| c.techniques.contains_key(&g.technique))
+    })
+}
+
+/// A recipe the player could have used, as far as a snapshot can tell.
+fn qualified(state: &GameState, recipe: &realmkit_spec::Recipe) -> bool {
+    lasting(state, &recipe.known_when)
+        && lasting(state, &recipe.requires)
+        && trained(state, recipe.trains.as_ref())
+}
+
 fn defeated(state: &GameState, id: &str) -> bool {
     state
         .combat
@@ -267,10 +295,11 @@ fn spent<'w>(
         let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
         let granted = progress.inventory.get(*output).copied().unwrap_or(0);
         let forged = pieces.saturating_sub(granted);
+        // Only recipes the player could have used explain a piece.
         let recipes: Vec<_> = rules
             .recipes
             .iter()
-            .filter(|r| &&r.output == output)
+            .filter(|r| &&r.output == output && qualified(state, r))
             .collect();
         let materials: BTreeSet<&Id> = recipes
             .iter()
@@ -284,6 +313,9 @@ fn spent<'w>(
                     .find(|s| &s.item == material)
                     .map_or(0, |s| s.quantity)
             };
+            // ponytail: per-material bounds are loose when several recipes make
+            // one item (a recipe without a material counts as 0 of it); an
+            // exact check searches assignments of recipes to pieces.
             let cheapest = recipes.iter().map(cost).min().unwrap_or(0);
             let dearest = recipes.iter().map(cost).max().unwrap_or(0);
             if !progress.repeatable_loot.contains(output) {

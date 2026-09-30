@@ -363,3 +363,34 @@ fn a_save_cannot_hold_crafting_its_player_never_qualified_for() {
         combat.next_gear = 2;
     }));
 }
+
+#[test]
+fn material_bounds_count_only_recipes_the_player_qualified_for() {
+    let mut world = smithy();
+    let combat = world.world.combat.as_mut().unwrap();
+    // One beetle, five ingots; a one-ingot sword, and a Master's five-ingot one.
+    combat.groups[0].repeatable = false;
+    combat.recipes[0].inputs[0].quantity = 1;
+    let mut masterwork = combat.recipes[0].clone();
+    masterwork.id = "masterwork_sword".into();
+    masterwork.inputs[0].quantity = 5;
+    masterwork.requires = vec![Condition::Technique {
+        technique: "smithing".into(),
+        rank: 3,
+    }];
+    combat.recipes.push(masterwork);
+    let beetle = world
+        .characters
+        .iter_mut()
+        .find(|c| c.id == "beetle")
+        .unwrap();
+    beetle.combat.as_mut().unwrap().loot[0].quantity = 5;
+    let mut engine = at_the_anvil(&world, 1);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    assert_eq!(ingots(&engine), 4);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+    // An Apprentice's sword cost one ingot, not five: the other four remain.
+    let mut dropped = engine.snapshot();
+    dropped.state.player.inventory.remove("iron_ingot");
+    assert!(Engine::restore(&world, dropped).is_err());
+}

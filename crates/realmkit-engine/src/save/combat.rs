@@ -157,17 +157,6 @@ fn techniques(
     )
 }
 
-/// Conditions that, once true, stay true: flags are never cleared and ranks
-/// never fall. A quest's status moves on, so it proves nothing later.
-fn lasting(state: &GameState, conditions: &[Condition]) -> bool {
-    let lasting: Vec<_> = conditions
-        .iter()
-        .filter(|c| !matches!(c, Condition::Quest { .. }))
-        .cloned()
-        .collect();
-    rules::conditions_met(state, &lasting)
-}
-
 /// Crafting the player qualified for: every tier a piece rose through, and
 /// some recipe for each piece forged beyond the grants, had its lasting
 /// conditions met and its trained technique learned.
@@ -178,9 +167,6 @@ fn crafting(
     rules: &Combat,
     progress: &Progress,
 ) -> Result<(), String> {
-    let trained = |grant: Option<&realmkit_spec::TechniqueGrant>| {
-        grant.is_none_or(|g| combat.techniques.contains_key(&g.technique))
-    };
     let tiers_ok = combat.gear.values().all(|gear| {
         let tiers = &world
             .item(&gear.item)
@@ -191,19 +177,17 @@ fn crafting(
             .tiers;
         tiers[..gear.tier.min(tiers.len())]
             .iter()
-            .all(|t| lasting(state, &t.requires) && trained(t.trains.as_ref()))
+            .all(|t| lasting(state, &t.requires) && trained(state, t.trains.as_ref()))
     });
     let forged_ok = progress.forged.iter().all(|output| {
         let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
         let granted = progress.inventory.get(*output).copied().unwrap_or(0);
         pieces <= granted
             || progress.repeatable_loot.contains(output)
-            || rules.recipes.iter().any(|r| {
-                &&r.output == output
-                    && lasting(state, &r.known_when)
-                    && lasting(state, &r.requires)
-                    && trained(r.trains.as_ref())
-            })
+            || rules
+                .recipes
+                .iter()
+                .any(|r| &&r.output == output && qualified(state, r))
     });
     ensure(
         tiers_ok && forged_ok,
