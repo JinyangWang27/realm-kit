@@ -203,10 +203,16 @@ impl<'w> Progress<'w> {
             .iter()
             .filter_map(|i| i.equipment.as_ref())
             .flat_map(|e| &e.tiers);
+        let catalysts = world
+            .combat()
+            .into_iter()
+            .flat_map(|c| &c.enchantments)
+            .flat_map(|e| &e.catalyst);
         let spendable = recipes
             .clone()
             .flat_map(|r| &r.inputs)
             .chain(tiers.flat_map(|t| &t.cost))
+            .chain(catalysts)
             .map(|s| &s.item)
             .collect();
         Ok(Self {
@@ -332,9 +338,12 @@ fn spent<'w>(
             .as_ref()
             .unwrap()
             .tiers;
+        let enchantment = gear.enchantment.as_ref().and_then(|e| world.enchantment(e));
+        let catalyst = enchantment.into_iter().flat_map(|e| &e.catalyst);
         for stack in tiers[..gear.tier.min(tiers.len())]
             .iter()
             .flat_map(|t| &t.cost)
+            .chain(catalyst)
         {
             add(&mut least, &stack.item, stack.quantity);
             add(&mut most, &stack.item, stack.quantity);

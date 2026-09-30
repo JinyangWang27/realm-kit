@@ -242,6 +242,7 @@ fn saves_reject_equipment_the_rules_could_not_produce() {
                     item: "iron_mail".into(),
                     equipped: false,
                     tier: 0,
+                    enchantment: None,
                 },
             );
             c.next_gear = 7;

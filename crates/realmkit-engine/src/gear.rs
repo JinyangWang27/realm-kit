@@ -18,13 +18,19 @@ pub(super) fn worn<'w>(world: &'w WorldSpec, combat: &CombatState) -> Vec<&'w Eq
         .collect()
 }
 
-/// Adds equipped bonuses at each piece's tier, then takes away speed penalties; speed stays at
+/// Adds equipped bonuses at each piece's tier, and their enchantments', then
+/// takes away speed penalties; speed stays at
 /// least 1. The speed cap applies later, when turns are scheduled.
 pub(super) fn apply(world: &WorldSpec, combat: &CombatState, stats: &mut Stats) {
     let mut penalty = 0_u32;
     for gear in combat.gear.values().filter(|g| g.equipped) {
         let piece = equipment(world, &gear.item);
         for (stat, bonus) in piece.bonuses_at(gear.tier) {
+            let total = stats.get_mut(*stat);
+            *total = total.saturating_add(*bonus);
+        }
+        let enchantment = gear.enchantment.as_ref().and_then(|e| world.enchantment(e));
+        for (stat, bonus) in enchantment.into_iter().flat_map(|e| &e.bonuses) {
             let total = stats.get_mut(*stat);
             *total = total.saturating_add(*bonus);
         }
@@ -95,6 +101,7 @@ pub(super) fn receive(
                 item: item.clone(),
                 equipped: false,
                 tier: 0,
+                enchantment: None,
             },
         );
     }

@@ -33,6 +33,11 @@ pub enum Command {
     Forge(Id),
     /// Raises a piece one improvement tier at the tier's station.
     Improve(u64),
+    /// Lays a known enchantment on an unenchanted piece it fits.
+    Enchant {
+        piece: u64,
+        enchantment: Id,
+    },
     Talk(Id),
     /// One-based index into the currently visible choices.
     ChooseDialogue(usize),
@@ -123,6 +128,10 @@ pub enum Event {
     Improved {
         gear: u64,
         tier: usize,
+    },
+    Enchanted {
+        gear: u64,
+        enchantment: Id,
     },
     EnemyDefeated {
         monster: Id,

@@ -271,6 +271,9 @@ pub fn events(
             Event::Forged { gear, .. } => {
                 writeln!(output, "You forge {}.", gear_name(engine, *gear))?
             }
+            Event::Enchanted { gear, .. } => {
+                writeln!(output, "It is now {}.", gear_name(engine, *gear))?
+            }
             Event::Improved { gear, .. } => {
                 writeln!(output, "It is now {}.", gear_name(engine, *gear))?
             }

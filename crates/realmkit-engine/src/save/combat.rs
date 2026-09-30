@@ -113,7 +113,8 @@ fn techniques(
                 .filter_map(|i| i.equipment.as_ref())
                 .flat_map(|e| &e.tiers)
                 .filter_map(|t| t.trains.as_ref()),
-        );
+        )
+        .chain(rules.enchantments.iter().filter_map(|e| e.trains.as_ref()));
     let teachable: BTreeSet<&Id> = rules
         .player_techniques
         .iter()
@@ -167,6 +168,18 @@ fn crafting(
     rules: &Combat,
     progress: &Progress,
 ) -> Result<(), String> {
+    // An enchantment that exists, fits its piece, and was the player's to lay.
+    let enchantments_ok = combat.gear.values().all(|gear| {
+        let equipment = world.item(&gear.item).unwrap().equipment.as_ref().unwrap();
+        gear.enchantment.as_ref().is_none_or(|id| {
+            world.enchantment(id).is_some_and(|e| {
+                e.fits(equipment)
+                    && lasting(state, &e.known_when)
+                    && lasting(state, &e.requires)
+                    && trained(state, e.trains.as_ref())
+            })
+        })
+    });
     let tiers_ok = combat.gear.values().all(|gear| {
         let tiers = &world
             .item(&gear.item)
@@ -190,7 +203,7 @@ fn crafting(
                 .any(|r| &&r.output == output && qualified(state, r))
     });
     ensure(
-        tiers_ok && forged_ok,
+        tiers_ok && forged_ok && enchantments_ok,
         "crafting the player was not able to do",
     )
 }

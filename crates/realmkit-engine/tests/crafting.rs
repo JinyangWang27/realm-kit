@@ -344,6 +344,7 @@ fn a_save_cannot_hold_crafting_its_player_never_qualified_for() {
                 item: "iron_mail".into(),
                 equipped: false,
                 tier: 0,
+                enchantment: None,
             },
         );
         combat.next_gear = 3;
@@ -358,6 +359,7 @@ fn a_save_cannot_hold_crafting_its_player_never_qualified_for() {
                 item: "iron_sword".into(),
                 equipped: false,
                 tier: 0,
+                enchantment: None,
             },
         );
         combat.next_gear = 2;
@@ -393,4 +395,144 @@ fn material_bounds_count_only_recipes_the_player_qualified_for() {
     let mut dropped = engine.snapshot();
     dropped.state.player.inventory.remove("iron_ingot");
     assert!(Engine::restore(&world, dropped).is_err());
+}
+
+/// From the anvil to the shrine, and Maud's lesson.
+fn to_the_altar(engine: &mut Engine<'_>) {
+    engine.execute(Move(West)).unwrap();
+    engine.execute(Move(North)).unwrap();
+    engine.execute(Talk("maud".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+}
+
+fn keen(piece: u64) -> Command {
+    Enchant {
+        piece,
+        enchantment: "keenness".into(),
+    }
+}
+
+#[test]
+fn forge_equip_improve_enchant_and_load_keep_each_piece_its_own() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    to_the_altar(&mut engine);
+    let events = engine.execute(keen(2)).unwrap();
+    assert!(events.contains(&Event::Enchanted {
+        gear: 2,
+        enchantment: "keenness".into()
+    }));
+    assert!(events.contains(&Event::ItemsSpent {
+        item: "ember_shard".into(),
+        quantity: 1
+    }));
+    // Back at the anvil, improving keeps the enchantment.
+    engine.execute(Move(South)).unwrap();
+    engine.execute(Move(East)).unwrap();
+    engine.execute(Improve(2)).unwrap();
+    let base = engine.player_stats().unwrap().patk;
+    engine.execute(Equip(2)).unwrap();
+    // Fine's +6 and Keenness's +2, each counted once.
+    assert_eq!(engine.player_stats().unwrap().patk, base + 8);
+    let piece = &combat(&engine).gear[&2];
+    assert_eq!(
+        (piece.tier, piece.enchantment.as_deref()),
+        (1, Some("keenness"))
+    );
+    let other = &combat(&engine).gear[&1];
+    assert_eq!((other.tier, other.enchantment.as_deref()), (0, None));
+    let restored = Engine::restore(&world, engine.snapshot()).unwrap();
+    assert_eq!(restored.state(), engine.state());
+    assert_eq!(restored.player_stats(), engine.player_stats());
+}
+
+#[test]
+fn enchanting_is_refused_without_changing_anything() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    // Not yet taught: the enchantment does not exist for the player.
+    assert!(matches!(
+        engine.execute(keen(1)),
+        Err(EngineError::UnknownEnchantment(_))
+    ));
+    to_the_altar(&mut engine);
+    let before = engine.state().clone();
+    let warding = Enchant {
+        piece: 1,
+        enchantment: "warding".into(),
+    };
+    assert!(matches!(
+        engine.execute(warding),
+        Err(EngineError::DoesNotFit { gear: 1, .. })
+    ));
+    assert!(matches!(
+        engine.execute(keen(7)),
+        Err(EngineError::NoSuchGear(7))
+    ));
+    assert_eq!(engine.state(), &before);
+    engine.execute(keen(1)).unwrap();
+    assert!(matches!(
+        engine.execute(keen(1)),
+        Err(EngineError::AlreadyEnchanted(1))
+    ));
+    // Away from the altar.
+    engine.execute(Move(South)).unwrap();
+    engine.execute(Move(East)).unwrap();
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    assert!(matches!(
+        engine.execute(keen(2)),
+        Err(EngineError::NoStation(station)) if station == "altar"
+    ));
+    assert!(offered(&engine)
+        .iter()
+        .all(|(c, _)| !matches!(c, Enchant { .. })));
+}
+
+#[test]
+fn saves_reject_enchantments_the_rules_could_not_lay() {
+    let mut world = smithy();
+    // Beetles that stay dead: one shard, spent on one enchantment.
+    world.world.combat.as_mut().unwrap().groups[0].repeatable = false;
+    world.world.combat.as_mut().unwrap().recipes[0].inputs[0].quantity = 1;
+    let mut engine = at_the_anvil(&world, 1);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    to_the_altar(&mut engine);
+    engine.execute(keen(1)).unwrap();
+    let snapshot = engine.snapshot();
+    assert!(Engine::restore(&world, snapshot.clone()).is_ok());
+    let loads = |change: fn(&mut GameState)| {
+        let mut changed = snapshot.clone();
+        change(&mut changed.state);
+        Engine::restore(&world, changed).is_ok()
+    };
+    // No such enchantment; one that does not fit; the shard back unspent;
+    // and an enchantment laid without knowing the art.
+    assert!(!loads(|s| {
+        s.combat
+            .as_mut()
+            .unwrap()
+            .gear
+            .get_mut(&1)
+            .unwrap()
+            .enchantment = Some("glory".into());
+    }));
+    assert!(!loads(|s| {
+        s.combat
+            .as_mut()
+            .unwrap()
+            .gear
+            .get_mut(&1)
+            .unwrap()
+            .enchantment = Some("warding".into());
+    }));
+    assert!(!loads(|s| {
+        s.player.inventory.insert("ember_shard".into(), 1);
+    }));
+    assert!(!loads(|s| {
+        s.combat.as_mut().unwrap().techniques.remove("enchanting");
+    }));
 }
