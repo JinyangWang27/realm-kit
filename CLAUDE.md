@@ -52,5 +52,5 @@ Longer design reasoning lives in `docs/open-decisions.md`, `docs/equipment.md` a
 
 ## Workflow in this repo
 
-- Work on a branch from `main`, one commit per step, and open the PR only after the implementation is complete. Codex reviews every push. Address comments that are material, and reply in every thread saying either what was fixed (with the commit) or why it was declined.
+- Work on a branch from `main`, one commit per step, and open the PR only after the implementation is complete. Reviews come from a separate Claude Code session whose findings the user pastes in; Codex auto-review is off. Verify each finding, fix the material ones with a test that fails on the old code, and report what was fixed (with the commit) or why it was declined.
 - For pure refactors, prove behaviour is unchanged: run every example walkthrough (`--line --seed 7 --saves <dir>`) on both `main` and the branch, and diff the output and the save files byte for byte.
