@@ -226,7 +226,85 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
                     || progress.forged.contains(item)
             }),
         "inventory does not match progress",
+    )?;
+    // What is held plus what crafting spent never exceeds what was granted,
+    // for every material granted in finite amounts.
+    let spent = spent(world, state, progress);
+    ensure(
+        spent.iter().all(|(item, spent)| {
+            let (held, granted) = (
+                held.get(*item).copied().unwrap_or(0),
+                progress.inventory.get(*item).copied().unwrap_or(0),
+            );
+            progress.repeatable_loot.contains(item) || held.saturating_add(*spent) <= granted
+        }),
+        "crafting does not match the materials it needed",
     )
+}
+
+/// The fewest materials that could have made the pieces held: the cheapest
+/// recipe for each piece beyond those granted, and every tier each piece has
+/// risen through.
+fn spent<'w>(
+    world: &'w WorldSpec,
+    state: &GameState,
+    progress: &Progress,
+) -> BTreeMap<&'w Id, u64> {
+    let mut spent: BTreeMap<&Id, u64> = BTreeMap::new();
+    let (Some(combat), Some(rules)) = (&state.combat, world.combat()) else {
+        return spent;
+    };
+    for output in &progress.forged {
+        // A looted item may also be forged; only the pieces beyond its
+        // grants must have been, and repeatable loot may explain them all.
+        if progress.repeatable_loot.contains(output) {
+            continue;
+        }
+        let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
+        let granted = progress.inventory.get(*output).copied().unwrap_or(0);
+        let forged = pieces.saturating_sub(granted);
+        let recipes: Vec<_> = rules
+            .recipes
+            .iter()
+            .filter(|r| &&r.output == output)
+            .collect();
+        let materials: BTreeSet<&Id> = recipes
+            .iter()
+            .flat_map(|r| &r.inputs)
+            .map(|s| &s.item)
+            .collect();
+        for material in materials {
+            let cheapest = recipes
+                .iter()
+                .map(|r| {
+                    r.inputs
+                        .iter()
+                        .find(|s| &s.item == material)
+                        .map_or(0, |s| s.quantity)
+                })
+                .min()
+                .unwrap_or(0);
+            let total = spent.entry(material).or_default();
+            *total = total.saturating_add(cheapest.saturating_mul(forged));
+        }
+    }
+    for gear in combat.gear.values() {
+        let tiers = &world
+            .item(&gear.item)
+            .unwrap()
+            .equipment
+            .as_ref()
+            .unwrap()
+            .tiers;
+        for stack in tiers[..gear.tier.min(tiers.len())]
+            .iter()
+            .flat_map(|t| &t.cost)
+        {
+            let total = spent.entry(&stack.item).or_default();
+            *total = total.saturating_add(stack.quantity);
+        }
+    }
+    spent
 }
 
 /// Completed quests' flags are set, and every flag has something that sets it.

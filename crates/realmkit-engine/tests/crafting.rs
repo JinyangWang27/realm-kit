@@ -270,3 +270,40 @@ fn improving_clamps_vitals_only_after_training() {
         "the same maximum keeps the same HP"
     );
 }
+
+#[test]
+fn a_save_cannot_hold_more_crafting_than_its_materials_paid_for() {
+    let mut world = smithy();
+    // One beetle that stays dead, one ingot a sword, and one more a Fine tier.
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.groups[0].repeatable = false;
+    combat.recipes[0].inputs[0].quantity = 1;
+    let mut engine = at_the_anvil(&world, 1);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    let snapshot = engine.snapshot();
+    assert!(Engine::restore(&world, snapshot.clone()).is_ok());
+    let loads = |change: fn(&mut GameState)| {
+        let mut changed = snapshot.clone();
+        change(&mut changed.state);
+        Engine::restore(&world, changed).is_ok()
+    };
+    // A second sword, a Fine tier, or the spent ingot back: each needs an
+    // ingot no play could have had.
+    assert!(!loads(|s| {
+        let combat = s.combat.as_mut().unwrap();
+        let sword = combat.gear[&1].clone();
+        combat.gear.insert(2, sword);
+        combat.next_gear = 3;
+    }));
+    assert!(!loads(|s| s
+        .combat
+        .as_mut()
+        .unwrap()
+        .gear
+        .get_mut(&1)
+        .unwrap()
+        .tier = 1));
+    assert!(!loads(|s| {
+        s.player.inventory.insert("iron_ingot".into(), 1);
+    }));
+}
