@@ -1510,11 +1510,20 @@ a proposed answer that still needs to be confirmed:
   recipes on a Smithing *technique*, which blurs that separation. Either keep
   it as a deliberate exception or move crafting to a crafting-owned proficiency
   before sandbox proficiencies copy the pattern.
-- **Price model (M6a).** Proposed: integer price = base × market modifier ×
-  stock factor, each a bounded percentage, with one final rounding. The selling
-  price sits below the buying price by an authored spread that the economy's
-  trading proficiency can narrow. Still open: whether player sales feed stock
-  immediately or only at restock.
+- **Price model (M6a).** Decided: prices follow production, not stock. Each
+  market keeps a price index per good in thousandths of the base price, within
+  authored bounds. A recurring price tick moves it against net supply
+  (production minus consumption from authored producer counts), reverts it
+  towards base, pulls processed goods up towards dearer inputs and converges
+  linked markets; caravans converge their destination on arrival. The player's
+  own purchases and sales move the index at once by an authored step. The buying
+  and selling prices sit either side of base × index by an authored spread that
+  trading narrows, with one final rounding. Prosperity drifts daily towards an
+  ideal set by scarcity and buildings, and scales income, tariffs, stock and
+  recruit pools ([Economy](sandbox-worlds.md#economy)). Still open: how many
+  warm-up rounds an authoring tool runs for initial prices, and whether the
+  price tick's draws should be replaced by fixed fractions of the bound, which
+  would drop the `market` RNG domain from prices entirely.
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.

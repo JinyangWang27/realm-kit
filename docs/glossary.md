@@ -224,9 +224,22 @@ relation with the player. Conditions read it and effects change it.
 
 ## Market
 
-Proposed for M6. A location that trades an authored set of goods. The engine
-computes its integer prices from authored base prices, the market's modifier and
-its current stock.
+Proposed for M6. A location that trades an authored set of goods. Each good has
+a saved price index, in thousandths of its base price, that a recurring tick
+moves against the market's authored production and demand. The engine derives
+integer buying and selling prices from it.
+
+## Prosperity
+
+Proposed for M6. A market's bounded integer measure of wealth. It drifts towards
+an ideal set by scarcity and buildings, rises with trade, falls with raids and
+sieges, and scales income, tariffs, merchant stock and recruit pools.
+
+## Workshop
+
+Proposed for M6. A player-owned business in a town that runs one processed
+good's recipe and pays the local profit, possibly a loss, on a recurring
+schedule. It is owned property, not a holding.
 
 ## Retinue
 

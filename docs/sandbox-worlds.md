@@ -83,7 +83,7 @@ quest deadlines, offers, runtime instances) is optional.
 | World time | none | Roads without durations take no time; without wait and rest, only travel passes time. |
 | Recurring schedules | world time | None; everything periodic below needs them. |
 | Offers | none | Without world time, offers have no deadlines; without schedules, they refresh only on arrival. |
-| Economy | none | Without schedules, stock never drifts back; without a trading proficiency, the buy/sell spread is fixed. |
+| Economy | none | Without schedules, prices move only through the player's own trade, and prosperity, restocks and workshop income do not exist; without producers, prices only revert to base; without world agents, trade links converge on the price tick and no caravans run; without a trading proficiency, the spread is fixed. Workshops are a separate part. |
 | Factions and standing | none | Diplomacy and standing tracks are separate parts; a world may author either. |
 | Personalities | none | Traits alone can gate dialogue. Reactions need standing; companion friction needs standing and a retinue, and its morale effect needs morale; agent behaviour needs world agents. |
 | Retinue | none | Wages, provisions, wounded recovery, morale drift and desertion run on the retinue's upkeep tick, so they need recurring schedules; wages and provisions also need the economy. Morale, wounded troops, upgrades and travel speed (which needs world time) are each separate parts. Without them nobody is paid or eats, morale is not tracked, every loss is killed, troops never upgrade, and roads take their authored time. |
@@ -202,21 +202,92 @@ the world authors it, and it arrives with a fixture that proves it.
 
 ### Economy
 
-- **State.** The player's currency, a fungible quantity. Each market's stock of
-  trade goods.
-- **Rules.**
-  - A market is a location that trades an authored set of goods.
-  - Price is computed in the engine, in integers, from an authored base price,
-    the market's modifier and its current stock. A trading proficiency, owned
-    by this capability, may narrow the gap between buying and selling prices.
-    Content never supplies a formula.
-  - Stock drifts back towards authored levels on a recurring restock schedule.
-- **Commands.** Buy and sell. The engine previews the price before the player
-  confirms.
-- **Conditions and effects.** `CurrencyAtLeast`; `PayCurrency` and
-  `GrantCurrency`.
-- **Bounds.** Validation caps prices, stock and currency so that engine
-  arithmetic stays small, following the existing `*_BOUND` pattern.
+Prices come from what each place makes and needs. A town surrounded by
+vineyards sells wine cheaply; a town with looms but no flocks pays well for
+wool. Caravans carrying goods between towns pull their prices together, and
+trade makes places prosper. The authored numbers describe production, not
+prices: the engine derives every price from them.
+
+- **Goods.** Each trade good authors a base price and its demand in each kind of
+  market (town, village). A processed good may author a recipe: one primary and
+  at most one secondary input good, the input used per run, the output per run
+  and an overhead cost. Goods may also author a provisions value (see
+  [Retinue](#retinue)).
+- **Producers.** A world declares a closed list of producer kinds in its own
+  language (grain fields, herds, mills, looms, smithies, …). Each kind authors
+  how much of which goods one unit yields and consumes per price tick. Every
+  market authors its counts of each kind. A village names its market town, and
+  its production and demand count towards that town's trade as well as its own.
+- **State.**
+  - The player's currency, a fungible quantity.
+  - A **price index** for each good in each market, in thousandths of the base
+    price: 1,000 is the base price. It stays within authored bounds, typically
+    100 to 10,000, so a price moves between a tenth and ten times its base.
+  - Each market's **prosperity**, a bounded integer.
+  - Each merchant's current stock of trade goods.
+- **Price tick.** On the economy's recurring price schedule, each market
+  updates each good's index, drawing from its own `market` RNG domain:
+  - The net supply is production minus consumption. A surplus lowers the index
+    by a draw below an authored multiple of the surplus, damped once the index is
+    already under an authored level; a shortage raises it the same way.
+  - The index then reverts towards 1,000 by an authored share of the gap.
+  - A processed good whose input is dearer than the good itself is pulled up by
+    an authored share of the difference, so a recipe's output never stays cheaper
+    than its input for long.
+  - Linked markets, a village and its market town or two towns joined by an
+    authored trade link, each move an authored share of the gap towards the
+    other.
+- **Initial prices.** The package authors each market's starting indices. An
+  authoring tool may compute them by running the price tick offline for a number
+  of warm-up rounds; the engine never warms up at runtime, so New Game draws no
+  randomness for prices.
+- **Caravans.** With [world agents](#world-agents), a caravan is a party whose
+  trade policy travels an authored trade link. On arrival it moves every good's
+  index in the destination an authored share of the way towards the origin's,
+  pays the destination's owner a tariff proportional to the price gaps it
+  closed and to the destination's prosperity, and may raise that prosperity.
+  Without world agents, trade links still converge on the price tick.
+- **Prosperity.** On the economy's daily schedule, each market's prosperity
+  moves one step towards an ideal value: an authored base, lowered for each
+  demanded good whose index sits well above base (scarcity), raised by the
+  market's buildings where [holdings](#holdings) exist. Caravan arrivals and
+  village trade raise it; raids, sieges and bandit trouble lower it by authored
+  amounts. Prosperity scales holding income, tariffs, merchant stock and
+  recruit pools by authored percentages.
+- **Merchants.** A merchant character trades at a market. On the market's
+  restock schedule its stock is redrawn from the `market` RNG domain: goods
+  weigh by the size of their net supply relative to their price, and the amount
+  grows with prosperity. Opening a trade screen never draws.
+- **Buying and selling.**
+  - The buying price is the base price × the index ÷ 1,000, raised by a spread;
+    the selling price is lowered by the same spread. One rounding, in integers.
+  - The spread is an authored percentage that the economy's trading
+    proficiency narrows. It widens by authored amounts at villages, for goods
+    the market neither makes nor needs, and when the merchant's relation with
+    the player is negative.
+  - Each unit bought raises that market's index for the good by an authored
+    step, and each unit sold lowers it, so the player's own trade moves prices
+    at once. Dumping one cargo in one town stops paying.
+  - Selling is limited by the merchant's currency, which the restock refills.
+- **Workshops.** The player may buy a workshop in a town, at most an authored
+  number per town, through a dialogue effect with the town's authored seller.
+  A workshop runs one processed good's recipe. On the economy's weekly schedule
+  it pays the output's local price × runs, minus the inputs' local prices and
+  the overhead, which can be a loss. Selling or closing it is another dialogue
+  effect. Workshops are owned property, not [holdings](#holdings): they have no
+  garrison and never change hands in a war.
+- **Commands.** Buy and sell. The engine previews the price, and the change the
+  trade makes to it, before the player confirms. Buying and selling a workshop
+  happen in dialogue.
+- **Conditions and effects.** `CurrencyAtLeast`, `OwnsWorkshop`; `PayCurrency`,
+  `GrantCurrency`, `BuyWorkshop` and `SellWorkshop`.
+- **Bounds.** Validation caps indices, prosperity, producer counts, stock,
+  currency and every authored rate so that engine arithmetic stays small,
+  following the existing `*_BOUND` pattern.
+- **Simulator parity.** The price tick is a formula over authored numbers, like
+  damage. `scripts/combat_sim` gains an economy model that mirrors it before
+  tests pin its numbers, and authors use it to check that trade routes pay
+  without one route dominating.
 
 ### Factions and standing
 
@@ -412,7 +483,8 @@ battles out of personal combat. This capability resolves army against army.
 
 - **Ownership.** A holding is a location with an owner, a faction or a
   character, that can change during play.
-- **Income.** A holding produces income and supplies on a recurring schedule.
+- **Income.** A holding produces income and supplies on a recurring schedule,
+  scaled by its market's [prosperity](#economy) where the economy exists.
 - **Garrison.** It keeps a garrison roster.
 - **Prison.** It holds prisoners within an authored limit that buildings can
   raise, and a captured lord taken there waits for ransom or escape.

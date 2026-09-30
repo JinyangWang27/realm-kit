@@ -1109,9 +1109,12 @@ world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
 Depends on M5a–M5d. Deliver in slices, each bumping the package and save
 format as usual:
 
-1. **M6a — economy.** Currency, markets with engine-computed integer prices
-   from authored base prices, modifiers and stock, buy and sell with a price
-   preview, and upkeep on recurring schedules.
+1. **M6a — economy.** Currency; markets whose per-good price index follows
+   authored production and demand on a recurring price tick; linked markets
+   that converge; prosperity; merchants who restock; buy and sell that move the
+   index, with a price preview; player workshops; and upkeep on recurring
+   schedules. The price tick is mirrored in `scripts/combat_sim` before tests
+   pin its numbers.
 2. **M6b — factions and standing.** War and peace between factions, authored
    standing tracks such as renown and relation, and the conditions and effects
    that read and change them. Authored personality traits steer dialogue and
