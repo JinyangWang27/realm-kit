@@ -317,3 +317,49 @@ fn a_save_cannot_drop_materials_nothing_spent() {
     dropped.state.player.inventory.remove("iron_ingot");
     assert!(Engine::restore(&world, dropped).is_err());
 }
+
+#[test]
+fn a_save_cannot_hold_crafting_its_player_never_qualified_for() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    // An Apprentice with one sword and the lesson learned.
+    let snapshot = engine.snapshot();
+    assert!(Engine::restore(&world, snapshot.clone()).is_ok());
+    let loads = |state: &GameState, change: fn(&mut GameState)| {
+        let mut changed = engine.snapshot();
+        changed.state = state.clone();
+        change(&mut changed.state);
+        Engine::restore(&world, changed).is_ok()
+    };
+    // Fine needs a Journeyman; mail needs one to forge.
+    assert!(!loads(&snapshot.state, |s| {
+        s.combat.as_mut().unwrap().gear.get_mut(&1).unwrap().tier = 1;
+    }));
+    assert!(!loads(&snapshot.state, |s| {
+        let combat = s.combat.as_mut().unwrap();
+        combat.gear.insert(
+            2,
+            Gear {
+                item: "iron_mail".into(),
+                equipped: false,
+                tier: 0,
+            },
+        );
+        combat.next_gear = 3;
+    }));
+    // A sword forged before Bran's lesson.
+    let fresh = Engine::new(&world).unwrap().state().clone();
+    assert!(!loads(&fresh, |s| {
+        let combat = s.combat.as_mut().unwrap();
+        combat.gear.insert(
+            1,
+            Gear {
+                item: "iron_sword".into(),
+                equipped: false,
+                tier: 0,
+            },
+        );
+        combat.next_gear = 2;
+    }));
+}
