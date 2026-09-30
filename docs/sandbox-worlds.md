@@ -90,10 +90,11 @@ quest deadlines, offers, runtime instances) is optional.
 | Personalities | none | Traits alone can gate dialogue. Reactions need standing; companion friction needs standing and a retinue, and its morale effect needs morale; agent behaviour needs world agents. |
 | Retinue | none | Wages, provisions, wounded recovery, morale drift and desertion run on the retinue's upkeep tick, so they need recurring schedules; wages and provisions also need the economy. Morale, wounded troops, upgrades and travel speed (which needs world time) are each separate parts. Without them nobody is paid or eats, morale is not tracked, every loss is killed, troops never upgrade, and roads take their authored time. |
 | Companion gear | retinue, equipment | None. Companions fight in encounters only where personal combat exists. |
-| Mass battle | retinue | Without morale or proficiencies, those terms leave the formula; without prisoners, losses are never captured; champion duels need personal combat. |
+| Mass battle | retinue | Without morale or proficiencies, those terms leave the formula; without prisoners, losses are never captured; champion duels need personal combat. Rewards, loot and lasting injuries are separate parts; looted gear needs equipment. |
 | Prisoners | retinue, and mass battle or personal combat | Ransom needs the economy; escapes run on a prison tick, so they need recurring schedules; holding prisons need holdings. |
-| Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time; raiding needs factions at war. Without factions, owners are characters. |
+| Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time; raiding needs factions at war; village unrest needs mass battle, and bandit trouble needs world agents and offers. Without factions, owners are characters. |
 | Politics and orders | factions and standing | Membership ranks, orders, marriage and a founded kingdom are separate parts. Marriage needs per-character relation tracks. |
+| Knowledge and news | none | Without world time, remembered prices and whereabouts carry no age; without the economy, nothing is remembered about prices; without characters who move, whereabouts are always current. |
 | World agents | recurring schedules | Without a retinue, parties carry no rosters and cannot fight; without mass battle, they never fight each other; without factions, there is no diplomacy; without the economy, no caravans trade. |
 | Faction strategy | factions and standing, world agents | The marshal, fief grants, defection, feasts and claimants are separate parts. Campaigns need holdings and mass battle; fief grants and feasts need holdings; defection needs per-character relation tracks; truces need world time. Without campaigns, factions only defend, raid and rest. |
 
@@ -220,14 +221,46 @@ M5 slices.
    condition holds is shown. Choosing a variant reads state only, so it draws
    no randomness and changes nothing. Templates keep their single-pass
    substitution: there is no conditional syntax inside a string.
+9. **Start choices.** A sandbox player usually begins by answering a few
+   questions about their past: a noble's child, a merchant's apprentice, a
+   deserter. A route may author a short sequence of start questions shown at
+   New Game, before the first turn. Each option applies an ordered list of
+   ordinary effects to the route's initial state: stat points, gear, currency,
+   standing, flags, techniques. Later text and conditions read those results
+   like any other state, which is how a form of address follows the player's
+   chosen identity. The answers themselves are saved only as the state they
+   produced and a list of chosen option IDs for display. Start choices are
+   not runtime identity editing: once play begins, nothing re-runs them.
+10. **Characters who move.** Lords travel with their parties, but other
+    characters move too: a travelling storyteller, a ransom broker or an
+    unhired companion who drifts between taverns. A character may author a set
+    of locations and a recurring schedule; on each occurrence the engine moves
+    it to one of them, drawn from a `world` RNG domain. Its location is saved
+    state keyed by its character ID, and it is present only where it
+    currently is.
 
 Proficiencies such as trading, leadership and field surgery are not a
 foundation. They follow [Section 8](open-decisions.md#8-checks-and-proficiencies):
 each capability that needs one owns its ranks and checks. The economy owns
-trading, the retinue owns leadership, and mass battle owns surgery. A technique
-rank is not such a proficiency. M4d's Smithing technique, which gates recipes,
-already blurs that line; [Section 18](open-decisions.md#18-living-sandbox-worlds)
-records the question.
+trading, the retinue owns leadership, and mass battle owns surgery and looting.
+A technique rank is not such a proficiency. M4d's Smithing technique, which
+gates recipes, already blurs that line;
+[Section 18](open-decisions.md#18-living-sandbox-worlds) records the question.
+
+- **Growth.** Proficiency ranks are bought with proficiency points, which a
+  world grants per level in the same level table that grants stat points
+  (M4a), and saved as an allocation per character. A world may cap each rank
+  by an authored stat, so a character must be strong to be a good surgeon.
+  Effective ranks are derived, never saved twice.
+- **Personal or party.** Each proficiency is authored as personal (only its
+  holder's rank counts) or party (the retinue uses the best rank among the
+  player and the companions riding with them). Leadership is typically
+  personal; surgery, trading and pathfinding are typically party, which makes
+  companions worth recruiting for their skills.
+- **Study.** An item may author a proficiency or technique it teaches. Studying
+  it is an action that passes authored world time, spread over rests or done
+  at once, and then grants the rank or technique XP. An item may instead grant
+  a rank bonus while carried. Without world time, study completes at once.
 
 ## Sandbox capabilities
 
@@ -353,9 +386,9 @@ they do, without scripting each character.
   engine still offers only its closed set of policies; traits only choose
   among them.
 - **Reactions to deeds.** Deeds come from two sources:
-  - The engine reports a closed set it can detect itself: raiding a village
-    (with holdings), releasing or ransoming a prisoner, and leaving wages
-    unpaid. A deed whose capability is absent never occurs.
+  - The engine reports a closed set it can detect itself: raiding a village,
+    demanding its supplies or driving off its livestock (with holdings),
+    releasing or ransoming a prisoner, and leaving wages unpaid. A deed whose capability is absent never occurs.
   - The world declares its own deed IDs, such as winning a tournament or
     breaking a promise, and reports them with an authored `ReportDeed` effect
     wherever its dialogue or quests decide the deed happened.
@@ -396,6 +429,11 @@ they do, without scripting each character.
   and its own state: wounds, technique ranks and, in worlds with levels, its
   own XP and level. See [Companion gear](#companion-gear).
 - **Recruiting and wages.** Recruiting happens at locations that offer it.
+  Each such location keeps a saved pool: a count per troop definition that
+  recruiting takes from. On an authored recurring schedule the pool refills
+  towards an authored size, scaled by the location's prosperity where the
+  economy exists and gated by the player's standing with the location's owner
+  where standing exists. Without schedules, a pool never refills.
   Wages fall due on the upkeep tick. What happens when they go unpaid
   (desertion, lost standing) is authored.
 - **Size limit.** The engine computes the roster limit as an integer: an
@@ -437,6 +475,11 @@ they do, without scripting each character.
   in integers with one rounding. A road with an authored duration never takes
   less than one minute; a road without one still takes no time. Agent parties
   use the same rule, so light raiders can catch a slow caravan on the road.
+- **Mounts.** Where the world has equipment, a piece may author a travel speed
+  for its wearer, as a riding animal does. The base party speed is then the
+  slowest of the player's and each companion's mount speeds, falling back to
+  the authored base for anyone without one. In an encounter a mount is ordinary
+  gear: its stat grants, such as speed, apply like any other piece's.
 
 ### Companion gear
 
@@ -453,7 +496,8 @@ character can wear gear:
 - **Derived stats.** Every retinue character's effective stats are derived by
   one function, like `rules::player_stats` today: the character's base
   (combat profile, or level table plus allocated points where the world gives
-  companions levels), technique passives and worn gear. They are never saved.
+  companions levels), technique passives and worn gear, minus any
+  [lasting injuries](#mass-battle). They are never saved.
 - **In fights.** Companions join personal encounters as allies on the player's
   side, which the encounter state already supports, and count as leaders in a
   mass battle. They are wounded rather than killed unless an authored rule says
@@ -504,6 +548,22 @@ battles out of personal combat. This capability resolves army against army.
   losing side's losses may instead become the winner's prisoners (see [Prisoners
   and ransom](#prisoners-and-ransom)). The player sees the result and the
   losses, not a blow-by-blow fight.
+- **Rewards.** A won battle grants XP to the player, to each companion who
+  fought and to the pools of surviving troop types, split by authored shares
+  of the defeated side's authored XP. It changes an authored standing track,
+  such as renown, by an amount that grows with the defeated side's strength
+  relative to the player's. Each defeated troop definition authors a loot
+  table; the battle's RNG domain draws from it, with more draws for a better
+  looting proficiency, into a loot pool the player takes from before leaving.
+  Anything left is lost. Looted equipment may start at an authored improvement
+  tier below the base, a worn or rusted copy, using the
+  [improvement tiers](equipment.md) that already exist.
+- **Lasting injuries.** A world may author injuries, each with stat
+  penalties. Defeat in a battle, or an authored effect, may inflict one on the
+  player or a companion, drawn from the battle's RNG domain with an authored
+  chance. Injuries are saved as IDs keyed by the character; effective stats
+  subtract their penalties, like gear in reverse, so nothing is saved twice. An
+  authored effect, such as a physician's treatment, removes one.
 - **Ground.** Locations and roads both author a ground modifier, neutral when
   omitted, so a battle has ground wherever parties can meet: at a location or
   on a road between two.
@@ -533,8 +593,23 @@ battles out of personal combat. This capability resolves army against army.
   holding's authored loot of goods and currency, and stops its income for an
   authored period. It is the engine-detected deed "raiding a village". An
   agent's raid policy applies the same rule.
-- **Conditions and effects.** `HoldsLocation`; `GrantHolding`,
-  `TransferHolding`.
+- **Villages.** A village holding offers more than raiding:
+  - Where its owner authors it, income accrues in the holding and must be
+    collected in person. Collecting may provoke unrest with an authored chance
+    that low relation with the villagers raises, ending in a small mass battle
+    or a lost share of the income.
+  - A hostile player may demand supplies or drive off livestock. Both are
+    engine-detected deeds that lower relation and prosperity, lighter than a
+    raid.
+  - Livestock is a trade good that authors itself as a herd: carried herds slow
+    travel by an authored penalty per head and can be slaughtered into an
+    authored provisions good.
+  - Bandit trouble is a village state that the world-agent tick sets with an
+    authored chance. It lowers prosperity and empties the recruit pool until an
+    offer from the village clears it, such as hunting the bandits down or
+    training the villagers to resist.
+- **Conditions and effects.** `HoldsLocation`, `VillageTroubled`;
+  `GrantHolding`, `TransferHolding`.
 
 ### Politics and orders
 
@@ -670,8 +745,32 @@ no language model and no per-faction script.
   to a faction. Backing the claim activates an authored dormant faction, like
   a player-founded kingdom, and lords persuaded through dialogue defect to it.
   No faction is created at runtime.
-- **News.** Stance changes, appointments, grants and defections are reported
-  as events, like every other world change.
+- **News.** Stance changes, appointments, grants and defections are notable
+  world events (see [Knowledge and news](#knowledge-and-news)).
+
+### Knowledge and news
+
+The world changes while the player is elsewhere, and the player should learn
+of it the way a traveller would, not see everything at once.
+
+- **Notable events.** A closed set of world events is notable: war declared,
+  peace made, a holding changes owner, a siege begins, a village is raided, a
+  lord changes faction, a marshal is appointed. When a command crosses one, the
+  engine reports it after the command's own events. A world authors which of
+  them the player hears at once (for example those involving the player's
+  faction, holdings or companions); the rest reach the player on arrival at a
+  town. Recent notable events are kept in a bounded, saved journal.
+- **Remembered prices.** Where the economy exists, the player remembers each
+  market's prices as last seen, with the minute seen. Visiting refreshes them;
+  so does an authored `RevealPrices` effect, such as buying a merchant's report.
+  Price previews for other markets show the remembered values and their age.
+- **Whereabouts.** Where characters move, the player remembers each
+  character's last known location. Seeing them refreshes it, and an authored
+  `RevealWhereabouts` effect, such as paying a traveller, reveals it.
+- **Presentation.** Clients show only what the player knows. The engine still
+  holds the whole state, so this is information disclosure
+  ([Section 14](open-decisions.md#14-presentation-and-information-disclosure)),
+  not a second copy of the world.
 
 ### Tournaments and other set pieces
 

@@ -1521,13 +1521,27 @@ a proposed answer that still needs to be confirmed:
   same authoring data, with identical IDs. Still open: a save is bound to the
   package revision, which includes text, so it cannot move between language
   packages; decide whether the revision should hash rules and text separately.
+- **Start choices (M5f).** Proposed: a route may author start questions shown
+  at New Game; each option applies an ordered effect list to the initial state,
+  and the save keeps only the resulting state plus the chosen option IDs. This
+  is authored initial state, not runtime identity editing, so it stays within
+  the original-character rules above. Still open: whether an option may skip
+  or add later questions.
+- **Characters who move (M5b).** Proposed: a character may author a set of
+  locations and a recurring schedule; each occurrence moves it to one of them,
+  drawn from a `world` RNG domain, and its location is saved keyed by its ID.
+  Still open: whether a move may avoid the player's current location.
 - **Proficiencies (M6).** Proposed: following [Section 8](#8-checks-and-proficiencies),
   each capability owns the proficiencies it needs (trading in the economy,
   leadership in the retinue, surgery in mass battle), with its own ranks and
   checks. A technique rank is not such a proficiency. Still open: M4d gates
   recipes on a Smithing *technique*, which blurs that separation. Either keep
   it as a deliberate exception or move crafting to a crafting-owned proficiency
-  before sandbox proficiencies copy the pattern.
+  before sandbox proficiencies copy the pattern. Proposed growth: proficiency
+  points per level from the level table, saved as an allocation per character
+  and optionally capped by an authored stat; each proficiency is personal or
+  party, and a party proficiency uses the best rank in the retinue; items can
+  teach a rank through study over world time or grant a bonus while carried.
 - **Price model (M6a).** Decided: prices follow production, not stock. Each
   market keeps a price index per good in thousandths of the base price, within
   authored bounds. A recurring price tick moves it against net supply
@@ -1606,13 +1620,23 @@ a proposed answer that still needs to be confirmed:
   captivity is an ordinary setback, not an outcome. Escapes run on the world's
   prison schedule with their own `captivity` RNG domain. Still open: what
   happens to the player's retinue and stash when the player is captured.
+- **Battle rewards and injuries (M6d).** Proposed: a victory splits the
+  defeated side's authored XP between the player, companions who fought and
+  surviving troop pools by authored shares; changes an authored standing track
+  by relative strength; and fills a loot pool from each defeated troop's loot
+  table, drawn from the battle's RNG domain with more draws for better looting.
+  Looted equipment may start at an authored improvement tier below the base.
+  Lasting injuries are authored stat penalties saved as IDs per character and
+  subtracted during derivation. Still open: whether loot left in the pool can
+  go to companions' stash automatically.
 - **Personalities (M6b).** Proposed: a world declares a closed list of named
   traits and each character authors a few; traits never change during play.
   Agent policy priorities and diplomacy weights may test a leader's traits.
   Reactions are authored rules of the form trait × deed → standing change.
-  Deeds are either a closed set the engine detects (raiding a village, which is
-  a holdings action, releasing or ransoming a prisoner, unpaid wages) or world-declared IDs that an authored
-  `ReportDeed` effect reports, such as a tournament win or a broken promise.
+  Deeds are either a closed set the engine detects (raiding a village,
+  demanding its supplies or driving off its livestock, which are holdings
+  actions; releasing or ransoming a prisoner; unpaid wages) or world-declared
+  IDs that an authored `ReportDeed` effect reports, such as a tournament win or a broken promise.
   Companion friction takes effect in the transition that lowers the relation,
   with no tick. Still open: whether any world needs traits that change.
 - **Wounded, provisions and morale (M6c, M6d).** Proposed: the roster saves a
@@ -1633,7 +1657,24 @@ a proposed answer that still needs to be confirmed:
   prisoners and a bonus from pathfinding, in integers with one rounding. A
   party with no healthy troops moves at the base speed. Roads with an authored
   duration take at least one minute; roads without one take no time. Agent
-  parties use the same rule.
+  parties use the same rule. Where equipment exists, a worn mount's authored
+  travel speed replaces the base for its wearer, and the slowest counts.
+- **Recruit pools (M6c).** Proposed: each recruiting location saves a count per
+  troop definition that recruiting consumes and an authored schedule refills,
+  scaled by prosperity and gated by standing where those exist.
+- **Knowledge and news (M6f).** Proposed: a closed set of notable world events
+  is reported after the command that crossed it, either at once or on arrival
+  at a town as the world authors, and kept in a bounded saved journal. The
+  player remembers each market's prices and each moving character's location
+  as last seen, with the minute; authored effects reveal them. Clients show
+  only this knowledge ([Section 14](#14-presentation-and-information-disclosure)).
+  Still open: the journal's bound, and whether agents' own knowledge is ever
+  limited, which the proposal does not do.
+- **Villages (M6e).** Proposed: rent may accrue and wait for collection in
+  person, with unrest drawn from its own RNG domain; demanding supplies and
+  driving off livestock are engine-detected deeds; livestock is a trade good
+  carried as a herd with a travel penalty; bandit trouble is a village state set
+  by the world-agent tick and cleared through an offer.
 - **Marriage (M6h).** Proposed: courtship is authored dialogue over relation
   tracks, and `Marry` records at most one spouse per character, keyed by ID. No
   children, heirs or dynasties. Still open: whether a spouse can act for the

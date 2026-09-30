@@ -96,6 +96,12 @@ explicit gameplay transition, never when a menu opens. An offer is an activity
 rather than a side questline, so the bounded waves that gate side questlines do
 not apply to it.
 
+## Start Choice
+
+Proposed for M5. An authored question a route asks at New Game, such as the
+player's background. Each option applies an ordered list of effects to the
+route's initial state; nothing re-runs it once play begins.
+
 ## Story Phase
 
 A discrete narrative/canonical progression period shared by the world. Story
@@ -267,6 +273,12 @@ may test them.
 Proposed for M5. An authored role such as lord, guild master or companion that
 characters list. Its dialogues, topics and line slots are shared by every
 member, and inside them `Speaker` refers to the member being talked to.
+
+## Lasting Injury
+
+Proposed for M6. An authored injury with stat penalties that a defeat or an
+effect inflicts on the player or a companion. It is saved as an ID per
+character; derived stats subtract its penalties until an effect removes it.
 
 ## Holding
 

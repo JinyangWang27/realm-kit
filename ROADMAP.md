@@ -1077,7 +1077,8 @@ above are delivered alongside them, in whichever order a fixture needs them.
    as specified above; roads with authored travel durations and exits beyond
    the six compass directions; wait and rest actions that consume time; and
    recurring schedules that the dispatch cursor expands lazily, one due
-   occurrence at a time.
+   occurrence at a time; and characters who move among authored locations on
+   a schedule, drawn from a `world` RNG domain.
 3. **M5c — quest lifecycle.** Quests that fail, carry world-time deadlines or
    are abandoned, plus repeatable offers: job templates whose parameters the
    saved RNG draws from authored candidate lists at an explicit gameplay
@@ -1090,6 +1091,9 @@ above are delivered alongside them, in whichever order a fixture needs them.
    dialogues and topics every member shares, `Speaker` references in
    conditions, effects and templates, line slots that each member fills, role
    offer givers, and text fields with conditional variants.
+6. **M5f — start choices.** A route's authored start questions at New Game,
+   each option an ordered effect list applied to the initial state, with the
+   chosen option IDs saved for display.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and tested paths to completion, can be saved/resumed, and include at least one
@@ -1110,15 +1114,17 @@ Hard dependencies between capabilities are few and validated, interactions
 happen only when both sides are present, and the full sandbox is simply the
 world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
 
-Depends on M5a–M5e. Deliver in slices, each bumping the package and save
+Depends on M5a–M5f. Deliver in slices, each bumping the package and save
 format as usual:
 
 1. **M6a — economy.** Currency; markets whose per-good price index follows
    authored production and demand on a recurring price tick; linked markets
    that converge; prosperity; merchants who restock; buy and sell that move the
    index, with a price preview; player workshops; and upkeep on recurring
-   schedules. The price tick is mirrored in `scripts/combat_sim` before tests
-   pin its numbers.
+   schedules. Trading is the first proficiency, so the proficiency mechanism
+   arrives here too: points per level, personal or party proficiencies, and
+   study from items over world time. The price tick is mirrored in
+   `scripts/combat_sim` before tests pin its numbers.
 2. **M6b — factions and standing.** War and peace between factions, authored
    standing tracks such as renown and relation, and the conditions and effects
    that read and change them. Authored personality traits steer dialogue and
@@ -1129,8 +1135,9 @@ format as usual:
    of counts and saved XP pools per troop type, companions as unique
    characters who wear their own gear from a shared stash, recruiting, an
    engine-computed roster limit, an upkeep tick with its own RNG domain for
-   wages, provisions, wounded recovery, morale and desertion, and travel speed
-   from the slowest troops and the party's load.
+   wages, provisions, wounded recovery, morale and desertion, recruit pools
+   that refill on a schedule, and travel speed from the slowest troops, the
+   party's mounts and its load.
 4. **M6d — mass battle.** Army-against-army resolution from rosters, leaders and
    ground (authored on locations and roads), with seeded casualties and an
    optional champion duel. The formula is mirrored in `scripts/combat_sim`
@@ -1139,16 +1146,21 @@ format as usual:
    the world-agent tick. Battles take prisoners: troop prisoners to sell or
    recruit, captured lords to ransom, escapes on a schedule, and player
    captivity as a setback rather than an ending. Holding prisons arrive with
-   M6e.
+   M6e. Victories grant XP, standing and a loot pool drawn from authored loot
+   tables; defeats may inflict authored lasting injuries.
 5. **M6e — holdings and sieges.** Ownership that changes during play, income,
    garrisons, authored buildings, sieges as mass battles after a preparation
    time, and raiding enemy villages for loot at the cost of their income.
+   Villages add rent collected in person with a risk of unrest, demanding
+   supplies, herds of livestock, and bandit trouble cleared through offers.
 6. **M6f — world agents.** Party instances on the road graph that apply a
    closed set of engine policies on recurring world ticks, with priorities
    that may test the leader's traits, routing by shortest travel time with ties
    broken by authored road order, spawners with caps, interception of the
    player, off-screen battles, weighted diplomacy events, and an
-   `AGENT_BOUND`.
+   `AGENT_BOUND`. Caravans trade along authored links. The player learns of
+   off-screen change through notable events, a saved news journal, and
+   remembered prices and whereabouts.
 7. **M6g — faction strategy.** A faction tick with its own RNG domain;
    defend, gather, campaign and rest stances chosen by authored priorities; a
    marshal whose army members follow; campaign and raid targets on the road
