@@ -107,26 +107,38 @@ M5 slices.
    templates such as "deliver cloth to a town" or "clear the bandits near a
    village".
    - An offer's parameters are drawn by the saved RNG from authored candidate
-     lists (target location, goods, reward band).
+     lists (target location, goods, reward band). The draw happens only at an
+     explicit gameplay transition, such as the giver's recurring refresh or the
+     player's arrival, and the drawn offer is saved. Opening a menu or talking
+     only reads offers that already exist, so inspecting jobs never consumes
+     randomness ([Section 7](open-decisions.md#7-randomness-and-reproducibility)).
    - The drawn values fill the offer's text with the existing single-pass
      template substitution.
    - Offers are activities, not side questlines. They do not break the rule
      that main progress unlocks side questlines in bounded waves.
-5. **Runtime instances for characters and parties.** A wounded lord, a
-   captured companion and a roaming war party each need mutable identity that
-   outlives one encounter. This follows
-   [Section 10](open-decisions.md#10-definitions-instances-and-identity) and is
-   already planned for M5.
-6. **Proficiencies outside combat.** Trading, leadership and field surgery are
-   proficiencies in the [Section 8](open-decisions.md#8-checks-and-proficiencies)
-   sense. Technique ranks already serve as one: M4d gates recipes on a Smithing
-   rank. However, techniques and recipes live in the combat block today. Moving
-   techniques out of that block lets a world without combat still rank its
-   traders and surgeons.
-7. **Sandbox routes.** A route still owns exactly one main questline. In a
-   sandbox, that questline is a ladder of ambitions ("hold a fief", "found an
-   order", "rule a kingdom") with **completed, non-terminal** outcomes, so play
-   continues after the ambition is reached.
+5. **Runtime instances for spawned copies and parties.** A roaming war party, a
+   bandit gang or a caravan needs mutable identity that outlives one encounter,
+   and several copies of one template may be alive at once. Unique authored
+   characters keep their authored IDs: a wounded lord's wounds, a captured
+   companion's captivity and a lord's whereabouts are state keyed by the
+   character ID, not a second identity. This follows
+   [Section 10](open-decisions.md#10-definitions-instances-and-identity), and
+   instances for combatant copies are already planned for M5.
+6. **Sandbox routes.** A route still owns exactly one main questline, and a
+   playthrough records at most one outcome
+   ([Section 3](open-decisions.md#3-outcomes-failure-and-replay)). In a sandbox,
+   the main questline is a ladder of ambitions: quests such as "hold a fief"
+   and "found an order" are ordinary quest progression. Only the top rung, such
+   as "rule a kingdom", is the route's **completed, non-terminal** outcome, so
+   play continues after it.
+
+Proficiencies such as trading, leadership and field surgery are not a
+foundation. They follow [Section 8](open-decisions.md#8-checks-and-proficiencies):
+each capability that needs one owns its ranks and checks. The economy owns
+trading, the retinue owns leadership, and mass battle owns surgery. A technique
+rank is not such a proficiency. M4d's Smithing technique, which gates recipes,
+already blurs that line; [Section 18](open-decisions.md#18-living-sandbox-worlds)
+records the question.
 
 ## Sandbox capabilities
 
@@ -141,9 +153,9 @@ the world authors it, and it arrives with a fixture that proves it.
 - **Rules.**
   - A market is a location that trades an authored set of goods.
   - Price is computed in the engine, in integers, from an authored base price,
-    the market's modifier and its current stock. A trade proficiency may
-    narrow the gap between buying and selling prices. Content never supplies a
-    formula.
+    the market's modifier and its current stock. A trading proficiency, owned
+    by this capability, may narrow the gap between buying and selling prices.
+    Content never supplies a formula.
   - Stock drifts back towards authored levels on a recurring restock schedule.
 - **Commands.** Buy and sell. The engine previews the price before the player
   confirms.
@@ -169,16 +181,19 @@ the world authors it, and it arrives with a fixture that proves it.
 
 - **Troops.** Troop definitions carry a combat profile, wages and an optional
   upgrade path (recruit → footman → sergeant).
-- **Roster.** The player's roster is a count per troop definition: troops are
-  fungible, not instances.
+- **Roster.** The player's roster holds, per troop definition, a count and an
+  XP pool: troops are fungible, not instances. Both are saved.
 - **Companions.** Companions are unique characters who join the retinue. They
   keep their own gear and technique ranks.
 - **Rules.** Recruiting happens at locations that offer it. An authored rule,
-  typically a standing threshold or a leadership rank, sets the roster size
-  limit. Wages fall due on a recurring schedule. What happens when they go
-  unpaid (desertion, lost standing) is authored.
-- **Upgrades.** Training moves troops up their upgrade path using XP from
-  battles.
+  typically a standing threshold or the retinue's own leadership proficiency,
+  sets the roster size limit. Wages fall due on a recurring schedule. What
+  happens when they go unpaid (desertion, lost standing) is authored.
+- **Upgrades.** Battles add XP to the pool of each surviving troop type.
+  Upgrading one troop to the next step of its path spends that step's authored
+  XP from the pool, so upgrades available after a save are the same as before
+  it. Recruits join with no XP. Casualties remove a proportional share of the
+  pool, rounded down, so the pool never outlives its troops.
 
 ### Mass battle
 
@@ -186,9 +201,12 @@ The [capability catalog](capabilities.md#combat-across-sources) keeps mass
 battles out of personal combat. This capability resolves army against army.
 
 - **Resolution.** The engine computes each side's strength from its roster, its
-  leaders' ranks and the ground, which is an authored location modifier. It
-  draws from the RNG and distributes casualties over several rounds. The player
-  sees the result and the losses, not a blow-by-blow fight.
+  leaders and the ground. It draws from the RNG and distributes casualties over
+  several rounds. The player sees the result and the losses, not a
+  blow-by-blow fight.
+- **Ground.** Locations and roads both author a ground modifier, neutral when
+  omitted, so a battle has ground wherever parties can meet: at a location or
+  on a road between two.
 - **Champions.** Optionally, the author can let the player fight a personal
   encounter against the enemy commander at a chosen moment. The result of that
   duel modifies the battle.
@@ -240,6 +258,9 @@ World agents are what make the world move without the player.
   - Authored priorities choose the policy. For example, a lord at war besieges
     the nearest enemy holding with a weak garrison, and otherwise patrols home
     lands.
+  - "Nearest" and every route a party takes are measured on the road graph by
+    total authored travel time. Ties break by authored road order, so routing
+    is deterministic.
   - Parties act in a stable order.
   - Their random choices draw from their own RNG domain, so adding a bandit
     gang does not change the player's critical hits.
@@ -272,16 +293,18 @@ small, original world, provisionally `examples/marches`:
 
 It grows one slice at a time, the way `arena` and `smithy` did. Its walkthrough
 covers 30 or more in-world days. During them:
-- the player trades, recruits, wins a mass battle, receives a fief and reaches a
-  non-terminal ambition outcome;
+- the player trades, recruits, wins a mass battle and receives a fief, which in
+  the fixture is the top ambition and so the route's completed, non-terminal
+  outcome, and play continues;
 - a war changes a holding's owner without the player's involvement.
 
 ## Non-goals
 
 - a scripting or behaviour language, or per-character AI scripts;
 - real-time play, or any gameplay tied to the wall clock;
-- terrain, continuous coordinates or pathfinding in the rules (the road graph is
-  the map; clients may draw it however they like);
+- terrain, continuous coordinates or free-space pathfinding in the rules (the
+  road graph is the map, and routing is shortest travel time on it; clients may
+  draw it however they like);
 - entities created at runtime other than instances of authored definitions;
 - a generic bag of numeric variables;
 - importing data from other games.

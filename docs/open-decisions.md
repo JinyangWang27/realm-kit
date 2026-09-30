@@ -1495,38 +1495,57 @@ a proposed answer that still needs to be confirmed:
   remain for worlds that use them. Still open: whether one world may mix the
   two.
 - **Offers (M5c).** Proposed: the saved RNG draws an offer's parameters from
-  authored candidate lists when the offer is first shown. The drawn values are
-  saved, so reopening a menu draws nothing. Still open: how many offers a
+  authored candidate lists only at an explicit gameplay transition, such as the
+  giver's recurring refresh or the player's arrival, and the drawn offer is
+  saved. Menus and dialogue only read existing offers, so inspecting jobs
+  consumes no randomness ([Section 7](#7-randomness-and-reproducibility)).
+  Still open: how many offers a
   giver holds at once, and when a refused offer comes back.
-- **Techniques outside the combat block (M5e).** Proposed: techniques move to
-  their own top-level section. Ranks, passives and gates keep their meaning.
-  Skills and XP training from encounters remain combat-only parts of a
-  technique. This is a package and save format change.
+- **Proficiencies (M6).** Proposed: following [Section 8](#8-checks-and-proficiencies),
+  each capability owns the proficiencies it needs (trading in the economy,
+  leadership in the retinue, surgery in mass battle), with its own ranks and
+  checks. A technique rank is not such a proficiency. Still open: M4d gates
+  recipes on a Smithing *technique*, which blurs that separation. Either keep
+  it as a deliberate exception or move crafting to a crafting-owned proficiency
+  before sandbox proficiencies copy the pattern.
 - **Price model (M6a).** Proposed: integer price = base × market modifier ×
   stock factor, each a bounded percentage, with one final rounding. The
-  selling price sits below the buying price by an authored spread that a trade
-  proficiency can narrow. Still open: whether player sales feed stock
+  selling price sits below the buying price by an authored spread that the
+  economy's trading proficiency can narrow. Still open: whether player sales feed stock
   immediately or only at restock.
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.
 - **Mass-battle formula (M6d).** Proposed: one integer strength formula over
-  rosters, leader ranks and an authored ground modifier, resolved in a fixed
+  rosters, leaders and an authored ground modifier that both locations and
+  roads carry (neutral when omitted), resolved in a fixed
   number of rounds with one RNG draw per round from a dedicated domain. It
   follows the simulator-parity rule: `scripts/combat_sim` mirrors it before
   tests pin its numbers. Still open: how troop quality beyond combat stats
   counts, and whether a champion duel can end a battle outright.
 - **Agent policies (M6f).** Proposed: a closed enum (patrol, raid, escort,
   besiege, return home), chosen by authored priority rules over typed
-  conditions. Parties act in stable instance order. Agents draw from their own
-  RNG domain, separate from combat and offers.
+  conditions. Parties act in stable instance order. "Nearest" and every route
+  a party takes are shortest total travel time on the road graph, with ties
+  broken by authored road order; there is no free-space pathfinding. Agents
+  draw from their own RNG domain, separate from combat and offers.
 - **Interception (M6f).** Proposed: travel along one road is atomic, but a tick
   that falls during the journey can stop the player at the road's midpoint when
   a hostile party shares that road. Still open: whether a party can pursue the
   player across more than one road.
 - **Runtime-created entities.** Proposed: none beyond instances of authored
-  definitions. A player-founded kingdom is an authored, dormant faction that an
+  definitions, and instances only for spawned copies and parties. Unique
+  authored characters keep their authored IDs, and state such as wounds or
+  captivity is keyed by them ([Section 10](#10-definitions-instances-and-identity)).
+  A player-founded kingdom is an authored, dormant faction that an
   effect activates, so validation sees every faction that can exist.
+- **Ambition ladders.** Proposed: a sandbox route's rungs below the top are
+  ordinary main-questline quests; only the top rung is the route's completed,
+  non-terminal outcome, because a playthrough records at most one outcome
+  ([Section 3](#3-outcomes-failure-and-replay)).
+- **Retinue XP (M6c).** Proposed: the roster saves an XP pool per troop type.
+  Battles add to it, an upgrade spends the next step's authored XP, recruits
+  add none, and casualties remove a proportional share, rounded down.
 - **Bounds and save size.** Proposed: a new `AGENT_BOUND` caps live parties,
   and validation keeps party rosters within the existing numeric bounds, so a
   save stays small and ticks stay cheap. The concrete value waits for the

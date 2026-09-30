@@ -1065,7 +1065,7 @@ milestones. They change how play reads, never the engine or its rules.
 
 M5 also lays the general foundations that
 [living sandbox worlds](docs/sandbox-worlds.md) need, and M6 depends on these
-five slices. The investigation fixture, optional Inventory and authored endings
+four slices. The investigation fixture, optional Inventory and authored endings
 above are delivered alongside them, in whichever order a fixture needs them.
 
 1. **M5a — condition tree and effect lists.** `requires` becomes one condition
@@ -1080,12 +1080,12 @@ above are delivered alongside them, in whichever order a fixture needs them.
    occurrence at a time.
 3. **M5c — quest lifecycle.** Quests that fail, carry world-time deadlines or
    are abandoned, plus repeatable offers: job templates whose parameters the
-   saved RNG draws from authored candidate lists.
-4. **M5d — runtime instances** for characters and parties whose state outlives
-   one encounter, as in the first bullet above.
-5. **M5e — techniques outside the combat block**, so that a world without
-   combat can rank proficiencies such as trading or leadership and gate content
-   on them, the way M4d gates recipes on Smithing.
+   saved RNG draws from authored candidate lists at an explicit gameplay
+   transition, such as a recurring refresh, never when a menu opens.
+4. **M5d — runtime instances** for spawned copies and parties whose state
+   outlives one encounter, as in the first bullet above. Unique authored
+   characters keep their authored IDs and carry state such as wounds or
+   captivity under them.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and tested paths to completion, can be saved/resumed, and include at least one
@@ -1103,7 +1103,7 @@ and joins orders while lords, bandits and caravans act on their own. The
 tracks its open questions. Every capability stays optional and ships with the
 slice of the reference fixture that proves it.
 
-Depends on M5a–M5e. Deliver in slices, each bumping the package and save
+Depends on M5a–M5d. Deliver in slices, each bumping the package and save
 format as usual:
 
 1. **M6a — economy.** Currency, markets with engine-computed integer prices
@@ -1111,17 +1111,20 @@ format as usual:
    preview, and upkeep on recurring schedules.
 2. **M6b — factions and standing.** War and peace between factions, authored
    standing tracks such as renown and relation, and the conditions and effects
-   that read and change them.
+   that read and change them. Proficiencies such as trading, leadership and
+   surgery belong to the capability that uses them.
 3. **M6c — retinue.** Troop definitions with wages and upgrade paths, a roster
-   of counts, companions as unique characters, recruiting and a roster limit.
+   of counts and saved XP pools per troop type, companions as unique
+   characters, recruiting and a roster limit.
 4. **M6d — mass battle.** Army-against-army resolution from rosters, leaders
-   and ground, with seeded casualties and an optional champion duel. The
+   and ground (authored on locations and roads), with seeded casualties and an optional champion duel. The
    formula is mirrored in `scripts/combat_sim` before tests pin its numbers.
 5. **M6e — holdings and sieges.** Ownership that changes during play, income,
    garrisons, authored buildings, and sieges as mass battles after a
    preparation time.
 6. **M6f — world agents.** Party instances on the road graph that apply a
-   closed set of engine policies on recurring world ticks, spawners with caps,
+   closed set of engine policies on recurring world ticks, routing by shortest
+   travel time with ties broken by authored road order, spawners with caps,
    interception of the player, off-screen battles, weighted diplomacy events,
    and an `AGENT_BOUND`.
 7. **M6g — politics and orders by composition.** Faction membership ranks for
@@ -1130,8 +1133,11 @@ format as usual:
 
 **Done when:** a small original fixture (`examples/marches`) plays 30 or more
 in-world days in which parties move and a war changes a holding's owner
-without the player, while the player trades, recruits, wins a mass battle,
-receives a fief and reaches a completed, non-terminal ambition outcome. The
+without the player, while the player trades, recruits, wins a mass battle and
+receives a fief. In the fixture the fief is the top ambition, so it records the
+route's completed, non-terminal outcome, and play continues. Lower rungs of the
+ambition ladder are ordinary main-questline quests, because a playthrough
+records at most one outcome. The
 same seed and commands reproduce it exactly, including across save and load.
 
 ## M7 — Authoring feedback and deterministic simulation

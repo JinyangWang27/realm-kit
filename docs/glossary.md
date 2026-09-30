@@ -91,9 +91,10 @@ A quest required for main progression is not a side quest.
 ## Offer
 
 Proposed for M5. A repeatable job template, such as a delivery or a bandit hunt,
-whose parameters the saved RNG draws from authored candidate lists. An offer is
-an activity rather than a side questline, so the bounded waves that gate side
-questlines do not apply to it.
+whose parameters the saved RNG draws from authored candidate lists at an
+explicit gameplay transition, never when a menu opens. An offer is an activity
+rather than a side questline, so the bounded waves that gate side questlines do
+not apply to it.
 
 ## Story Phase
 
