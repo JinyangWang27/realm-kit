@@ -1595,6 +1595,14 @@ a proposed answer that still needs to be confirmed:
   naming are referenced directly by locations and factions; authoring tools may
   group them as a culture before export. Still open: whether any world needs
   culture to change during play, which would make it holding state.
+- **Capability boundaries.** Proposed: every sandbox capability and every
+  part inside one is optional, per the
+  [Modularity](sandbox-worlds.md#modularity) rules: presence decides, hard
+  dependencies are few and validated with stable codes, cross-capability
+  interactions occur only when both sides are present, and each absent part
+  has a defined behaviour instead of placeholder data. Still open: whether a
+  part's presence is marked by its own block or by optional fields inside the
+  capability's block.
 - **Bounds and save size.** Proposed: a new `AGENT_BOUND` caps live parties,
   and validation keeps party rosters within the existing numeric bounds, so a
   save stays small and ticks stay cheap. The concrete value waits for the

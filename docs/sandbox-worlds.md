@@ -44,10 +44,57 @@ keeps:
   roaming parties, prices and pending schedules.
 - Randomness comes from explicit, saved RNG streams and selects only among
   authored possibilities.
-- Every capability below is optional. A world that uses none of them carries no
-  state, commands or screens for them.
+- Every capability below, and every part inside one, is optional. A world that
+  uses none of them carries no state, commands or screens for them. See
+  [Modularity](#modularity).
 - Content supplies bounded numbers and typed rules, never formula strings or
   scripts.
+
+## Modularity
+
+The sandbox is not one feature. It is a set of small capabilities that a world
+picks from, and the full realm of rival kingdoms is just the world that picks
+all of them. A trading game might use only travel, world time and the economy;
+a mercenary story might add a retinue and mass battles but no holdings; a
+court drama might use factions, personalities and marriage with no fighting at
+all. Four rules keep that true:
+
+1. **Presence decides.** A capability exists only when the world authors its
+   block. Absent, it has no state, commands, menus, events or save fields.
+2. **Few hard dependencies.** A capability requires another only when it cannot
+   mean anything without it, as listed below. Validation rejects a world that
+   authors a capability without its prerequisites, with a stable diagnostic code.
+3. **Soft interactions only when both are present.** Where two capabilities touch,
+   for example morale and provisions, the interaction happens only if both
+   exist. With one missing, that input or effect simply does not occur; nothing
+   is faked with neutral placeholder data.
+4. **Parts inside a capability are optional too.** Each part left out has a defined
+   behaviour, listed below, so a world can take a capability's core and skip its
+   extras.
+
+The M5 condition tree and effect lists are package syntax rather than a capability:
+a world that writes one condition or one effect behaves exactly as it does
+today. Every other foundation (world time, recurring schedules, roads, quest
+deadlines, offers, runtime instances) is optional.
+
+| Capability | Hard requirements | Optional parts, and what happens without them |
+| --- | --- | --- |
+| World time | none | Roads without durations take no time; without wait and rest, only travel passes time. |
+| Recurring schedules | world time | None; everything periodic below needs them. |
+| Offers | none | Without world time, offers have no deadlines; without schedules, they refresh only on arrival. |
+| Economy | none | Without schedules, stock never drifts back; without a trading proficiency, the buy/sell spread is fixed. |
+| Factions and standing | none | Diplomacy and standing tracks are separate parts; a world may author either. |
+| Personalities | none | Traits alone can gate dialogue. Reactions need standing; agent behaviour needs world agents. |
+| Retinue | none | Wages need the economy and schedules; provisions need economy goods and schedules; morale, wounded troops, upgrades and travel speed are each separate parts. Without them nobody is paid or eats, morale is not tracked, every loss is killed, troops never upgrade, and roads take their authored time. |
+| Companion gear | retinue, equipment | None. Companions fight in encounters only where personal combat exists. |
+| Mass battle | retinue | Without morale or proficiencies, those terms leave the formula; without prisoners, losses are never captured; champion duels need personal combat. |
+| Prisoners | retinue, and mass battle or personal combat | Ransom needs the economy; escapes need schedules; holding prisons need holdings. |
+| Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time. Without factions, owners are characters. |
+| Politics and orders | factions and standing | Membership ranks, orders, marriage and a founded kingdom are separate parts. Marriage needs per-character relation tracks. |
+| World agents | recurring schedules | Without a retinue, parties carry no rosters and cannot fight; without mass battle, they never fight each other; without factions, there is no diplomacy. |
+
+Each capability section below describes the capability with all its parts
+present.
 
 ## What already fits
 
@@ -209,8 +256,10 @@ they do, without scripting each character.
 
 ### Retinue
 
-- **Troops.** Troop definitions carry a combat profile, wages and an optional
-  upgrade path (recruit → footman → sergeant).
+- **Troops.** Troop definitions optionally carry wages, an upgrade path
+  (recruit → footman → sergeant), a mass-battle strength where the world has
+  mass battles, and a personal-combat profile only where troops also join
+  encounters.
 - **Roster.** The player's roster holds, per troop definition, a count of
   healthy troops, a count of wounded troops and an XP pool: troops are
   fungible, not instances. All three are saved.

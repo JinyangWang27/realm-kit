@@ -141,7 +141,9 @@ travel + time + economy + factions/standing + relationships + party (retinue)
 Its main questline is a ladder of ambitions whose top rung is one completed,
 non-terminal outcome, while lords, bandits and caravans act on world ticks.
 Politics and knightly orders compose factions, standing and holdings rather
-than adding capabilities of their own. See [living sandbox worlds](sandbox-worlds.md).
+than adding capabilities of their own. Each of these is optional on its own, so
+smaller worlds take only the pieces they need; see
+[modularity](sandbox-worlds.md#modularity) for the dependencies between them.
 
 Crafting belongs only if the source supports characters making or improving
 things. Combat belongs only if physical or magical conflict is an important

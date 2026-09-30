@@ -1100,8 +1100,11 @@ kingdoms where the player trades, hires soldiers, earns standing, holds fiefs
 and joins orders while lords, bandits and caravans act on their own. The
 [sandbox design direction](docs/sandbox-worlds.md) describes each capability;
 [Section 18](docs/open-decisions.md#18-living-sandbox-worlds) of the register
-tracks its open questions. Every capability stays optional and ships with the
-slice of the reference fixture that proves it.
+tracks its open questions. Every capability, and every part inside one, stays
+optional and ships with the slice of the reference fixture that proves it.
+Hard dependencies between capabilities are few and validated, interactions
+happen only when both sides are present, and the full sandbox is simply the
+world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
 
 Depends on M5a–M5d. Deliver in slices, each bumping the package and save
 format as usual:
@@ -1148,6 +1151,10 @@ route's completed, non-terminal outcome, and play continues. Lower rungs of the
 ambition ladder are ordinary main-questline quests, because a playthrough
 records at most one outcome. The
 same seed and commands reproduce it exactly, including across save and load.
+Trimmed variants of the fixture that drop capabilities, such as one with only
+travel, time and the economy, and one without world agents, still validate and
+play, and a world missing a hard prerequisite is rejected with a stable
+diagnostic.
 
 ## M7 — Authoring feedback and deterministic simulation
 
