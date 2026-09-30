@@ -120,9 +120,11 @@ pub(crate) fn improve(
         gear: piece,
         tier: gear.tier,
     });
-    // A lighter or weaker tier changes the maxima of a worn piece.
+    train(world, state, tier.trains.as_ref(), events)?;
+    // Maxima settle only after every change: a weaker tier's lost bonus may
+    // come back through the rank its training reaches.
     clamp_vitals(world, state);
-    train(world, state, tier.trains.as_ref(), events)
+    Ok(())
 }
 
 /// Known recipes and improvable pieces at this location's stations. Those

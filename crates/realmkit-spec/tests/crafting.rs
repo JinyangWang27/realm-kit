@@ -139,3 +139,47 @@ fn stations_need_combat() {
     quiet.locations[0].stations = vec!["anvil".into()];
     assert!(codes(&quiet).contains(&"combat_disabled".to_string()));
 }
+
+#[test]
+fn materials_are_counted_items_listed_once() {
+    // The same item twice in one cost would be checked twice against one count.
+    let mut twice = smithy();
+    let inputs = &mut recipe(&mut twice, "iron_sword").inputs;
+    inputs.push(inputs[0].clone());
+    assert!(
+        codes(&twice).contains(&"duplicate_id".to_string()),
+        "{:?}",
+        twice.diagnostics()
+    );
+    // Equipment arrives as pieces, never as a count to spend.
+    let mut worn = smithy();
+    tier(&mut worn, "iron_mail", 0).cost[0].item = "iron_sword".into();
+    assert!(
+        codes(&worn).contains(&"invalid_material".to_string()),
+        "{:?}",
+        worn.diagnostics()
+    );
+}
+
+#[test]
+fn every_tier_of_a_weapon_keeps_an_attack_in_its_channel() {
+    // A special-channel sword whose base bonus is its wielder's only special
+    // attack, and whose Fine tier drops it.
+    let mut world = smithy();
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.cross_share = 0;
+    combat.levels.iter_mut().for_each(|l| l.stats.satk = 0);
+    let sword = world
+        .items
+        .iter_mut()
+        .find(|i| i.id == "iron_sword")
+        .unwrap();
+    let gear = sword.equipment.as_mut().unwrap();
+    gear.basic_channel = Some(Channel::Special);
+    gear.bonuses = [(Stat::Satk, 5)].into();
+    assert!(
+        codes(&world).contains(&"no_attack".to_string()),
+        "{:?}",
+        world.diagnostics()
+    );
+}

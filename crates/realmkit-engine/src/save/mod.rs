@@ -124,9 +124,10 @@ struct Progress<'w> {
     xp_ceiling: u64,
     any_repeatable: bool,
     repeatable_loot: BTreeSet<&'w Id>,
-    /// Materials crafting spends and items it makes: their counts follow
-    /// crafting, not only recorded progress.
-    crafted: BTreeSet<&'w Id>,
+    /// Materials crafting spends: at most what progress granted, maybe less.
+    spendable: BTreeSet<&'w Id>,
+    /// Items crafting makes: at least what progress granted, maybe more.
+    forged: BTreeSet<&'w Id>,
 }
 
 impl<'w> Progress<'w> {
@@ -174,15 +175,15 @@ impl<'w> Progress<'w> {
             .iter()
             .filter_map(|i| i.equipment.as_ref())
             .flat_map(|e| &e.tiers);
-        let crafted = recipes
+        let spendable = recipes
             .clone()
             .flat_map(|r| &r.inputs)
             .chain(tiers.flat_map(|t| &t.cost))
             .map(|s| &s.item)
-            .chain(recipes.map(|r| &r.output))
             .collect();
         Ok(Self {
-            crafted,
+            spendable,
+            forged: recipes.map(|r| &r.output).collect(),
             inventory,
             quest_flags,
             xp_floor: floor,
@@ -215,12 +216,14 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
         progress
             .inventory
             .iter()
-            .filter(|(item, _)| !progress.crafted.contains(item))
+            .filter(|(item, _)| !progress.spendable.contains(item))
             .all(|(item, count)| held.get(item).is_some_and(|h| h >= count))
             && held.iter().all(|(item, h)| {
-                progress.inventory.get(item) == Some(h)
+                let granted = progress.inventory.get(item).copied().unwrap_or(0);
+                *h == granted
                     || progress.repeatable_loot.contains(item)
-                    || progress.crafted.contains(item)
+                    || (progress.spendable.contains(item) && *h < granted)
+                    || progress.forged.contains(item)
             }),
         "inventory does not match progress",
     )

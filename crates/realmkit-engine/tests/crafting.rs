@@ -211,3 +211,62 @@ fn nothing_is_forged_in_a_fight() {
         Err(EngineError::InEncounter)
     ));
 }
+
+#[test]
+fn spent_materials_can_fall_below_their_grants_but_never_exceed_them() {
+    let mut world = smithy();
+    // Beetles that stay dead: their ingots are a finite grant.
+    world.world.combat.as_mut().unwrap().groups[0].repeatable = false;
+    let engine = at_the_anvil(&world, 1);
+    let snapshot = engine.snapshot();
+    let with = |count: u64| {
+        let mut changed = snapshot.clone();
+        changed
+            .state
+            .player
+            .inventory
+            .insert("iron_ingot".into(), count);
+        Engine::restore(&world, changed).is_ok()
+    };
+    assert!(with(1));
+    assert!(with(0), "spending may leave fewer than were granted");
+    assert!(!with(2), "no crafting makes ingots");
+}
+
+#[test]
+fn improving_clamps_vitals_only_after_training() {
+    let mut world = smithy();
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.recipes[1].requires.clear();
+    // Journeyman gives back the HP that Fine mail no longer does.
+    combat.techniques[0].ranks[1].passive = [(Stat::Hp, 10)].into();
+    let mail = world
+        .items
+        .iter_mut()
+        .find(|i| i.id == "iron_mail")
+        .unwrap();
+    let gear = mail.equipment.as_mut().unwrap();
+    gear.bonuses.insert(Stat::Hp, 10);
+    gear.tiers[0].requires.clear();
+    gear.tiers[0].trains = Some(TechniqueGrant {
+        technique: "smithing".into(),
+        rank: None,
+        xp: 10,
+    });
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_mail".into())).unwrap();
+    engine.execute(Equip(1)).unwrap();
+    engine.execute(Move(West)).unwrap();
+    engine.execute(Rest).unwrap();
+    engine.execute(Move(East)).unwrap();
+    let full = vitals(&engine).hp;
+    assert_eq!(full, engine.player_stats().unwrap().hp);
+    engine.execute(Improve(1)).unwrap();
+    assert_eq!(smithing(&engine).rank, 2);
+    assert_eq!(engine.player_stats().unwrap().hp, full);
+    assert_eq!(
+        vitals(&engine).hp,
+        full,
+        "the same maximum keeps the same HP"
+    );
+}

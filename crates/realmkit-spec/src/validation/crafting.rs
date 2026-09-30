@@ -61,8 +61,21 @@ fn station(out: &mut Vec<Diagnostic>, owner: &str, station: &str, stations: &BTr
     reference(out, owner, "station", station, stations.contains(station));
 }
 
-/// At least one material, each a real item in a positive quantity.
+/// At least one material, each a real counted item in a positive quantity,
+/// listed once so one count is checked once.
 fn materials(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, stacks: &[ItemStack]) {
+    ids(out, "material", stacks.iter().map(|s| s.item.as_str()));
+    // Equipment arrives as pieces, never as a count crafting could spend.
+    for stack in stacks {
+        if w.item(&stack.item).is_some_and(|i| i.equipment.is_some()) {
+            issue(
+                out,
+                owner,
+                "invalid_material",
+                format!("equipment cannot be a crafting material: {}", stack.item),
+            );
+        }
+    }
     if stacks.is_empty() {
         issue(
             out,

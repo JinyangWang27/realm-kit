@@ -468,8 +468,10 @@ An item's `equipment` can list improvement `tiers`, in order:
 - Every check (station, requirements, materials) runs before anything
   changes; a refusal spends nothing. Results are guaranteed, with no rolls.
   Nothing is forged during a fight.
-- Materials are ordinary counted items. The best tier of every piece counts
-  toward the 9,999 worst case. Stations need a combat block.
+- Materials are ordinary counted items, each listed once per recipe or tier;
+  equipment cannot be a material. The best tier of every piece counts toward
+  the 9,999 worst case, and a weapon's basic-attack channel must keep an
+  attack at every tier. Stations need a combat block.
 
 ### Encounters
 
