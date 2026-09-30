@@ -279,6 +279,13 @@ Proposed for M6. A runtime party instance, such as a lord's war party, a bandit
 gang or a caravan, that acts on world ticks by applying a policy from a closed,
 engine-defined set. Agents move the world without the player.
 
+## Faction Strategy
+
+Proposed for M6. The closed engine rules a faction applies on its own recurring
+tick: a stance (defend, gather, campaign, rest) chosen by authored priorities,
+a marshal whose army members follow, fief grants and defection. It is
+deterministic rule application, not a planner or a language model.
+
 ## Proficiency
 
 Capability-owned competence state used when a mechanic needs it, such as

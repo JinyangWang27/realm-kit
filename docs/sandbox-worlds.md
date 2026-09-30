@@ -94,7 +94,8 @@ quest deadlines, offers, runtime instances) is optional.
 | Prisoners | retinue, and mass battle or personal combat | Ransom needs the economy; escapes run on a prison tick, so they need recurring schedules; holding prisons need holdings. |
 | Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time; raiding needs factions at war. Without factions, owners are characters. |
 | Politics and orders | factions and standing | Membership ranks, orders, marriage and a founded kingdom are separate parts. Marriage needs per-character relation tracks. |
-| World agents | recurring schedules | Without a retinue, parties carry no rosters and cannot fight; without mass battle, they never fight each other; without factions, there is no diplomacy. |
+| World agents | recurring schedules | Without a retinue, parties carry no rosters and cannot fight; without mass battle, they never fight each other; without factions, there is no diplomacy; without the economy, no caravans trade. |
+| Faction strategy | factions and standing, world agents | The marshal, fief grants, defection, feasts and claimants are separate parts. Campaigns need holdings and mass battle; fief grants and feasts need holdings; defection needs per-character relation tracks; truces need world time. Without campaigns, factions only defend, raid and rest. |
 
 Every periodic rule runs on a recurring schedule that belongs to its own
 capability (the retinue's upkeep tick, the prison tick, the world-agent tick),
@@ -582,7 +583,9 @@ World agents are what make the world move without the player.
     parties.
 - **Ticks.** On each world tick, which is a recurring schedule, every party
   applies one policy from a closed, engine-defined set: patrol, raid, escort,
-  besiege and return home.
+  besiege, follow, trade and return home. Follow serves a
+  [faction's](#faction-strategy) marshal; trade serves a caravan's route in the
+  [economy](#economy).
   - Authored priorities choose the policy. For example, a lord at war besieges
     the nearest enemy holding with a weak garrison, and otherwise patrols home
     lands.
@@ -613,6 +616,63 @@ World agents are what make the world move without the player.
 - **Bounds.** A new `AGENT_BOUND` caps the number of live parties, so ticks
   and saves stay small.
 
+### Faction strategy
+
+World agents move one party at a time. Faction strategy lets a kingdom act as a
+whole: gather its lords into an army, march on an enemy castle, hand out what it
+takes and make peace when the war goes badly. Like agent policies, it is a
+closed set of engine rules chosen by authored priorities. There is no planner,
+no language model and no per-faction script.
+
+- **Faction tick.** A recurring schedule, typically daily, that falls before
+  the world-agent tick at the same minute. Factions act in authored order and
+  draw from their own `faction` RNG domain.
+- **Stance.** Each faction holds one stance from a closed set: defend, gather,
+  campaign (with a target) and rest. Authored priority rules over typed
+  conditions choose it on each tick. A world might gather when at war and
+  rested for an authored time, campaign once the gathered strength reaches an
+  authored multiple of the target's garrison, and rest when the army falls
+  below an authored share of its gathered strength or the campaign runs past
+  an authored length.
+- **Marshal.** A faction may author that its ruler appoints a marshal. When the
+  office is empty, the ruler picks the eligible member with the highest value
+  of an authored standing track, such as renown, with ties broken by relation
+  with the ruler and then authored order. A player member can be appointed.
+  While the faction gathers or campaigns, the marshal's party leads and
+  members' parties take the `follow` policy towards it, unless one of their own
+  priorities wins, such as relieving their besieged holding.
+- **Targets.** A campaign targets the nearest enemy holding, by travel time
+  from the marshal, whose garrison strength is below the army's by an
+  authored margin; a raid stance targets the nearest enemy village. Ties break
+  by authored location order.
+- **The player in an army.** A player member receives the marshal's summons as
+  an offer, and authored standing changes follow for answering or ignoring it.
+  A player marshal chooses the target through commands instead.
+- **Fief grants.** A holding the faction takes is granted on its next tick: to
+  the player if the player asked for it and meets authored conditions,
+  otherwise to the member with the fewest holdings, ties broken by relation
+  with the ruler and then authored order. Members passed over lose authored
+  relation with the ruler.
+- **Defection.** A lord's faction membership is saved state keyed by the
+  character ID. On the faction tick a member whose relation with its ruler is
+  below an authored threshold may leave, with an authored chance, for the
+  faction whose ruler it likes best, taking its holdings with it.
+- **Diplomacy.** The weighted diplomacy events of [world agents](#world-agents)
+  gain typed inputs: how long a war has lasted, holdings and battles lost in
+  it, and how many wars each side fights. Making peace starts an authored truce
+  during which neither side can declare war. Authored border incidents are
+  world events that raise the weight of war for a while.
+- **Feasts.** In the rest stance a ruler, or a member with enough holdings, may
+  hold a feast at one of its holdings for an authored time, and members'
+  parties travel there. The player finds the realm's lords and ladies in one
+  place, and authored standing effects reward attending.
+- **Claimants and rebellion.** A claimant is a character with an authored claim
+  to a faction. Backing the claim activates an authored dormant faction, like
+  a player-founded kingdom, and lords persuaded through dialogue defect to it.
+  No faction is created at runtime.
+- **News.** Stance changes, appointments, grants and defections are reported
+  as events, like every other world change.
+
 ### Tournaments and other set pieces
 
 Tournaments, arena fights and wagers need no capability. They are encounters
@@ -632,7 +692,8 @@ covers 30 or more in-world days. During them:
 - the player trades, recruits, wins a mass battle and receives a fief, which in
   the fixture is the top ambition and so the route's completed, non-terminal
   outcome, and play continues;
-- a war changes a holding's owner without the player's involvement.
+- a marshal's campaign changes a holding's owner and the ruler grants it,
+  without the player's involvement.
 
 ## Non-goals
 

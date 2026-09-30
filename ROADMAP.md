@@ -1149,14 +1149,21 @@ format as usual:
    broken by authored road order, spawners with caps, interception of the
    player, off-screen battles, weighted diplomacy events, and an
    `AGENT_BOUND`.
-7. **M6g — politics and orders by composition.** Faction membership ranks for
+7. **M6g — faction strategy.** A faction tick with its own RNG domain;
+   defend, gather, campaign and rest stances chosen by authored priorities; a
+   marshal whose army members follow; campaign and raid targets on the road
+   graph; fief grants; defection; truces and war-weariness inputs to diplomacy;
+   feasts; and claimants backed through dormant factions. These are closed
+   engine rules, not a planner or a model.
+8. **M6h — politics and orders by composition.** Faction membership ranks for
    vassalage and knightly orders, chapter houses as buildings, courtship and
    marriage on relation tracks and dialogue, and a player-founded kingdom as an
    authored dormant faction.
 
 **Done when:** a small original fixture (`examples/marches`) plays 30 or more
-in-world days in which parties move and a war changes a holding's owner
-without the player, while the player trades, recruits, wins a mass battle and
+in-world days in which parties move, prices drift with production, and a
+marshal's campaign takes a holding and the ruler grants it, all without the
+player, while the player trades, recruits, wins a mass battle and
 receives a fief. In the fixture the fief is the top ambition, so it records the
 route's completed, non-terminal outcome, and play continues. Lower rungs of the
 ambition ladder are ordinary main-questline quests, because a playthrough

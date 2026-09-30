@@ -1553,11 +1553,20 @@ a proposed answer that still needs to be confirmed:
   tests pin its numbers. Still open: how troop quality beyond combat stats
   counts, and whether a champion duel can end a battle outright.
 - **Agent policies (M6f).** Proposed: a closed enum (patrol, raid, escort,
-  besiege, return home), chosen by authored priority rules over typed
+  besiege, follow, trade, return home), chosen by authored priority rules over typed
   conditions. Parties act in stable instance order. "Nearest" and every route
   a party takes are shortest total travel time on the road graph, with ties
   broken by authored road order; there is no free-space pathfinding. Agents
   draw from their own RNG domain, separate from combat and offers.
+- **Faction strategy (M6g).** Proposed: a faction tick before the agent tick,
+  with its own `faction` RNG domain; a closed stance enum (defend, gather,
+  campaign, rest) chosen by authored priority rules; a marshal picked by an
+  authored standing track with ties by relation and authored order; campaign
+  targets by travel time and garrison margin; fief grants to the player on
+  request, otherwise to the member with the fewest holdings; defection below an
+  authored relation threshold; truces after peace. Still open: whether several
+  allied factions can campaign together, and whether the player's own kingdom
+  uses the same stance rules for its vassals.
 - **Interception (M6f).** Proposed: travel along one road is atomic, but a tick
   that falls during the journey can stop the player at the road's midpoint when
   a hostile party shares that road; a battle there uses the road's ground.
@@ -1625,7 +1634,7 @@ a proposed answer that still needs to be confirmed:
   party with no healthy troops moves at the base speed. Roads with an authored
   duration take at least one minute; roads without one take no time. Agent
   parties use the same rule.
-- **Marriage (M6g).** Proposed: courtship is authored dialogue over relation
+- **Marriage (M6h).** Proposed: courtship is authored dialogue over relation
   tracks, and `Marry` records at most one spouse per character, keyed by ID. No
   children, heirs or dynasties. Still open: whether a spouse can act for the
   player, for example running a holding while the player travels.
