@@ -1007,6 +1007,11 @@ milestones. They change how play reads, never the engine or its rules.
 4. **Light styling** · delivered. In a terminal, names, headings and the
    selected entry are bold, growth is green, criticals yellow and death red,
    and key hints are dimmed. Pipes, `--line` and `NO_COLOR` get plain text.
+5. **Fight screen** · delivered. In terminal play a fight takes the alternate
+   screen, redrawn each turn: health bars for everyone, the next turns, the
+   last six lines of the fight (the latest turn marked) and the menu. When
+   it ends, scrollback keeps only the opening line and the final turn. Line
+   mode and pipes keep the full log.
 
 ## M5 — Longer authored adventures and source-specific mechanics
 
