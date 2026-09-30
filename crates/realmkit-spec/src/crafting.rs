@@ -44,6 +44,35 @@ pub struct Tier {
     pub trains: Option<TechniqueGrant>,
 }
 
+/// A passive enchantment for one piece: its bonuses add to the piece's at
+/// any tier, and it stays through improvement. A piece takes one, for good.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Enchantment {
+    pub id: Id,
+    /// The enchanted piece's name; `{item}` is its name before, tier included.
+    pub name: TextTemplate,
+    /// Fits any piece occupying one of these slots.
+    pub slots: Vec<Id>,
+    pub bonuses: BTreeMap<Stat, u32>,
+    pub station: Id,
+    /// Consumed by each enchanting.
+    pub catalyst: Vec<ItemStack>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub known_when: Vec<Condition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trains: Option<TechniqueGrant>,
+}
+
+impl Enchantment {
+    /// Whether it can go on `piece`: the piece occupies one of its slots.
+    pub fn fits(&self, piece: &Equipment) -> bool {
+        piece.slots.iter().any(|s| self.slots.contains(s))
+    }
+}
+
 impl Equipment {
     /// Stat bonuses at `tier` (0 is the item as defined).
     pub fn bonuses_at(&self, tier: usize) -> &BTreeMap<Stat, u32> {

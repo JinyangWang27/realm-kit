@@ -1,55 +1,235 @@
 {
-  "format_version": 10,
+  "format_version": 11,
   "id": "low_ford_smithy",
   "name": "The Smithy at Low Ford",
   "language": "en",
   "start": "yard",
   "player": "apprentice",
-  "flags": ["taught_forging"],
+  "flags": [
+    "taught_forging",
+    "taught_enchanting"
+  ],
   "combat": {
     "special_name": "Spirit",
-    "timeline": { "action_cost": 100000, "speed_cap": 200 },
+    "timeline": {
+      "action_cost": 100000,
+      "speed_cap": 200
+    },
     "levels": [
-      { "xp": 0, "stats": { "hp": 50, "patk": 10, "pdef": 6, "satk": 1, "sdef": 4, "speed": 100 } },
-      { "xp": 12, "stats": { "hp": 56, "patk": 11, "pdef": 7, "satk": 1, "sdef": 4, "speed": 100 } },
-      { "xp": 30, "stats": { "hp": 62, "patk": 12, "pdef": 8, "satk": 1, "sdef": 5, "speed": 100 } }
+      {
+        "xp": 0,
+        "stats": {
+          "hp": 50,
+          "patk": 10,
+          "pdef": 6,
+          "satk": 1,
+          "sdef": 4,
+          "speed": 100
+        }
+      },
+      {
+        "xp": 12,
+        "stats": {
+          "hp": 56,
+          "patk": 11,
+          "pdef": 7,
+          "satk": 1,
+          "sdef": 4,
+          "speed": 100
+        }
+      },
+      {
+        "xp": 30,
+        "stats": {
+          "hp": 62,
+          "patk": 12,
+          "pdef": 8,
+          "satk": 1,
+          "sdef": 5,
+          "speed": 100
+        }
+      }
     ],
     "techniques": [
       {
         "id": "smithing",
         "name": "Smithing",
         "ranks": [
-          { "name": "Apprentice", "xp": 0 },
-          { "name": "Journeyman", "xp": 20 },
-          { "name": "Master", "xp": 50 }
+          {
+            "name": "Apprentice",
+            "xp": 0
+          },
+          {
+            "name": "Journeyman",
+            "xp": 20
+          },
+          {
+            "name": "Master",
+            "xp": 50
+          }
+        ]
+      },
+      {
+        "id": "enchanting",
+        "name": "Enchanting",
+        "ranks": [
+          {
+            "name": "Novice",
+            "xp": 0
+          },
+          {
+            "name": "Adept",
+            "xp": 20
+          }
         ]
       }
     ],
-    "slots": ["hand", "body"],
+    "slots": [
+      "hand",
+      "body"
+    ],
     "recipes": [
       {
         "id": "iron_sword",
         "station": "anvil",
-        "inputs": [{ "item": "iron_ingot", "quantity": 2 }],
+        "inputs": [
+          {
+            "item": "iron_ingot",
+            "quantity": 2
+          }
+        ],
         "output": "iron_sword",
-        "known_when": [{ "kind": "flag", "flag": "taught_forging" }],
-        "requires": [{ "kind": "technique", "technique": "smithing", "rank": 1 }],
-        "trains": { "technique": "smithing", "xp": 10 }
+        "known_when": [
+          {
+            "kind": "flag",
+            "flag": "taught_forging"
+          }
+        ],
+        "requires": [
+          {
+            "kind": "technique",
+            "technique": "smithing",
+            "rank": 1
+          }
+        ],
+        "trains": {
+          "technique": "smithing",
+          "xp": 10
+        }
       },
       {
         "id": "iron_mail",
         "station": "anvil",
-        "inputs": [{ "item": "iron_ingot", "quantity": 3 }],
+        "inputs": [
+          {
+            "item": "iron_ingot",
+            "quantity": 3
+          }
+        ],
         "output": "iron_mail",
-        "known_when": [{ "kind": "flag", "flag": "taught_forging" }],
-        "requires": [{ "kind": "technique", "technique": "smithing", "rank": 2 }],
-        "trains": { "technique": "smithing", "xp": 15 }
+        "known_when": [
+          {
+            "kind": "flag",
+            "flag": "taught_forging"
+          }
+        ],
+        "requires": [
+          {
+            "kind": "technique",
+            "technique": "smithing",
+            "rank": 2
+          }
+        ],
+        "trains": {
+          "technique": "smithing",
+          "xp": 15
+        }
       }
     ],
-    "groups": [{ "id": "slag", "repeatable": true }],
+    "groups": [
+      {
+        "id": "slag",
+        "repeatable": true
+      }
+    ],
+    "enchantments": [
+      {
+        "id": "keenness",
+        "name": "{item} of Keenness",
+        "slots": [
+          "hand"
+        ],
+        "bonuses": {
+          "patk": 2
+        },
+        "station": "altar",
+        "catalyst": [
+          {
+            "item": "ember_shard",
+            "quantity": 1
+          }
+        ],
+        "known_when": [
+          {
+            "kind": "flag",
+            "flag": "taught_enchanting"
+          }
+        ],
+        "requires": [
+          {
+            "kind": "technique",
+            "technique": "enchanting",
+            "rank": 1
+          }
+        ],
+        "trains": {
+          "technique": "enchanting",
+          "xp": 10
+        }
+      },
+      {
+        "id": "warding",
+        "name": "Warded {item}",
+        "slots": [
+          "body"
+        ],
+        "bonuses": {
+          "hp": 10,
+          "pdef": 1
+        },
+        "station": "altar",
+        "catalyst": [
+          {
+            "item": "ember_shard",
+            "quantity": 2
+          }
+        ],
+        "known_when": [
+          {
+            "kind": "flag",
+            "flag": "taught_enchanting"
+          }
+        ],
+        "requires": [
+          {
+            "kind": "technique",
+            "technique": "enchanting",
+            "rank": 2
+          }
+        ],
+        "trains": {
+          "technique": "enchanting",
+          "xp": 10
+        }
+      }
+    ],
     "narrative": {
-      "attack": ["{attacker} strike {target}: {damage} damage."],
-      "hurt": ["{attacker} bites {target}: {damage} damage."],
+      "attack": [
+        "{attacker} strike {target}: {damage} damage."
+      ],
+      "hurt": [
+        "{attacker} bites {target}: {damage} damage."
+      ],
       "victory": "{target} cracks apart.",
       "death": "The mine goes dark around you."
     }

@@ -21,7 +21,7 @@ pub use techniques::*;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 10;
+pub const FORMAT_VERSION: u32 = 11;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -145,6 +145,9 @@ impl WorldSpec {
     }
     pub fn recipe(&self, id: &str) -> Option<&Recipe> {
         self.combat()?.recipes.iter().find(|v| v.id == id)
+    }
+    pub fn enchantment(&self, id: &str) -> Option<&Enchantment> {
+        self.combat()?.enchantments.iter().find(|v| v.id == id)
     }
     pub fn item(&self, id: &str) -> Option<&Item> {
         self.items.iter().find(|v| v.id == id)

@@ -25,6 +25,12 @@ forge iron_sword
 techniques
 equip 1
 improve 1
+west
+north
+talk maud
+choose 1
+choose 1
+enchant 1 keenness
 inventory
 status
 quit

@@ -1,14 +1,45 @@
 [
-  { "id": "apprentice", "name": "You", "description": "A new apprentice with soot on your sleeves." },
-  { "id": "bran", "name": "Bran the Smith", "description": "Forearms like hawsers.", "dialogue": "bran" },
+  {
+    "id": "apprentice",
+    "name": "You",
+    "description": "A new apprentice with soot on your sleeves."
+  },
+  {
+    "id": "bran",
+    "name": "Bran the Smith",
+    "description": "Forearms like hawsers.",
+    "dialogue": "bran"
+  },
+  {
+    "id": "maud",
+    "name": "Old Maud",
+    "description": "She hums to the altar as if it might answer.",
+    "dialogue": "maud"
+  },
   {
     "id": "beetle",
     "name": "A Slag Beetle",
     "description": "Its shell is half iron. There are always more.",
     "combat": {
-      "stats": { "hp": 12, "patk": 5, "pdef": 3, "satk": 0, "sdef": 2, "speed": 90 },
+      "stats": {
+        "hp": 12,
+        "patk": 5,
+        "pdef": 3,
+        "satk": 0,
+        "sdef": 2,
+        "speed": 90
+      },
       "xp": 3,
-      "loot": [{ "item": "iron_ingot", "quantity": 1 }],
+      "loot": [
+        {
+          "item": "iron_ingot",
+          "quantity": 1
+        },
+        {
+          "item": "ember_shard",
+          "quantity": 1
+        }
+      ],
       "group": "slag"
     }
   }

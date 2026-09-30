@@ -29,6 +29,7 @@ pub(super) fn crafting(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat
         conditions(out, w, id, &recipe.requires);
         trains(out, w, id, recipe.trains.as_ref());
     }
+    enchantments(out, w, combat, &stations);
     for item in &w.items {
         let Some(gear) = &item.equipment else {
             continue;
@@ -54,6 +55,49 @@ pub(super) fn crafting(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat
                 );
             }
         }
+    }
+}
+
+/// Enchantments name the piece by template, fit declared slots, add real
+/// bonuses within bounds, and cost a catalyst at a station.
+fn enchantments(
+    out: &mut Vec<Diagnostic>,
+    w: &WorldSpec,
+    combat: &Combat,
+    stations: &BTreeSet<&str>,
+) {
+    ids(
+        out,
+        "enchantment",
+        combat.enchantments.iter().map(|e| e.id.as_str()),
+    );
+    for enchantment in &combat.enchantments {
+        let id = &enchantment.id;
+        template(out, id, &enchantment.name.0, &["item"]);
+        if enchantment.slots.is_empty() {
+            issue(
+                out,
+                id,
+                "invalid_slots",
+                "an enchantment fits at least one slot",
+            );
+        }
+        for slot in &enchantment.slots {
+            reference(out, id, "slot", slot, combat.slots.contains(slot));
+        }
+        if enchantment.bonuses.is_empty() || enchantment.bonuses.values().any(|v| *v > STAT_BOUND) {
+            issue(
+                out,
+                id,
+                "invalid_stats",
+                format!("an enchantment adds at least one bonus, each at most {STAT_BOUND}"),
+            );
+        }
+        station(out, id, &enchantment.station, stations);
+        materials(out, w, id, &enchantment.catalyst);
+        conditions(out, w, id, &enchantment.known_when);
+        conditions(out, w, id, &enchantment.requires);
+        trains(out, w, id, enchantment.trains.as_ref());
     }
 }
 

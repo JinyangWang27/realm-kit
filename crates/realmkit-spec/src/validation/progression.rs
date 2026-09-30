@@ -112,11 +112,20 @@ fn worst_bonus(w: &WorldSpec, combat: &Combat, stat: Stat) -> u64 {
                 // A piece's bonus counts once, spread over its slots, so
                 // the sum over slots bounds any set of worn pieces.
                 .map(|e| {
-                    // The best tier's bonus, since a piece may be improved.
-                    let bonus = (0..=e.tiers.len())
+                    // The best tier's bonus, since a piece may be improved,
+                    // plus the best enchantment that fits it.
+                    let tier = (0..=e.tiers.len())
                         .map(|t| u64::from(e.bonuses_at(t).get(&stat).copied().unwrap_or(0)))
                         .max()
                         .unwrap_or(0);
+                    let enchantment = combat
+                        .enchantments
+                        .iter()
+                        .filter(|x| x.fits(e))
+                        .map(|x| u64::from(x.bonuses.get(&stat).copied().unwrap_or(0)))
+                        .max()
+                        .unwrap_or(0);
+                    let bonus = tier + enchantment;
                     bonus.div_ceil(e.slots.len().max(1) as u64)
                 })
                 .max()

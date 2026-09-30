@@ -183,3 +183,85 @@ fn every_tier_of_a_weapon_keeps_an_attack_in_its_channel() {
         world.diagnostics()
     );
 }
+
+fn enchantment<'w>(w: &'w mut WorldSpec, id: &str) -> &'w mut Enchantment {
+    let combat = w.world.combat.as_mut().unwrap();
+    combat.enchantments.iter_mut().find(|e| e.id == id).unwrap()
+}
+
+#[test]
+fn enchantments_are_checked() {
+    let world = smithy();
+    let keen = world.enchantment("keenness").unwrap();
+    let sword = world
+        .item("iron_sword")
+        .unwrap()
+        .equipment
+        .as_ref()
+        .unwrap();
+    let mail = world.item("iron_mail").unwrap().equipment.as_ref().unwrap();
+    assert!(keen.fits(sword) && !keen.fits(mail));
+    type Change = fn(&mut WorldSpec);
+    let changes: [(Change, &str); 11] = [
+        (
+            |w| enchantment(w, "keenness").slots = vec!["tail".into()],
+            "missing_reference",
+        ),
+        (
+            |w| enchantment(w, "keenness").slots.clear(),
+            "invalid_slots",
+        ),
+        (
+            |w| enchantment(w, "keenness").bonuses.clear(),
+            "invalid_stats",
+        ),
+        (
+            |w| {
+                enchantment(w, "keenness")
+                    .bonuses
+                    .insert(Stat::Patk, STAT_BOUND + 1);
+            },
+            "invalid_stats",
+        ),
+        (
+            |w| enchantment(w, "keenness").name = TextTemplate("{sword} of Keenness".into()),
+            "invalid_template",
+        ),
+        (
+            |w| enchantment(w, "keenness").station = "kiln".into(),
+            "missing_reference",
+        ),
+        (
+            |w| enchantment(w, "keenness").catalyst.clear(),
+            "invalid_quantity",
+        ),
+        (
+            |w| enchantment(w, "keenness").catalyst[0].item = "iron_mail".into(),
+            "invalid_material",
+        ),
+        (
+            |w| enchantment(w, "keenness").trains.as_mut().unwrap().rank = Some(2),
+            "invalid_grant",
+        ),
+        (
+            |w| enchantment(w, "warding").id = "keenness".into(),
+            "duplicate_id",
+        ),
+        // The best enchantment that fits counts toward the worst case too.
+        (
+            |w| {
+                enchantment(w, "warding").bonuses.insert(Stat::Pdef, 9_990);
+            },
+            "invalid_points",
+        ),
+    ];
+    for (index, (change, code)) in changes.into_iter().enumerate() {
+        let mut world = smithy();
+        change(&mut world);
+        assert!(
+            codes(&world).contains(&code.to_string()),
+            "case {index}: {:?}",
+            world.diagnostics()
+        );
+    }
+}

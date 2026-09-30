@@ -47,6 +47,9 @@ pub struct Combat {
     /// What can be forged, and at which stations.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recipes: Vec<Recipe>,
+    /// Enchantments that can be laid on a piece, and at which stations.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub enchantments: Vec<Enchantment>,
     pub narrative: Narrative,
 }
 
