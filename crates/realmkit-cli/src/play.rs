@@ -134,11 +134,12 @@ pub(crate) fn play_keys(
     let mut log = render::Log::new(paint);
     let mut engine = start(world, saves, seed, &mut log, output)?;
     let (mut leave_dialogue, mut open) = (false, None);
-    // What the last command printed, shown on whichever screen play is on.
-    let mut pending = Vec::new();
+    // What the last command printed, shown on whichever screen play is on,
+    // and messages that are no command (help, typos, saving), shown apart.
+    let (mut pending, mut notice) = (Vec::new(), Vec::new());
     let mut screen: Option<FightScreen> = None;
     'scene: loop {
-        settle(&engine, &mut screen, &mut pending, output)?;
+        settle(&engine, &mut screen, &mut notice, &mut pending, output)?;
         let mut menu = Menu::new(&engine, leave_dialogue, open.take());
         let mut lines = 0;
         match &screen {
@@ -172,7 +173,7 @@ pub(crate) fn play_keys(
                     continue 'scene;
                 }
                 Outcome::Help => {
-                    writeln!(pending, "{}", input::help(world))?;
+                    writeln!(notice, "{}", input::help(world))?;
                     continue 'scene;
                 }
                 Outcome::Run(command) => {
@@ -203,22 +204,22 @@ pub(crate) fn play_keys(
                                 continue 'scene;
                             }
                             _ => {
-                                writeln!(pending, "{}", menu::NOT_LISTED)?;
+                                writeln!(notice, "{}", menu::NOT_LISTED)?;
                                 continue 'scene;
                             }
                         },
                         Ok(input::Input::Help) => {
-                            writeln!(pending, "{}", input::help(world))?;
+                            writeln!(notice, "{}", input::help(world))?;
                             continue 'scene;
                         }
                         Ok(input::Input::Blank) => continue 'scene,
                         Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
-                            persist(&mut engine, saves, &mut log, request, &mut pending)?;
+                            persist(&mut engine, saves, &mut log, request, &mut notice)?;
                             leave_dialogue = false;
                             continue 'scene;
                         }
                         Err(message) => {
-                            writeln!(pending, "Invalid command: {message}.")?;
+                            writeln!(notice, "Invalid command: {message}.")?;
                             continue 'scene;
                         }
                     }
@@ -237,7 +238,10 @@ pub(crate) fn play_keys(
     // Quitting mid-fight still returns the terminal to its normal screen.
     match screen.take() {
         Some(fight) => fight.leave(output, &pending)?,
-        None => output.write_all(&pending)?,
+        None => {
+            output.write_all(&notice)?;
+            output.write_all(&pending)?;
+        }
     }
     writeln!(output)?;
     Ok(())
@@ -245,25 +249,37 @@ pub(crate) fn play_keys(
 
 /// Shows what the last command printed: on the normal screen, or as the
 /// fight screen's latest turn. Starting a fight enters the fight screen;
-/// ending one (or dying) leaves it with the final turn.
+/// ending one (or dying) leaves it with the final turn. A notice is shown
+/// once, and in a fight never counts as a turn.
 fn settle(
     engine: &Engine<'_>,
     screen: &mut Option<FightScreen>,
+    notice: &mut Vec<u8>,
     pending: &mut Vec<u8>,
     output: &mut impl Write,
 ) -> io::Result<()> {
+    let text = String::from_utf8_lossy(notice).into_owned();
+    notice.clear();
     match (screen.take(), fight::active(engine)) {
-        (None, false) => output.write_all(pending)?,
+        (None, false) => {
+            output.write_all(text.as_bytes())?;
+            output.write_all(pending)?;
+        }
         (None, true) => {
+            output.write_all(text.as_bytes())?;
             let mut fight = FightScreen::enter(output)?;
             fight.record(pending);
             *screen = Some(fight);
         }
         (Some(mut fight), true) => {
             fight.record(pending);
+            fight.notice = text;
             *screen = Some(fight);
         }
-        (Some(fight), false) => fight.leave(output, pending)?,
+        (Some(fight), false) => {
+            fight.leave(output, pending)?;
+            output.write_all(text.as_bytes())?;
+        }
     }
     pending.clear();
     Ok(())
@@ -550,5 +566,24 @@ mod tests {
             !plain.contains("\u{1b}[1m") && !plain.contains("\u{1b}[2m"),
             "{plain:?}"
         );
+    }
+
+    #[test]
+    fn a_typo_in_a_fight_is_a_notice_not_a_turn() {
+        let world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena")).unwrap();
+        // East to the rat warren, then engage the rat.
+        let mut keys = vec![Char('e'), Char(':')];
+        keys.extend("engage rat".chars().map(Char));
+        keys.extend([Enter, Char(':'), Char('z'), Enter, Quit]);
+        let mut output = Vec::new();
+        let (world, keys) = (&world, keys.into_iter().map(Ok));
+        play_keys(world, None, Some(1), Paint::default(), keys, &mut output).unwrap();
+        let text = String::from_utf8(output).unwrap();
+        let frames: Vec<_> = text.split("\u{1b}[2J").collect();
+        let last = frames.last().unwrap();
+        assert!(last.contains("Invalid command"), "{last}");
+        assert!(!last.contains("› Invalid"), "{last}");
+        assert!(last.contains("› You face A Warren Rat."), "{last}");
     }
 }

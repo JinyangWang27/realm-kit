@@ -31,6 +31,8 @@ pub struct FightScreen {
     /// Every line of the fight so far, with the turn it came from.
     lines: Vec<(usize, String)>,
     turn: usize,
+    /// Help, typos and other messages that are no turn: shown once, below.
+    pub notice: String,
 }
 
 impl FightScreen {
@@ -39,6 +41,7 @@ impl FightScreen {
         Ok(Self {
             lines: Vec::new(),
             turn: 0,
+            notice: String::new(),
         })
     }
 
@@ -55,13 +58,21 @@ impl FightScreen {
     }
 
     /// Returns to the normal screen, which keeps the fight's opening line and
-    /// its final turn.
+    /// its final turn: `last`, or the latest recorded turn when play stopped
+    /// without one.
     pub fn leave(self, output: &mut impl Write, last: &[u8]) -> io::Result<()> {
         queue!(output, LeaveAlternateScreen)?;
         if let Some((_, opening)) = self.lines.first() {
             writeln!(output, "{opening}")?;
         }
-        output.write_all(last)
+        if !last.is_empty() {
+            return output.write_all(last);
+        }
+        let latest = self.lines.iter().skip(1).filter(|(t, _)| *t == self.turn);
+        for (_, line) in latest {
+            writeln!(output, "{line}")?;
+        }
+        Ok(())
     }
 
     pub fn draw(
@@ -87,6 +98,9 @@ impl FightScreen {
             } else {
                 writeln!(output, "  {}", paint.dim(line))?;
             }
+        }
+        if !self.notice.is_empty() {
+            writeln!(output, "\n{}", self.notice.trim_end())?;
         }
         menu.write(output, true, paint)?;
         Ok(())
@@ -155,7 +169,7 @@ fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Res
 /// Ten cells of health, in halves: green above half, yellow above a quarter,
 /// red below. A living fighter always shows at least half a cell.
 fn bar(hp: u32, max: u32, paint: Paint) -> String {
-    let halves = (u64::from(hp) * (2 * BAR as u64) / u64::from(max.max(1))) as usize;
+    let halves = (u64::from(hp.min(max)) * (2 * BAR as u64) / u64::from(max.max(1))) as usize;
     let halves = if hp > 0 { halves.max(1) } else { 0 };
     let (full, half) = (halves / 2, halves % 2);
     let filled = "█".repeat(full) + if half == 1 { "▌" } else { "" };
@@ -183,14 +197,27 @@ mod tests {
         assert_eq!(bar(39, 60, plain), "██████▌░░░");
         assert_eq!(bar(1, 100, plain), "▌░░░░░░░░░");
         assert_eq!(bar(0, 24, plain), "░░░░░░░░░░");
+        // More HP than the maximum fills the bar instead of panicking.
+        assert_eq!(bar(30, 24, plain), "██████████");
+    }
+
+    #[test]
+    fn leaving_without_a_final_command_keeps_the_last_turn() {
+        let mut screen = FightScreen::enter(&mut Vec::new()).unwrap();
+        screen.record(b"You face The Rat.\nThe Rat bites You: 1 damage.\n");
+        screen.record(b"You hit The Rat: 2 damage.\n");
+        let mut output = Vec::new();
+        screen.leave(&mut output, b"").unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(
+            text.ends_with("You face The Rat.\nYou hit The Rat: 2 damage.\n"),
+            "{text:?}"
+        );
     }
 
     #[test]
     fn blank_output_is_not_a_turn() {
-        let mut screen = FightScreen {
-            lines: Vec::new(),
-            turn: 0,
-        };
+        let mut screen = FightScreen::enter(&mut Vec::new()).unwrap();
         for turn in 0..3 {
             screen.record(format!("a{turn}\nb{turn}\nc{turn}\n").as_bytes());
         }
