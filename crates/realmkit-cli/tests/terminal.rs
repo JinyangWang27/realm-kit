@@ -481,7 +481,9 @@ fn the_smithy_forges_improves_and_keeps_copies_apart() {
         "You forge #2 Iron sword.",
         "Smithing: Journeyman!",
         "Spent: Iron ingot ×1\nIt is now #1 Fine Iron sword.\n",
-        "  #1 Fine Iron sword [equipped] — Plain, straight and honest.",
+        "You learn Enchanting.",
+        "Spent: Ember shard ×1\nIt is now #1 Fine Iron sword of Keenness.\nEnchanting +10\n",
+        "  #1 Fine Iron sword of Keenness [equipped] — Plain, straight and honest.",
         "  #2 Iron sword — Plain, straight and honest.",
         "  Smithing — Journeyman",
     ] {
@@ -501,4 +503,19 @@ fn the_smithy_forges_improves_and_keeps_copies_apart() {
     let help = String::from_utf8(run(&["play", SMITHY], "help\n").stdout).unwrap();
     assert!(help.contains("forge <recipe>"), "{help}");
     assert!(help.contains("improve <#>"), "{help}");
+    assert!(help.contains("enchant <#> <enchantment>"), "{help}");
+    // At the altar, enchanting waits behind its own entry.
+    let input = format!(
+        "{}west\nnorth\n",
+        walkthrough.split("west\nnorth").next().unwrap()
+    );
+    let input = input.replace("techniques\n", "") + "talk maud\nchoose 1\nchoose 1\n4\n";
+    let text = String::from_utf8(run(&["play", SMITHY, "--line"], &input).stdout).unwrap();
+    for passage in [
+        "4. Enchanting ›",
+        "Enchant #1 Fine Iron sword → Fine Iron sword of Keenness (Attack +2) — 1 Ember shard",
+        "Enchant #2 Iron sword → Iron sword of Keenness (Attack +2) — 1 Ember shard",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
 }

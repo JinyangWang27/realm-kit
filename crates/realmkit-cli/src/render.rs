@@ -47,8 +47,8 @@ fn hit(
     writeln!(output, "{}", interpolate(text, &values)?)
 }
 
-/// A piece's name at its tier: "Iron sword", or "Fine Iron sword" from the
-/// tier's authored template.
+/// A piece's name at its tier and with its enchantment: "Iron sword", or
+/// "Fine Iron sword of Keenness" from the authored templates.
 pub fn piece_name(world: &realmkit_spec::WorldSpec, gear: &realmkit_engine::Gear) -> String {
     let Some(item) = world.item(&gear.item) else {
         return "?".into();
@@ -57,9 +57,14 @@ pub fn piece_name(world: &realmkit_spec::WorldSpec, gear: &realmkit_engine::Gear
         .tier
         .checked_sub(1)
         .and_then(|i| item.equipment.as_ref()?.tiers.get(i));
-    match tier {
+    let name = match tier {
         Some(tier) => interpolate(&tier.name, &[("item", &item.name)]).unwrap_or(item.name.clone()),
         None => item.name.clone(),
+    };
+    // The enchantment names the piece as it is at its tier.
+    match gear.enchantment.as_ref().and_then(|e| world.enchantment(e)) {
+        Some(enchantment) => interpolate(&enchantment.name, &[("item", &name)]).unwrap_or(name),
+        None => name,
     }
 }
 
