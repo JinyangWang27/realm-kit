@@ -262,6 +262,12 @@ as cautious or cruel. Characters author a few; traits never change during play.
 Agent policies, diplomacy weights, dialogue and reactions to the player's deeds
 may test them.
 
+## Dialogue Role
+
+Proposed for M5. An authored role such as lord, guild master or companion that
+characters list. Its dialogues, topics and line slots are shared by every
+member, and inside them `Speaker` refers to the member being talked to.
+
 ## Holding
 
 Proposed for M6. A location owned by a faction or character that can change

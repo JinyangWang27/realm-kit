@@ -75,7 +75,9 @@ all. Four rules keep that true:
 
 The M5 condition tree and effect lists are package syntax rather than a
 capability: a world that writes one condition or one effect behaves exactly as
-it does today. Every other foundation (world time, recurring schedules, roads,
+it does today. Dialogue roles and text variants are syntax too: a world without
+roles gives each character its own dialogue, and a plain string is a text with
+one variant. Every other foundation (world time, recurring schedules, roads,
 quest deadlines, offers, runtime instances) is optional.
 
 | Capability | Hard requirements | Optional parts, and what happens without them |
@@ -185,6 +187,38 @@ M5 slices.
    and "found an order" are ordinary quest progression. Only the top rung, such
    as "rule a kingdom", is the route's **completed, non-terminal** outcome, so
    play continues after it.
+7. **Dialogue by role.** A realm has dozens of lords, ladies, guild masters and
+   village elders, and most of what they say is the same for everyone in the
+   role: asking about the war, seeking service, requesting a fief. Writing it
+   once per character would multiply the package and drift out of step.
+   - A world declares **roles** in its own language, and each character lists
+     the roles it holds, in order. Roles are authored and do not change during
+     play; what a member can say still changes, because conditions read state.
+   - A role may author **dialogues** and **topics**. Talking to a character
+     opens its own dialogue when it has one whose opening condition holds,
+     otherwise the first matching dialogue of its roles, in order. A role's
+     topics are choices appended to every member's opening node, after the
+     character's own choices, when their conditions hold.
+   - Inside a conversation, conditions, effects and templates may refer to the
+     **speaker**, the character being talked to, wherever they accept a
+     character: `RelationAtLeast { with: Speaker }`, `HasTrait(Speaker, …)`,
+     `ChangeStanding { target: Speaker }`, `JoinRetinue(Speaker)`, and
+     `{speaker}` or `{speaker_faction}` in text. `Speaker` is a typed reference
+     resolved when the choice is evaluated, not a variable.
+   - A role may declare **line slots**, named texts that each member supplies,
+     such as a companion's introduction, backstory, request to join and
+     objection to a deed. Shared nodes show a slot in place of fixed text.
+     Validation requires every member to author every slot the role's
+     dialogue can reach, or the role to author a default for it.
+   - An offer's giver may be a role, so every guild master offers the same job
+     templates, drawn for each one separately.
+8. **Text variants.** Some text depends on who the player is or how things
+   stand: a form of address that follows the player's chosen identity, a
+   greeting that follows a relation. A player-facing text field may be a list of
+   variants, each with a condition, ending in one without; the first whose
+   condition holds is shown. Choosing a variant reads state only, so it draws
+   no randomness and changes nothing. Templates keep their single-pass
+   substitution: there is no conditional syntax inside a string.
 
 Proficiencies such as trading, leadership and field surgery are not a
 foundation. They follow [Section 8](open-decisions.md#8-checks-and-proficiencies):

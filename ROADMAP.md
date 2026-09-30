@@ -1064,8 +1064,8 @@ milestones. They change how play reads, never the engine or its rules.
 ### Delivery slices · proposed
 
 M5 also lays the general foundations that
-[living sandbox worlds](docs/sandbox-worlds.md) need, and M6 depends on these
-four slices. The investigation fixture, optional Inventory and authored endings
+[living sandbox worlds](docs/sandbox-worlds.md) need, and M6 depends on
+these slices. The investigation fixture, optional Inventory and authored endings
 above are delivered alongside them, in whichever order a fixture needs them.
 
 1. **M5a — condition tree and effect lists.** `requires` becomes one condition
@@ -1086,6 +1086,10 @@ above are delivered alongside them, in whichever order a fixture needs them.
    outlives one encounter, as in the first bullet above. Unique authored
    characters keep their authored IDs and carry state such as wounds or
    captivity under them.
+5. **M5e — dialogue by role and text variants.** Authored roles whose
+   dialogues and topics every member shares, `Speaker` references in
+   conditions, effects and templates, line slots that each member fills, role
+   offer givers, and text fields with conditional variants.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and tested paths to completion, can be saved/resumed, and include at least one
@@ -1106,7 +1110,7 @@ Hard dependencies between capabilities are few and validated, interactions
 happen only when both sides are present, and the full sandbox is simply the
 world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
 
-Depends on M5a–M5d. Deliver in slices, each bumping the package and save
+Depends on M5a–M5e. Deliver in slices, each bumping the package and save
 format as usual:
 
 1. **M6a — economy.** Currency; markets whose per-good price index follows

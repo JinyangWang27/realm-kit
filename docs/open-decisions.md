@@ -1503,6 +1503,24 @@ a proposed answer that still needs to be confirmed:
   consumes no randomness ([Section 7](#7-randomness-and-reproducibility)).
   Still open: how many offers a
   giver holds at once, and when a refused offer comes back.
+- **Dialogue by role (M5e).** Proposed: roles are authored on characters and
+  never change; a role's dialogues open for a member only when the member has
+  no matching dialogue of its own, and its topics append after the member's own
+  choices. `Speaker` is a typed character reference usable wherever a
+  character is, resolved at evaluation; there is no variable binding beyond
+  it. Line slots are validated per member against what the role's dialogue can
+  reach. Still open: whether roles may also be derived from state (the holder
+  of a location, a faction's ruler) rather than listed, and whether a
+  character may suppress one inherited topic.
+- **Text variants (M5e).** Proposed: any player-facing text may be a list of
+  `{ when, text }` variants ending in an unconditional one; the first that
+  holds is shown. Evaluation is pure, so displaying text never draws or
+  mutates. Still open: whether combat prose variants move to the same rule.
+- **Several languages (M5e).** Proposed: a package keeps exactly one language.
+  A source that carries several produces one package per language from the
+  same authoring data, with identical IDs. Still open: a save is bound to the
+  package revision, which includes text, so it cannot move between language
+  packages; decide whether the revision should hash rules and text separately.
 - **Proficiencies (M6).** Proposed: following [Section 8](#8-checks-and-proficiencies),
   each capability owns the proficiencies it needs (trading in the economy,
   leadership in the retinue, surgery in mass battle), with its own ranks and
