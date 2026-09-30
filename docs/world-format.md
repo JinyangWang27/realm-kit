@@ -1,6 +1,6 @@
-# World package format 9
+# World package format 10
 
-Format 9 makes combat optional. The level table and combat prose live in an
+Format 10 makes combat optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -21,15 +21,15 @@ there is no migration. Convert them by hand:
   apply the Format 4 steps.
 - **Format 4** (M3c-1): give each opponent whose skills unlock above level 1 a
   `level`, since opponents now use only skills unlocked at their level;
-  `groups` are optional. Then apply the Formats 5–8 step.
-- **Formats 5–8** (M3c-2, M3d, M4a, M4b): only raise the number; `crit`,
-  `stat_points`, techniques and equipment are optional.
+  `groups` are optional. Then apply the Formats 5–9 step.
+- **Formats 5–9** (M3c-2, M3d, M4a, M4b, M4c): only raise the number; `crit`,
+  `stat_points`, techniques, equipment, recipes and tiers are optional.
 
 A world without combat only needs its `format_version` raised.
 
-Format 9 represents one fixed player-controlled character and one playable
+Format 10 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 9 does not serialize a route collection
+stable logical route ID `default`; Format 10 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -44,7 +44,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 9 also requires item and quest tables because they serve the current demo.
+Format 10 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -79,7 +79,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 9 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 10 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -139,7 +139,7 @@ Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags
 are monotonic in this version. Conditions govern availability/choice visibility.
 
-This flat conjunctive representation is a Format 9 limitation. The long-term
+This flat conjunctive representation is a Format 10 limitation. The long-term
 condition model uses pure typed predicates composed with `All / Any / Not`;
 predicates remain domain-specific and typed rather than becoming arbitrary
 expressions/property paths. Typed effects execute in authored order as part of the
@@ -185,7 +185,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 9 has a single flat quest collection. The long-term model should retain
+Format 10 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -420,6 +420,57 @@ an item with an `equipment` part can be worn:
   every slot, with levels, points and technique bonuses, must keep each stat
   within 9,999.
 
+### Forging and improvement
+
+A location can offer crafting `stations`, and the combat block lists
+`recipes` that forge a wearable item at one of them:
+
+```json
+"stations": ["anvil"]
+```
+
+```json
+{
+  "id": "iron_sword",
+  "station": "anvil",
+  "inputs": [{ "item": "iron_ingot", "quantity": 2 }],
+  "output": "iron_sword",
+  "known_when": [{ "kind": "flag", "flag": "taught_forging" }],
+  "requires": [{ "kind": "technique", "technique": "smithing", "rank": 1 }],
+  "trains": { "technique": "smithing", "xp": 10 }
+}
+```
+
+An item's `equipment` can list improvement `tiers`, in order:
+
+```json
+"tiers": [{
+  "name": "Fine {item}",
+  "bonuses": { "patk": 6 },
+  "speed_penalty": 5,
+  "station": "anvil",
+  "cost": [{ "item": "iron_ingot", "quantity": 1 }],
+  "requires": [{ "kind": "technique", "technique": "smithing", "rank": 2 }]
+}]
+```
+
+- A recipe is hidden until `known_when` holds (a teacher, a found plan or a
+  quest sets its flag), then listed; it can be used once `requires` holds,
+  and the menu says what is missing. Proficiency is an ordinary technique,
+  such as Smithing with named ranks; `trains` gives it XP on each success,
+  and teaches it if unknown. It may not set a rank.
+- `forge <recipe>` at the station spends the inputs and makes one new piece.
+  `improve <#>` raises a piece one tier at that tier's station. A tier's
+  `bonuses` replace the item's (or the previous tier's) whole, and its
+  `speed_penalty`, when set, replaces the penalty; slots, weapon overrides
+  and modifiers stay. The piece is named by the tier's template, where
+  `{item}` is the item's name, so word order can follow the world's language.
+- Every check (station, requirements, materials) runs before anything
+  changes; a refusal spends nothing. Results are guaranteed, with no rolls.
+  Nothing is forged during a fight.
+- Materials are ordinary counted items. The best tier of every piece counts
+  toward the 9,999 worst case. Stations need a combat block.
+
 ### Encounters
 
 `engage` starts an encounter with a fighter at the player's location; it then
@@ -522,7 +573,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 9 currently selects combat prose variants from the current
+Format 10 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful

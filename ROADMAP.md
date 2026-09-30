@@ -917,7 +917,7 @@ every package.
 - Deliver in slices: M4a player-allocated stat points (delivered); M4b technique
   ranks (delivered); M4c equipment instances and equip/unequip (delivered);
   M4d stations, deterministic
-  forging and authored improvement-state transitions; M4e one compatible
+  forging and authored improvement-state transitions (delivered); M4e one compatible
   learned enchantment per item. Runtime instances use deterministic
   saved IDs only when distinguishable copies need independent state; unique
   legendary equipment may still have one mutable instance, while fungible
