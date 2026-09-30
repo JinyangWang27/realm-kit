@@ -1484,13 +1484,13 @@ and the roadmap schedules them as
 a proposed answer that still needs to be confirmed:
 
 - **Recurring schedules (M5b).** Proposed: a schedule authors a period of at
-  least one minute, checked by validation, and a first occurrence strictly
-  after the route's initial world time. A zero period would make each
-  occurrence due again at its own minute and break the no-loop guarantee
-  above. The dispatch cursor from [Section 9](#9-time-models) expands a
-  schedule lazily, one due occurrence at a time. Only the next occurrence is saved, never an expanded
-  list. Ties with one-shot events keep stable authored declaration order.
-  Still open: whether an effect may start or stop a schedule, or only authored
+  least one minute, checked by validation, and a first occurrence strictly after
+  the route's initial world time. A zero period would make each occurrence due
+  again at its own minute and break the no-loop guarantee above. The dispatch
+  cursor from [Section 9](#9-time-models) expands a schedule lazily, one due
+  occurrence at a time. Only the next occurrence is saved, never an expanded
+  list. Ties with one-shot events keep stable authored declaration order. Still
+  open: whether an effect may start or stop a schedule, or only authored
   conditions gate what each occurrence does.
 - **Exits beyond compass directions (M5b).** Proposed: roads are named exits
   keyed by an ASCII ID, with an authored travel duration. Compass directions
@@ -1511,9 +1511,9 @@ a proposed answer that still needs to be confirmed:
   it as a deliberate exception or move crafting to a crafting-owned proficiency
   before sandbox proficiencies copy the pattern.
 - **Price model (M6a).** Proposed: integer price = base × market modifier ×
-  stock factor, each a bounded percentage, with one final rounding. The
-  selling price sits below the buying price by an authored spread that the
-  economy's trading proficiency can narrow. Still open: whether player sales feed stock
+  stock factor, each a bounded percentage, with one final rounding. The selling
+  price sits below the buying price by an authored spread that the economy's
+  trading proficiency can narrow. Still open: whether player sales feed stock
   immediately or only at restock.
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
@@ -1567,26 +1567,37 @@ a proposed answer that still needs to be confirmed:
   side's casualties, drawn from the battle's RNG domain and capped by the
   winner's prisoner limit; unique leaders are captured rather than killed by
   default; captivity of a unique character is state keyed by its ID. Player
-  captivity is an ordinary setback, not an outcome. Still open: what happens to
-  the player's retinue and stash when the player is captured.
+  captivity is an ordinary setback, not an outcome. Escapes run on the world's
+  prison schedule with their own `captivity` RNG domain. Still open: what
+  happens to the player's retinue and stash when the player is captured.
 - **Personalities (M6b).** Proposed: a world declares a closed list of named
   traits and each character authors a few; traits never change during play.
   Agent policy priorities and diplomacy weights may test a leader's traits.
-  Reactions are authored rules of the form trait × deed → standing change over
-  a closed, engine-defined set of player deeds. Still open: the first set of
-  deeds, and whether any world needs traits that change.
+  Reactions are authored rules of the form trait × deed → standing change.
+  Deeds are either a closed set the engine detects (raiding a village, releasing
+  or ransoming a prisoner, unpaid wages) or world-declared IDs that an authored
+  `ReportDeed` effect reports, such as a tournament win or a broken promise.
+  Companion friction takes effect in the transition that lowers the relation,
+  with no tick. Still open: whether any world needs traits that change.
 - **Wounded, provisions and morale (M6c, M6d).** Proposed: the roster saves a
   healthy and a wounded count per troop type; battle losses split into killed
   and wounded by an authored share that surgery raises; an authored share of
-  the wounded recovers on each tick. Provisions are a value on trade goods,
-  eaten per head, prisoners included, on daily ticks. Morale is one bounded
-  integer per retinue; low morale lowers battle strength and causes desertion.
+  the wounded recovers on each upkeep tick. Provisions are a value on trade
+  goods, eaten per head, prisoners included. Morale is one bounded integer per
+  retinue; low morale lowers battle strength and causes desertion. Wages,
+  provisions, recovery, morale drift and desertion run in that fixed order on
+  the retinue's own upkeep schedule, with desertion drawn from a `retinue` RNG
+  domain, so these rules work without world agents and never shift agent
+  draws.
   Still open: whether food variety matters, and whether carried goods have a
   weight limit.
 - **Travel speed (M6c).** Proposed: a road's authored duration scaled by the
-  party's speed, from its slowest healthy troop type with penalties for size,
-  wounded and prisoners and a bonus from pathfinding, in integers with one
-  rounding and a one-minute floor. Agent parties use the same rule.
+  party's speed: the slowest of a world-authored base party speed and each
+  healthy troop type's authored speed, with penalties for size, wounded and
+  prisoners and a bonus from pathfinding, in integers with one rounding. A
+  party with no healthy troops moves at the base speed. Roads with an authored
+  duration take at least one minute; roads without one take no time. Agent
+  parties use the same rule.
 - **Marriage (M6g).** Proposed: courtship is authored dialogue over relation
   tracks, and `Marry` records at most one spouse per character, keyed by ID. No
   children, heirs or dynasties. Still open: whether a spouse can act for the

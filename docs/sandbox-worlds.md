@@ -25,9 +25,9 @@ on caravans. They earn renown, swear fealty to a king and receive a village as
 a fief. Later they may join a knightly order, build its chapter house, marry
 into a noble house or crown themselves.
 
-Meanwhile lords ride out with their own war parties. Kingdoms declare war and make
-peace. Castles fall to sieges that the player never sees, and invaders raid the
-borders. A later visit finds a new banner over a town the player once knew.
+Meanwhile lords ride out with their own war parties. Kingdoms declare war and
+make peace. Castles fall to sieges that the player never sees, and invaders raid
+the borders. A later visit finds a new banner over a town the player once knew.
 
 No part of this needs a concrete source game. The scenario only pushes
 RealmKit's abstractions and tests.
@@ -63,19 +63,20 @@ all. Four rules keep that true:
    block. Absent, it has no state, commands, menus, events or save fields.
 2. **Few hard dependencies.** A capability requires another only when it cannot
    mean anything without it, as listed below. Validation rejects a world that
-   authors a capability without its prerequisites, with a stable diagnostic code.
-3. **Soft interactions only when both are present.** Where two capabilities touch,
-   for example morale and provisions, the interaction happens only if both
-   exist. With one missing, that input or effect simply does not occur; nothing
-   is faked with neutral placeholder data.
-4. **Parts inside a capability are optional too.** Each part left out has a defined
-   behaviour, listed below, so a world can take a capability's core and skip its
-   extras.
+   authors a capability without its prerequisites, with a stable diagnostic
+   code.
+3. **Soft interactions only when both are present.** Where two capabilities
+   touch, for example morale and provisions, the interaction happens only if
+   both exist. With one missing, that input or effect simply does not occur;
+   nothing is faked with neutral placeholder data.
+4. **Parts inside a capability are optional too.** Each part left out has a
+   defined behaviour, listed below, so a world can take a capability's core and
+   skip its extras.
 
-The M5 condition tree and effect lists are package syntax rather than a capability:
-a world that writes one condition or one effect behaves exactly as it does
-today. Every other foundation (world time, recurring schedules, roads, quest
-deadlines, offers, runtime instances) is optional.
+The M5 condition tree and effect lists are package syntax rather than a
+capability: a world that writes one condition or one effect behaves exactly as
+it does today. Every other foundation (world time, recurring schedules, roads,
+quest deadlines, offers, runtime instances) is optional.
 
 | Capability | Hard requirements | Optional parts, and what happens without them |
 | --- | --- | --- |
@@ -84,14 +85,19 @@ deadlines, offers, runtime instances) is optional.
 | Offers | none | Without world time, offers have no deadlines; without schedules, they refresh only on arrival. |
 | Economy | none | Without schedules, stock never drifts back; without a trading proficiency, the buy/sell spread is fixed. |
 | Factions and standing | none | Diplomacy and standing tracks are separate parts; a world may author either. |
-| Personalities | none | Traits alone can gate dialogue. Reactions need standing; agent behaviour needs world agents. |
-| Retinue | none | Wages need the economy and schedules; provisions need economy goods and schedules; morale, wounded troops, upgrades and travel speed are each separate parts. Without them nobody is paid or eats, morale is not tracked, every loss is killed, troops never upgrade, and roads take their authored time. |
+| Personalities | none | Traits alone can gate dialogue. Reactions need standing; companion friction needs standing and a retinue, and its morale effect needs morale; agent behaviour needs world agents. |
+| Retinue | none | Wages, provisions, wounded recovery, morale drift and desertion run on the retinue's upkeep tick, so they need recurring schedules; wages and provisions also need the economy. Morale, wounded troops, upgrades and travel speed (which needs world time) are each separate parts. Without them nobody is paid or eats, morale is not tracked, every loss is killed, troops never upgrade, and roads take their authored time. |
 | Companion gear | retinue, equipment | None. Companions fight in encounters only where personal combat exists. |
 | Mass battle | retinue | Without morale or proficiencies, those terms leave the formula; without prisoners, losses are never captured; champion duels need personal combat. |
-| Prisoners | retinue, and mass battle or personal combat | Ransom needs the economy; escapes need schedules; holding prisons need holdings. |
+| Prisoners | retinue, and mass battle or personal combat | Ransom needs the economy; escapes run on a prison tick, so they need recurring schedules; holding prisons need holdings. |
 | Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time. Without factions, owners are characters. |
 | Politics and orders | factions and standing | Membership ranks, orders, marriage and a founded kingdom are separate parts. Marriage needs per-character relation tracks. |
 | World agents | recurring schedules | Without a retinue, parties carry no rosters and cannot fight; without mass battle, they never fight each other; without factions, there is no diplomacy. |
+
+Every periodic rule runs on a recurring schedule that belongs to its own
+capability (the retinue's upkeep tick, the prison tick, the world-agent tick),
+and each draws from its own RNG domain. Adding or removing one capability
+therefore never shifts another's timing or random draws.
 
 Each capability section below describes the capability with all its parts
 present.
@@ -240,31 +246,42 @@ they do, without scripting each character.
   first. Diplomacy event weights may test a ruler's traits the same way. The
   engine still offers only its closed set of policies; traits only choose
   among them.
-- **Reactions to deeds.** The engine reports a closed set of player deeds:
-  raiding a village, releasing or ransoming a prisoner, leaving wages unpaid,
-  winning a tournament, breaking an authored promise. The world authors
-  reaction rules of the form trait × deed → standing change, applied to the
-  characters with that trait whom the rule names by scope (the retinue's
-  companions, the lords of an affected faction). Reactions are ordinary
-  effects, applied in authored order and reported as events.
+- **Reactions to deeds.** Deeds come from two sources:
+  - The engine reports a closed set it can detect itself: raiding a village,
+    releasing or ransoming a prisoner, and leaving wages unpaid.
+  - The world declares its own deed IDs, such as winning a tournament or
+    breaking a promise, and reports them with an authored `ReportDeed` effect
+    wherever its dialogue or quests decide the deed happened.
+
+  The world authors reaction rules of the form trait × deed → standing change,
+  applied to the characters with that trait whom the rule names by scope (the
+  retinue's companions, the lords of an affected faction). Reactions are
+  ordinary effects, applied in authored order and reported as events.
 - **Companion friction.** A companion whose relation with the player falls
-  below an authored threshold leaves on the next tick, taking nothing by
-  default. Pairs of traits may author a mutual dislike that lowers morale while
-  both companions ride together.
+  below an authored threshold leaves in the same transition that lowered it,
+  taking nothing by default, so no tick is needed. Pairs of traits may author a
+  mutual dislike that lowers morale on each upkeep tick while both companions
+  ride together.
 - **Dialogue.** `HasTrait` conditions let conversations and offers differ by
   temperament.
 
 ### Retinue
 
 - **Troops.** Troop definitions optionally carry wages, an upgrade path
-  (recruit → footman → sergeant), a mass-battle strength where the world has
-  mass battles, and a personal-combat profile only where troops also join
-  encounters.
+  (recruit → footman → sergeant), a travel speed where the world uses travel
+  speed, a mass-battle strength where the world has mass battles, and a
+  personal-combat profile only where troops also join encounters.
+- **Upkeep tick.** The retinue's periodic rules run on one recurring schedule
+  that the world authors for it, typically daily: wages, provisions, wounded
+  recovery, morale drift and desertion, in that fixed order. Its random draws
+  come from its own `retinue` RNG domain, so world agents, battles and prisons
+  never shift them. Without recurring schedules, none of these periodic rules
+  exist.
 - **Roster.** The player's roster holds, per troop definition, a count of
   healthy troops, a count of wounded troops and an XP pool: troops are
   fungible, not instances. All three are saved.
 - **Wounded troops.** Wounded troops do not fight, still draw wages and count
-  towards the size limit. On each world tick an authored share recovers, more
+  towards the size limit. On each upkeep tick an authored share recovers, more
   at a location that authors rest or healing, and the retinue's surgery
   proficiency raises it.
 - **Companions.** Companions are unique characters who join the retinue through
@@ -272,40 +289,47 @@ they do, without scripting each character.
   and its own state: wounds, technique ranks and, in worlds with levels, its
   own XP and level. See [Companion gear](#companion-gear).
 - **Recruiting and wages.** Recruiting happens at locations that offer it.
-  Wages fall due on a recurring schedule. What happens when they go unpaid
+  Wages fall due on the upkeep tick. What happens when they go unpaid
   (desertion, lost standing) is authored.
 - **Size limit.** The engine computes the roster limit as an integer: an
   authored base plus authored contributions from standing tracks and the
   retinue's leadership proficiency. Companions count towards it; prisoners have
   their own limit (see [Prisoners and ransom](#prisoners-and-ransom)). A command
-  that would exceed the limit is refused. If the limit later drops, for example
-  after lost renown, nobody leaves; recruiting is refused until the roster is
-  back under it. Agent party templates author their own fixed limits, and a
-  validation bound caps every roster.
+  that would exceed the limit is refused. That includes a dialogue choice whose
+  join effect would exceed it: the transition is atomic, so the whole choice is
+  refused and nothing commits. Authors gate such a choice with a `RosterHasRoom`
+  condition so that it shows as unavailable instead. If the limit later drops,
+  for example after lost renown, nobody leaves; recruiting is refused until the
+  roster is back under it. Agent party templates author their own fixed limits,
+  and a validation bound caps every roster.
 - **Upgrades.** Battles add XP to the pool of each surviving troop type, and
   recruits join with no XP. Every troop that leaves a type, whether by upgrade,
   death, capture or desertion, takes its share of that type's pool: the pool
-  divided by the type's healthy and wounded count, rounded down. A troop can upgrade once its share reaches the
-  next step's authored XP. It pays that XP from its share and carries the rest
-  into its new type's pool. Any other leaver's share is lost, and a
-  type whose last troop leaves also drops any rounding remainder. XP is only
+  divided by the type's healthy and wounded count, rounded down. A troop can
+  upgrade once its share reaches the next step's authored XP. It pays that XP
+  from its share and carries the rest into its new type's pool. Any other
+  leaver's share is lost, and a type whose last troop leaves also drops any
+  rounding remainder. XP is only
   moved or spent, never created outside battle, so a pool never outlives its
   troops and upgrades available after a save are the same as before it.
-- **Provisions.** Trade goods may author a provisions value. On each daily
+- **Provisions.** Trade goods may author a provisions value. On each upkeep
   tick the retinue eats provisions per head, prisoners included, from its
-  carried goods, oldest stock first in authored goods order. A hungry retinue
+  carried goods in authored goods order. A hungry retinue
   loses morale, and starvation is authored (desertion, wounds).
 - **Morale.** A bounded integer for the whole retinue, raised and lowered by
   authored amounts for meals, variety of food, paid or missed wages, victories
   and defeats, companion friction and the leadership proficiency. Low morale
   lowers mass-battle strength, and below an authored threshold troops desert on
-  ticks, drawn from the agents' RNG domain. Agent parties use their template's
-  fixed morale unless a world authors more.
+  upkeep ticks, drawn from the `retinue` RNG domain. Agent parties use their
+  template's fixed morale unless a world authors more.
 - **Travel speed.** A road's authored duration is scaled by the party's speed:
-  the slowest healthy troop type's authored speed, minus authored penalties for
-  roster size, wounded troops and prisoners, plus a pathfinding proficiency.
-  The engine computes it in integers with one rounding, and a journey never
-  takes less than one minute. Agent parties use the same rule, so light
+  the slowest of the world's authored base party speed (which covers the player
+  and companions) and each healthy troop type's speed, minus authored penalties
+  for roster size, wounded troops and prisoners, plus a pathfinding
+  proficiency. A party with no healthy troops moves at the base speed. The
+  engine computes it in integers with one rounding. A road with an authored
+  duration never takes less than one minute; a road without one still takes no
+  time. Agent parties use the same rule, so light
   raiders can catch a slow caravan on the road.
 
 ### Companion gear
@@ -343,15 +367,16 @@ character can wear gear:
   unique leader is captured, not killed, unless an authored rule says
   otherwise. A personal encounter can capture a yielding opponent the same way.
 - **Using prisoners.**
-  - Sell troop prisoners to a ransom broker at a location, for an engine-computed
-    price per troop definition (economy).
+  - Sell troop prisoners to a ransom broker at a location, for an
+    engine-computed price per troop definition (economy).
   - Recruit prisoners into the retinue when an authored condition allows it,
     which counts against the roster limit.
   - Ransom a captured lord: an authored offer from the lord's faction, drawn at
     a gameplay transition like any offer, pays currency for the release.
   - Release a prisoner, with authored standing effects.
-- **Escape.** On a recurring schedule, prisoners may escape with an authored
-  chance from the agents' RNG domain; a holding's garrison and buildings lower
+- **Escape.** On a prison tick, a recurring schedule the world authors for
+  prisoners, they may escape with an authored chance drawn from their own
+  `captivity` RNG domain; a holding's garrison and buildings lower
   it.
 - **The player captured.** Losing a mass battle may capture the player instead
   of ending the route. Captivity is an ordinary setback
@@ -370,10 +395,10 @@ battles out of personal combat. This capability resolves army against army.
   roster, its leaders, its morale and the ground. It draws from the RNG and
   distributes losses over several rounds.
 - **Losses.** Each loss is killed or wounded by an authored share that the
-  side's surgery proficiency raises. Wounded winners stay in their roster;
-  the losing side's losses may instead become the winner's prisoners (see
-  [Prisoners and ransom](#prisoners-and-ransom)). The player sees the result and the losses, not a
-  blow-by-blow fight.
+  side's surgery proficiency raises. Wounded winners stay in their roster; the
+  losing side's losses may instead become the winner's prisoners (see [Prisoners
+  and ransom](#prisoners-and-ransom)). The player sees the result and the
+  losses, not a blow-by-blow fight.
 - **Ground.** Locations and roads both author a ground modifier, neutral when
   omitted, so a battle has ground wherever parties can meet: at a location or
   on a road between two.
@@ -413,8 +438,8 @@ Politics composes the capabilities above rather than adding a new one.
   - An unmarried character may author that it can be courted, and names a
     guardian, typically a parent or the head of the house.
   - Courtship is authored dialogue gated on the player's relation with that
-    character and standing with the guardian; visits, gifts and feasts raise that relation
-    through ordinary effects.
+    character and standing with the guardian; visits, gifts and feasts raise
+    that relation through ordinary effects.
   - Marriage is an effect, `Marry`, that records at most one spouse for each
     side, keyed by character ID. A spouse's house then counts as kin through
     authored standing changes, and the spouse may live at, and help run, one of
@@ -455,7 +480,8 @@ World agents are what make the world move without the player.
     is deterministic.
   - Parties act in a stable order.
   - Their random choices draw from their own RNG domain, so adding a bandit
-    gang does not change the player's critical hits.
+    gang does not change the player's critical hits, desertions or prison
+    escapes.
 - **Spawners.** Locations spawn parties from templates, with authored caps and
   intervals. A destroyed party is removed; its instance ID is never reused
   within the same history.

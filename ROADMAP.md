@@ -1115,15 +1115,18 @@ format as usual:
 2. **M6b — factions and standing.** War and peace between factions, authored
    standing tracks such as renown and relation, and the conditions and effects
    that read and change them. Authored personality traits steer dialogue and
-   drive reactions to a closed set of player deeds. Proficiencies such as trading, leadership and
-   surgery belong to the capability that uses them.
+   drive reactions to player deeds, either detected by the engine or reported
+   by an authored `ReportDeed` effect. Proficiencies such as trading,
+   leadership and surgery belong to the capability that uses them.
 3. **M6c — retinue.** Troop definitions with wages and upgrade paths, a roster
    of counts and saved XP pools per troop type, companions as unique
    characters who wear their own gear from a shared stash, recruiting, an
-   engine-computed roster limit, provisions eaten on daily ticks, morale with
-   desertion, and travel speed from the slowest troops and the party's load.
+   engine-computed roster limit, an upkeep tick with its own RNG domain for
+   wages, provisions, wounded recovery, morale and desertion, and travel speed
+   from the slowest troops and the party's load.
 4. **M6d — mass battle.** Army-against-army resolution from rosters, leaders
-   and ground (authored on locations and roads), with seeded casualties and an optional champion duel. The
+   and ground (authored on locations and roads), with seeded casualties and an
+   optional champion duel. The
    formula is mirrored in `scripts/combat_sim` before tests pin its numbers.
    Losses split into killed and wounded, and wounded troops recover on ticks.
    Battles take prisoners: troop prisoners to sell or recruit, captured lords
@@ -1133,11 +1136,11 @@ format as usual:
    garrisons, authored buildings, and sieges as mass battles after a
    preparation time.
 6. **M6f — world agents.** Party instances on the road graph that apply a
-   closed set of engine policies on recurring world ticks, with priorities that
-   may test the leader's traits, routing by shortest
-   travel time with ties broken by authored road order, spawners with caps,
-   interception of the player, off-screen battles, weighted diplomacy events,
-   and an `AGENT_BOUND`.
+   closed set of engine policies on recurring world ticks, with priorities
+   that may test the leader's traits, routing by shortest travel time with ties
+   broken by authored road order, spawners with caps, interception of the
+   player, off-screen battles, weighted diplomacy events, and an
+   `AGENT_BOUND`.
 7. **M6g — politics and orders by composition.** Faction membership ranks for
    vassalage and knightly orders, chapter houses as buildings, courtship and
    marriage on relation tracks and dialogue, and a player-founded kingdom as an
