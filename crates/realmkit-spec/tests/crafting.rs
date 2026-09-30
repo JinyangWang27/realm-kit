@@ -202,7 +202,12 @@ fn enchantments_are_checked() {
     let mail = world.item("iron_mail").unwrap().equipment.as_ref().unwrap();
     assert!(keen.fits(sword) && !keen.fits(mail));
     type Change = fn(&mut WorldSpec);
-    let changes: [(Change, &str); 11] = [
+    let changes: [(Change, &str); 12] = [
+        // Bonuses are an enchantment's only effect, so one must be positive.
+        (
+            |w| enchantment(w, "keenness").bonuses = [(Stat::Patk, 0)].into(),
+            "invalid_stats",
+        ),
         (
             |w| enchantment(w, "keenness").slots = vec!["tail".into()],
             "missing_reference",

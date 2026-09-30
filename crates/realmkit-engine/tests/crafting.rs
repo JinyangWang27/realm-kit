@@ -536,3 +536,46 @@ fn saves_reject_enchantments_the_rules_could_not_lay() {
         s.combat.as_mut().unwrap().techniques.remove("enchanting");
     }));
 }
+
+#[test]
+fn a_technique_only_crafting_teaches_needs_the_crafting_in_the_save() {
+    let mut world = smithy();
+    // Maud tells, but does not teach: laying Keenness is the only lesson.
+    let maud = world.dialogues.iter_mut().find(|d| d.id == "maud").unwrap();
+    maud.nodes[1].choices[0].effect = None;
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.enchantments[0].requires.clear();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    to_the_altar(&mut engine);
+    engine.execute(keen(1)).unwrap();
+    assert!(combat_state_has(&engine, "enchanting"));
+    let snapshot = engine.snapshot();
+    assert!(Engine::restore(&world, snapshot.clone()).is_ok());
+    // The technique, but no enchanted piece to show for it.
+    let mut unearned = snapshot.clone();
+    let gear = unearned
+        .state
+        .combat
+        .as_mut()
+        .unwrap()
+        .gear
+        .get_mut(&1)
+        .unwrap();
+    gear.enchantment = None;
+    assert!(Engine::restore(&world, unearned).is_err());
+
+    // An enchantment that needs the very technique it would teach explains
+    // nothing: it could only be laid by someone who knew it already.
+    world.world.combat.as_mut().unwrap().enchantments[0].requires = vec![Condition::Technique {
+        technique: "enchanting".into(),
+        rank: 1,
+    }];
+    let mut circular = snapshot;
+    circular.package_revision = world.revision();
+    assert!(Engine::restore(&world, circular).is_err());
+}
+
+fn combat_state_has(engine: &Engine<'_>, technique: &str) -> bool {
+    combat(engine).techniques.contains_key(technique)
+}

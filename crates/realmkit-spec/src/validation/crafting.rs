@@ -85,7 +85,8 @@ fn enchantments(
         for slot in &enchantment.slots {
             reference(out, id, "slot", slot, combat.slots.contains(slot));
         }
-        if enchantment.bonuses.is_empty() || enchantment.bonuses.values().any(|v| *v > STAT_BOUND) {
+        let bonuses = enchantment.bonuses.values();
+        if !bonuses.clone().any(|v| *v > 0) || bonuses.clone().any(|v| *v > STAT_BOUND) {
             issue(
                 out,
                 id,
