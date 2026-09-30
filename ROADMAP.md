@@ -918,7 +918,7 @@ every package.
   ranks (delivered); M4c equipment instances and equip/unequip (delivered);
   M4d stations, deterministic
   forging and authored improvement-state transitions (delivered); M4e one compatible
-  learned enchantment per item. Runtime instances use deterministic
+  learned enchantment per item (delivered). Runtime instances use deterministic
   saved IDs only when distinguishable copies need independent state; unique
   legendary equipment may still have one mutable instance, while fungible
   identical resources remain definition + quantity. Materials/quality are concrete
