@@ -1,6 +1,6 @@
-# World package format 10
+# World package format 11
 
-Format 10 makes combat optional. The level table and combat prose live in an
+Format 11 makes combat optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -21,15 +21,16 @@ there is no migration. Convert them by hand:
   apply the Format 4 steps.
 - **Format 4** (M3c-1): give each opponent whose skills unlock above level 1 a
   `level`, since opponents now use only skills unlocked at their level;
-  `groups` are optional. Then apply the Formats 5–9 step.
-- **Formats 5–9** (M3c-2, M3d, M4a, M4b, M4c): only raise the number; `crit`,
-  `stat_points`, techniques, equipment, recipes and tiers are optional.
+  `groups` are optional. Then apply the Formats 5–10 step.
+- **Formats 5–10** (M3c-2, M3d, M4a, M4b, M4c, M4d): only raise the number;
+  `crit`, `stat_points`, techniques, equipment, recipes, tiers and
+  enchantments are optional.
 
 A world without combat only needs its `format_version` raised.
 
-Format 10 represents one fixed player-controlled character and one playable
+Format 11 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 10 does not serialize a route collection
+stable logical route ID `default`; Format 11 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -44,7 +45,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 10 also requires item and quest tables because they serve the current demo.
+Format 11 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -79,7 +80,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 10 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 11 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -139,7 +140,7 @@ Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
 unset. Dialogue `set_flag` effects and quest completion flags set them; flags
 are monotonic in this version. Conditions govern availability/choice visibility.
 
-This flat conjunctive representation is a Format 10 limitation. The long-term
+This flat conjunctive representation is a Format 11 limitation. The long-term
 condition model uses pure typed predicates composed with `All / Any / Not`;
 predicates remain domain-specific and typed rather than becoming arbitrary
 expressions/property paths. Typed effects execute in authored order as part of the
@@ -185,7 +186,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 10 has a single flat quest collection. The long-term model should retain
+Format 11 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -473,6 +474,34 @@ An item's `equipment` can list improvement `tiers`, in order:
   the 9,999 worst case, and a weapon's basic-attack channel must keep an
   attack at every tier. Stations need a combat block.
 
+### Enchanting
+
+The combat block can list `enchantments`, each laid on a piece at a station:
+
+```json
+{
+  "id": "keenness",
+  "name": "{item} of Keenness",
+  "slots": ["hand"],
+  "bonuses": { "patk": 2 },
+  "station": "altar",
+  "catalyst": [{ "item": "ember_shard", "quantity": 1 }],
+  "known_when": [{ "kind": "flag", "flag": "taught_enchanting" }],
+  "requires": [{ "kind": "technique", "technique": "enchanting", "rank": 1 }],
+  "trains": { "technique": "enchanting", "xp": 10 }
+}
+```
+
+- An enchantment fits any piece occupying one of its `slots`. `enchant <#>
+  <enchantment>` at the station spends the catalyst and lays it on the piece
+  for good: a piece takes one enchantment, never replaced or removed.
+- Its `bonuses` add to the piece's at whatever tier it is, and improving the
+  piece keeps them. The name template applies after the tier's, so `{item}`
+  is "Fine Iron sword" and the piece becomes "Fine Iron sword of Keenness".
+- Knowledge, requirements, training and the order of checks work as for
+  recipes. Effects are passive stat bonuses only. The best enchantment that
+  fits each piece counts toward the 9,999 worst case.
+
 ### Encounters
 
 `engage` starts an encounter with a fighter at the player's location; it then
@@ -575,7 +604,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 10 currently selects combat prose variants from the current
+Format 11 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful

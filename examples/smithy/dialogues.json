@@ -10,9 +10,14 @@
           {
             "text": "Teach me to forge.",
             "next": "hammer",
-            "effect": { "kind": "set_flag", "flag": "taught_forging" }
+            "effect": {
+              "kind": "set_flag",
+              "flag": "taught_forging"
+            }
           },
-          { "text": "Later." }
+          {
+            "text": "Later."
+          }
         ]
       },
       {
@@ -21,7 +26,46 @@
         "choices": [
           {
             "text": "Take the hammer.",
-            "effect": { "kind": "grant_technique", "technique": "smithing" }
+            "effect": {
+              "kind": "grant_technique",
+              "technique": "smithing"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maud",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "'The altar remembers heat,' Maud says. 'So do shards.'",
+        "choices": [
+          {
+            "text": "Teach me to enchant.",
+            "next": "lesson",
+            "effect": {
+              "kind": "set_flag",
+              "flag": "taught_enchanting"
+            }
+          },
+          {
+            "text": "Later."
+          }
+        ]
+      },
+      {
+        "id": "lesson",
+        "text": "'One ember shard wakes an edge. Warding takes two, and a surer hand.'",
+        "choices": [
+          {
+            "text": "Lay your hand on mine.",
+            "effect": {
+              "kind": "grant_technique",
+              "technique": "enchanting"
+            }
           }
         ]
       }

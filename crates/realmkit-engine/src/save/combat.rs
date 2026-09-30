@@ -16,7 +16,7 @@ pub(super) fn check(
     level(combat, rules)?;
     defeats(world, combat)?;
     allocation(world, combat, rules)?;
-    techniques(world, state, combat, rules)?;
+    techniques(world, state, combat, rules, progress)?;
     crafting(world, state, combat, rules, progress)?;
     let max = rules::player_stats(world, combat);
     match &combat.stance {
@@ -100,20 +100,9 @@ fn techniques(
     state: &GameState,
     combat: &CombatState,
     rules: &Combat,
+    progress: &Progress,
 ) -> Result<(), String> {
-    // Crafting trains techniques too, and teaches one it names.
-    let crafting = rules
-        .recipes
-        .iter()
-        .filter_map(|r| r.trains.as_ref())
-        .chain(
-            world
-                .items
-                .iter()
-                .filter_map(|i| i.equipment.as_ref())
-                .flat_map(|e| &e.tiers)
-                .filter_map(|t| t.trains.as_ref()),
-        );
+    let crafting = crafting_lessons(world, combat, rules, progress);
     let teachable: BTreeSet<&Id> = rules
         .player_techniques
         .iter()
@@ -167,6 +156,18 @@ fn crafting(
     rules: &Combat,
     progress: &Progress,
 ) -> Result<(), String> {
+    // An enchantment that exists, fits its piece, and was the player's to lay.
+    let enchantments_ok = combat.gear.values().all(|gear| {
+        let equipment = world.item(&gear.item).unwrap().equipment.as_ref().unwrap();
+        gear.enchantment.as_ref().is_none_or(|id| {
+            world.enchantment(id).is_some_and(|e| {
+                e.fits(equipment)
+                    && lasting(state, &e.known_when)
+                    && lasting(state, &e.requires)
+                    && trained(state, e.trains.as_ref())
+            })
+        })
+    });
     let tiers_ok = combat.gear.values().all(|gear| {
         let tiers = &world
             .item(&gear.item)
@@ -190,9 +191,71 @@ fn crafting(
                 .any(|r| &&r.output == output && qualified(state, r))
     });
     ensure(
-        tiers_ok && forged_ok,
+        tiers_ok && forged_ok && enchantments_ok,
         "crafting the player was not able to do",
     )
+}
+
+/// Techniques crafting could have taught, shown by the crafting it left
+/// behind: a forged piece, a tier reached, an enchantment laid. A lesson
+/// whose own conditions need the technique it teaches explains nothing.
+fn crafting_lessons<'w>(
+    world: &'w WorldSpec,
+    combat: &CombatState,
+    rules: &'w Combat,
+    progress: &Progress,
+) -> Vec<&'w realmkit_spec::TechniqueGrant> {
+    let needs_itself = |grant: &realmkit_spec::TechniqueGrant, conditions: &[&[Condition]]| {
+        conditions.iter().flat_map(|c| c.iter()).any(|c| {
+            matches!(c, Condition::Technique { technique, .. } if *technique == grant.technique)
+        })
+    };
+    let mut lessons = Vec::new();
+    for recipe in &rules.recipes {
+        let pieces = combat
+            .gear
+            .values()
+            .filter(|g| g.item == recipe.output)
+            .count() as u64;
+        let granted = progress.inventory.get(&recipe.output).copied().unwrap_or(0);
+        let forged = pieces > granted || progress.repeatable_loot.contains(&recipe.output);
+        if let Some(grant) = recipe
+            .trains
+            .as_ref()
+            .filter(|g| forged && !needs_itself(g, &[&recipe.known_when, &recipe.requires]))
+        {
+            lessons.push(grant);
+        }
+    }
+    for gear in combat.gear.values() {
+        let tiers = &world
+            .item(&gear.item)
+            .unwrap()
+            .equipment
+            .as_ref()
+            .unwrap()
+            .tiers;
+        for tier in &tiers[..gear.tier.min(tiers.len())] {
+            if let Some(grant) = tier
+                .trains
+                .as_ref()
+                .filter(|g| !needs_itself(g, &[&tier.requires]))
+            {
+                lessons.push(grant);
+            }
+        }
+        let enchantment = gear.enchantment.as_ref().and_then(|e| world.enchantment(e));
+        if let Some(e) = enchantment {
+            if let Some(grant) = e
+                .trains
+                .as_ref()
+                .filter(|g| !needs_itself(g, &[&e.known_when, &e.requires]))
+            {
+                lessons.push(grant);
+            }
+        }
+    }
+    lessons
 }
 
 /// An encounter is consistent with the rules that produce it: the player

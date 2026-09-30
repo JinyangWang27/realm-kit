@@ -39,7 +39,7 @@ Invariants the code relies on:
 - **Simulator parity.** The damage, timeline and XP formulas mirror `scripts/combat_sim`. Tests in `engine/tests/encounters.rs` pin numbers produced by the simulator, so formula changes must keep both in step.
 - **Language.** Player-facing text comes from the world package, in the world's declared language. IDs and typed-command tokens stay ASCII.
 
-`examples/` holds the test worlds: `demo-world` (the quest loop), `quiet-archive` (no combat), `duel` (skills, MP, resting), `arena` (groups, flee, yielding, crits, stat points, gear), `sect` (technique ranks) and `smithy` (forging and improvement). Each has a `walkthrough.txt`, except `quiet-archive`. The CLI terminal tests in `crates/realmkit-cli/tests/terminal.rs` run the real binary.
+`examples/` holds the test worlds: `demo-world` (the quest loop), `quiet-archive` (no combat), `duel` (skills, MP, resting), `arena` (groups, flee, yielding, crits, stat points, gear), `sect` (technique ranks) and `smithy` (forging, improvement and enchanting). Each has a `walkthrough.txt`, except `quiet-archive`. The CLI terminal tests in `crates/realmkit-cli/tests/terminal.rs` run the real binary.
 
 ## Docs to update with changes
 

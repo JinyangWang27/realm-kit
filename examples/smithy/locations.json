@@ -4,24 +4,67 @@
     "name": "The Smithy Yard",
     "description": "Coal smoke, a quench barrel, and Bran at the doorway.",
     "exits": {
-      "east": { "destination": "forge", "blocked_text": "The forge is shut." },
-      "down": { "destination": "mine", "blocked_text": "The mine is shut." }
+      "east": {
+        "destination": "forge",
+        "blocked_text": "The forge is shut."
+      },
+      "down": {
+        "destination": "mine",
+        "blocked_text": "The mine is shut."
+      },
+      "north": {
+        "destination": "shrine",
+        "blocked_text": "The shrine is shut."
+      }
     },
-    "characters": ["bran"],
+    "characters": [
+      "bran"
+    ],
     "safe": true
   },
   {
     "id": "forge",
     "name": "The Forge",
     "description": "An anvil worn bright in the middle, and heat you feel in your teeth.",
-    "exits": { "west": { "destination": "yard", "blocked_text": "The yard is shut." } },
-    "stations": ["anvil"]
+    "exits": {
+      "west": {
+        "destination": "yard",
+        "blocked_text": "The yard is shut."
+      }
+    },
+    "stations": [
+      "anvil"
+    ]
   },
   {
     "id": "mine",
     "name": "The Old Mine",
     "description": "Slag heaps, and something clicking in them.",
-    "exits": { "up": { "destination": "yard", "blocked_text": "The shaft is blocked." } },
-    "characters": ["beetle"]
+    "exits": {
+      "up": {
+        "destination": "yard",
+        "blocked_text": "The shaft is blocked."
+      }
+    },
+    "characters": [
+      "beetle"
+    ]
+  },
+  {
+    "id": "shrine",
+    "name": "The Hill Shrine",
+    "description": "A stone altar under a hawthorn, warm to the touch.",
+    "exits": {
+      "south": {
+        "destination": "yard",
+        "blocked_text": "The path is blocked."
+      }
+    },
+    "characters": [
+      "maud"
+    ],
+    "stations": [
+      "altar"
+    ]
   }
 ]

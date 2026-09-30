@@ -48,6 +48,12 @@ pub enum EngineError {
     RequirementsUnmet,
     #[error("you do not have enough {0}")]
     NotEnoughMaterials(Id),
+    #[error("you do not know that enchantment")]
+    UnknownEnchantment(Id),
+    #[error("#{0} is already enchanted")]
+    AlreadyEnchanted(u64),
+    #[error("{enchantment} does not fit #{gear}")]
+    DoesNotFit { gear: u64, enchantment: Id },
     #[error("#{0} cannot be improved further")]
     NoHigherTier(u64),
     #[error("you are not fighting anyone; engage first")]

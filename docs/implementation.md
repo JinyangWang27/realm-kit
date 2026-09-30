@@ -73,6 +73,11 @@ proves the complete single-player loop with authored content.
   piece's bonuses (and speed penalty) one tier at a time. Checks precede any
   change, results are guaranteed, and crafting trains its technique.
   `examples/smithy` exercises it. Package and save format 10.
+- [x] Enchanting (M4e): enchantments fit pieces by slot and add passive
+  stat bonuses on top of the piece's tier, laid once per piece at a station
+  for a catalyst, known and gated like recipes, and kept through
+  improvement. `examples/smithy` now plays forge → equip → improve → enchant
+  → save/load. Package and save format 11.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

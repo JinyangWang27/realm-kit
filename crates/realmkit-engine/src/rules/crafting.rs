@@ -127,6 +127,52 @@ pub(crate) fn improve(
     Ok(())
 }
 
+/// Lays a known enchantment on an unenchanted piece it fits, for good.
+pub(crate) fn enchant(
+    world: &WorldSpec,
+    state: &mut GameState,
+    piece: u64,
+    id: &Id,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let gear = state
+        .combat
+        .as_ref()
+        .and_then(|c| c.gear.get(&piece))
+        .ok_or(EngineError::NoSuchGear(piece))?;
+    let enchantment = world
+        .enchantment(id)
+        .filter(|e| conditions_met(state, &e.known_when))
+        .ok_or_else(|| EngineError::UnknownEnchantment(id.clone()))?;
+    if gear.enchantment.is_some() {
+        return Err(EngineError::AlreadyEnchanted(piece));
+    }
+    let equipment = world.item(&gear.item).unwrap().equipment.as_ref().unwrap();
+    if !enchantment.fits(equipment) {
+        return Err(EngineError::DoesNotFit {
+            gear: piece,
+            enchantment: id.clone(),
+        });
+    }
+    ready(
+        world,
+        state,
+        &enchantment.station,
+        &enchantment.requires,
+        &enchantment.catalyst,
+    )?;
+    spend(state, &enchantment.catalyst, events);
+    let gear = state.combat.as_mut().unwrap().gear.get_mut(&piece).unwrap();
+    gear.enchantment = Some(id.clone());
+    events.push(Event::Enchanted {
+        gear: piece,
+        enchantment: id.clone(),
+    });
+    train(world, state, enchantment.trains.as_ref(), events)?;
+    clamp_vitals(world, state);
+    Ok(())
+}
+
 /// Known recipes and improvable pieces at this location's stations. Those
 /// short of ability or materials stay listed, so the player sees why.
 pub(crate) fn offered(world: &WorldSpec, state: &GameState) -> Vec<Action> {
@@ -150,5 +196,23 @@ pub(crate) fn offered(world: &WorldSpec, state: &GameState) -> Vec<Action> {
             available: ready(world, state, &tier.station, &tier.requires, &tier.cost).is_ok(),
         })
     });
-    forge.chain(improve).collect()
+    // Every known enchantment here, on every unenchanted piece it fits.
+    let enchant = rules
+        .enchantments
+        .iter()
+        .filter(|e| here.stations.contains(&e.station) && conditions_met(state, &e.known_when))
+        .flat_map(|e| {
+            let pieces = state.combat.iter().flat_map(|c| &c.gear);
+            pieces.filter_map(move |(id, gear)| {
+                let equipment = world.item(&gear.item)?.equipment.as_ref()?;
+                (gear.enchantment.is_none() && e.fits(equipment)).then(|| Action {
+                    command: Command::Enchant {
+                        piece: *id,
+                        enchantment: e.id.clone(),
+                    },
+                    available: ready(world, state, &e.station, &e.requires, &e.catalyst).is_ok(),
+                })
+            })
+        });
+    forge.chain(improve).chain(enchant).collect()
 }

@@ -24,6 +24,8 @@ const RESPEC: &str = "Refund stat points";
 const TRAIN_GROUP: &str = "Train stats";
 const EQUIPMENT_GROUP: &str = "Equipment";
 const SMITHING_GROUP: &str = "Smithing";
+const ENCHANTING_GROUP: &str = "Enchanting";
+const ENCHANT: &str = "Enchant";
 const FORGE: &str = "Forge";
 const IMPROVE: &str = "Improve";
 const NEEDS: &str = "needs";
@@ -68,6 +70,7 @@ pub enum Group {
     Train,
     Equipment,
     Smithing,
+    Enchanting,
 }
 
 impl Group {
@@ -76,6 +79,7 @@ impl Group {
             Command::Allocate { .. } | Command::Respec => Some(Self::Train),
             Command::Equip(_) => Some(Self::Equipment),
             Command::Forge(_) | Command::Improve(_) => Some(Self::Smithing),
+            Command::Enchant { .. } => Some(Self::Enchanting),
             _ => None,
         }
     }
@@ -195,6 +199,7 @@ fn group_label(engine: &Engine<'_>, group: Group) -> String {
         },
         Group::Equipment => format!("{EQUIPMENT_GROUP} {OPENS}"),
         Group::Smithing => format!("{SMITHING_GROUP} {OPENS}"),
+        Group::Enchanting => format!("{ENCHANTING_GROUP} {OPENS}"),
     }
 }
 
@@ -274,6 +279,29 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 "{IMPROVE} {} → {}{changes} — {cost}{why}",
                 gear_name(engine, *piece),
                 piece_name(world, &next)
+            )
+        }
+        // "Enchant #1 Iron sword → Iron sword of Keenness (Attack +2) — 1 Ember shard".
+        Command::Enchant { piece, enchantment } => {
+            let gear = &engine.state().combat.as_ref()?.gear[piece];
+            let enchantment = world.enchantment(enchantment)?;
+            let mut next = gear.clone();
+            next.enchantment = Some(enchantment.id.clone());
+            let bonuses: Vec<String> = Stat::ALL
+                .into_iter()
+                .filter_map(|s| {
+                    // A zero bonus changes nothing, so it is not shown.
+                    let bonus = enchantment.bonuses.get(&s).filter(|b| **b > 0)?;
+                    Some(format!("{} +{bonus}", stat_name(world, s)))
+                })
+                .collect();
+            let cost = materials(world, &enchantment.catalyst);
+            let why = missing(engine, &enchantment.requires, &enchantment.catalyst);
+            format!(
+                "{ENCHANT} {} → {} ({}) — {cost}{why}",
+                gear_name(engine, *piece),
+                piece_name(world, &next),
+                bonuses.join(", ")
             )
         }
         _ if !action.available => return None,
@@ -727,5 +755,53 @@ mod tests {
         assert!(labels.contains(
             &"Improve #1 Iron sword → Fine Iron sword (Attack +4 → +6) — 1 Iron ingot [needs Journeyman Smithing]"
         ), "{labels:?}");
+    }
+
+    #[test]
+    fn an_enchantment_label_leaves_out_zero_bonuses() {
+        let mut world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/smithy"
+        ))
+        .unwrap();
+        let combat = world.world.combat.as_mut().unwrap();
+        combat.enchantments[0].bonuses.insert(Stat::Pdef, 0);
+        let mut engine = Engine::new(&world).unwrap();
+        let steps = [
+            Command::Talk("bran".into()),
+            Command::ChooseDialogue(1),
+            Command::ChooseDialogue(1),
+            Command::Move(Direction::Down),
+        ];
+        for command in steps {
+            engine.execute(command).unwrap();
+        }
+        for _ in 0..2 {
+            engine.execute(Command::Engage("beetle".into())).unwrap();
+            while engine.encounter().is_some() {
+                engine.execute(Command::Attack("beetle".into())).unwrap();
+            }
+        }
+        for command in [
+            Command::Move(Direction::Up),
+            Command::Move(Direction::East),
+            Command::Forge("iron_sword".into()),
+            Command::Move(Direction::West),
+            Command::Move(Direction::North),
+            Command::Talk("maud".into()),
+            Command::ChooseDialogue(1),
+            Command::ChooseDialogue(1),
+        ] {
+            engine.execute(command).unwrap();
+        }
+        let mut menu = Menu::new(&engine, false, None);
+        let enchanting = menu
+            .entries()
+            .iter()
+            .position(|e| e.label == "Enchanting ›")
+            .unwrap();
+        menu.choose(enchanting + 1);
+        let label = &menu.entries()[0].label;
+        assert!(label.contains("(Attack +2)"), "{label}");
     }
 }
