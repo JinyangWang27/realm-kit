@@ -5,23 +5,27 @@ use std::{collections::BTreeMap, path::Path};
 
 mod combat;
 mod crafting;
+mod economy;
 mod items;
 mod places;
 mod stats;
 mod story;
 mod techniques;
+mod time;
 mod validation;
 pub use combat::*;
 pub use crafting::*;
+pub use economy::*;
 pub use items::*;
 pub use places::*;
 pub use stats::*;
 pub use story::*;
 pub use techniques::*;
+pub use time::*;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 11;
+pub const FORMAT_VERSION: u32 = 12;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -50,6 +54,17 @@ pub struct World {
     /// Absent in a world without fighting; then there is no XP or level either.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub combat: Option<Combat>,
+    /// Absent in a world without a clock; then nothing takes time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time: Option<WorldTime>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roads: Vec<Road>,
+    /// Effects that happen on a schedule; they need world time.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<WorldEvent>,
+    /// Absent in a world without currency or trade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub economy: Option<Economy>,
 }
 
 // Serde defaults shared by several content types.
@@ -127,12 +142,27 @@ impl WorldSpec {
     /// Whether any content draws random numbers; only then does play keep a
     /// seeded generator.
     pub fn stochastic(&self) -> bool {
+        self.random_combat() || self.random_world() || self.random_market()
+    }
+    /// Whether fights draw random numbers: some hit can be critical.
+    pub fn random_combat(&self) -> bool {
         self.combat().is_some_and(|c| {
             c.player_basic_crit.is_some() || c.skills.iter().any(|s| s.crit.is_some())
         }) || self
             .characters
             .iter()
             .any(|c| c.combat.as_ref().is_some_and(|p| p.basic_crit.is_some()))
+    }
+    /// Whether the world draws random numbers: some character moves.
+    pub fn random_world(&self) -> bool {
+        self.characters.iter().any(|c| c.moves.is_some())
+    }
+    /// Whether prices draw random numbers: the economy has a price tick.
+    pub fn random_market(&self) -> bool {
+        self.economy().is_some_and(|e| e.tick.is_some())
+    }
+    pub fn economy(&self) -> Option<&Economy> {
+        self.world.economy.as_ref()
     }
     pub fn technique(&self, id: &str) -> Option<&Technique> {
         self.combat()?.techniques.iter().find(|v| v.id == id)
@@ -157,6 +187,22 @@ impl WorldSpec {
     }
     pub fn dialogue(&self, id: &str) -> Option<&Dialogue> {
         self.dialogues.iter().find(|v| v.id == id)
+    }
+    /// Every authored effect, wherever it is written.
+    pub fn effects(&self) -> impl Iterator<Item = &Effect> {
+        self.dialogues
+            .iter()
+            .flat_map(|d| &d.nodes)
+            .flat_map(|n| &n.choices)
+            .flat_map(|c| &c.effects)
+            .chain(self.world.events.iter().flat_map(|e| &e.effects))
+    }
+    /// The road from `from` to `to`, if one joins them.
+    pub fn road(&self, from: &str, to: &str) -> Option<&Road> {
+        self.world
+            .roads
+            .iter()
+            .find(|r| r.leads(from).is_some_and(|other| other == to))
     }
 }
 

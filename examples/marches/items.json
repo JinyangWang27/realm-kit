@@ -1,0 +1,8 @@
+[
+  { "id": "sealed_letter", "name": "Sealed letter", "description": "The reeve's seal, pressed hard into green wax." },
+  { "id": "keep_token", "name": "Keep token", "description": "A holly-leaf badge that opens the keep's gate after dusk." },
+  { "id": "grain", "name": "Grain", "description": "A sack of barley, still smelling of the field." },
+  { "id": "wool", "name": "Wool", "description": "A greasy fleece, rolled and tied." },
+  { "id": "cloth", "name": "Cloth", "description": "A bolt of undyed broadcloth from the Vellmarket looms." },
+  { "id": "eels", "name": "Smoked eels", "description": "A string of fen eels, smoked black." }
+]

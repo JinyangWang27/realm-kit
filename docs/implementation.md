@@ -78,6 +78,29 @@ proves the complete single-player loop with authored content.
   for a catalyst, known and gated like recipes, and kept through
   improvement. `examples/smithy` now plays forge → equip → improve → enchant
   → save/load. Package and save format 11.
+- [x] Condition trees and effect lists (M5a): `requires` and `known_when` are
+  one optional condition composed with `all`, `any` and `not` over typed
+  leaves, now including carried counted items; dialogue choices apply an
+  ordered `effects` list, including `grant_items` and `take_items`, that
+  commits or fails as a whole. Saves judge a condition by whether it could
+  once have held, and items that effects hand over are loose in the
+  inventory check. Package and save format 12.
+- [x] World time, roads and schedules (M5b): an optional clock in minutes
+  that only travel, waiting and resting move; undirected roads with travel
+  minutes and conditions beside compass exits; one-shot and recurring events
+  with conditions and effects; characters who move among locations on a
+  schedule, drawn from their own `world` random stream; and a time-of-day
+  condition. Occurrences resolve in chronological, then schedule, order, and
+  saves keep only the minute and each mover's location. `examples/marches`
+  exercises it. Package and save format 12.
+- [x] Economy core (M6a): currency with a world-language format, goods,
+  producer kinds and markets whose price index per good follows production
+  and demand on a scheduled four-phase price tick drawn from its own
+  `market` stream, linked markets that converge, merchants who must be
+  present, buying and selling with a spread and per-unit index steps, and
+  currency conditions and effects. `scripts/combat_sim/economy.py` mirrors
+  the tick and the trade prices, and engine tests pin its numbers. Package
+  and save format 12.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

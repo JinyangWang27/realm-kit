@@ -1068,17 +1068,31 @@ M5 also lays the general foundations that
 these slices. The investigation fixture, optional Inventory and authored endings
 above are delivered alongside them, in whichever order a fixture needs them.
 
-1. **M5a — condition tree and effect lists.** `requires` becomes one condition
-   composed with `All / Any / Not` over typed leaf predicates, and a dialogue
-   choice carries an ordered list of `effects` in place of one optional
-   `effect`, applied atomically. Numeric predicates stay domain-typed, as
-   [decided](docs/open-decisions.md#6-conditions-and-effects).
+1. **M5a — condition tree and effect lists · delivered.** `requires` becomes
+   one condition composed with `All / Any / Not` over typed leaf predicates,
+   and a dialogue choice carries an ordered list of `effects` in place of one
+   optional `effect`, applied atomically. Numeric predicates stay
+   domain-typed, as [decided](docs/open-decisions.md#6-conditions-and-effects).
+   As delivered (Format 12): an `item` predicate for carried counted items and
+   `grant_items`/`take_items` effects arrive with it, and
+   `examples/quiet-archive` uses `any`, `not` and multi-effect choices.
 2. **M5b — world time, travel and recurring schedules.** Optional World Time
    as specified above; roads with authored travel durations and exits beyond
    the six compass directions; wait and rest actions that consume time; and
    recurring schedules that the dispatch cursor expands lazily, one due
    occurrence at a time; and characters who move among authored locations on
-   a schedule, drawn from a `world` RNG domain.
+   a schedule, drawn from a `world` RNG domain. **Delivered** (Format 12):
+   undirected roads with minutes, conditions and blocked text, mixable with
+   compass exits; `wait` with an authored menu step and `rest` with an
+   authored duration; one-shot and recurring authored events whose effects
+   are flags, items and technique grants; movers; and a `time_of_day`
+   condition. Only the minute and movers' locations are saved, since every
+   next occurrence follows from the minute. Effects cannot start or stop a
+   schedule; conditions gate what an occurrence does. `examples/marches`
+   begins here. Follow-up: a character who appears or leaves because the
+   clock entered or left its `time_of_day` hours, and a market that opens
+   or closes with its merchant, change silently; report them as movers'
+   arrivals are reported.
 3. **M5c — quest lifecycle.** Quests that fail, carry world-time deadlines or
    are abandoned, plus repeatable offers: job templates whose parameters the
    saved RNG draws from authored candidate lists at an explicit gameplay
@@ -1114,8 +1128,10 @@ Hard dependencies between capabilities are few and validated, interactions
 happen only when both sides are present, and the full sandbox is simply the
 world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
 
-Depends on M5a–M5f. Deliver in slices, each bumping the package and save
-format as usual:
+Each slice depends on the M5 foundations it uses, following the hard
+requirements in [Modularity](docs/sandbox-worlds.md#modularity): the economy
+needs only M5a's effects and M5b's schedules, so it came first. Deliver in
+slices, each bumping the package and save format as usual:
 
 1. **M6a — economy.** Currency; markets whose per-good price index follows
    authored production and demand on a recurring price tick; linked markets
@@ -1124,7 +1140,16 @@ format as usual:
    schedules. Trading is the first proficiency, so the proficiency mechanism
    arrives here too: points per level, personal or party proficiencies, and
    study from items over world time. The price tick is mirrored in
-   `scripts/combat_sim` before tests pin its numbers.
+   `scripts/combat_sim` before tests pin its numbers. Delivered in two parts.
+   **M6a-1 · delivered** (Format 12): currency, goods, producer kinds,
+   town and village markets with authored starting indices, the four-phase
+   price tick on its own `market` stream, links, merchants who must be
+   present, buying and selling with a spread, per-unit index steps and an
+   engine-computed preview, and currency conditions and effects;
+   `scripts/combat_sim/economy.py` mirrors the tick and computes warm-up
+   prices for authors; `examples/marches` trades. **M6a-2:** prosperity,
+   merchants' stock and currency, workshops, upkeep and the trading
+   proficiency.
 2. **M6b — factions and standing.** War and peace between factions, authored
    standing tracks such as renown and relation, and the conditions and effects
    that read and change them. Authored personality traits steer dialogue and

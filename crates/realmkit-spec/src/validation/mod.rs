@@ -5,9 +5,11 @@ use std::collections::BTreeSet;
 
 mod combat;
 mod crafting;
+mod economy;
 mod equipment;
 mod progression;
 mod story;
+mod time;
 mod world;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -51,6 +53,10 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     world::characters(&mut out, w);
     story::quests(&mut out, w, &placed);
     story::dialogues(&mut out, w);
+    time::rules(&mut out, w);
+    if let Some(economy) = w.economy() {
+        economy::rules(&mut out, w, economy);
+    }
     if let Some(combat) = w.combat() {
         combat::rules(&mut out, w, combat);
     }
@@ -111,28 +117,79 @@ fn reference(out: &mut Vec<Diagnostic>, owner: &str, kind: &str, target: &str, e
     }
 }
 
-fn conditions(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, values: &[Condition]) {
-    for condition in values {
-        match condition {
-            Condition::Flag { flag } => {
-                reference(out, owner, "flag", flag, w.world.flags.contains(flag))
+fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Option<&Condition>) {
+    let Some(value) = value else {
+        return;
+    };
+    match value {
+        Condition::All { of } | Condition::Any { of } => {
+            if of.is_empty() {
+                issue(
+                    out,
+                    owner,
+                    "invalid_condition",
+                    "`all` and `any` need at least one condition",
+                );
             }
-            Condition::Quest { quest, .. } => {
-                reference(out, owner, "quest", quest, w.quest(quest).is_some())
-            }
-            Condition::Technique { technique, rank } => {
-                let known = w.technique(technique);
-                reference(out, owner, "technique", technique, known.is_some());
-                if known.is_some_and(|t| *rank == 0 || *rank > t.ranks.len()) {
-                    issue(
-                        out,
-                        owner,
-                        "invalid_rank",
-                        format!("{technique} has no rank {rank}"),
-                    );
-                }
+            for c in of {
+                condition(out, w, owner, Some(c));
             }
         }
+        Condition::Not { condition: inner } => condition(out, w, owner, Some(inner)),
+        Condition::Flag { flag } => {
+            reference(out, owner, "flag", flag, w.world.flags.contains(flag))
+        }
+        Condition::Quest { quest, .. } => {
+            reference(out, owner, "quest", quest, w.quest(quest).is_some())
+        }
+        Condition::Technique { technique, rank } => {
+            let known = w.technique(technique);
+            reference(out, owner, "technique", technique, known.is_some());
+            if known.is_some_and(|t| *rank == 0 || *rank > t.ranks.len()) {
+                issue(
+                    out,
+                    owner,
+                    "invalid_rank",
+                    format!("{technique} has no rank {rank}"),
+                );
+            }
+        }
+        Condition::Item { item, quantity } => counted(out, w, owner, item, *quantity),
+        Condition::TimeOfDay { from, to } => {
+            if *from >= MINUTES_PER_DAY || *to >= MINUTES_PER_DAY || from == to {
+                issue(
+                    out,
+                    owner,
+                    "invalid_condition",
+                    "a time of day is two different minutes of the day, 0 to 1439",
+                );
+            }
+            time::needed(out, w, owner);
+        }
+        Condition::Currency { amount } => economy::amount(out, w, owner, *amount),
+    }
+}
+
+/// An existing counted item, in a positive quantity: equipment pieces are
+/// individuals, so they cannot be counted or handed over.
+fn counted(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, item: &str, quantity: u64) {
+    let known = w.item(item);
+    reference(out, owner, "item", item, known.is_some());
+    if known.is_some_and(|i| i.equipment.is_some()) {
+        issue(
+            out,
+            owner,
+            "invalid_item",
+            format!("{item} is equipment; only counted items can be required or taken"),
+        );
+    }
+    if quantity == 0 {
+        issue(
+            out,
+            owner,
+            "invalid_quantity",
+            "item quantity must be positive",
+        );
     }
 }
 

@@ -1,0 +1,79 @@
+[
+  {
+    "id": "reeve",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "'Traveller. Are you going towards the keep?'",
+        "choices": [
+          {
+            "text": "I can carry a message.",
+            "next": "letter",
+            "requires": { "kind": "quest", "quest": "carry_letter", "status": "available" },
+            "effects": [
+              { "kind": "accept_quest", "quest": "carry_letter" },
+              { "kind": "grant_items", "items": [{ "item": "sealed_letter", "quantity": 1 }] }
+            ]
+          },
+          {
+            "text": "The steward has your letter.",
+            "next": "thanks",
+            "requires": { "kind": "quest", "quest": "carry_letter", "status": "ready" },
+            "effects": [
+              { "kind": "complete_quest", "quest": "carry_letter" },
+              { "kind": "grant_currency", "amount": 60 }
+            ]
+          },
+          {
+            "text": "When will the causeway open?",
+            "next": "causeway",
+            "requires": { "kind": "not", "condition": { "kind": "flag", "flag": "thaw" } }
+          },
+          { "text": "Not today." }
+        ]
+      },
+      { "id": "letter", "text": "'Greyford, then the keep road. Mind the hour.'" },
+      { "id": "thanks", "text": "'Good. The fen will be passable soon enough, and then we will have visitors.'" },
+      { "id": "causeway", "text": "'When the meltwater drains. Tomorrow afternoon, if the sky holds.'" }
+    ]
+  },
+  {
+    "id": "steward",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "'State your business quickly; the gate closes at eight.'",
+        "choices": [
+          {
+            "text": "A letter from the reeve of Ashmere.",
+            "next": "read",
+            "requires": { "kind": "item", "item": "sealed_letter", "quantity": 1 },
+            "effects": [
+              { "kind": "take_items", "items": [{ "item": "sealed_letter", "quantity": 1 }] },
+              { "kind": "set_flag", "flag": "letter_delivered" }
+            ]
+          },
+          { "text": "Nothing that will not keep." }
+        ]
+      },
+      { "id": "read", "text": "He breaks the seal and reads twice. 'The fen road. Tell her I will send men when it drains.'" }
+    ]
+  },
+  {
+    "id": "wenna",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "'Sit, sit. A tale costs nothing, and is worth about as much.'",
+        "choices": [
+          { "text": "Tell me about the fen.", "next": "fen" },
+          { "text": "Another time." }
+        ]
+      },
+      { "id": "fen", "text": "'Every spring the fen swallows the causeway, and every spring it gives it back a little shorter.'" }
+    ]
+  }
+]

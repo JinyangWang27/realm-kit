@@ -130,5 +130,7 @@ pub(crate) fn rest(
     });
     state.dialogue = None;
     events.push(Event::Rested);
-    Ok(())
+    // Resting takes the world's authored time, if it keeps one.
+    let minutes = world.world.time.as_ref().and_then(|t| t.rest).unwrap_or(0);
+    time::advance(world, state, minutes, events)
 }

@@ -29,8 +29,8 @@ pub struct TechniqueRank {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub passive: BTreeMap<Stat, u32>,
     /// A breakthrough gate: technique XP waits at this rank's threshold until it holds.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub requires: Vec<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<Condition>,
 }
 
 /// Teaches a technique if it is unknown, raises it to at least `rank`

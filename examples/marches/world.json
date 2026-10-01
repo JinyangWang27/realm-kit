@@ -1,0 +1,82 @@
+{
+  "format_version": 12,
+  "id": "marches",
+  "name": "The Marches",
+  "language": "en",
+  "start": "greyford",
+  "player": "traveller",
+  "flags": ["letter_delivered", "thaw"],
+  "time": {
+    "start": 480,
+    "clock": "Day {day}, {hour}:{minute}",
+    "wait": 60
+  },
+  "roads": [
+    { "id": "greyford-ashmere", "between": ["greyford", "ashmere"], "minutes": 120 },
+    { "id": "greyford-hollin", "between": ["greyford", "hollin_keep"], "minutes": 240 },
+    { "id": "hollin-vellmarket", "between": ["hollin_keep", "vellmarket"], "minutes": 300 },
+    {
+      "id": "fen-causeway",
+      "between": ["ashmere", "vellmarket"],
+      "minutes": 180,
+      "requires": { "kind": "flag", "flag": "thaw" },
+      "blocked_text": "Meltwater still covers the fen causeway."
+    }
+  ],
+  "events": [
+    {
+      "id": "thaw",
+      "schedule": { "at": 2280 },
+      "effects": [{ "kind": "set_flag", "flag": "thaw" }]
+    }
+  ],
+  "economy": {
+    "currency": { "format": "{amount} silver", "start": 100 },
+    "goods": [
+      { "item": "grain", "price": 20, "demand": { "town": 8, "village": 3 } },
+      { "item": "wool", "price": 40, "demand": { "town": 2 } },
+      { "item": "cloth", "price": 120, "demand": { "town": 6, "village": 1 }, "input": "wool" },
+      { "item": "eels", "price": 15, "demand": { "town": 4, "village": 1 } }
+    ],
+    "producers": [
+      { "id": "fields", "name": "Barley fields", "yields": { "grain": 6 } },
+      { "id": "flocks", "name": "Sheep runs", "yields": { "wool": 4 } },
+      { "id": "looms", "name": "Looms", "yields": { "cloth": 2 }, "consumes": { "wool": 3 } },
+      { "id": "traps", "name": "Eel traps", "yields": { "eels": 5 } }
+    ],
+    "markets": [
+      {
+        "location": "greyford",
+        "kind": "town",
+        "merchant": "hild",
+        "producers": { "fields": 1 },
+        "prices": { "grain": 760, "wool": 1086, "cloth": 1309, "eels": 728 }
+      },
+      {
+        "location": "ashmere",
+        "kind": "village",
+        "producers": { "fields": 3, "traps": 4 },
+        "prices": { "grain": 586, "wool": 1052, "cloth": 1232, "eels": 517 },
+        "spread_percent": 25
+      },
+      {
+        "location": "vellmarket",
+        "kind": "town",
+        "merchant": "maddoc",
+        "producers": { "flocks": 6, "looms": 6 },
+        "prices": { "grain": 1601, "wool": 745, "cloth": 712, "eels": 1301 }
+      }
+    ],
+    "links": [{ "between": ["greyford", "ashmere"], "percent": 10 }],
+    "index_bounds": [100, 10000],
+    "spread_percent": 15,
+    "trade_step": 26,
+    "tick": {
+      "schedule": { "at": 1440, "every": 1440 },
+      "supply_step": 8,
+      "damp_below": 900,
+      "revert_percent": 3,
+      "input_pull_percent": 10
+    }
+  }
+}

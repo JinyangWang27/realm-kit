@@ -536,9 +536,11 @@ Decisions:
   deterministic behavior; higher-level validation/simulation can diagnose bad
   content when concrete cases justify it.
 
-The current Format 1 `requires: Vec<Condition>` is implicitly conjunctive and is
-an implementation limitation. A future format revision can introduce the
-composable condition tree when richer story branching first needs it.
+Format 12 (M5a) delivers the condition tree and effect lists: every
+`requires` and `known_when` is one optional condition composed with `all`,
+`any` and `not`, and a dialogue choice carries an ordered `effects` list that
+commits or fails as a whole. Format 11's implicitly conjunctive lists are
+rejected, not migrated.
 
 ## 7. Randomness and reproducibility
 
@@ -1483,19 +1485,19 @@ and the roadmap schedules them as
 [M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). Each question below has
 a proposed answer that still needs to be confirmed:
 
-- **Recurring schedules (M5b).** Proposed: a schedule authors a period of at
-  least one minute, checked by validation, and a first occurrence strictly after
-  the route's initial world time. A zero period would make each occurrence due
-  again at its own minute and break the no-loop guarantee above. The dispatch
-  cursor from [Section 9](#9-time-models) expands a schedule lazily, one due
-  occurrence at a time. Only the next occurrence is saved, never an expanded
-  list. Ties with one-shot events keep stable authored declaration order. Still
-  open: whether an effect may start or stop a schedule, or only authored
-  conditions gate what each occurrence does.
-- **Exits beyond compass directions (M5b).** Proposed: roads are named exits
-  keyed by an ASCII ID, with an authored travel duration. Compass directions
-  remain for worlds that use them. Still open: whether one world may mix the
-  two.
+- **Recurring schedules (M5b) · decided.** A schedule authors a first minute
+  strictly after the route's initial world time and an optional period of at
+  least one minute, checked by validation. The dispatch cursor expands it
+  lazily, one due occurrence at a time. Nothing about a schedule is saved:
+  its next occurrence follows from the saved minute. Ties at one minute go in
+  schedule order (authored events, then movers; later capabilities append
+  their own schedules after these). Effects cannot start or stop a schedule;
+  an occurrence's authored condition decides whether it does anything.
+- **Exits beyond compass directions (M5b) · decided.** Roads are an undirected
+  list in `world.json`, each with an ASCII ID, two ends and optional travel
+  minutes, condition and blocked text; at most one road joins a pair, so
+  travel names its destination. A world, and even one location, may mix
+  roads with compass exits.
 - **Offers (M5c).** Proposed: the saved RNG draws an offer's parameters from
   authored candidate lists only at an explicit gameplay transition, such as the
   giver's recurring refresh or the player's arrival, and the drawn offer is
@@ -1528,11 +1530,12 @@ a proposed answer that still needs to be confirmed:
   is authored initial state, not runtime identity editing, so it stays within
   the original-character rules above. Still open: whether an option may skip
   or add later questions.
-- **Characters who move (M5b).** Proposed: a character may author a set of
+- **Characters who move (M5b) · decided.** A character may author a set of
   locations and a recurring schedule; each occurrence moves it to one of them,
-  drawn from a `world` RNG domain, and its location is saved keyed by its ID.
-  Occurrences are skipped while it rides in a party or is captive. Still open:
-  whether a move may avoid the player's current location.
+  uniformly drawn from a `world` RNG domain, possibly where it already is or
+  where the player stands, and its location is saved keyed by its ID. A mover
+  starts at its one placement and has no combat profile. Occurrences will be
+  skipped while it rides in a party or is captive, once those exist.
 - **Proficiencies (M6).** Proposed: following [Section 8](#8-checks-and-proficiencies),
   each capability owns the proficiencies it needs (trading in the economy,
   leadership in the retinue, surgery in mass battle), with its own ranks and
@@ -1544,22 +1547,26 @@ a proposed answer that still needs to be confirmed:
   and optionally capped by an authored stat; each proficiency is personal or
   party, and a party proficiency uses the best rank in the retinue; items can
   teach a rank through study over world time or grant a bonus while carried.
-- **Price model (M6a).** Decided: prices follow production, not stock. Each
+- **Price model (M6a) · decided.** Prices follow production, not stock. Each
   market keeps a price index per good in thousandths of the base price, within
   authored bounds. A recurring price tick moves it against net supply
-  (production minus consumption from authored producer counts), reverts it
+  (production minus consumption from authored producer counts, where
+  producers' consumption of a good shrinks by 1,000 ÷ index while it is
+  dear), reverts it
   towards base, pulls processed goods up towards dearer inputs and converges
   linked markets, in four phases with draws in authored market and goods order
-  and convergence applied from one snapshot; caravans converge their destination
-  on arrival. The player's own purchases and sales move the index at once by an
-  authored step. The buying and selling prices sit either side of base × index
-  by an authored spread that trading narrows, with one final rounding.
+  and convergence applied from one snapshot; caravans will converge their
+  destination on arrival. The player's own purchases and sales move the index
+  at once by an authored step per unit. Buying costs base × index × (100 +
+  spread) and selling fetches base × index ÷ (100 + spread), with one final
+  rounding, as the source does; a trading proficiency will narrow the spread.
   Prosperity drifts daily towards an ideal set by scarcity and buildings, and
   scales income, tariffs, stock and recruit pools
-  ([Economy](sandbox-worlds.md#economy)). Still open: how many warm-up rounds an
-  authoring tool runs for initial prices, and whether the price tick's draws
-  should be replaced by fixed fractions of the bound, which would drop the
-  `market` RNG domain from prices entirely.
+  ([Economy](sandbox-worlds.md#economy)). As delivered in M6a-1: the supply
+  draws stay, from their own `market` stream; phase 1 clamps to the bounds so
+  later phases work on valid indices; and warm-up rounds are an authoring
+  choice, run by `scripts/combat_sim economy --prices`, never by the engine.
+  Prosperity, stock, workshops and proficiency wait for M6a-2.
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.

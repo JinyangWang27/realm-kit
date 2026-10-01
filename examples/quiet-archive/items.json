@@ -1,3 +1,4 @@
 [
-  { "id": "vault_key", "name": "Vault key", "description": "Brass, warm from Pell's pocket." }
+  { "id": "vault_key", "name": "Vault key", "description": "Brass, warm from Pell's pocket." },
+  { "id": "pen", "name": "Reed pen", "description": "The copyist's spare, split at the nib." }
 ]

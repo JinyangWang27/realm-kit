@@ -64,22 +64,132 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
         state.combat.is_some() == world.combat().is_some(),
         "combat state does not match the world",
     )?;
+    // Each stream exists exactly when content draws from it.
     ensure(
-        state.rng.is_some() == world.stochastic()
-            && state.rng.is_none_or(|r| r.version == RNG_VERSION),
+        match state.rng {
+            None => !world.stochastic(),
+            Some(r) => {
+                r.version == RNG_VERSION
+                    && r.combat.is_some() == world.random_combat()
+                    && r.world.is_some() == world.random_world()
+                    && r.market.is_some() == world.random_market()
+            }
+        },
         "random state does not match the world",
+    )?;
+    time(world, state)?;
+    economy(world, state)
+}
+
+/// Currency within its bound, and an index for every good at every market
+/// within the index bounds.
+fn economy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let valid = match (world.economy(), &state.economy) {
+        (None, None) => true,
+        (Some(economy), Some(wallet)) => {
+            let [low, high] = economy.index_bounds;
+            wallet.currency <= realmkit_spec::CURRENCY_BOUND
+                && wallet.prices.len() == economy.markets.len()
+                && economy.markets.iter().all(|market| {
+                    wallet.prices.get(&market.location).is_some_and(|prices| {
+                        prices.len() == economy.goods.len()
+                            && economy.goods.iter().all(|good| {
+                                prices
+                                    .get(&good.item)
+                                    .is_some_and(|i| (low..=high).contains(i))
+                            })
+                    })
+                })
+        }
+        _ => false,
+    };
+    ensure(valid, "currency or prices do not match the world")
+}
+
+/// The clock is within its bounds, and every mover is somewhere it may be.
+fn time(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    ensure(
+        match (&world.world.time, state.time) {
+            (Some(time), Some(now)) => now >= time.start && now <= realmkit_spec::WORLD_TIME_BOUND,
+            (None, None) => true,
+            _ => false,
+        },
+        "world time does not match the world",
+    )?;
+    let movers: Vec<_> = world
+        .characters
+        .iter()
+        .filter_map(|c| Some((&c.id, c.moves.as_ref()?)))
+        .collect();
+    // Before its first move, a mover is still where it was placed.
+    let now = state.time.unwrap_or(0);
+    let placed = |id: &Id| world.locations.iter().find(|l| l.characters.contains(id));
+    ensure(
+        state.whereabouts.len() == movers.len()
+            && movers.iter().all(|(id, moves)| {
+                state.whereabouts.get(*id).is_some_and(|at| {
+                    moves.among.contains(at)
+                        && (now >= moves.schedule.at || placed(id).is_some_and(|l| &l.id == at))
+                })
+            }),
+        "a character who moves is somewhere it cannot be",
     )
 }
 
-/// Conditions that, once true, stay true: flags are never cleared and ranks
-/// never fall. A quest's status moves on, so it proves nothing later.
-fn lasting(state: &GameState, conditions: &[Condition]) -> bool {
-    let lasting: Vec<_> = conditions
+/// Effects that could have happened by the saved minute: every dialogue
+/// choice's, and every event's whose first occurrence has come.
+pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effect> {
+    let now = state.time.unwrap_or(0);
+    let choices = world
+        .dialogues
         .iter()
-        .filter(|c| !matches!(c, Condition::Quest { .. }))
-        .cloned()
-        .collect();
-    rules::conditions_met(state, &lasting)
+        .flat_map(|d| &d.nodes)
+        .flat_map(|n| &n.choices)
+        .flat_map(|c| &c.effects);
+    let events = world
+        .world
+        .events
+        .iter()
+        .filter(|e| e.schedule.at <= now)
+        .flat_map(|e| &e.effects);
+    choices.chain(events).collect()
+}
+
+/// Whether an optional requirement could have held at some earlier moment.
+fn lasting(world: &WorldSpec, state: &GameState, requires: Option<&Condition>) -> bool {
+    requires.is_none_or(|c| could_have_been(world, state, c, true))
+}
+
+/// Whether `condition` could once have evaluated to `value`. Flags are never
+/// cleared and ranks never fall, so a flag or rank that was once required
+/// still holds. Every flag starts unset, and techniques other than the
+/// starting ones start unlearned; quest states and items move both ways, so
+/// anything else proves nothing. Branches are judged separately, which can
+/// only accept more.
+fn could_have_been(
+    world: &WorldSpec,
+    state: &GameState,
+    condition: &Condition,
+    value: bool,
+) -> bool {
+    let could = |c, v| could_have_been(world, state, c, v);
+    match condition {
+        Condition::All { of } if value => of.iter().all(|c| could(c, true)),
+        Condition::All { of } => of.iter().any(|c| could(c, false)),
+        Condition::Any { of } if value => of.iter().any(|c| could(c, true)),
+        Condition::Any { of } => of.iter().all(|c| could(c, false)),
+        Condition::Not { condition } => could(condition, !value),
+        Condition::Flag { .. } | Condition::Technique { .. } if value => {
+            rules::holds(state, condition)
+        }
+        // A starting technique was known at that rank from the first moment.
+        Condition::Technique { technique, rank } => !world
+            .combat()
+            .into_iter()
+            .flat_map(|c| &c.player_techniques)
+            .any(|g| &g.technique == technique && g.rank.unwrap_or(1) >= *rank),
+        _ => true,
+    }
 }
 
 /// Crafting that trains a technique teaches it, so it must be learned.
@@ -93,9 +203,9 @@ fn trained(state: &GameState, grant: Option<&realmkit_spec::TechniqueGrant>) -> 
 }
 
 /// A recipe the player could have used, as far as a snapshot can tell.
-fn qualified(state: &GameState, recipe: &realmkit_spec::Recipe) -> bool {
-    lasting(state, &recipe.known_when)
-        && lasting(state, &recipe.requires)
+fn qualified(world: &WorldSpec, state: &GameState, recipe: &realmkit_spec::Recipe) -> bool {
+    lasting(world, state, recipe.known_when.as_ref())
+        && lasting(world, state, recipe.requires.as_ref())
         && trained(state, recipe.trains.as_ref())
 }
 
@@ -152,6 +262,14 @@ struct Progress<'w> {
     xp_ceiling: u64,
     any_repeatable: bool,
     repeatable_loot: BTreeSet<&'w Id>,
+    /// Items effects grant or take, which a choice can do any number of
+    /// times, so their counts follow from nothing.
+    loose: BTreeSet<&'w Id>,
+    /// Effects that could have happened by the saved minute.
+    fired: Vec<&'w Effect>,
+    /// Items effects only take, never grant: their counts can fall below
+    /// what progress granted, but never rise above it.
+    taken: BTreeSet<&'w Id>,
     /// Materials crafting spends: at most what progress granted, maybe less.
     spendable: BTreeSet<&'w Id>,
     /// Items crafting makes: at least what progress granted, maybe more.
@@ -215,7 +333,28 @@ impl<'w> Progress<'w> {
             .chain(catalysts)
             .map(|s| &s.item)
             .collect();
+        // Trade goods come and go at markets too.
+        let goods = world.economy().into_iter().flat_map(|e| &e.goods);
+        let fired = fired(world, state);
+        let stacks = |taking: bool| {
+            fired.iter().flat_map(move |e| match e {
+                Effect::GrantItems { items } if !taking => items.as_slice(),
+                Effect::TakeItems { items } if taking => items.as_slice(),
+                _ => &[],
+            })
+        };
+        let loose: BTreeSet<&Id> = stacks(false)
+            .map(|s| &s.item)
+            .chain(goods.map(|g| &g.item))
+            .collect();
+        let taken = stacks(true)
+            .map(|s| &s.item)
+            .filter(|item| !loose.contains(item))
+            .collect();
         Ok(Self {
+            fired,
+            loose,
+            taken,
             spendable,
             forged: recipes.map(|r| &r.output).collect(),
             inventory,
@@ -250,13 +389,19 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
         progress
             .inventory
             .iter()
-            .filter(|(item, _)| !progress.spendable.contains(item))
+            .filter(|(item, _)| {
+                !progress.spendable.contains(item)
+                    && !progress.loose.contains(item)
+                    && !progress.taken.contains(item)
+            })
             .all(|(item, count)| held.get(item).is_some_and(|h| h >= count))
             && held.iter().all(|(item, h)| {
                 let granted = progress.inventory.get(item).copied().unwrap_or(0);
                 *h == granted
                     || progress.repeatable_loot.contains(item)
-                    || (progress.spendable.contains(item) && *h < granted)
+                    || progress.loose.contains(item)
+                    || ((progress.spendable.contains(item) || progress.taken.contains(item))
+                        && *h < granted)
                     || progress.forged.contains(item)
             }),
         "inventory does not match progress",
@@ -272,8 +417,12 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
             let at = |spent: &BTreeMap<&Id, u64>| {
                 held.saturating_add(spent.get(*item).copied().unwrap_or(0))
             };
+            // Something taken may also have been handed over, so then only
+            // the upper bound holds.
             progress.repeatable_loot.contains(item)
-                || (at(&least) <= granted && at(&most) >= granted)
+                || progress.loose.contains(item)
+                || (at(&least) <= granted
+                    && (progress.taken.contains(item) || at(&most) >= granted))
         }),
         "crafting does not match the materials it needed",
     )
@@ -305,7 +454,7 @@ fn spent<'w>(
         let recipes: Vec<_> = rules
             .recipes
             .iter()
-            .filter(|r| &&r.output == output && qualified(state, r))
+            .filter(|r| &&r.output == output && qualified(world, state, r))
             .collect();
         let materials: BTreeSet<&Id> = recipes
             .iter()
@@ -324,7 +473,7 @@ fn spent<'w>(
             // exact check searches assignments of recipes to pieces.
             let cheapest = recipes.iter().map(cost).min().unwrap_or(0);
             let dearest = recipes.iter().map(cost).max().unwrap_or(0);
-            if !progress.repeatable_loot.contains(output) {
+            if !progress.repeatable_loot.contains(output) && !progress.loose.contains(output) {
                 add(&mut least, material, cheapest.saturating_mul(forged));
             }
             add(&mut most, material, dearest.saturating_mul(forged));
@@ -361,21 +510,41 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
         .flat_map(|g| g.victory_flags.iter().chain(&g.defeat_flags))
         .cloned()
         .collect();
-    let dialogue_flags: BTreeSet<_> = world
-        .dialogues
+    let effect_flags: BTreeSet<_> = progress
+        .fired
         .iter()
-        .flat_map(|d| &d.nodes)
-        .flat_map(|n| &n.choices)
-        .filter_map(|c| match &c.effect {
-            Some(DialogueEffect::SetFlag { flag }) => Some(flag.clone()),
+        .filter_map(|e| match e {
+            Effect::SetFlag { flag } => Some(flag.clone()),
             _ => None,
         })
         .collect();
+    // An unconditional event that only sets flags cannot fail, so once its
+    // first minute has come, its flags are set.
+    let now = state.time.unwrap_or(0);
+    let mut required = world
+        .world
+        .events
+        .iter()
+        .filter(|e| e.requires.is_none() && e.schedule.at <= now)
+        .filter(|e| {
+            e.effects
+                .iter()
+                .all(|f| matches!(f, Effect::SetFlag { .. }))
+        })
+        .flat_map(|e| &e.effects)
+        .filter_map(|e| match e {
+            Effect::SetFlag { flag } => Some(flag),
+            _ => None,
+        });
+    ensure(
+        required.all(|flag| state.flags.contains(flag)),
+        "an event that has happened left no mark",
+    )?;
     ensure(
         progress.quest_flags.is_subset(&state.flags)
             && state.flags.iter().all(|f| {
                 progress.quest_flags.contains(f)
-                    || dialogue_flags.contains(f)
+                    || effect_flags.contains(f)
                     || group_flags.contains(f)
             }),
         "story flags do not match progress",

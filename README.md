@@ -110,8 +110,9 @@ The engine is synchronous. `Engine::new(&world)` validates its input;
 `Engine::restore(&world, snapshot)` resumes it or rejects it whole when it
 belongs to another package, revision or route, or holds impossible state.
 Given the same world and command sequence, state and events are identical.
-There are no clocks, network clients or AI SDKs in gameplay. Randomness exists
-only in worlds that author it (critical hits in `examples/arena`), and comes from
+There are no wall clocks, network clients or AI SDKs in gameplay. Randomness exists
+only in worlds that author it (critical hits in `examples/arena`, a wandering
+storyteller and daily price changes in `examples/marches`), and comes from
 a seeded, versioned generator saved with the game: `--seed <n>` replays a run
 exactly, and without it the CLI picks a seed from the clock and prints it.
 
@@ -135,6 +136,16 @@ At a station such as an anvil, known recipes forge new pieces from materials
 and improvement tiers make a piece better one step at a time, trained by a
 smithing technique. At an altar, a learned enchantment is laid on a piece
 once for good, and stays through later improvement (`examples/smithy`).
+Worlds can also keep a clock (`examples/marches`). Roads between places take
+authored time (`Travel to Ashmere — 2 h`, or `travel ashmere`), `wait 2h` lets
+time pass, some people keep hours, others wander from town to town on a
+schedule, and events such as a thaw that opens a causeway happen at set times
+whether or not you are there. Time moves only when you travel, wait or rest.
+Worlds with an economy have currency and markets: buy smoked eels where the
+fen is full of them and sell them where they are scarce (`Market ›`, or
+`buy eels 6`, `sell eels 6`, `market`). Every unit you trade nudges the local
+price, and once a day each market's prices drift with what it makes and
+needs, so a good route stops paying if you flood it.
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting

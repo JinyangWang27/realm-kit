@@ -95,6 +95,40 @@ pub fn stat_name(world: &realmkit_spec::WorldSpec, stat: Stat) -> String {
     }
 }
 
+/// An amount in the world's currency, such as "120 silver".
+pub fn money(world: &realmkit_spec::WorldSpec, amount: u64) -> String {
+    let amount = amount.to_string();
+    match world.economy() {
+        Some(economy) => {
+            interpolate(&economy.currency.format, &[("amount", &amount)]).unwrap_or(amount)
+        }
+        None => amount,
+    }
+}
+
+/// "45 min", "1 h 30 min", "2 d 4 h".
+pub fn duration(minutes: u64) -> String {
+    let (days, hours, mins) = (minutes / 1_440, minutes % 1_440 / 60, minutes % 60);
+    let parts: Vec<String> = [(days, "d"), (hours, "h"), (mins, "min")]
+        .into_iter()
+        .filter(|(n, _)| *n > 0)
+        .map(|(n, unit)| format!("{n} {unit}"))
+        .collect();
+    if parts.is_empty() {
+        "0 min".into()
+    } else {
+        parts.join(" ")
+    }
+}
+
+/// The world's clock at `minute`, from its authored template.
+pub fn clock(world: &realmkit_spec::WorldSpec, minute: u64) -> Option<String> {
+    let time = world.world.time.as_ref()?;
+    let values = realmkit_spec::clock_values(minute);
+    let values: Vec<(&str, &str)> = values.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    interpolate(&time.clock, &values).ok()
+}
+
 pub fn direction_name(direction: Direction) -> &'static str {
     match direction {
         Direction::North => "north",
@@ -217,6 +251,9 @@ pub fn events(
     let world = engine.world();
     let name = |id: &str| &world.character(id).unwrap().name;
     let player = name(&world.world.player);
+    // After travel the location shows the clock, so the time is repeated
+    // only to date something that happened on the way.
+    let travelled = events.iter().any(|e| matches!(e, Event::Moved { .. }));
     for event in events {
         match event {
             Event::LocationViewed { location } => {
@@ -379,6 +416,47 @@ pub fn events(
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,
             Event::QuestsViewed => panels::quests(output, engine, paint)?,
+            Event::TimePassed {
+                eventful: false, ..
+            } if travelled => {}
+            Event::TimePassed { minutes, now, .. } => writeln!(
+                output,
+                "{}",
+                paint.dim(&format!(
+                    "{} later: {}",
+                    duration(*minutes),
+                    clock(world, *now).unwrap_or_default()
+                ))
+            )?,
+            Event::CharacterArrived { character } => {
+                writeln!(output, "{} arrives.", name(character))?
+            }
+            Event::CharacterLeft { character } => writeln!(output, "{} leaves.", name(character))?,
+            Event::Bought {
+                good,
+                quantity,
+                cost,
+            } => writeln!(
+                output,
+                "Bought: {} ×{quantity} for {}",
+                world.item(good).unwrap().name,
+                money(world, *cost)
+            )?,
+            Event::Sold {
+                good,
+                quantity,
+                earned,
+            } => writeln!(
+                output,
+                "Sold: {} ×{quantity} for {}",
+                world.item(good).unwrap().name,
+                money(world, *earned)
+            )?,
+            Event::CurrencyReceived { amount } => {
+                writeln!(output, "Received: {}", money(world, *amount))?
+            }
+            Event::CurrencyPaid { amount } => writeln!(output, "Paid: {}", money(world, *amount))?,
+            Event::MarketViewed => panels::market(output, engine, paint)?,
             Event::Moved { .. } | Event::DialogueEnded | Event::StoryFlagSet { .. } => {}
         }
     }
@@ -388,6 +466,37 @@ pub fn events(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_journey_is_dated_only_when_something_happened_on_the_way() {
+        let world = realmkit_spec::WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/marches"
+        ))
+        .unwrap();
+        let engine = Engine::new(&world).unwrap();
+        let render = |batch: &[Event]| {
+            let mut output = Vec::new();
+            events(&mut output, &engine, batch, Paint::default()).unwrap();
+            String::from_utf8(output).unwrap()
+        };
+        let moved = Event::Moved {
+            from: "greyford".into(),
+            to: "ashmere".into(),
+        };
+        let passed = |eventful| Event::TimePassed {
+            minutes: 120,
+            now: 600,
+            eventful,
+        };
+        let quiet = render(&[moved.clone(), passed(false)]);
+        assert!(!quiet.contains("later"), "{quiet}");
+        let eventful = render(&[moved, Event::CurrencyReceived { amount: 5 }, passed(true)]);
+        assert!(
+            eventful.contains("Received: 5 silver\n2 h later: Day 1, 10:00"),
+            "{eventful}"
+        );
+    }
 
     #[test]
     fn interpolation_preserves_unicode_and_does_not_reinterpret_values() {

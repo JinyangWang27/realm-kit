@@ -25,8 +25,8 @@ pub(super) fn crafting(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat
                 format!("a recipe forges a wearable item: {}", recipe.output),
             );
         }
-        conditions(out, w, id, &recipe.known_when);
-        conditions(out, w, id, &recipe.requires);
+        condition(out, w, id, recipe.known_when.as_ref());
+        condition(out, w, id, recipe.requires.as_ref());
         trains(out, w, id, recipe.trains.as_ref());
     }
     enchantments(out, w, combat, &stations);
@@ -39,7 +39,7 @@ pub(super) fn crafting(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat
             template(out, id, &tier.name.0, &["item"]);
             station(out, id, &tier.station, &stations);
             materials(out, w, id, &tier.cost);
-            conditions(out, w, id, &tier.requires);
+            condition(out, w, id, tier.requires.as_ref());
             trains(out, w, id, tier.trains.as_ref());
             if tier
                 .bonuses
@@ -96,8 +96,8 @@ fn enchantments(
         }
         station(out, id, &enchantment.station, stations);
         materials(out, w, id, &enchantment.catalyst);
-        conditions(out, w, id, &enchantment.known_when);
-        conditions(out, w, id, &enchantment.requires);
+        condition(out, w, id, enchantment.known_when.as_ref());
+        condition(out, w, id, enchantment.requires.as_ref());
         trains(out, w, id, enchantment.trains.as_ref());
     }
 }

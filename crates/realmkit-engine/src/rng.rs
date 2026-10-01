@@ -8,21 +8,38 @@ pub const RNG_VERSION: u32 = 1;
 /// "combat" in ASCII: each domain starts from its own state, so draws in one
 /// never shift another.
 const DOMAIN_COMBAT: u64 = 0x636f_6d62_6174;
+/// "world" in ASCII: characters who move.
+const DOMAIN_WORLD: u64 = 0x77_6f72_6c64;
+/// "market" in ASCII: the price tick.
+const DOMAIN_MARKET: u64 = 0x6d61_726b_6574;
 
-/// Saved generator state, one stream per random domain.
+/// Saved generator state, one stream per random domain. A domain exists
+/// only in worlds whose content draws from it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RngState {
     pub version: u32,
-    pub combat: u64,
+    /// Critical hits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<u64>,
+    /// Characters who move.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub world: Option<u64>,
+    /// The price tick.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub market: Option<u64>,
 }
 
 impl RngState {
-    pub fn new(seed: u64) -> Self {
-        Self {
+    /// The streams `world`'s content draws from, or `None` if it draws nothing.
+    pub fn for_world(world: &realmkit_spec::WorldSpec, seed: u64) -> Option<Self> {
+        let state = Self {
             version: RNG_VERSION,
-            combat: seed ^ DOMAIN_COMBAT,
-        }
+            combat: world.random_combat().then_some(seed ^ DOMAIN_COMBAT),
+            world: world.random_world().then_some(seed ^ DOMAIN_WORLD),
+            market: world.random_market().then_some(seed ^ DOMAIN_MARKET),
+        };
+        world.stochastic().then_some(state)
     }
 }
 
@@ -33,6 +50,12 @@ pub fn splitmix64(state: &mut u64) -> u64 {
     z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
     z ^ (z >> 31)
+}
+
+/// A uniform draw below `n` (which is positive), scaled by multiplication
+/// rather than a biased modulo.
+pub(crate) fn below(state: &mut u64, n: u64) -> u64 {
+    ((u128::from(splitmix64(state)) * u128::from(n)) >> 64) as u64
 }
 
 /// A draw that succeeds `percent` times in 100, scaled by multiplication

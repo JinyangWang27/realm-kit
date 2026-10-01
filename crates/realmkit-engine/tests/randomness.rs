@@ -28,9 +28,15 @@ fn a_world_without_random_content_keeps_no_generator() {
     }
     let world = arena();
     assert!(world.stochastic());
+    // Only the combat stream: nothing in the arena moves.
     assert_eq!(
         Engine::new_with_seed(&world, 7).unwrap().state().rng,
-        Some(RngState::new(7))
+        Some(RngState {
+            version: RNG_VERSION,
+            combat: Some(7 ^ 0x636f_6d62_6174),
+            world: None,
+            market: None,
+        })
     );
 }
 
@@ -111,8 +117,12 @@ fn a_mid_stream_save_continues_the_sequence_and_refusals_draw_nothing() {
     other.state.rng.as_mut().unwrap().version = RNG_VERSION + 1;
     assert!(Engine::restore(&world, other).is_err());
     let mut stray = Engine::new(&duel()).unwrap().snapshot();
-    stray.state.rng = Some(RngState::new(1));
+    stray.state.rng = RngState::for_world(&world, 1);
     assert!(Engine::restore(&duel(), stray).is_err());
+    // A stream for a domain the world never draws from is refused too.
+    let mut extra = engine.snapshot();
+    extra.state.rng.as_mut().unwrap().world = Some(1);
+    assert!(Engine::restore(&world, extra).is_err());
 }
 
 #[test]

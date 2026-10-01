@@ -145,13 +145,13 @@ fn an_improved_mail_keeps_its_lighter_penalty() {
     let mut world = smithy();
     // Make mail an apprentice's work so the test needs only ingots.
     let combat = world.world.combat.as_mut().unwrap();
-    combat.recipes[1].requires.clear();
+    combat.recipes[1].requires = None;
     let mail = world
         .items
         .iter_mut()
         .find(|i| i.id == "iron_mail")
         .unwrap();
-    mail.equipment.as_mut().unwrap().tiers[0].requires.clear();
+    mail.equipment.as_mut().unwrap().tiers[0].requires = None;
     let mut engine = at_the_anvil(&world, 5);
     engine.execute(Forge("iron_mail".into())).unwrap();
     engine.execute(Equip(1)).unwrap();
@@ -236,7 +236,7 @@ fn materials_never_exceed_their_grants() {
 fn improving_clamps_vitals_only_after_training() {
     let mut world = smithy();
     let combat = world.world.combat.as_mut().unwrap();
-    combat.recipes[1].requires.clear();
+    combat.recipes[1].requires = None;
     // Journeyman gives back the HP that Fine mail no longer does.
     combat.techniques[0].ranks[1].passive = [(Stat::Hp, 10)].into();
     let mail = world
@@ -246,7 +246,7 @@ fn improving_clamps_vitals_only_after_training() {
         .unwrap();
     let gear = mail.equipment.as_mut().unwrap();
     gear.bonuses.insert(Stat::Hp, 10);
-    gear.tiers[0].requires.clear();
+    gear.tiers[0].requires = None;
     gear.tiers[0].trains = Some(TechniqueGrant {
         technique: "smithing".into(),
         rank: None,
@@ -376,10 +376,10 @@ fn material_bounds_count_only_recipes_the_player_qualified_for() {
     let mut masterwork = combat.recipes[0].clone();
     masterwork.id = "masterwork_sword".into();
     masterwork.inputs[0].quantity = 5;
-    masterwork.requires = vec![Condition::Technique {
+    masterwork.requires = Some(Condition::Technique {
         technique: "smithing".into(),
         rank: 3,
-    }];
+    });
     combat.recipes.push(masterwork);
     let beetle = world
         .characters
@@ -542,9 +542,9 @@ fn a_technique_only_crafting_teaches_needs_the_crafting_in_the_save() {
     let mut world = smithy();
     // Maud tells, but does not teach: laying Keenness is the only lesson.
     let maud = world.dialogues.iter_mut().find(|d| d.id == "maud").unwrap();
-    maud.nodes[1].choices[0].effect = None;
+    maud.nodes[1].choices[0].effects.clear();
     let combat = world.world.combat.as_mut().unwrap();
-    combat.enchantments[0].requires.clear();
+    combat.enchantments[0].requires = None;
     let mut engine = at_the_anvil(&world, 5);
     engine.execute(Forge("iron_sword".into())).unwrap();
     to_the_altar(&mut engine);
@@ -567,10 +567,10 @@ fn a_technique_only_crafting_teaches_needs_the_crafting_in_the_save() {
 
     // An enchantment that needs the very technique it would teach explains
     // nothing: it could only be laid by someone who knew it already.
-    world.world.combat.as_mut().unwrap().enchantments[0].requires = vec![Condition::Technique {
+    world.world.combat.as_mut().unwrap().enchantments[0].requires = Some(Condition::Technique {
         technique: "enchanting".into(),
         rank: 1,
-    }];
+    });
     let mut circular = snapshot;
     circular.package_revision = world.revision();
     assert!(Engine::restore(&world, circular).is_err());
@@ -578,4 +578,79 @@ fn a_technique_only_crafting_teaches_needs_the_crafting_in_the_save() {
 
 fn combat_state_has(engine: &Engine<'_>, technique: &str) -> bool {
     combat(engine).techniques.contains_key(technique)
+}
+
+#[test]
+fn a_save_judges_condition_trees_by_what_could_once_have_held() {
+    let mut world = smithy();
+    let flag = |flag: &str| Condition::Flag { flag: flag.into() };
+    let sword = &mut world.world.combat.as_mut().unwrap().recipes[0];
+    // Known only before enchanting is taught; usable with Smithing or that lesson.
+    sword.known_when = Some(Condition::All {
+        of: vec![
+            flag("taught_forging"),
+            Condition::Not {
+                condition: Box::new(flag("taught_enchanting")),
+            },
+        ],
+    });
+    sword.requires = Some(Condition::Any {
+        of: vec![
+            Condition::Technique {
+                technique: "smithing".into(),
+                rank: 1,
+            },
+            flag("taught_enchanting"),
+        ],
+    });
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    let snapshot = engine.snapshot();
+    assert!(Engine::restore(&world, snapshot.clone()).is_ok());
+    // The `not` held when the sword was forged, even if the flag is set now.
+    let mut later = snapshot.clone();
+    later.state.flags.insert("taught_enchanting".into());
+    assert!(Engine::restore(&world, later).is_ok());
+
+    // A flag that is required outright must still be set: flags never clear.
+    let sword = &mut world.world.combat.as_mut().unwrap().recipes[0];
+    sword.requires = Some(flag("taught_enchanting"));
+    let mut unearned = snapshot;
+    unearned.package_revision = world.revision();
+    assert!(matches!(
+        Engine::restore(&world, unearned),
+        Err(EngineError::InvalidSave(why)) if why.contains("crafting")
+    ));
+}
+
+#[test]
+fn a_starting_technique_was_never_unlearned() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    let mut snapshot = engine.snapshot();
+    // The same sword under content where the recipe needs the player not to
+    // know Enchanting, which everyone knows from the start.
+    let mut starting = smithy();
+    let combat = starting.world.combat.as_mut().unwrap();
+    combat.player_techniques.push(TechniqueGrant {
+        technique: "enchanting".into(),
+        rank: None,
+        xp: 0,
+    });
+    combat.recipes[0].requires = Some(Condition::Not {
+        condition: Box::new(Condition::Technique {
+            technique: "enchanting".into(),
+            rank: 1,
+        }),
+    });
+    snapshot.package_revision = starting.revision();
+    let fresh = Engine::new(&starting).unwrap();
+    let learned = fresh.state().combat.as_ref().unwrap().techniques["enchanting"];
+    let combat_state = snapshot.state.combat.as_mut().unwrap();
+    combat_state.techniques.insert("enchanting".into(), learned);
+    assert!(matches!(
+        Engine::restore(&starting, snapshot),
+        Err(EngineError::InvalidSave(why)) if why.contains("crafting")
+    ));
 }

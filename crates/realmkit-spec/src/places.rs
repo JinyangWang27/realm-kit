@@ -35,8 +35,8 @@ pub struct Location {
 #[serde(deny_unknown_fields)]
 pub struct Exit {
     pub destination: Id,
-    #[serde(default)]
-    pub requires: Vec<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<Condition>,
     pub blocked_text: String,
 }
 
@@ -47,13 +47,16 @@ pub struct Character {
     pub id: Id,
     pub name: String,
     pub description: String,
-    /// Conditions for the character to be present where it is placed.
-    #[serde(default)]
-    pub requires: Vec<Condition>,
+    /// The condition for the character to be present where it is placed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dialogue: Option<Id>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub combat: Option<CombatProfile>,
+    /// Moves among locations on a schedule instead of staying where placed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moves: Option<Moves>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -1,5 +1,5 @@
 {
-  "format_version": 11,
+  "format_version": 12,
   "id": "low_ford_smithy",
   "name": "The Smithy at Low Ford",
   "language": "en",
@@ -99,19 +99,15 @@
           }
         ],
         "output": "iron_sword",
-        "known_when": [
-          {
-            "kind": "flag",
-            "flag": "taught_forging"
-          }
-        ],
-        "requires": [
-          {
-            "kind": "technique",
-            "technique": "smithing",
-            "rank": 1
-          }
-        ],
+        "known_when": {
+          "kind": "flag",
+          "flag": "taught_forging"
+        },
+        "requires": {
+          "kind": "technique",
+          "technique": "smithing",
+          "rank": 1
+        },
         "trains": {
           "technique": "smithing",
           "xp": 10
@@ -127,19 +123,15 @@
           }
         ],
         "output": "iron_mail",
-        "known_when": [
-          {
-            "kind": "flag",
-            "flag": "taught_forging"
-          }
-        ],
-        "requires": [
-          {
-            "kind": "technique",
-            "technique": "smithing",
-            "rank": 2
-          }
-        ],
+        "known_when": {
+          "kind": "flag",
+          "flag": "taught_forging"
+        },
+        "requires": {
+          "kind": "technique",
+          "technique": "smithing",
+          "rank": 2
+        },
         "trains": {
           "technique": "smithing",
           "xp": 15
@@ -169,19 +161,15 @@
             "quantity": 1
           }
         ],
-        "known_when": [
-          {
-            "kind": "flag",
-            "flag": "taught_enchanting"
-          }
-        ],
-        "requires": [
-          {
-            "kind": "technique",
-            "technique": "enchanting",
-            "rank": 1
-          }
-        ],
+        "known_when": {
+          "kind": "flag",
+          "flag": "taught_enchanting"
+        },
+        "requires": {
+          "kind": "technique",
+          "technique": "enchanting",
+          "rank": 1
+        },
         "trains": {
           "technique": "enchanting",
           "xp": 10
@@ -204,19 +192,15 @@
             "quantity": 2
           }
         ],
-        "known_when": [
-          {
-            "kind": "flag",
-            "flag": "taught_enchanting"
-          }
-        ],
-        "requires": [
-          {
-            "kind": "technique",
-            "technique": "enchanting",
-            "rank": 2
-          }
-        ],
+        "known_when": {
+          "kind": "flag",
+          "flag": "taught_enchanting"
+        },
+        "requires": {
+          "kind": "technique",
+          "technique": "enchanting",
+          "rank": 2
+        },
         "trains": {
           "technique": "enchanting",
           "xp": 10

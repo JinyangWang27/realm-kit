@@ -4,15 +4,22 @@ use super::*;
 
 mod actions;
 mod crafting;
+mod economy;
 mod player;
 mod story;
+mod time;
 
 pub(super) use actions::actions;
+pub(super) use economy::quote;
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
 pub(super) use story::{choices, grant_items, grant_xp, progress, set_flag};
 
-pub(super) fn conditions_met(state: &GameState, conditions: &[Condition]) -> bool {
-    conditions.iter().all(|condition| match condition {
+/// Evaluates a condition against the state; pure, so it may run any number of times.
+pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
+    match condition {
+        Condition::All { of } => of.iter().all(|c| holds(state, c)),
+        Condition::Any { of } => of.iter().any(|c| holds(state, c)),
+        Condition::Not { condition } => !holds(state, condition),
         Condition::Flag { flag } => state.flags.contains(flag),
         Condition::Quest { quest, status } => state.quests.get(quest) == Some(status),
         Condition::Technique { technique, rank } => state
@@ -20,7 +27,30 @@ pub(super) fn conditions_met(state: &GameState, conditions: &[Condition]) -> boo
             .as_ref()
             .and_then(|c| c.techniques.get(technique))
             .is_some_and(|learned| learned.rank >= *rank),
-    })
+        Condition::Item { item, quantity } => state
+            .player
+            .inventory
+            .get(item)
+            .is_some_and(|n| n >= quantity),
+        // Validation keeps time conditions to worlds with a clock.
+        Condition::Currency { amount } => state
+            .economy
+            .as_ref()
+            .is_some_and(|e| e.currency >= *amount),
+        Condition::TimeOfDay { from, to } => state.time.is_some_and(|now| {
+            let minute = now % realmkit_spec::MINUTES_PER_DAY;
+            if from < to {
+                (*from..*to).contains(&minute)
+            } else {
+                minute >= *from || minute < *to
+            }
+        }),
+    }
+}
+
+/// An optional requirement: absent means always.
+pub(super) fn allowed(state: &GameState, requires: Option<&Condition>) -> bool {
+    requires.is_none_or(|c| holds(state, c))
 }
 
 pub(super) fn player_vitals(state: &GameState) -> Option<Vitals> {
@@ -54,21 +84,52 @@ fn fighting(state: &GameState) -> Option<&Encounter> {
     }
 }
 
-/// Placed at the player's location and present under its conditions.
+/// Characters at the player's location, whatever their conditions: those
+/// placed here in the location's order, then movers who are here now.
+pub(super) fn placed_here<'a>(world: &'a WorldSpec, state: &GameState) -> Vec<&'a Id> {
+    let here = &state.player.location;
+    let placed = world
+        .location(here)
+        .unwrap()
+        .characters
+        .iter()
+        .filter(|id| !state.whereabouts.contains_key(*id));
+    let movers = world
+        .characters
+        .iter()
+        .filter(|c| state.whereabouts.get(&c.id) == Some(here))
+        .map(|c| &c.id);
+    placed.chain(movers).collect()
+}
+
+/// Who is at the player's location now: placed or moved here, present
+/// under their conditions and not defeated, in [`placed_here`] order.
+pub(super) fn present_here<'a>(world: &'a WorldSpec, state: &GameState) -> Vec<&'a Character> {
+    placed_here(world, state)
+        .into_iter()
+        .filter(|id| !defeated(state, id))
+        .filter_map(|id| character_here(world, state, id))
+        .collect()
+}
+
+/// At the player's location and present under its conditions.
 pub(super) fn character_here<'a>(
     world: &'a WorldSpec,
     state: &GameState,
     id: &str,
 ) -> Option<&'a Character> {
-    let placed = world
-        .location(&state.player.location)
-        .unwrap()
-        .characters
-        .iter()
-        .any(|c| c == id);
+    let here = match state.whereabouts.get(id) {
+        Some(at) => *at == state.player.location,
+        None => world
+            .location(&state.player.location)
+            .unwrap()
+            .characters
+            .iter()
+            .any(|c| c == id),
+    };
     world
         .character(id)
-        .filter(|c| placed && conditions_met(state, &c.requires))
+        .filter(|c| here && allowed(state, c.requires.as_ref()))
 }
 
 /// Can be talked to here; a defeated fighter is gone, like its listing.
@@ -85,6 +146,7 @@ pub(super) fn is_panel(command: &Command) -> bool {
             | Command::Inventory
             | Command::Quests
             | Command::Techniques
+            | Command::Market
     )
 }
 
@@ -114,7 +176,19 @@ pub(super) fn execute(
         Command::Status => events.push(Event::StatusViewed),
         Command::Quests => events.push(Event::QuestsViewed),
         Command::Techniques => events.push(Event::TechniquesViewed),
+        Command::Market => {
+            economy::market_here(world, state)?;
+            events.push(Event::MarketViewed)
+        }
+        Command::Buy { good, quantity } => {
+            economy::trade(world, state, &good, quantity, true, &mut events)?
+        }
+        Command::Sell { good, quantity } => {
+            economy::trade(world, state, &good, quantity, false, &mut events)?
+        }
         Command::Move(direction) => move_to(world, state, direction, &mut events)?,
+        Command::Travel(to) => time::travel(world, state, to, &mut events)?,
+        Command::Wait(minutes) => time::wait(world, state, minutes, &mut events)?,
         Command::Talk(id) => story::talk(world, state, id, &mut events)?,
         Command::ChooseDialogue(number) => story::choose(world, state, number, &mut events)?,
         Command::AcceptQuest(id) => {
@@ -145,6 +219,16 @@ pub(super) fn execute(
     // A flag or quest this command changed may open a breakthrough gate.
     if !panel {
         techniques::promote(world, state, &mut events);
+        // Any change, such as a trade that empties a choice's condition, can
+        // leave the conversation with no speaker or nothing to say: it ends.
+        if let Some(open) = &state.dialogue {
+            if !npc_here(world, state, &open.npc)
+                || choices(world, state, &open.npc, &open.node).is_empty()
+            {
+                state.dialogue = None;
+                events.push(Event::DialogueEnded);
+            }
+        }
     }
     Ok(events)
 }
@@ -157,7 +241,7 @@ fn move_to(
 ) -> Result<(), EngineError> {
     let location = world.location(&state.player.location).unwrap();
     let exit = location.exits.get(&direction).ok_or(EngineError::NoExit)?;
-    if !conditions_met(state, &exit.requires) {
+    if !allowed(state, exit.requires.as_ref()) {
         return Err(EngineError::ExitLocked {
             location: location.id.clone(),
             direction,

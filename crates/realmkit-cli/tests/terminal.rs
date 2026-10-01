@@ -519,3 +519,68 @@ fn the_smithy_forges_improves_and_keeps_copies_apart() {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
 }
+
+const MARCHES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/marches");
+
+#[test]
+fn the_marches_pass_time_on_roads_and_by_waiting() {
+    let dir = saves_dir("marches");
+    let walkthrough = std::fs::read_to_string(format!("{MARCHES}/walkthrough.txt")).unwrap();
+    let output = run(
+        &["play", MARCHES, "--line", "--seed", "7", "--saves", &dir],
+        &walkthrough,
+    );
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "Greyford\nDay 1, 08:00\n",
+        "Roads: Ashmere (2 h), Hollin Keep (4 h)\n",
+        "2. Travel to Ashmere — 2 h",
+        "3. Travel to Vellmarket — 3 h [locked]",
+        "4. Wait — 1 h",
+        "Ashmere\nDay 1, 10:00\n",
+        "Roads: Greyford (2 h), Vellmarket (3 h, closed)",
+        "Hollin Keep\nDay 1, 16:00\n",
+        "Meltwater still covers the fen causeway.",
+        "16 h later: Day 2, 14:00",
+        "Vellmarket\nDay 2, 17:00\n",
+        "The Reeve's Letter [carry_letter]: Completed",
+        // Trading: eels from the fen sell dearer in Vellmarket, cloth in Greyford.
+        "Market at Greyford:\n  Grain — buy 17 silver · sell 13 silver · carried 0\n",
+        "Bought: Smoked eels ×6 for 63 silver",
+        "Received: 60 silver",
+        "Sold: Smoked eels ×6 for 93 silver",
+        "Bought: Cloth ×1 for 98 silver",
+        "Sold: Cloth ×1 for 135 silver",
+        "Inventory:\n  227 silver\n",
+        "5. Market ›",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    // Travel shows the clock once, at the destination.
+    assert!(!text.contains("2 h later"), "{text}");
+    let help = String::from_utf8(run(&["play", MARCHES], "help\n").stdout).unwrap();
+    assert!(help.contains("travel <location-id>"));
+    assert!(help.contains("buy <item> [units]"));
+    // The market submenu prices every good, and shows what cannot be afforded.
+    let menu = run(
+        &["play", MARCHES, "--line", "--seed", "7"],
+        "travel ashmere\n5\n2\n",
+    );
+    let menu = String::from_utf8(menu.stdout).unwrap();
+    for passage in [
+        "Market\n  1. Prices\n  2. Buy Grain — 14 silver (next 15 silver)\n",
+        "4. Buy Cloth — 184 silver [cannot afford]",
+        "Bought: Grain ×1 for 14 silver",
+        "Sell Grain (1) — 9 silver (next 9 silver)",
+    ] {
+        assert!(menu.contains(passage), "missing {passage:?} in {menu}");
+    }
+    assert!(help.contains("wait [minutes]"));
+    // A save made on the road resumes at the same minute.
+    let resumed = run(&["play", MARCHES, "--line", "--saves", &dir], "load\n");
+    assert!(String::from_utf8(resumed.stdout)
+        .unwrap()
+        .contains("Loaded save 2."));
+    std::fs::remove_dir_all(dir).unwrap();
+}

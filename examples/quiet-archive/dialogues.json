@@ -10,18 +10,29 @@
           {
             "text": "Is something wrong?",
             "next": "request",
-            "requires": [{ "kind": "quest", "quest": "lost_map", "status": "available" }]
+            "requires": { "kind": "quest", "quest": "lost_map", "status": "available" }
           },
           {
             "text": "The copyist has the map. He was only mending it.",
             "next": "thanks",
-            "requires": [{ "kind": "quest", "quest": "lost_map", "status": "ready" }],
-            "effect": { "kind": "complete_quest", "quest": "lost_map" }
+            "requires": { "kind": "quest", "quest": "lost_map", "status": "ready" },
+            "effects": [{ "kind": "complete_quest", "quest": "lost_map" }]
           },
           {
             "text": "Where should I look?",
             "next": "reminder",
-            "requires": [{ "kind": "quest", "quest": "lost_map", "status": "active" }]
+            "requires": { "kind": "quest", "quest": "lost_map", "status": "active" }
+          },
+          {
+            "text": "Is the vault always locked?",
+            "next": "vault",
+            "requires": {
+              "kind": "any",
+              "of": [
+                { "kind": "quest", "quest": "lost_map", "status": "active" },
+                { "kind": "quest", "quest": "lost_map", "status": "ready" }
+              ]
+            }
           },
           { "text": "Leave her to her work." }
         ]
@@ -30,13 +41,14 @@
         "id": "request",
         "text": "'A map is missing. Would you ask after it? I cannot leave the desk.'",
         "choices": [
-          { "text": "I will find it.", "next": "accepted", "effect": { "kind": "accept_quest", "quest": "lost_map" } },
+          { "text": "I will find it.", "next": "accepted", "effects": [{ "kind": "accept_quest", "quest": "lost_map" }] },
           { "text": "Not now." }
         ]
       },
       { "id": "accepted", "text": "'The stacks, to the north. Mind the ladders.'" },
       { "id": "reminder", "text": "'Ask the copyist. He never returns anything on time.'" },
-      { "id": "thanks", "text": "'Mending it,' she repeats, and almost smiles." }
+      { "id": "thanks", "text": "'Mending it,' she repeats, and almost smiles." },
+      { "id": "vault", "text": "'Until every map is home, yes.' She touches the key at her belt." }
     ]
   },
   {
@@ -47,14 +59,31 @@
         "id": "greeting",
         "text": "The copyist does not stop writing. 'Yes?'",
         "choices": [
-          { "text": "Have you seen the river map?", "next": "confession", "effect": { "kind": "set_flag", "flag": "map_found" } },
+          { "text": "Have you seen the river map?", "next": "confession", "effects": [{ "kind": "set_flag", "flag": "map_found" }] },
+          {
+            "text": "Could I borrow a pen?",
+            "next": "pen",
+            "requires": { "kind": "not", "condition": { "kind": "flag", "flag": "pen_borrowed" } },
+            "effects": [
+              { "kind": "set_flag", "flag": "pen_borrowed" },
+              { "kind": "grant_items", "items": [{ "item": "pen", "quantity": 1 }] }
+            ]
+          },
+          {
+            "text": "Here is your pen back.",
+            "next": "returned",
+            "requires": { "kind": "item", "item": "pen", "quantity": 1 },
+            "effects": [{ "kind": "take_items", "items": [{ "item": "pen", "quantity": 1 }] }]
+          },
           { "text": "Nothing. Sorry to disturb you." }
         ]
       },
       {
         "id": "confession",
         "text": "He lifts a blotter. The map lies beneath it, its torn edge newly stitched. 'Tell Pell it will be back tomorrow.'"
-      }
+      },
+      { "id": "pen", "text": "He hands you a reed pen without looking. 'One. I count them.'" },
+      { "id": "returned", "text": "He counts it back into the jar." }
     ]
   }
 ]

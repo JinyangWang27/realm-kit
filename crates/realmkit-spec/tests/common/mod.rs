@@ -50,3 +50,11 @@ pub fn codes(w: &WorldSpec) -> Vec<String> {
 pub fn arena() -> WorldSpec {
     WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena")).unwrap()
 }
+
+pub fn marches() -> WorldSpec {
+    WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/marches"
+    ))
+    .unwrap()
+}

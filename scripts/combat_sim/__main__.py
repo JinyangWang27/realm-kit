@@ -1,10 +1,12 @@
-"""Command line: python3 -m scripts.combat_sim [report|check|tune] [--formula ...]"""
+"""Command line: python3 -m scripts.combat_sim [report|check|tune] [--formula ...], or
+python3 -m scripts.combat_sim economy <world> [--seed N] [--ticks N] [--prices]"""
 
 from __future__ import annotations
 
 import argparse
 import sys
 
+from . import economy
 from .content import DEFAULT
 from .model import Formula, Rules
 from .report import report
@@ -14,6 +16,9 @@ from .tune import robustness
 
 
 def main() -> None:
+    if sys.argv[1:2] == ["economy"]:
+        economy.main(sys.argv[2:])
+        return
     parser = argparse.ArgumentParser(
         prog="python3 -m scripts.combat_sim", description="Balance simulator for the proposed M3 combat rules."
     )

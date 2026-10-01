@@ -1,6 +1,9 @@
-# World package format 11
+# World package format 12
 
-Format 11 makes combat optional. The level table and combat prose live in an
+Format 12 composes conditions with `all`, `any` and `not`, gives dialogue
+choices ordered effect lists, and adds optional world time with roads,
+scheduled events and characters who move, and an optional economy of
+currency and markets whose prices follow production. Combat stays optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -24,13 +27,15 @@ there is no migration. Convert them by hand:
   `groups` are optional. Then apply the Formats 5–10 step.
 - **Formats 5–10** (M3c-2, M3d, M4a, M4b, M4c, M4d): only raise the number;
   `crit`, `stat_points`, techniques, equipment, recipes, tiers and
-  enchantments are optional.
+  enchantments are optional. Then apply the Format 11 steps.
+- **Format 11** (M4e): every `requires` and `known_when` list becomes one
+  condition. A list of one condition becomes that condition; a longer list
+  becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
+  dialogue choice's `effect` becomes a one-element `effects` list.
 
-A world without combat only needs its `format_version` raised.
-
-Format 11 represents one fixed player-controlled character and one playable
+Format 12 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 11 does not serialize a route collection
+stable logical route ID `default`; Format 12 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -45,7 +50,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 11 also requires item and quest tables because they serve the current demo.
+Format 12 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -57,7 +62,7 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat` block |
+| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads` and `events` |
 | `locations.json` | Array of locations with descriptions, directional exits and placed character IDs |
 | `characters.json` | Array of characters with descriptions, availability conditions, and optional dialogue and combat profile |
 | `items.json` | Array of items with names and descriptions |
@@ -80,7 +85,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 11 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 12 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -116,35 +121,260 @@ explicit and does not require a universal z-axis.
   "exits": {
     "north": {
       "destination": "hall",
-      "requires": [{ "kind": "flag", "flag": "hall_open" }],
+      "requires": { "kind": "flag", "flag": "hall_open" },
       "blocked_text": "The hall is locked."
     }
   }
 }
 ```
 
-`requires` lists are AND conditions and default to empty. They can appear on
-exits, characters and dialogue choices. A condition tests a declared flag, a
-quest state or a technique's rank:
+A `requires` condition can appear on exits, characters and dialogue choices;
+left out, it always holds. A condition is one typed leaf predicate, or a
+composition of others:
 
 ```json
+{ "kind": "flag", "flag": "hall_open" }
 { "kind": "quest", "quest": "quiet_the_track", "status": "ready" }
 { "kind": "technique", "technique": "azure_breath", "rank": 2 }
+{ "kind": "item", "item": "pen", "quantity": 1 }
+{ "kind": "all", "of": [ ... ] }
+{ "kind": "any", "of": [ ... ] }
+{ "kind": "not", "condition": { ... } }
 ```
 
-A technique condition holds once the player has learned the technique at
-least to that rank (see [Techniques](#techniques)), so a realm can gate an
-exit, a dialogue choice or a character.
+- `flag` holds once the declared flag is set.
+- `quest` holds while the quest has that status: `available`, `active`,
+  `ready` or `completed`.
+- `technique` holds once the player has learned the technique at least to
+  that rank (see [Techniques](#techniques)), so a realm can gate an exit, a
+  dialogue choice or a character.
+- `item` holds while the player carries at least `quantity` (1 or more) of a
+  counted item; equipment pieces are individuals and cannot be counted.
+- `time_of_day` holds during part of each day; see
+  [World time](#world-time-roads-and-events).
+- `currency` (`{ "kind": "currency", "amount": 150 }`) holds while the player
+  has at least that much; see [Economy](#economy).
+- `all` holds when every condition in `of` does, `any` when at least one
+  does, and `not` when its `condition` does not. `of` must not be empty.
 
-Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
-unset. Dialogue `set_flag` effects and quest completion flags set them; flags
-are monotonic in this version. Conditions govern availability/choice visibility.
+All flags start unset. Dialogue `set_flag` effects and quest completion flags
+set them; flags are monotonic in this version. Evaluating a condition is pure:
+showing a menu or a choice never changes state. Predicates stay typed: there
+are no property paths, formula strings or generic numeric comparisons.
 
-This flat conjunctive representation is a Format 11 limitation. The long-term
-condition model uses pure typed predicates composed with `All / Any / Not`;
-predicates remain domain-specific and typed rather than becoming arbitrary
-expressions/property paths. Typed effects execute in authored order as part of the
-engine's atomic state transition.
+## World time, roads and events
+
+A world may keep a clock. The optional `time` block in `world.json` counts
+minutes from an authored epoch; the clock moves only when the player travels a
+road, waits or rests, never on its own and never for other commands. A world
+without it has no time at all, and its saves carry none.
+
+```json
+"time": {
+  "start": 480,
+  "clock": "Day {day}, {hour}:{minute}",
+  "wait": 60,
+  "rest": 480
+}
+```
+
+- `start` is the minute a new game begins at (here 08:00 on day 1), at most
+  1,000,000,000.
+- `clock` is how clients show the time: `{day}` counts from 1, `{hour}` and
+  `{minute}` have two digits. A day has 1,440 minutes.
+- `wait`, if present, lets the player wait; the menu offers this many minutes
+  at a time and `wait <minutes>` (or `wait 2h`, `wait 1d`) any length from 1
+  to 43,200 minutes. Without it there is no waiting.
+- `rest`, if present, is how long resting at a safe place takes; it needs the
+  combat block.
+
+`roads` join locations, in either direction:
+
+```json
+"roads": [
+  { "id": "greyford-ashmere", "between": ["greyford", "ashmere"], "minutes": 120 },
+  {
+    "id": "fen-causeway",
+    "between": ["ashmere", "vellmarket"],
+    "minutes": 180,
+    "requires": { "kind": "flag", "flag": "thaw" },
+    "blocked_text": "Meltwater still covers the fen causeway."
+  }
+]
+```
+
+A road joins two different locations, and at most one road joins any pair.
+`travel <location-id>` (or `go <location-id>`) takes the road from the
+player's location: the player arrives, then its `minutes` (up to 43,200) pass.
+A road without minutes takes no time and needs no clock. A road may have a
+`requires` condition, and then needs a `blocked_text` shown when it does not
+hold. Roads and compass exits can be mixed, even at one location; exits stay
+directed and take no time. Clients list roads in authored order.
+
+`events` happen on a schedule:
+
+```json
+"events": [
+  { "id": "thaw", "schedule": { "at": 2280 }, "effects": [{ "kind": "set_flag", "flag": "thaw" }] },
+  { "id": "bell", "schedule": { "at": 1800, "every": 1440 }, "requires": { ... }, "effects": [ ... ] }
+]
+```
+
+A `schedule` first falls at minute `at`, which must be after `start`, and then,
+if it has one, every `every` minutes (at least 1). An occurrence applies the
+event's `effects` in order when its optional `requires` holds, and does nothing
+otherwise. An occurrence whose effects cannot all apply, such as a grant past
+a bound, is skipped whole, so it never holds time back. Events may `set_flag`, `grant_items`, `grant_currency` and
+`grant_technique` (a recurring event without XP); they cannot accept or
+complete quests, take items or take payment, which belong to conversations.
+
+A character may move among locations on a schedule:
+
+```json
+{
+  "id": "wenna",
+  "name": "Old Wenna",
+  "dialogue": "wenna",
+  "moves": { "among": ["greyford", "ashmere", "vellmarket"], "schedule": { "at": 1800, "every": 1440 } }
+}
+```
+
+At each occurrence it goes to one of `among` (two or more locations), drawn
+from the world's seeded random stream; it may stay where it is. It starts
+where it is placed, which must be exactly one location of `among`, and is
+present only where it is now. A mover has no combat profile. The client is
+told when it arrives at or leaves the player's location, while it is present
+under its conditions; nobody is seen coming or going while the player is on
+the road, and the destination shows who is there on arrival.
+
+When time passes, every occurrence it crosses happens in chronological order,
+with the clock at that occurrence's minute. Occurrences at the same minute go
+in schedule order: events in authored order, movers in character order, then
+the economy's price tick.
+Because every first occurrence is after `start`, nothing is due when play
+begins, and an occurrence can never schedule another at its own minute. Saves
+keep the minute and each mover's location; the next occurrence of every
+schedule follows from the minute, so nothing else is saved.
+
+A `time_of_day` condition holds while the minute of the day is in
+`from..to`, wrapping past midnight when `from` is larger:
+
+```json
+{ "kind": "time_of_day", "from": 480, "to": 1200 }
+```
+
+It needs the time block, as do events, movers and roads with minutes
+(`time_disabled` otherwise).
+
+## Economy
+
+The optional `economy` block in `world.json` gives the player currency and
+lets locations be markets. Prices are not authored as prices: each market
+keeps a price index per good, in thousandths of the good's base price, and
+the index moves with what the market makes and needs.
+
+```json
+"economy": {
+  "currency": { "format": "{amount} silver", "start": 100 },
+  "goods": [
+    { "item": "wool", "price": 40, "demand": { "town": 2 } },
+    { "item": "cloth", "price": 120, "demand": { "town": 6, "village": 1 }, "input": "wool" }
+  ],
+  "producers": [
+    { "id": "flocks", "name": "Sheep runs", "yields": { "wool": 4 } },
+    { "id": "looms", "name": "Looms", "yields": { "cloth": 2 }, "consumes": { "wool": 3 } }
+  ],
+  "markets": [
+    {
+      "location": "vellmarket",
+      "kind": "town",
+      "merchant": "maddoc",
+      "producers": { "flocks": 6, "looms": 6 },
+      "prices": { "wool": 745, "cloth": 712 }
+    }
+  ],
+  "links": [{ "between": ["greyford", "ashmere"], "percent": 10 }],
+  "index_bounds": [100, 10000],
+  "spread_percent": 15,
+  "trade_step": 26,
+  "tick": {
+    "schedule": { "at": 1440, "every": 1440 },
+    "supply_step": 8,
+    "damp_below": 900,
+    "revert_percent": 3,
+    "input_pull_percent": 10
+  }
+}
+```
+
+- **Currency.** `format` shows an amount through `{amount}`, in the world's
+  language; `start` is what a new game begins with. The player holds at most
+  10^12.
+- **Goods** are counted items, each listed once, traded at every market. A
+  good has a base `price` (1 to 1,000,000), the units each kind of market
+  (`town` or `village`) consumes on a tick as `demand`, and optionally the
+  good it is made from as `input`.
+- **Producers** are kinds such as fields, flocks or looms, named in the
+  world's language: what one unit `yields` and `consumes` on a tick.
+- **Markets** are locations, at most one each. A market's `kind` chooses its
+  demand, its `producers` say how many of each it has, and its starting
+  `prices` are indices (1,000 when left out) within `index_bounds`. A market
+  with a `merchant` trades only while that character is present and
+  undefeated, so a merchant's hours or travels close it. The merchant must
+  be placed at the market or move among locations that include it. A market may replace the economy's
+  `spread_percent`.
+- **Links** join two markets whose prices pull together; one market's links
+  share at most 100 percent in total.
+
+Buying one unit costs `price × index × (100 + spread) / 100,000`, at least 1;
+selling one fetches `price × index × 100 / (1,000 × (100 + spread))`, each
+rounded down once. Units trade one at a time: each bought unit raises the
+market's index by `trade_step` and each sold one lowers it by the same,
+within the bounds, so dumping a whole cargo in one town stops paying.
+`buy <item> [units]` and `sell <item> [units]` trade up to 1,000 units at
+once, all or nothing; `market` shows the prices here.
+
+Trading back and forth never pays, in either order. One step moves the index
+both ways, so trades that end holding what the player started with leave the
+index where it was. Validation requires every spread (the economy's and each
+market's) to satisfy (100 + spread)² × lowest index ≥ 10,000 × (lowest index
++ `trade_step`) (`invalid_spread`). With bounds from 100 and a step of 26,
+that is a spread of at least 13%. Separate buy and sell steps would let a
+large stack bought or sold at one price come back at a profit, so there is
+one step.
+
+With a `tick` (which needs the time block), prices move on its schedule in
+four phases, each finished for every market before the next:
+
+1. **Supply.** Production is the market's producers' yields; consumption is
+   its kind's demand plus what its producers consume. Producers make do with
+   less of a dear good: while its index is above 1,000, what they consume of
+   it is scaled by 1,000 ÷ index, rounded down once, so an industry short of
+   its input does not drive the price to the bound. A surplus lowers the
+   index by a draw below `supply_step` × the surplus, multiplied by index ÷
+   `damp_below` while the index is below `damp_below`; a shortage raises it by
+   a draw below `supply_step` × the shortage. The result stays within the
+   bounds. Draws come from the economy's own `market` random stream, in market
+   order, then goods order, only where supply is unbalanced.
+2. **Revert.** The gap between the index and 1,000 shrinks by
+   `revert_percent`, rounded towards zero.
+3. **Inputs.** A good whose input is dearer moves `input_pull_percent` of the
+   gap up towards it, measured on the phase-2 prices.
+4. **Links.** Both markets of a link move `percent` of their gap towards each
+   other, measured on the phase-3 prices and applied together.
+
+Without a tick, only trade moves prices, and the world draws nothing for
+them. The engine never warms prices up: the package authors starting indices.
+`python3 -m scripts.combat_sim economy <world> --ticks 30 --prices` runs the
+tick offline and prints indices to author, and the engine's tests pin numbers
+that simulator produces. Saves keep the currency and every index; trade goods
+may be carried in any number.
+
+Validation keeps every authored number small enough that no tick or trade
+can overflow: at most 10,000 producers of a kind, units per producer and
+demand; at most 100,000,000 of a good made or used by one market per tick
+(counted at the base price, where producers use the most);
+index bounds that contain 1,000 within 1 to 100,000.
 
 ## Characters
 
@@ -171,7 +401,7 @@ Talking and fighting are optional components:
 `world.player` names the player character. It has no dialogue or combat profile
 and is placed nowhere; in a combat world its numbers come from the level table.
 A location's `characters` list places the others. A placed character is present
-while its `requires` conditions hold; the player can talk to it if it has a
+while its `requires` condition holds; the player can talk to it if it has a
 `dialogue` and attack it if it has a `combat` profile: its `stats` (see
 [Stats](#stats-damage-and-skills)), the `xp` granted on defeat, optional `loot`,
 optional `skills` (skill IDs, usable once the profile's `level` reaches each
@@ -186,7 +416,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 11 has a single flat quest collection. The long-term model should retain
+Format 12 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -194,15 +424,30 @@ explicit main-story/story-phase conditions, and side outcomes may feed typed
 state into later main-quest conditions.
 
 Each dialogue has a `start` node ID and a `nodes` array. A node has authored
-`text` and optional `choices`. Each choice has authored `text`, optional
-`requires`, optional `next`, and an optional typed `effect`:
+`text` and optional `choices`. Each choice has authored `text`, an optional
+`requires` condition, optional `next`, and an optional list of typed
+`effects`:
 
 ```json
 { "kind": "accept_quest", "quest": "quiet_the_track" }
 { "kind": "complete_quest", "quest": "quiet_the_track" }
 { "kind": "set_flag", "flag": "hall_open" }
 { "kind": "grant_technique", "technique": "cloud_palm", "rank": 1, "xp": 0 }
+{ "kind": "grant_items", "items": [{ "item": "pen", "quantity": 1 }] }
+{ "kind": "take_items", "items": [{ "item": "pen", "quantity": 1 }] }
+{ "kind": "grant_currency", "amount": 60 }
+{ "kind": "pay_currency", "amount": 150 }
 ```
+
+Effects apply in authored order to the staged state, and the choice commits
+or fails as a whole: if any effect is refused, such as taking items the player
+does not carry or completing a quest that is not ready, nothing the earlier
+effects did is kept. `grant_items` gives items as quest rewards do (equipment
+arrives as individual pieces); `take_items` hands over counted items only.
+`grant_currency` and `pay_currency` need the economy; paying more than the
+player has refuses the choice.
+A choice can be taken again while its condition holds, so a one-time gift
+pairs `grant_items` with `set_flag` under a `not` condition on that flag.
 
 Choices are filtered and then numbered contiguously from one. Omitting `next`
 ends the conversation. A node with no visible choices displays its text and
@@ -339,7 +584,7 @@ source's own terms; players see that name, never a number:
       { "name": "First Layer", "xp": 0, "passive": { "mp": 10, "satk": 2 } },
       { "name": "Second Layer", "xp": 10, "passive": { "mp": 20, "satk": 4 } },
       { "name": "Third Layer", "xp": 30, "passive": { "mp": 35, "satk": 7 },
-        "requires": [{ "kind": "flag", "flag": "scripture_found" }] }
+        "requires": { "kind": "flag", "flag": "scripture_found" } }
     ]
   },
   {
@@ -365,7 +610,7 @@ source's own terms; players see that name, never a number:
   `technique_xp_per_use` (default 10), with the same level falloff as character
   XP. Each victory also gives every learned technique its `xp_share_percent` of
   the character XP earned; keep it small so internal arts deepen slowly.
-- **Gates.** A rank's `requires` conditions are a breakthrough gate: technique
+- **Gates.** A rank's `requires` condition is a breakthrough gate: technique
   XP waits at that rank's threshold until they hold, and the technique rises
   as soon as they do.
 - **Grants** (`player_techniques`, the `grant_technique` dialogue effect and
@@ -436,8 +681,8 @@ A location can offer crafting `stations`, and the combat block lists
   "station": "anvil",
   "inputs": [{ "item": "iron_ingot", "quantity": 2 }],
   "output": "iron_sword",
-  "known_when": [{ "kind": "flag", "flag": "taught_forging" }],
-  "requires": [{ "kind": "technique", "technique": "smithing", "rank": 1 }],
+  "known_when": { "kind": "flag", "flag": "taught_forging" },
+  "requires": { "kind": "technique", "technique": "smithing", "rank": 1 },
   "trains": { "technique": "smithing", "xp": 10 }
 }
 ```
@@ -451,7 +696,7 @@ An item's `equipment` can list improvement `tiers`, in order:
   "speed_penalty": 5,
   "station": "anvil",
   "cost": [{ "item": "iron_ingot", "quantity": 1 }],
-  "requires": [{ "kind": "technique", "technique": "smithing", "rank": 2 }]
+  "requires": { "kind": "technique", "technique": "smithing", "rank": 2 }
 }]
 ```
 
@@ -486,8 +731,8 @@ The combat block can list `enchantments`, each laid on a piece at a station:
   "bonuses": { "patk": 2 },
   "station": "altar",
   "catalyst": [{ "item": "ember_shard", "quantity": 1 }],
-  "known_when": [{ "kind": "flag", "flag": "taught_enchanting" }],
-  "requires": [{ "kind": "technique", "technique": "enchanting", "rank": 1 }],
+  "known_when": { "kind": "flag", "flag": "taught_enchanting" },
+  "requires": { "kind": "technique", "technique": "enchanting", "rank": 1 },
   "trains": { "technique": "enchanting", "xp": 10 }
 }
 ```
@@ -581,8 +826,11 @@ A skill's `crit`, the combat block's `player_basic_crit` and a profile's
 
 The chance is 1–100% and the multiplier 101–1,000% of a normal hit, applied
 inside the damage formula before its single rounding. A world that authors any
-crit keeps a seeded random stream in its saved state (SplitMix64, versioned);
-every other world keeps none and plays exactly as it did. A draw happens only
+crit keeps a seeded `combat` stream in its saved state (SplitMix64, versioned),
+and a world with characters who move keeps a separate `world` stream; each
+starts from the seed mixed with its own constant, so draws in one never shift
+the other. A world with neither keeps no random state and plays exactly as it
+did. A draw happens only
 when an action with a crit resolves, so a refused command never consumes one,
 and the same seed and commands always replay identically. Clients choose the
 seed (the CLI takes `--seed`, else uses the clock, and prints it).
@@ -604,7 +852,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 11 currently selects combat prose variants from the current
+Format 12 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -624,12 +872,14 @@ order. `validate()` returns `SpecError::Validation` with those diagnostics if
 any are errors. `load()` validates before returning a playable world. File I/O
 and JSON syntax/type errors retain the file path and underlying error.
 
-Checks include version, IDs, references, dialogue links/effects, declared flags,
+Checks include version, IDs, references (in every leaf of a condition tree),
+non-empty `all`/`any`, counted items in item conditions and `take_items`,
+dialogue links/effects, declared flags,
 the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
 skill references, usable and affordable skills, loot quantities, fighter
 placement and template placeholders. `load()` reports a package whose
-`format_version` is not 9 as `SpecError::UnsupportedFormat` before parsing it.
+`format_version` is not 12 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.

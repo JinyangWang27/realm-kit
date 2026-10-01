@@ -87,7 +87,7 @@ pub(super) fn locations<'w>(out: &mut Vec<Diagnostic>, w: &'w WorldSpec) -> BTre
                 &exit.destination,
                 w.location(&exit.destination).is_some(),
             );
-            conditions(out, w, &l.id, &exit.requires);
+            condition(out, w, &l.id, exit.requires.as_ref());
         }
         ids(
             out,
@@ -142,7 +142,7 @@ pub(super) fn characters(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 w.dialogue(dialogue).is_some(),
             );
         }
-        conditions(out, w, &character.id, &character.requires);
+        condition(out, w, &character.id, character.requires.as_ref());
         if let Some(profile) = &character.combat {
             combat_profile(out, w, &character.id, profile);
         }

@@ -259,7 +259,7 @@ fn technique_ranks(
                 );
             }
         }
-        conditions(out, w, id, &rank.requires);
+        condition(out, w, id, rank.requires.as_ref());
     }
 }
 
@@ -272,13 +272,16 @@ fn core_art(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat, core: &Id
         core,
         w.technique(core).is_some(),
     );
-    let teachable = combat.player_techniques.iter().any(|g| &g.technique == core)
-        || w.quests.iter().flat_map(|q| &q.reward_techniques).any(|g| &g.technique == core)
-        || w.dialogues
+    let teachable = combat
+        .player_techniques
+        .iter()
+        .any(|g| &g.technique == core)
+        || w.quests
             .iter()
-            .flat_map(|d| &d.nodes)
-            .flat_map(|n| &n.choices)
-            .any(|c| matches!(&c.effect, Some(DialogueEffect::GrantTechnique(g)) if &g.technique == core));
+            .flat_map(|q| &q.reward_techniques)
+            .any(|g| &g.technique == core)
+        || w.effects()
+            .any(|e| matches!(e, Effect::GrantTechnique(g) if &g.technique == core));
     if !teachable {
         issue(
             out,

@@ -1,7 +1,7 @@
 //! Synchronous gameplay; no generation or presentation dependencies.
 
 use realmkit_spec::{
-    Channel, Character, Condition, DialogueChoice, DialogueEffect, Direction, Id, ItemStack,
+    Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack,
     QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat, Stats, WorldSpec,
     BASIC_POWER,
 };
@@ -73,7 +73,35 @@ impl<'w> Engine<'w> {
                 flags: BTreeSet::new(),
                 dialogue: None,
                 turn: 0,
-                rng: world.stochastic().then(|| RngState::new(seed)),
+                rng: RngState::for_world(world, seed),
+                time: world.world.time.as_ref().map(|t| t.start),
+                // Each mover starts where it is placed.
+                whereabouts: world
+                    .characters
+                    .iter()
+                    .filter(|c| c.moves.is_some())
+                    .filter_map(|c| {
+                        let start = world
+                            .locations
+                            .iter()
+                            .find(|l| l.characters.contains(&c.id))?;
+                        Some((c.id.clone(), start.id.clone()))
+                    })
+                    .collect(),
+                economy: world.economy().map(|economy| EconomyState {
+                    currency: economy.currency.start,
+                    prices: economy
+                        .markets
+                        .iter()
+                        .map(|m| {
+                            let prices = economy.goods.iter().map(|g| {
+                                let index = m.prices.get(&g.item).copied();
+                                (g.item.clone(), index.unwrap_or(realmkit_spec::BASE_INDEX))
+                            });
+                            (m.location.clone(), prices.collect())
+                        })
+                        .collect(),
+                }),
             },
         };
         // Starting techniques, then vitals at the maxima their passives give.
@@ -179,7 +207,29 @@ impl<'w> Engine<'w> {
         })
     }
 
-    pub fn conditions_met(&self, conditions: &[Condition]) -> bool {
-        rules::conditions_met(&self.state, conditions)
+    /// Characters at the player's location, whatever their conditions: those
+    /// placed here, then characters who move and are here now.
+    pub fn placed_here(&self) -> Vec<&'w Id> {
+        rules::placed_here(self.world, &self.state)
+    }
+
+    /// A good's prices at the open market here: one unit now, and the next
+    /// after it. `None` away from an open market or for an untraded good.
+    pub fn quote(&self, good: &str) -> Option<Quote> {
+        rules::quote(self.world, &self.state, good)
+    }
+
+    /// Who is here now: present under their conditions and not defeated.
+    pub fn present_here(&self) -> Vec<&'w Character> {
+        rules::present_here(self.world, &self.state)
+    }
+
+    /// Whether a condition holds now; evaluating it changes nothing.
+    pub fn holds(&self, condition: &Condition) -> bool {
+        rules::holds(&self.state, condition)
+    }
+    /// Whether an optional requirement is met; an absent one always is.
+    pub fn allows(&self, requires: Option<&Condition>) -> bool {
+        rules::allowed(&self.state, requires)
     }
 }

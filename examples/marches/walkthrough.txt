@@ -1,0 +1,28 @@
+look
+market
+travel ashmere
+talk reeve
+choose 1
+buy eels 6
+travel greyford
+travel hollin_keep
+talk steward
+choose 1
+travel greyford
+travel ashmere
+talk reeve
+choose 1
+travel vellmarket
+wait 16h
+travel vellmarket
+sell eels 6
+buy cloth
+market
+travel ashmere
+travel greyford
+wait 8h
+market
+sell cloth
+inventory
+quests
+quit

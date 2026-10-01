@@ -10,10 +10,10 @@
           {
             "text": "Teach me to forge.",
             "next": "hammer",
-            "effect": {
+            "effects": [{
               "kind": "set_flag",
               "flag": "taught_forging"
-            }
+            }]
           },
           {
             "text": "Later."
@@ -26,10 +26,10 @@
         "choices": [
           {
             "text": "Take the hammer.",
-            "effect": {
+            "effects": [{
               "kind": "grant_technique",
               "technique": "smithing"
-            }
+            }]
           }
         ]
       }
@@ -46,10 +46,10 @@
           {
             "text": "Teach me to enchant.",
             "next": "lesson",
-            "effect": {
+            "effects": [{
               "kind": "set_flag",
               "flag": "taught_enchanting"
-            }
+            }]
           },
           {
             "text": "Later."
@@ -62,10 +62,10 @@
         "choices": [
           {
             "text": "Lay your hand on mine.",
-            "effect": {
+            "effects": [{
               "kind": "grant_technique",
               "technique": "enchanting"
-            }
+            }]
           }
         ]
       }

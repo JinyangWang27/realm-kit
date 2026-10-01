@@ -35,6 +35,11 @@ pub(crate) fn apply(
             )
             .map(|()| false)
         }
+        Err(EngineError::RoadBlocked { road }) => {
+            let road = engine.world().world.roads.iter().find(|r| r.id == road);
+            let text = road.and_then(|r| r.blocked_text.as_deref());
+            return writeln!(output, "{}", text.unwrap_or_default()).map(|()| false);
+        }
         Err(error) => return writeln!(output, "{error}").map(|()| false),
     };
     // Checkpoint before printing, so a closed terminal cannot lose the progress.

@@ -14,11 +14,11 @@ pub struct Recipe {
     /// A wearable item; each forge makes one new piece of it.
     pub output: Id,
     /// Knowledge: a teacher, a found plan or a quest makes it true.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub known_when: Vec<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub known_when: Option<Condition>,
     /// Ability, such as a smithing rank; unmet requirements are shown.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub requires: Vec<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<Condition>,
     /// Technique XP each successful forge gives; teaches the technique if unknown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trains: Option<TechniqueGrant>,
@@ -38,8 +38,8 @@ pub struct Tier {
     pub speed_penalty: Option<u32>,
     pub station: Id,
     pub cost: Vec<ItemStack>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub requires: Vec<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trains: Option<TechniqueGrant>,
 }
@@ -58,10 +58,10 @@ pub struct Enchantment {
     pub station: Id,
     /// Consumed by each enchanting.
     pub catalyst: Vec<ItemStack>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub known_when: Vec<Condition>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub requires: Vec<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub known_when: Option<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trains: Option<TechniqueGrant>,
 }

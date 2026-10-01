@@ -1,7 +1,7 @@
 use crate::{
     input,
     render::Paint,
-    render::{direction_name, gear_name, piece_name, stat_name},
+    render::{direction_name, duration, gear_name, money, piece_name, stat_name},
 };
 use realmkit_engine::{Command, Engine};
 use realmkit_spec::{Resource, Stat};
@@ -12,6 +12,8 @@ use std::io::{self, Write};
 const TALK: &str = "Talk to";
 const ATTACK: &str = "Attack";
 const TRAVEL: &str = "Travel";
+const TRAVEL_TO: &str = "Travel to";
+const WAIT: &str = "Wait";
 const LOCKED: &str = "[locked]";
 const ON: &str = "on";
 const ENGAGE: &str = "Engage";
@@ -24,6 +26,12 @@ const RESPEC: &str = "Refund stat points";
 const TRAIN_GROUP: &str = "Train stats";
 const EQUIPMENT_GROUP: &str = "Equipment";
 const SMITHING_GROUP: &str = "Smithing";
+const MARKET_GROUP: &str = "Market";
+const PRICES: &str = "Prices";
+const BUY: &str = "Buy";
+const SELL: &str = "Sell";
+const NEXT_PRICE: &str = "next";
+const AFFORD: &str = "[cannot afford]";
 const ENCHANTING_GROUP: &str = "Enchanting";
 const ENCHANT: &str = "Enchant";
 const FORGE: &str = "Forge";
@@ -71,6 +79,7 @@ pub enum Group {
     Equipment,
     Smithing,
     Enchanting,
+    Market,
 }
 
 impl Group {
@@ -80,6 +89,7 @@ impl Group {
             Command::Equip(_) => Some(Self::Equipment),
             Command::Forge(_) | Command::Improve(_) => Some(Self::Smithing),
             Command::Enchant { .. } => Some(Self::Enchanting),
+            Command::Market | Command::Buy { .. } | Command::Sell { .. } => Some(Self::Market),
             _ => None,
         }
     }
@@ -108,6 +118,8 @@ pub struct Menu {
     dialogue: bool,
     /// In a fight: everyone's vitals and the projected turn order.
     header: Vec<String>,
+    /// What the world offers, for letter shortcuts.
+    context: input::Context,
 }
 
 /// The engine projects turns as if every action took a basic action's time.
@@ -200,6 +212,7 @@ fn group_label(engine: &Engine<'_>, group: Group) -> String {
         Group::Equipment => format!("{EQUIPMENT_GROUP} {OPENS}"),
         Group::Smithing => format!("{SMITHING_GROUP} {OPENS}"),
         Group::Enchanting => format!("{ENCHANTING_GROUP} {OPENS}"),
+        Group::Market => format!("{MARKET_GROUP} {OPENS}"),
     }
 }
 
@@ -221,6 +234,24 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 format!(" {LOCKED}")
             }
         ),
+        // "Travel to Ashmere — 2 h", or "[locked]" like an exit.
+        Command::Travel(to) => {
+            let road = world.road(&here.id, to)?;
+            format!(
+                "{TRAVEL_TO} {}{}{}",
+                world.location(to)?.name,
+                if road.minutes > 0 {
+                    format!(" — {}", duration(road.minutes))
+                } else {
+                    String::new()
+                },
+                if action.available {
+                    String::new()
+                } else {
+                    format!(" {LOCKED}")
+                }
+            )
+        }
         // Like a locked exit, choosing it explains why it cannot be used.
         Command::UseSkill { skill, target } => {
             let skill = world.skill(skill).unwrap();
@@ -261,7 +292,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             let recipe = world.recipe(id).unwrap();
             let output = &world.item(&recipe.output).unwrap().name;
             let cost = materials(world, &recipe.inputs);
-            let why = missing(engine, &recipe.requires, &recipe.inputs);
+            let why = missing(engine, recipe.requires.as_ref(), &recipe.inputs);
             format!("{FORGE} {output} — {cost}{why}")
         }
         // "Improve #1 Iron sword → Fine Iron sword (Attack +4 → +6) — 1 Iron
@@ -274,7 +305,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             next.tier += 1;
             let changes = tier_changes(world, equipment, gear.tier);
             let cost = materials(world, &tier.cost);
-            let why = missing(engine, &tier.requires, &tier.cost);
+            let why = missing(engine, tier.requires.as_ref(), &tier.cost);
             format!(
                 "{IMPROVE} {} → {}{changes} — {cost}{why}",
                 gear_name(engine, *piece),
@@ -296,7 +327,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 })
                 .collect();
             let cost = materials(world, &enchantment.catalyst);
-            let why = missing(engine, &enchantment.requires, &enchantment.catalyst);
+            let why = missing(engine, enchantment.requires.as_ref(), &enchantment.catalyst);
             format!(
                 "{ENCHANT} {} → {} ({}) — {cost}{why}",
                 gear_name(engine, *piece),
@@ -304,8 +335,43 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 bonuses.join(", ")
             )
         }
+        // "Buy Cloth — 129 silver (next 133)": this unit's price and the
+        // next one's after the index moves; unaffordable goods stay listed.
+        Command::Buy { good, .. } => {
+            let quote = engine.quote(good)?;
+            let name = &world.item(good)?.name;
+            if !action.available {
+                let currency = engine.state().economy.as_ref()?.currency;
+                let why = if currency < quote.buy { AFFORD } else { LOCKED };
+                return Some(format!("{BUY} {name} — {} {why}", money(world, quote.buy)));
+            }
+            format!(
+                "{BUY} {name} — {} ({NEXT_PRICE} {})",
+                money(world, quote.buy),
+                money(world, quote.next_buy)
+            )
+        }
+        Command::Sell { .. } if !action.available => return None,
+        Command::Sell { good, .. } => {
+            let quote = engine.quote(good)?;
+            let held = engine
+                .state()
+                .player
+                .inventory
+                .get(good)
+                .copied()
+                .unwrap_or(0);
+            format!(
+                "{SELL} {} ({held}) — {} ({NEXT_PRICE} {})",
+                world.item(good)?.name,
+                money(world, quote.sell),
+                money(world, quote.next_sell)
+            )
+        }
+        Command::Market => PRICES.into(),
         _ if !action.available => return None,
         Command::Rest => REST.into(),
+        Command::Wait(minutes) => format!("{WAIT} — {}", duration(*minutes)),
         Command::Flee => FLEE.into(),
         // "Train Attack: 12 → 13", from the same effective stats the engine uses.
         Command::Allocate { stat, .. } => {
@@ -356,16 +422,13 @@ fn materials(world: &realmkit_spec::WorldSpec, stacks: &[realmkit_spec::ItemStac
 /// " [needs Journeyman Smithing]", " [needs 2 Iron ingot]", or nothing.
 fn missing(
     engine: &Engine<'_>,
-    requires: &[realmkit_spec::Condition],
+    requires: Option<&realmkit_spec::Condition>,
     stacks: &[realmkit_spec::ItemStack],
 ) -> String {
     let world = engine.world();
-    let unmet = requires
-        .iter()
-        .find(|c| !engine.conditions_met(std::slice::from_ref(*c)));
-    if let Some(condition) = unmet {
-        return match condition {
-            realmkit_spec::Condition::Technique { technique, rank } => {
+    if let Some(condition) = requires.filter(|c| !engine.holds(c)) {
+        return match unmet(engine, condition) {
+            Some(realmkit_spec::Condition::Technique { technique, rank }) => {
                 let technique = world.technique(technique).unwrap();
                 let rank = &technique.ranks[rank - 1].name;
                 format!(" [{NEEDS} {rank} {}]", technique.name)
@@ -384,6 +447,20 @@ fn missing(
             world.item(&s.item).unwrap().name
         ),
         None => String::new(),
+    }
+}
+
+/// The first unmet leaf that a failed condition needs, if it can be named:
+/// through `all` only, since `any` and `not` have no single reason.
+fn unmet<'c>(
+    engine: &Engine<'_>,
+    condition: &'c realmkit_spec::Condition,
+) -> Option<&'c realmkit_spec::Condition> {
+    use realmkit_spec::Condition;
+    match condition {
+        Condition::All { of } => unmet(engine, of.iter().find(|c| !engine.holds(c))?),
+        Condition::Any { .. } | Condition::Not { .. } => None,
+        leaf => Some(leaf),
     }
 }
 
@@ -475,6 +552,7 @@ impl Menu {
             cursor: 0,
             dialogue,
             header: encounter_lines(engine),
+            context: input::Context::of(engine.world()),
         }
     }
 
@@ -587,7 +665,7 @@ impl Menu {
             Key::Char(c @ '1'..='9') => return self.choose(c as usize - '0' as usize),
             // Letter shortcuts (movement, panels) apply only outside dialogue focus.
             Key::Char(c) if !self.dialogue => {
-                return match input::parse(&c.to_string()) {
+                return match input::shortcut(c, self.context) {
                     Ok(input::Input::Command(command)) => Outcome::Run(command),
                     Ok(input::Input::Help) => Outcome::Help,
                     _ => Outcome::Ignore,

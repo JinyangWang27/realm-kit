@@ -105,7 +105,7 @@ pub(super) fn add_xp(
         if kept < next.xp {
             break;
         }
-        if !rules::conditions_met(state, &next.requires) {
+        if !rules::allowed(state, next.requires.as_ref()) {
             (kept, capped) = (next.xp, true);
             break;
         }
@@ -145,7 +145,7 @@ pub(super) fn promote(world: &WorldSpec, state: &mut GameState, events: &mut Vec
             if learned.xp < next.xp {
                 break;
             }
-            let open = rules::conditions_met(state, &next.requires);
+            let open = rules::allowed(state, next.requires.as_ref());
             let learned = state
                 .combat
                 .as_mut()

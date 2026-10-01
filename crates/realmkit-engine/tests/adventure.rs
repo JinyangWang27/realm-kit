@@ -440,16 +440,16 @@ fn mismatched_or_corrupt_saves_are_rejected() {
 #[test]
 fn a_choice_that_makes_the_speaker_unavailable_ends_the_conversation() {
     let mut world = demo();
-    world.characters[1].requires = vec![Condition::Quest {
+    world.characters[1].requires = Some(Condition::Quest {
         quest: "quiet_the_track".into(),
         status: QuestStatus::Available,
-    }];
+    });
     let accepted = &mut world.dialogues[0].nodes[2];
     accepted.choices.push(DialogueChoice {
         text: "Farewell.".into(),
         next: None,
-        requires: Vec::new(),
-        effect: None,
+        requires: None,
+        effects: Vec::new(),
     });
     let mut engine = Engine::new(&world).unwrap();
     accept(&mut engine);

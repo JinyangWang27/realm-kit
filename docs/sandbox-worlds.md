@@ -130,20 +130,21 @@ These are general improvements that a sandbox needs first. Most of them are
 already planned or decided for authored adventures. The roadmap delivers them as
 M5 slices.
 
-1. **Condition tree.** Conditions become `All / Any / Not` over typed leaf
-   predicates, and a `requires` list becomes one condition. A sandbox adds many
+1. **Condition tree** (delivered in M5a). Conditions are `All / Any / Not`
+   over typed leaf predicates, and a `requires` list became one condition. A sandbox adds many
    numeric predicates: currency held, standing with a faction, whether two
    factions are at war, who holds a location, the world time. Each predicate
    stays domain-typed, for example `CurrencyAtLeast`, `StandingAtLeast`,
    `AtWar`, `HoldsLocation` or `WorldTimeWithin`. There is still no generic
    numeric comparison and no variable bag
    ([Section 6](open-decisions.md#6-conditions-and-effects)).
-2. **Effect lists.** A dialogue choice carries `effects`, a list applied in
-   authored order to staged state, in place of today's single optional `effect`.
+2. **Effect lists** (delivered in M5a). A dialogue choice carries `effects`, a
+   list applied in authored order to staged state, in place of the single
+   optional `effect` it had before.
    The whole transition commits or fails together. Each effect variant arrives
    with the capability that owns its state: paying coin, changing standing,
    adding troops, granting a holding.
-3. **World time and travel.** Optional world time follows
+3. **World time and travel** (delivered in M5b). Optional world time follows
    [Section 9](open-decisions.md#9-time-models): minutes from an authored epoch,
    advanced only by explicit actions. The sandbox needs three additions:
    - Roads carry an authored travel duration.
@@ -234,8 +235,8 @@ M5 slices.
    chosen identity. The answers themselves are saved only as the state they
    produced and a list of chosen option IDs for display. Start choices are
    not runtime identity editing: once play begins, nothing re-runs them.
-10. **Characters who move.** Lords travel with their parties, but other
-    characters move too: a travelling storyteller, a ransom broker or an
+10. **Characters who move** (delivered in M5b). Lords travel with their
+    parties, but other characters move too: a travelling storyteller, a ransom broker or an
     unhired companion who drifts between taverns. A character may author a set
     of locations and a recurring schedule; on each occurrence the engine moves
     it to one of them, drawn from a `world` RNG domain. Its location is saved
@@ -276,6 +277,12 @@ the world authors it, and it arrives with a fixture that proves it.
 
 ### Economy
 
+M6a-1 delivers goods, producers, markets, the price tick, links, buying and
+selling, merchants who must be present and currency conditions and effects
+([Economy](world-format.md#economy)). Prosperity, merchants' stock,
+workshops and the trading proficiency follow in M6a-2. A village does not
+yet count towards its market town's trade; link the two instead.
+
 Prices come from what each place makes and needs. A town surrounded by
 vineyards sells wine cheaply; a town with looms but no flocks pays well for
 wool. Caravans carrying goods between towns pull their prices together, and
@@ -303,7 +310,8 @@ prices: the engine derives every price from them.
   updates every good's index in four phases. Each phase finishes for all markets
   before the next begins, and draws come from the economy's own `market` RNG
   domain in authored market order, then authored goods order:
-  - The net supply is production minus consumption. A surplus lowers the index
+  - The net supply is production minus consumption; producers use less of a
+    good while it is dear, scaled by 1,000 ÷ index above the base. A surplus lowers the index
     by a draw below an authored multiple of the surplus, damped once the index is
     already under an authored level; a shortage raises it the same way.
   - The index then reverts towards 1,000 by an authored share of the gap.

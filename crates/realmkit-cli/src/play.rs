@@ -43,7 +43,7 @@ pub(crate) fn play(
             writeln!(output)?;
             break;
         }
-        let command = match input::parse(&line) {
+        let command = match input::parse(world, &line) {
             Ok(input::Input::Quit) => break,
             Ok(input::Input::Blank) => continue,
             Ok(input::Input::Help) => {
@@ -194,7 +194,7 @@ pub(crate) fn play_keys(
                     let Some(line) = read_typed(&mut keys, output)? else {
                         break 'scene;
                     };
-                    match input::parse(&line) {
+                    match input::parse(world, &line) {
                         Ok(input::Input::Quit) => break 'scene,
                         Ok(input::Input::Command(command)) => command,
                         Ok(input::Input::Select(number)) => match menu.choose(number) {

@@ -129,9 +129,27 @@ pub struct GameState {
     pub turn: u64,
     /// Present only in worlds with random content.
     pub rng: Option<RngState>,
+    /// The current minute of world time; present only in worlds with a clock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time: Option<u64>,
+    /// Where each character who moves is now.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub whereabouts: BTreeMap<Id, Id>,
+    /// Currency and prices; present only in worlds with an economy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub economy: Option<EconomyState>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 11;
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EconomyState {
+    pub currency: u64,
+    /// Each market's price index for every good, by location then item, in
+    /// thousandths of the base price.
+    pub prices: BTreeMap<Id, BTreeMap<Id, u32>>,
+}
+
+pub const SAVE_FORMAT_VERSION: u32 = 12;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 

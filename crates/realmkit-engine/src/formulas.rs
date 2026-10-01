@@ -1,4 +1,4 @@
-//! Pure combat arithmetic, shared with `scripts/combat_sim`.
+//! Pure combat and trade arithmetic, shared with `scripts/combat_sim`.
 
 use super::*;
 
@@ -75,4 +75,28 @@ pub fn xp_for_defeat(xp: u64, player_level: usize, opponent_level: usize) -> u64
     let scaled = u128::from(xp) * (10 + diff.clamp(-4, 4)) as u128 / 10;
     // At most 140% of a u64 value: saturate rather than wrap on absurd content.
     u64::try_from(scaled).unwrap_or(u64::MAX)
+}
+
+/// What one unit costs to buy: the base price at `index` thousandths, raised
+/// by the spread, rounded down once, and never free.
+pub fn buy_price(price: u64, index: u32, spread: u32) -> u64 {
+    let raw = u128::from(price) * u128::from(index) * (100 + u128::from(spread)) / 100_000;
+    u64::try_from(raw).unwrap_or(u64::MAX).max(1)
+}
+
+/// What one unit sells for: the base price at `index` thousandths, divided
+/// by the spread, rounded down once.
+pub fn sell_price(price: u64, index: u32, spread: u32) -> u64 {
+    let raw = u128::from(price) * u128::from(index) * 100 / (1_000 * (100 + u128::from(spread)));
+    u64::try_from(raw).unwrap_or(u64::MAX)
+}
+
+/// One unit of a good at a market: what it costs and fetches now, and after
+/// one unit has been bought or sold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Quote {
+    pub buy: u64,
+    pub sell: u64,
+    pub next_buy: u64,
+    pub next_sell: u64,
 }

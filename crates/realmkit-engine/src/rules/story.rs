@@ -17,7 +17,7 @@ pub(crate) fn choices<'a>(
         .unwrap()
         .choices
         .iter()
-        .filter(|c| conditions_met(state, &c.requires))
+        .filter(|c| allowed(state, c.requires.as_ref()))
         .collect()
 }
 
@@ -191,6 +191,58 @@ pub(crate) fn quest(
     Ok(())
 }
 
+/// Applies effects in authored order to the staged state. An error refuses
+/// the whole command, so nothing they did is kept.
+pub(crate) fn apply(
+    world: &WorldSpec,
+    state: &mut GameState,
+    effects: &[Effect],
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    for effect in effects {
+        match effect {
+            Effect::AcceptQuest { quest: id } => quest(world, state, id, false, events)?,
+            Effect::CompleteQuest { quest: id } => quest(world, state, id, true, events)?,
+            Effect::SetFlag { flag } => set_flag(world, state, flag, events),
+            Effect::GrantTechnique(grant) => techniques::grant(world, state, grant, events)?,
+            Effect::GrantItems { items } => grant_items(world, state, items, events)?,
+            Effect::TakeItems { items } => take_items(state, items, events)?,
+            Effect::GrantCurrency { amount } => economy::grant(state, *amount, events)?,
+            Effect::PayCurrency { amount } => economy::pay(state, *amount, events)?,
+        }
+    }
+    Ok(())
+}
+
+/// Hands over counted items, all or nothing.
+pub(crate) fn take_items(
+    state: &mut GameState,
+    stacks: &[ItemStack],
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    for stack in stacks {
+        let held = state
+            .player
+            .inventory
+            .get(&stack.item)
+            .copied()
+            .unwrap_or(0);
+        let left = held
+            .checked_sub(stack.quantity)
+            .ok_or_else(|| EngineError::NotEnoughMaterials(stack.item.clone()))?;
+        if left == 0 {
+            state.player.inventory.remove(&stack.item);
+        } else {
+            state.player.inventory.insert(stack.item.clone(), left);
+        }
+        events.push(Event::ItemsSpent {
+            item: stack.item.clone(),
+            quantity: stack.quantity,
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn talk(
     world: &WorldSpec,
     state: &mut GameState,
@@ -227,15 +279,7 @@ pub(crate) fn choose(
         .checked_sub(1)
         .and_then(|i| visible.get(i))
         .ok_or(EngineError::InvalidChoice)?;
-    match &choice.effect {
-        Some(DialogueEffect::AcceptQuest { quest: id }) => quest(world, state, id, false, events)?,
-        Some(DialogueEffect::CompleteQuest { quest: id }) => quest(world, state, id, true, events)?,
-        Some(DialogueEffect::SetFlag { flag }) => set_flag(world, state, flag, events),
-        Some(DialogueEffect::GrantTechnique(grant)) => {
-            techniques::grant(world, state, grant, events)?
-        }
-        None => {}
-    }
+    apply(world, state, &choice.effects, events)?;
     // An effect can make the speaker unavailable; the conversation ends then.
     match &choice.next {
         Some(next) if npc_here(world, state, &active.npc) => {

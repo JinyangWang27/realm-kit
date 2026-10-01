@@ -1,6 +1,6 @@
 //! Panels: views of the current state that spend no time.
 
-use crate::render::{direction_name, piece_name, stat_name, Paint};
+use crate::render::{clock, direction_name, duration, money, piece_name, stat_name, Paint};
 use realmkit_engine::Engine;
 use realmkit_spec::Stat;
 use std::io::{self, Write};
@@ -15,47 +15,46 @@ pub fn location(
     let world = engine.world();
     let state = engine.state();
     let location = world.location(location).unwrap();
-    writeln!(
-        output,
-        "{}\n{}",
-        paint.title(&location.name),
-        location.description
-    )?;
-    write!(output, "Exits:")?;
-    for (direction, exit) in &location.exits {
-        write!(
-            output,
-            " {}{}",
-            direction_name(*direction),
-            if engine.conditions_met(&exit.requires) {
-                ""
-            } else {
-                " (locked)"
+    writeln!(output, "{}", paint.title(&location.name))?;
+    if let Some(now) = state.time.and_then(|now| clock(world, now)) {
+        writeln!(output, "{}", paint.dim(&now))?;
+    }
+    writeln!(output, "{}", location.description)?;
+    let roads: Vec<String> = world
+        .world
+        .roads
+        .iter()
+        .filter_map(|road| {
+            let to = world.location(road.leads(&location.id)?)?;
+            let mut notes = Vec::new();
+            if road.minutes > 0 {
+                notes.push(duration(road.minutes));
             }
-        )?;
+            if !engine.allows(road.requires.as_ref()) {
+                notes.push("closed".into());
+            }
+            Some(match notes.is_empty() {
+                true => to.name.clone(),
+                false => format!("{} ({})", to.name, notes.join(", ")),
+            })
+        })
+        .collect();
+    if !roads.is_empty() {
+        writeln!(output, "Roads: {}", roads.join(", "))?;
     }
-    if location.exits.is_empty() {
-        write!(output, " none")?;
+    // A place reached only by road has no compass exits to list.
+    if !location.exits.is_empty() || roads.is_empty() {
+        location_exits(output, engine, location)?;
     }
-    writeln!(output)?;
-    for id in &location.characters {
-        let character = world.character(id).unwrap();
-        if !engine.conditions_met(&character.requires) {
-            continue;
-        }
-        let defeated = state
-            .combat
-            .as_ref()
-            .is_some_and(|c| c.defeated.contains(id));
+    for character in engine.present_here() {
         // A fighter shows its HP: current in a fight, full otherwise.
         let fighting = engine
             .encounter()
-            .and_then(|e| e.participants.iter().find(|p| &p.character == id));
+            .and_then(|e| e.participants.iter().find(|p| p.character == character.id));
         let hp = fighting
             .map(|p| p.hp)
             .or(character.combat.as_ref().map(|c| c.stats.hp));
         match hp {
-            _ if defeated => {}
             Some(0) => {}
             Some(hp) => writeln!(
                 output,
@@ -68,11 +67,68 @@ pub fn location(
     Ok(())
 }
 
+/// "Exits: north east (locked)", or "Exits: none".
+fn location_exits(
+    output: &mut impl Write,
+    engine: &Engine<'_>,
+    location: &realmkit_spec::Location,
+) -> io::Result<()> {
+    write!(output, "Exits:")?;
+    for (direction, exit) in &location.exits {
+        write!(
+            output,
+            " {}{}",
+            direction_name(*direction),
+            if engine.allows(exit.requires.as_ref()) {
+                ""
+            } else {
+                " (locked)"
+            }
+        )?;
+    }
+    if location.exits.is_empty() {
+        write!(output, " none")?;
+    }
+    writeln!(output)
+}
+
+/// The market here: each good's buying and selling price, and how many the
+/// player carries.
+pub fn market(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
+    let world = engine.world();
+    let state = engine.state();
+    let (Some(economy), Some(wallet)) = (world.economy(), &state.economy) else {
+        return Ok(());
+    };
+    let Some(market) = economy.market(&state.player.location) else {
+        return Ok(());
+    };
+    let name = &world.location(&market.location).unwrap().name;
+    writeln!(output, "{}", paint.title(&format!("Market at {name}:")))?;
+    for good in &economy.goods {
+        let Some(quote) = engine.quote(&good.item) else {
+            continue;
+        };
+        let held = state.player.inventory.get(&good.item).copied().unwrap_or(0);
+        writeln!(
+            output,
+            "  {} — buy {} · sell {} · carried {held}",
+            world.item(&good.item).unwrap().name,
+            money(world, quote.buy),
+            money(world, quote.sell),
+        )?;
+    }
+    writeln!(output, "  {}", money(world, wallet.currency))
+}
+
 /// Pieces of equipment by number, then counted items.
 pub fn inventory(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();
     let state = engine.state();
     writeln!(output, "{}", paint.title("Inventory:"))?;
+    if let Some(wallet) = &state.economy {
+        writeln!(output, "  {}", money(world, wallet.currency))?;
+    }
     let gear = state.combat.as_ref().map(|c| &c.gear);
     if state.player.inventory.is_empty() && gear.is_none_or(|g| g.is_empty()) {
         writeln!(output, "  Empty")?;

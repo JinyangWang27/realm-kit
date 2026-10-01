@@ -83,9 +83,9 @@ fn recipes_and_tiers_are_checked() {
         ),
         (
             |w| {
-                recipe(w, "iron_sword").known_when = vec![Condition::Flag {
+                recipe(w, "iron_sword").known_when = Some(Condition::Flag {
                     flag: "nope".into(),
-                }]
+                })
             },
             "missing_reference",
         ),
@@ -114,10 +114,10 @@ fn recipes_and_tiers_are_checked() {
         ),
         (
             |w| {
-                tier(w, "iron_sword", 1).requires = vec![Condition::Technique {
+                tier(w, "iron_sword", 1).requires = Some(Condition::Technique {
                     technique: "smithing".into(),
                     rank: 9,
-                }]
+                })
             },
             "invalid_rank",
         ),

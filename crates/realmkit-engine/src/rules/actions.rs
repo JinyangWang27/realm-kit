@@ -23,26 +23,34 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         return fight_actions(world, state, encounter, panels);
     }
     let location = world.location(&state.player.location).unwrap();
-    let mut actions: Vec<_> = location
-        .characters
+    let here = placed_here(world, state);
+    let mut actions: Vec<_> = here
         .iter()
         .filter(|id| npc_here(world, state, id))
-        .map(|id| available(Command::Talk(id.clone())))
+        .map(|id| available(Command::Talk((*id).clone())))
         .collect();
     if state.combat.is_some() {
         actions.extend(
-            location
-                .characters
-                .iter()
+            here.iter()
                 .filter(|id| !defeated(state, id))
                 .filter(|id| character_here(world, state, id).is_some_and(|c| c.combat.is_some()))
-                .map(|id| available(Command::Engage(id.clone()))),
+                .map(|id| available(Command::Engage((*id).clone()))),
         );
     }
     actions.extend(location.exits.iter().map(|(direction, exit)| Action {
         command: Command::Move(*direction),
-        available: conditions_met(state, &exit.requires),
+        available: allowed(state, exit.requires.as_ref()),
     }));
+    // Roads in authored order; a closed one is listed to explain itself.
+    actions.extend(world.world.roads.iter().filter_map(|road| {
+        Some(Action {
+            command: Command::Travel(road.leads(&location.id)?.clone()),
+            available: allowed(state, road.requires.as_ref()),
+        })
+    }));
+    if let Some(step) = world.world.time.as_ref().and_then(|t| t.wait) {
+        actions.push(available(Command::Wait(step)));
+    }
     if state.combat.is_some() && location.safe {
         actions.push(available(Command::Rest));
     }
@@ -78,7 +86,51 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         );
     }
     actions.extend(crafting::offered(world, state));
+    actions.extend(trade(world, state));
     actions.extend(panels);
+    actions
+}
+
+/// At an open market: its prices, then buying one unit of each good, where
+/// affordable, and selling one of each good the player carries.
+fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
+    let Ok((economy, _)) = economy::market_here(world, state) else {
+        return Vec::new();
+    };
+    let wallet = state.economy.as_ref().unwrap();
+    let held = |good: &Id| state.player.inventory.get(good).copied();
+    let mut actions = vec![Action {
+        command: Command::Market,
+        available: true,
+    }];
+    for good in &economy.goods {
+        let quote = economy::quote(world, state, &good.item).unwrap();
+        actions.push(Action {
+            command: Command::Buy {
+                good: good.item.clone(),
+                quantity: 1,
+            },
+            // Carrying one more must fit the count too.
+            available: wallet.currency >= quote.buy
+                && held(&good.item).is_none_or(|n| n.checked_add(1).is_some()),
+        });
+    }
+    for good in &economy.goods {
+        if held(&good.item).is_some() {
+            let quote = economy::quote(world, state, &good.item).unwrap();
+            actions.push(Action {
+                command: Command::Sell {
+                    good: good.item.clone(),
+                    quantity: 1,
+                },
+                // Proceeds that would pass the currency bound cannot be taken.
+                available: wallet
+                    .currency
+                    .checked_add(quote.sell)
+                    .is_some_and(|total| total <= realmkit_spec::CURRENCY_BOUND),
+            });
+        }
+    }
     actions
 }
 

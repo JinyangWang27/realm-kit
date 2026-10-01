@@ -10,23 +10,23 @@
           {
             "text": "What troubles the village?",
             "next": "request",
-            "requires": [{ "kind": "quest", "quest": "quiet_the_track", "status": "available" }]
+            "requires": { "kind": "quest", "quest": "quiet_the_track", "status": "available" }
           },
           {
             "text": "The wolf is dead. The track is clear.",
             "next": "thanks",
-            "requires": [{ "kind": "quest", "quest": "quiet_the_track", "status": "ready" }],
-            "effect": { "kind": "complete_quest", "quest": "quiet_the_track" }
+            "requires": { "kind": "quest", "quest": "quiet_the_track", "status": "ready" },
+            "effects": [{ "kind": "complete_quest", "quest": "quiet_the_track" }]
           },
           {
             "text": "Tell me again where to look.",
             "next": "reminder",
-            "requires": [{ "kind": "quest", "quest": "quiet_the_track", "status": "active" }]
+            "requires": { "kind": "quest", "quest": "quiet_the_track", "status": "active" }
           },
           {
             "text": "I will take the candle to the chapel.",
             "next": "farewell",
-            "requires": [{ "kind": "flag", "flag": "ruins_open" }]
+            "requires": { "kind": "flag", "flag": "ruins_open" }
           },
           { "text": "Leave her to her thoughts." }
         ]
@@ -35,7 +35,7 @@
         "id": "request",
         "text": "'A wolf walks the north track in daylight. That is trouble enough for one village.' She turns the candle over. 'Will you help?'",
         "choices": [
-          { "text": "I will clear the track.", "next": "accepted", "effect": { "kind": "accept_quest", "quest": "quiet_the_track" } },
+          { "text": "I will clear the track.", "next": "accepted", "effects": [{ "kind": "accept_quest", "quest": "quiet_the_track" }] },
           { "text": "Not yet." }
         ]
       },

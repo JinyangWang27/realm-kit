@@ -1,0 +1,12 @@
+[
+  {
+    "id": "carry_letter",
+    "name": "The Reeve's Letter",
+    "giver": "reeve",
+    "objective": { "kind": "flag", "flag": "letter_delivered" },
+    "introduction": "Odda presses a letter into your hand. 'For the steward at Hollin Keep, about the fen road. He sees petitioners from eight in the morning until eight at night, and not a minute after.'",
+    "progress": "The steward has the reeve's letter. Odda will want to know.",
+    "completion": "Odda cuts a new notch in her stick. 'Then the keep knows. Take this; the gatekeepers will let you in after dark.'",
+    "reward_items": [{ "item": "keep_token", "quantity": 1 }]
+  }
+]

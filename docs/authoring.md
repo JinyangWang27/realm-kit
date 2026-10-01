@@ -37,7 +37,7 @@ fn author() -> Result<(), Box<dyn std::error::Error>> {
     draft.create_location(garden)?;
     draft.link_locations("village", Direction::West, Exit {
         destination: "garden".into(),
-        requires: vec![],
+        requires: None,
         blocked_text: "The garden gate is shut.".into(),
     })?;
     for diagnostic in draft.validate_world() {

@@ -6,6 +6,22 @@ use super::*;
 pub enum Command {
     Look,
     Move(Direction),
+    /// Takes the road from here to a location, passing its travel time.
+    Travel(Id),
+    /// Lets this many minutes of world time pass.
+    Wait(u64),
+    /// Buys units of a good at this location's market.
+    Buy {
+        good: Id,
+        quantity: u64,
+    },
+    /// Sells units of a good at this location's market.
+    Sell {
+        good: Id,
+        quantity: u64,
+    },
+    /// Shows this location's prices; only at a market.
+    Market,
     /// Starts an encounter with a fighter at the current location.
     Engage(Id),
     /// In an encounter: a basic attack in the player's basic-attack channel.
@@ -59,6 +75,39 @@ pub enum Event {
         from: Id,
         to: Id,
     },
+    /// World time moved on; `now` is the minute it reached. `eventful` says
+    /// whether anything the player notices happened meanwhile (a flag being
+    /// set does not count); those events come just before.
+    TimePassed {
+        minutes: u64,
+        now: u64,
+        eventful: bool,
+    },
+    /// A character who moves came to the player's location.
+    CharacterArrived {
+        character: Id,
+    },
+    /// A character who moves left the player's location.
+    CharacterLeft {
+        character: Id,
+    },
+    Bought {
+        good: Id,
+        quantity: u64,
+        cost: u64,
+    },
+    Sold {
+        good: Id,
+        quantity: u64,
+        earned: u64,
+    },
+    CurrencyReceived {
+        amount: u64,
+    },
+    CurrencyPaid {
+        amount: u64,
+    },
+    MarketViewed,
     /// `skill` is `None` for a basic attack, which uses narrative `variant`.
     DamageDealt {
         target: Id,

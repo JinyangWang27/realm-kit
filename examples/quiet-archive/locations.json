@@ -7,7 +7,7 @@
       "north": { "destination": "stacks", "blocked_text": "The stacks are closed." },
       "east": {
         "destination": "vault",
-        "requires": [{ "kind": "flag", "flag": "vault_open" }],
+        "requires": { "kind": "flag", "flag": "vault_open" },
         "blocked_text": "The iron door is locked. Pell keeps the key."
       }
     },
