@@ -47,20 +47,6 @@ fn ready(
     Ok(())
 }
 
-fn spend(state: &mut GameState, materials: &[ItemStack], events: &mut Vec<Event>) {
-    for stack in materials {
-        let held = state.player.inventory.get_mut(&stack.item).unwrap();
-        *held -= stack.quantity;
-        if *held == 0 {
-            state.player.inventory.remove(&stack.item);
-        }
-        events.push(Event::ItemsSpent {
-            item: stack.item.clone(),
-            quantity: stack.quantity,
-        });
-    }
-}
-
 /// Crafting's technique XP, which teaches the technique if it is unknown.
 fn train(
     world: &WorldSpec,
@@ -88,7 +74,7 @@ pub(crate) fn forge(
         recipe.requires.as_ref(),
         &recipe.inputs,
     )?;
-    spend(state, &recipe.inputs, events);
+    story::take_items(state, &recipe.inputs, events)?;
     let combat = state.combat.as_mut().unwrap();
     let gear = combat.next_gear;
     gear::receive(combat, &recipe.output, 1)?;
@@ -119,7 +105,7 @@ pub(crate) fn improve(
         tier.requires.as_ref(),
         &tier.cost,
     )?;
-    spend(state, &tier.cost, events);
+    story::take_items(state, &tier.cost, events)?;
     let gear = state.combat.as_mut().unwrap().gear.get_mut(&piece).unwrap();
     gear.tier += 1;
     events.push(Event::Improved {
@@ -167,7 +153,7 @@ pub(crate) fn enchant(
         enchantment.requires.as_ref(),
         &enchantment.catalyst,
     )?;
-    spend(state, &enchantment.catalyst, events);
+    story::take_items(state, &enchantment.catalyst, events)?;
     let gear = state.combat.as_mut().unwrap().gear.get_mut(&piece).unwrap();
     gear.enchantment = Some(id.clone());
     events.push(Event::Enchanted {

@@ -188,6 +188,23 @@ fn markets(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
                 merchant,
                 w.character(merchant).is_some(),
             );
+            // A merchant who is never at the market would keep it shut.
+            let placed = w
+                .location(owner)
+                .is_some_and(|l| l.characters.contains(merchant));
+            let visits = w
+                .character(merchant)
+                .and_then(|c| c.moves.as_ref())
+                .is_some_and(|m| m.among.contains(owner));
+            let known = w.character(merchant).is_some() && w.location(owner).is_some();
+            if known && !placed && !visits {
+                issue(
+                    out,
+                    owner,
+                    "invalid_merchant",
+                    format!("merchant {merchant} is never at this market"),
+                );
+            }
         }
         if let Some(spread) = market.spread_percent {
             bounded(out, owner, spread.into(), 1_000, "a spread");
@@ -229,7 +246,7 @@ fn markets(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
 fn links(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
     let owner = &w.world.id;
     let mut pairs = BTreeSet::new();
-    let mut shares: BTreeMap<&str, u32> = BTreeMap::new();
+    let mut shares: BTreeMap<&str, u64> = BTreeMap::new();
     for link in &economy.links {
         let [a, b] = &link.between;
         for end in [a, b] {
@@ -240,7 +257,7 @@ fn links(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
                 end,
                 economy.market(end).is_some(),
             );
-            *shares.entry(end).or_default() += link.percent;
+            *shares.entry(end).or_default() += u64::from(link.percent);
         }
         if a == b || !pairs.insert((a.min(b), a.max(b))) {
             issue(

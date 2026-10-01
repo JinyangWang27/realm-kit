@@ -318,7 +318,8 @@ the index moves with what the market makes and needs.
   demand, its `producers` say how many of each it has, and its starting
   `prices` are indices (1,000 when left out) within `index_bounds`. A market
   with a `merchant` trades only while that character is present and
-  undefeated, so a merchant's hours or travels close it. A market may replace the economy's
+  undefeated, so a merchant's hours or travels close it. The merchant must
+  be placed at the market or move among locations that include it. A market may replace the economy's
   `spread_percent`.
 - **Links** join two markets whose prices pull together; one market's links
   share at most 100 percent in total.

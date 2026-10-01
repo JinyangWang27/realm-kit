@@ -124,6 +124,22 @@ fn economy_content_is_checked_with_stable_codes() {
             },
             "invalid_link",
         ),
+        // Shares far past 100 are reported, not added up past the integer.
+        (
+            |w| {
+                economy(w).links[0].percent = 3_000_000_000;
+                economy(w).links.push(TradeLink {
+                    between: ["greyford".into(), "vellmarket".into()],
+                    percent: 3_000_000_000,
+                })
+            },
+            "invalid_link",
+        ),
+        // Maddoc never comes to Greyford, so its market would never open.
+        (
+            |w| economy(w).markets[0].merchant = Some("maddoc".into()),
+            "invalid_merchant",
+        ),
         (
             |w| economy(w).tick.as_mut().unwrap().revert_percent = 101,
             "invalid_amount",

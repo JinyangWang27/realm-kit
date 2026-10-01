@@ -89,6 +89,14 @@ fn occur(
     effects: &[realmkit_spec::Effect],
     events: &mut Vec<Event>,
 ) {
+    // Setting flags cannot fail, so only fallible grants need a staged copy.
+    if effects
+        .iter()
+        .all(|e| matches!(e, realmkit_spec::Effect::SetFlag { .. }))
+    {
+        story::apply(world, state, effects, events).expect("setting flags cannot fail");
+        return;
+    }
     let mut staged = state.clone();
     let mut happened = Vec::new();
     if story::apply(world, &mut staged, effects, &mut happened).is_ok() {
@@ -108,7 +116,8 @@ fn relocate(state: &mut GameState, character: &Character, events: &mut Vec<Event
         .insert(character.id.clone(), to.clone())
         .unwrap();
     let here = &state.player.location;
-    if from == *to {
+    // A character absent under its conditions comes and goes unseen.
+    if from == *to || !allowed(state, character.requires.as_ref()) {
         return;
     }
     if from == *here {

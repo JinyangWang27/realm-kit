@@ -111,7 +111,13 @@ fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 good: good.item.clone(),
                 quantity: 1,
             },
-            available: wallet.currency >= cost,
+            // Carrying one more must fit the count too.
+            available: wallet.currency >= cost
+                && state
+                    .player
+                    .inventory
+                    .get(&good.item)
+                    .is_none_or(|held| held.checked_add(1).is_some()),
         });
     }
     for good in &economy.goods {

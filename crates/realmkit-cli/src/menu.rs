@@ -118,6 +118,8 @@ pub struct Menu {
     dialogue: bool,
     /// In a fight: everyone's vitals and the projected turn order.
     header: Vec<String>,
+    /// What the world offers, for letter shortcuts.
+    context: input::Context,
 }
 
 /// The engine projects turns as if every action took a basic action's time.
@@ -333,36 +335,34 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 bonuses.join(", ")
             )
         }
-        // "Buy Cloth — 129 silver (next 133)", from the engine's own trade on
-        // a copy; unaffordable goods stay listed to show the price.
+        // "Buy Cloth — 129 silver (next 133)": this unit's price and the
+        // next one's after the index moves; unaffordable goods stay listed.
         Command::Buy { good, .. } => {
-            let mut probe = engine.clone();
+            let quote = Quote::of(engine, good)?;
             let name = &world.item(good)?.name;
-            let Ok(events) = probe.execute(action.command.clone()) else {
-                let (economy, wallet) = (world.economy()?, engine.state().economy.as_ref()?);
-                let market = economy.market(&here.id)?;
-                let index = wallet.prices[&here.id][good];
-                let price = buy_price(economy.good(good)?.price, index, economy.spread(market));
-                return Some(format!("{BUY} {name} — {} {AFFORD}", money(world, price)));
-            };
-            let cost = events.iter().find_map(|e| match e {
-                realmkit_engine::Event::Bought { cost, .. } => Some(*cost),
-                _ => None,
-            })?;
-            let next = next_price(&probe, good, true)?;
+            let cost = buy_price(quote.price, quote.index, quote.spread);
+            if !action.available {
+                let why = if quote.currency < cost {
+                    AFFORD
+                } else {
+                    LOCKED
+                };
+                return Some(format!("{BUY} {name} — {} {why}", money(world, cost)));
+            }
+            let next = (quote.index + quote.steps.buy).min(quote.bounds[1]);
             format!(
                 "{BUY} {name} — {} ({NEXT_PRICE} {})",
                 money(world, cost),
-                money(world, next)
+                money(world, buy_price(quote.price, next, quote.spread))
             )
         }
+        Command::Sell { .. } if !action.available => return None,
         Command::Sell { good, .. } => {
-            let mut probe = engine.clone();
-            let events = probe.execute(action.command.clone()).ok()?;
-            let earned = events.iter().find_map(|e| match e {
-                realmkit_engine::Event::Sold { earned, .. } => Some(*earned),
-                _ => None,
-            })?;
+            let quote = Quote::of(engine, good)?;
+            let next = quote
+                .index
+                .saturating_sub(quote.steps.sell)
+                .max(quote.bounds[0]);
             let held = engine
                 .state()
                 .player
@@ -373,8 +373,8 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             format!(
                 "{SELL} {} ({held}) — {} ({NEXT_PRICE} {})",
                 world.item(good)?.name,
-                money(world, earned),
-                money(world, next_price(&probe, good, false)?)
+                money(world, sell_price(quote.price, quote.index, quote.spread)),
+                money(world, sell_price(quote.price, next, quote.spread))
             )
         }
         Command::Market => PRICES.into(),
@@ -418,18 +418,31 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
     })
 }
 
-/// The price of the next unit at this market, buying or selling.
-fn next_price(engine: &Engine<'_>, good: &str, buying: bool) -> Option<u64> {
-    let world = engine.world();
-    let economy = world.economy()?;
-    let here = &engine.state().player.location;
-    let market = economy.market(here)?;
-    let index = engine.state().economy.as_ref()?.prices[here][good];
-    let price = economy.good(good)?.price;
-    Some(match buying {
-        true => buy_price(price, index, economy.spread(market)),
-        false => sell_price(price, index, economy.spread(market)),
-    })
+/// What a good trades at here, read from the state rather than by trading.
+struct Quote {
+    price: u64,
+    index: u32,
+    spread: u32,
+    steps: realmkit_spec::TradeStep,
+    bounds: [u32; 2],
+    currency: u64,
+}
+
+impl Quote {
+    fn of(engine: &Engine<'_>, good: &str) -> Option<Self> {
+        let economy = engine.world().economy()?;
+        let here = &engine.state().player.location;
+        let market = economy.market(here)?;
+        let wallet = engine.state().economy.as_ref()?;
+        Some(Self {
+            price: economy.good(good)?.price,
+            index: *wallet.prices.get(here)?.get(good)?,
+            spread: economy.spread(market),
+            steps: economy.trade_step,
+            bounds: economy.index_bounds,
+            currency: wallet.currency,
+        })
+    }
 }
 
 /// "2 Iron ingot, 1 Leather strip".
@@ -575,6 +588,7 @@ impl Menu {
             cursor: 0,
             dialogue,
             header: encounter_lines(engine),
+            context: input::Context::of(engine.world()),
         }
     }
 
@@ -687,7 +701,7 @@ impl Menu {
             Key::Char(c @ '1'..='9') => return self.choose(c as usize - '0' as usize),
             // Letter shortcuts (movement, panels) apply only outside dialogue focus.
             Key::Char(c) if !self.dialogue => {
-                return match input::shortcut(c) {
+                return match input::shortcut(c, self.context) {
                     Ok(input::Input::Command(command)) => Outcome::Run(command),
                     Ok(input::Input::Help) => Outcome::Help,
                     _ => Outcome::Ignore,

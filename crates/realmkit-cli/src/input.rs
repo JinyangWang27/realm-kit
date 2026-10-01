@@ -104,17 +104,37 @@ fn minutes(value: &str) -> Result<u64, &'static str> {
         .ok_or("expected minutes, such as 90, 2h or 1d")
 }
 
+/// What a world offers that typed commands depend on.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Context {
+    /// The authored wait step, which `wait` alone takes.
+    pub wait_step: Option<u64>,
+    /// `go <place>` travels by road only where there are roads.
+    pub roads: bool,
+    /// `market` and `m` exist only with an economy.
+    pub markets: bool,
+}
+
+impl Context {
+    pub fn of(world: &WorldSpec) -> Self {
+        Self {
+            wait_step: world.world.time.as_ref().and_then(|t| t.wait),
+            roads: !world.world.roads.is_empty(),
+            markets: world.economy().is_some(),
+        }
+    }
+}
+
 pub fn parse(world: &WorldSpec, line: &str) -> Result<Input, &'static str> {
-    parse_with(line, world.world.time.as_ref().and_then(|t| t.wait))
+    parse_with(line, Context::of(world))
 }
 
 /// A one-letter key typed outside a conversation, such as `n` or `i`.
-pub fn shortcut(key: char) -> Result<Input, &'static str> {
-    parse_with(&key.to_string(), None)
+pub fn shortcut(key: char, context: Context) -> Result<Input, &'static str> {
+    parse_with(&key.to_string(), context)
 }
 
-/// `wait` alone waits the world's authored step, if it has one.
-fn parse_with(line: &str, wait_step: Option<u64>) -> Result<Input, &'static str> {
+fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
     let words: Vec<_> = line.split_whitespace().collect();
     let Some(verb) = words.first() else {
         return Ok(Input::Blank);
@@ -138,10 +158,11 @@ fn parse_with(line: &str, wait_step: Option<u64>) -> Result<Input, &'static str>
         // A direction, or else a location a road leads to.
         ("go", [value]) => match direction(&value.to_ascii_lowercase()) {
             Some(direction) => Command::Move(direction),
-            None => Command::Travel((*value).into()),
+            None if context.roads => Command::Travel((*value).into()),
+            None => return Err("unknown direction"),
         },
         ("travel", [id]) => Command::Travel((*id).into()),
-        ("market" | "m", []) => Command::Market,
+        ("market" | "m", []) if context.markets => Command::Market,
         ("buy", [good, rest @ ..]) if rest.len() <= 1 => Command::Buy {
             good: (*good).into(),
             quantity: quantity(rest)?,
@@ -150,7 +171,7 @@ fn parse_with(line: &str, wait_step: Option<u64>) -> Result<Input, &'static str>
             good: (*good).into(),
             quantity: quantity(rest)?,
         },
-        ("wait", []) => Command::Wait(wait_step.ok_or("this world has no waiting")?),
+        ("wait", []) => Command::Wait(context.wait_step.ok_or("this world has no waiting")?),
         ("wait", [value]) => Command::Wait(minutes(&value.to_ascii_lowercase())?),
         ("engage", [id]) => Command::Engage((*id).into()),
         ("attack", [id]) => Command::Attack((*id).into()),
@@ -266,12 +287,25 @@ mod tests {
             parse("travel ashmere"),
             Ok(Input::Command(Command::Travel("ashmere".into())))
         );
+        // The demo has no roads or markets: a typo stays a typo.
+        assert_eq!(parse("go nrth"), Err("unknown direction"));
+        assert!(parse("market").is_err());
+        assert!(shortcut('m', Context::default()).is_err());
+        let sandbox = Context {
+            wait_step: Some(60),
+            roads: true,
+            markets: true,
+        };
+        assert_eq!(shortcut('m', sandbox), Ok(Input::Command(Command::Market)));
         // `go` takes a direction, or else a place a road leads to.
         assert_eq!(
-            parse("go Ashmere"),
+            super::parse_with("go Ashmere", sandbox),
             Ok(Input::Command(Command::Travel("Ashmere".into())))
         );
-        assert_eq!(parse("market"), Ok(Input::Command(Command::Market)));
+        assert_eq!(
+            super::parse_with("market", sandbox),
+            Ok(Input::Command(Command::Market))
+        );
         assert_eq!(
             parse("buy cloth 3"),
             Ok(Input::Command(Command::Buy {
@@ -295,7 +329,13 @@ mod tests {
         // The demo has no clock, so a bare wait has no step to take.
         assert!(parse("wait").is_err());
         assert_eq!(
-            super::parse_with("wait", Some(60)),
+            super::parse_with(
+                "wait",
+                Context {
+                    wait_step: Some(60),
+                    ..Context::default()
+                }
+            ),
             Ok(Input::Command(Command::Wait(60)))
         );
         assert_eq!(

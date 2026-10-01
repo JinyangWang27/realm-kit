@@ -415,3 +415,18 @@ fn a_defeated_merchant_trades_no_more() {
         Err(EngineError::NotHere(merchant)) if merchant == "hild"
     ));
 }
+
+#[test]
+fn buying_is_not_offered_when_the_count_cannot_hold_another_unit() {
+    let world = marches();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    engine.execute(Travel("ashmere".into())).unwrap();
+    let mut full = engine.snapshot();
+    full.state.player.inventory.insert("eels".into(), u64::MAX);
+    let mut full = Engine::restore(&world, full).unwrap();
+    assert!(offered(&full).contains(&(buy("eels", 1), false)));
+    assert!(matches!(
+        full.execute(buy("eels", 1)),
+        Err(EngineError::NumericLimit)
+    ));
+}

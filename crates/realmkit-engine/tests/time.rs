@@ -317,7 +317,7 @@ fn time_never_passes_beyond_its_bound() {
     world.world.events.clear();
     world.world.economy.as_mut().unwrap().tick = None;
     world.characters.retain(|c| c.moves.is_none());
-    world.locations[0].characters.clear();
+    world.locations[0].characters.retain(|c| c != "wenna");
     let mut engine = Engine::new(&world).unwrap();
     let before = engine.state().clone();
     assert!(matches!(
@@ -418,4 +418,29 @@ fn a_save_cannot_know_what_a_future_event_teaches() {
     early.state.combat = later.state().combat.clone();
     assert!(Engine::restore(&world, early).is_err());
     engine.execute(Wait(60)).unwrap();
+}
+
+#[test]
+fn a_mover_absent_under_its_conditions_comes_and_goes_unseen() {
+    let mut world = marches();
+    // Wenna appears only once the letter is delivered, which never happens here.
+    world
+        .characters
+        .iter_mut()
+        .find(|c| c.id == "wenna")
+        .unwrap()
+        .requires = Some(Condition::Flag {
+        flag: "letter_delivered".into(),
+    });
+    for seed in 0..20 {
+        let mut engine = Engine::new_with_seed(&world, seed).unwrap();
+        let events = engine.execute(Wait(10 * 1_440)).unwrap();
+        assert!(
+            !events.iter().any(|e| matches!(
+                e,
+                Event::CharacterArrived { .. } | Event::CharacterLeft { .. }
+            )),
+            "seed {seed}"
+        );
+    }
 }
