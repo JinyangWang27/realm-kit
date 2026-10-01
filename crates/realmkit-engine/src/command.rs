@@ -76,7 +76,8 @@ pub enum Event {
         to: Id,
     },
     /// World time moved on; `now` is the minute it reached. `eventful` says
-    /// whether anything happened meanwhile; those events come just before.
+    /// whether anything the player notices happened meanwhile (a flag being
+    /// set does not count); those events come just before.
     TimePassed {
         minutes: u64,
         now: u64,

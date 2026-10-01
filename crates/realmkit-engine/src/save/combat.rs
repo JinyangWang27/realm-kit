@@ -155,8 +155,8 @@ fn crafting(
         gear.enchantment.as_ref().is_none_or(|id| {
             world.enchantment(id).is_some_and(|e| {
                 e.fits(equipment)
-                    && lasting(state, e.known_when.as_ref())
-                    && lasting(state, e.requires.as_ref())
+                    && lasting(world, state, e.known_when.as_ref())
+                    && lasting(world, state, e.requires.as_ref())
                     && trained(state, e.trains.as_ref())
             })
         })
@@ -169,9 +169,9 @@ fn crafting(
             .as_ref()
             .unwrap()
             .tiers;
-        tiers[..gear.tier.min(tiers.len())]
-            .iter()
-            .all(|t| lasting(state, t.requires.as_ref()) && trained(state, t.trains.as_ref()))
+        tiers[..gear.tier.min(tiers.len())].iter().all(|t| {
+            lasting(world, state, t.requires.as_ref()) && trained(state, t.trains.as_ref())
+        })
     });
     let forged_ok = progress.forged.iter().all(|output| {
         let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
@@ -182,7 +182,7 @@ fn crafting(
             || rules
                 .recipes
                 .iter()
-                .any(|r| &&r.output == output && qualified(state, r))
+                .any(|r| &&r.output == output && qualified(world, state, r))
     });
     ensure(
         tiers_ok && forged_ok && enchantments_ok,

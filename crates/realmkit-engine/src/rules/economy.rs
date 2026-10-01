@@ -83,12 +83,6 @@ pub(crate) fn trade(
     if !buying {
         story::take_items(state, &stack, &mut Vec::new())?;
     }
-    type Price = fn(u64, u32, u32) -> u64;
-    type Step = fn(&Economy, u32) -> u32;
-    let (price, step): (Price, Step) = match buying {
-        true => (buy_price, raised),
-        false => (sell_price, lowered),
-    };
     let spread = economy.spread(market);
     let wallet = state.economy.as_mut().unwrap();
     let index = wallet
@@ -98,10 +92,17 @@ pub(crate) fn trade(
         .unwrap();
     let mut total = 0_u64;
     for _ in 0..quantity {
-        total = total
-            .checked_add(price(good.price, *index, spread))
-            .ok_or(EngineError::NumericLimit)?;
-        *index = step(economy, *index);
+        let unit = if buying {
+            buy_price(good.price, *index, spread)
+        } else {
+            sell_price(good.price, *index, spread)
+        };
+        total = total.checked_add(unit).ok_or(EngineError::NumericLimit)?;
+        *index = if buying {
+            raised(economy, *index)
+        } else {
+            lowered(economy, *index)
+        };
     }
     let good = good.item.clone();
     if buying {
@@ -109,10 +110,7 @@ pub(crate) fn trade(
             .currency
             .checked_sub(total)
             .ok_or(EngineError::NotEnoughCurrency)?;
-        let count = state.player.inventory.entry(good.clone()).or_default();
-        *count = count
-            .checked_add(quantity)
-            .ok_or(EngineError::NumericLimit)?;
+        story::grant_items(world, state, &stack, &mut Vec::new())?;
         events.push(Event::Bought {
             good,
             quantity,

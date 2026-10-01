@@ -119,15 +119,18 @@ fn time(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     let movers: Vec<_> = world
         .characters
         .iter()
-        .filter_map(|c| Some((&c.id, &c.moves.as_ref()?.among)))
+        .filter_map(|c| Some((&c.id, c.moves.as_ref()?)))
         .collect();
+    // Before its first move, a mover is still where it was placed.
+    let now = state.time.unwrap_or(0);
+    let placed = |id: &Id| world.locations.iter().find(|l| l.characters.contains(id));
     ensure(
         state.whereabouts.len() == movers.len()
-            && movers.iter().all(|(id, among)| {
-                state
-                    .whereabouts
-                    .get(*id)
-                    .is_some_and(|at| among.contains(at))
+            && movers.iter().all(|(id, moves)| {
+                state.whereabouts.get(*id).is_some_and(|at| {
+                    moves.among.contains(at)
+                        && (now >= moves.schedule.at || placed(id).is_some_and(|l| &l.id == at))
+                })
             }),
         "a character who moves is somewhere it cannot be",
     )
@@ -153,25 +156,38 @@ pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effe
 }
 
 /// Whether an optional requirement could have held at some earlier moment.
-fn lasting(state: &GameState, requires: Option<&Condition>) -> bool {
-    requires.is_none_or(|c| could_have_been(state, c, true))
+fn lasting(world: &WorldSpec, state: &GameState, requires: Option<&Condition>) -> bool {
+    requires.is_none_or(|c| could_have_been(world, state, c, true))
 }
 
 /// Whether `condition` could once have evaluated to `value`. Flags are never
 /// cleared and ranks never fall, so a flag or rank that was once required
-/// still holds. Every flag starts unset, and quest states and items move both
-/// ways, so anything else proves nothing. Branches are judged separately,
-/// which can only accept more.
-fn could_have_been(state: &GameState, condition: &Condition, value: bool) -> bool {
+/// still holds. Every flag starts unset, and techniques other than the
+/// starting ones start unlearned; quest states and items move both ways, so
+/// anything else proves nothing. Branches are judged separately, which can
+/// only accept more.
+fn could_have_been(
+    world: &WorldSpec,
+    state: &GameState,
+    condition: &Condition,
+    value: bool,
+) -> bool {
+    let could = |c, v| could_have_been(world, state, c, v);
     match condition {
-        Condition::All { of } if value => of.iter().all(|c| could_have_been(state, c, true)),
-        Condition::All { of } => of.iter().any(|c| could_have_been(state, c, false)),
-        Condition::Any { of } if value => of.iter().any(|c| could_have_been(state, c, true)),
-        Condition::Any { of } => of.iter().all(|c| could_have_been(state, c, false)),
-        Condition::Not { condition } => could_have_been(state, condition, !value),
+        Condition::All { of } if value => of.iter().all(|c| could(c, true)),
+        Condition::All { of } => of.iter().any(|c| could(c, false)),
+        Condition::Any { of } if value => of.iter().any(|c| could(c, true)),
+        Condition::Any { of } => of.iter().all(|c| could(c, false)),
+        Condition::Not { condition } => could(condition, !value),
         Condition::Flag { .. } | Condition::Technique { .. } if value => {
             rules::holds(state, condition)
         }
+        // A starting technique was known at that rank from the first moment.
+        Condition::Technique { technique, rank } => !world
+            .combat()
+            .into_iter()
+            .flat_map(|c| &c.player_techniques)
+            .any(|g| &g.technique == technique && g.rank.unwrap_or(1) >= *rank),
         _ => true,
     }
 }
@@ -187,9 +203,9 @@ fn trained(state: &GameState, grant: Option<&realmkit_spec::TechniqueGrant>) -> 
 }
 
 /// A recipe the player could have used, as far as a snapshot can tell.
-fn qualified(state: &GameState, recipe: &realmkit_spec::Recipe) -> bool {
-    lasting(state, recipe.known_when.as_ref())
-        && lasting(state, recipe.requires.as_ref())
+fn qualified(world: &WorldSpec, state: &GameState, recipe: &realmkit_spec::Recipe) -> bool {
+    lasting(world, state, recipe.known_when.as_ref())
+        && lasting(world, state, recipe.requires.as_ref())
         && trained(state, recipe.trains.as_ref())
 }
 
@@ -438,7 +454,7 @@ fn spent<'w>(
         let recipes: Vec<_> = rules
             .recipes
             .iter()
-            .filter(|r| &&r.output == output && qualified(state, r))
+            .filter(|r| &&r.output == output && qualified(world, state, r))
             .collect();
         let materials: BTreeSet<&Id> = recipes
             .iter()

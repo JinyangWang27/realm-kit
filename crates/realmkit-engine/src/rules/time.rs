@@ -91,7 +91,10 @@ fn pass(
         events.push(Event::TimePassed {
             minutes,
             now: end,
-            eventful: events.len() > before,
+            // Setting a flag is bookkeeping; the player sees nothing.
+            eventful: events[before..]
+                .iter()
+                .any(|e| !matches!(e, Event::StoryFlagSet { .. })),
         });
     }
     Ok(())

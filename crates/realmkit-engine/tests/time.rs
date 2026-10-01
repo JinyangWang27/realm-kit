@@ -474,22 +474,51 @@ fn nobody_is_seen_coming_or_going_from_the_road() {
 }
 
 #[test]
-fn time_passing_says_whether_anything_happened_meanwhile() {
-    let world = marches();
-    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+fn time_passing_says_whether_anything_noticeable_happened_meanwhile() {
+    let mut world = marches();
     let passed = |events: &[Event]| {
         events.iter().find_map(|e| match e {
             Event::TimePassed { eventful, .. } => Some(*eventful),
             _ => None,
         })
     };
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     assert_eq!(passed(&travel(&mut engine, "ashmere")), Some(false));
-    // Waiting until 13:00 on day 2, then travelling over the thaw at 14:00.
-    engine.execute(Wait(2_220 - 600 - 1)).unwrap();
-    engine.execute(Wait(1)).unwrap();
+    // Travelling over the thaw at 14:00 on day 2 only sets a flag.
+    engine.execute(Wait(2_220 - 600)).unwrap();
     let events = travel(&mut engine, "greyford");
     assert!(events.contains(&Event::StoryFlagSet {
         flag: "thaw".into()
     }));
-    assert_eq!(passed(&events), Some(true));
+    assert_eq!(passed(&events), Some(false));
+    // A purse found on the road is something to see.
+    world.world.events.push(WorldEvent {
+        id: "purse".into(),
+        schedule: Schedule {
+            at: 540,
+            every: None,
+        },
+        requires: None,
+        effects: vec![Effect::GrantCurrency { amount: 5 }],
+    });
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    assert_eq!(passed(&travel(&mut engine, "ashmere")), Some(true));
+}
+
+#[test]
+fn a_save_keeps_a_mover_where_it_was_placed_until_its_first_move() {
+    let world = marches();
+    let engine = Engine::new_with_seed(&world, 7).unwrap();
+    let mut early = engine.snapshot();
+    early
+        .state
+        .whereabouts
+        .insert("wenna".into(), "ashmere".into());
+    assert!(matches!(
+        Engine::restore(&world, early.clone()),
+        Err(EngineError::InvalidSave(_))
+    ));
+    // After her first move at 06:00 on day 2, Ashmere is a place she may be.
+    early.state.time = Some(1_800);
+    assert!(Engine::restore(&world, early).is_ok());
 }

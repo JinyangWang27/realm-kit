@@ -622,3 +622,35 @@ fn a_save_judges_condition_trees_by_what_could_once_have_held() {
         Err(EngineError::InvalidSave(why)) if why.contains("crafting")
     ));
 }
+
+#[test]
+fn a_starting_technique_was_never_unlearned() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    let mut snapshot = engine.snapshot();
+    // The same sword under content where the recipe needs the player not to
+    // know Enchanting, which everyone knows from the start.
+    let mut starting = smithy();
+    let combat = starting.world.combat.as_mut().unwrap();
+    combat.player_techniques.push(TechniqueGrant {
+        technique: "enchanting".into(),
+        rank: None,
+        xp: 0,
+    });
+    combat.recipes[0].requires = Some(Condition::Not {
+        condition: Box::new(Condition::Technique {
+            technique: "enchanting".into(),
+            rank: 1,
+        }),
+    });
+    snapshot.package_revision = starting.revision();
+    let fresh = Engine::new(&starting).unwrap();
+    let learned = fresh.state().combat.as_ref().unwrap().techniques["enchanting"];
+    let combat_state = snapshot.state.combat.as_mut().unwrap();
+    combat_state.techniques.insert("enchanting".into(), learned);
+    assert!(matches!(
+        Engine::restore(&starting, snapshot),
+        Err(EngineError::InvalidSave(why)) if why.contains("crafting")
+    ));
+}

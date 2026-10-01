@@ -1089,7 +1089,10 @@ above are delivered alongside them, in whichever order a fixture needs them.
    condition. Only the minute and movers' locations are saved, since every
    next occurrence follows from the minute. Effects cannot start or stop a
    schedule; conditions gate what an occurrence does. `examples/marches`
-   begins here.
+   begins here. Follow-up: a character who appears or leaves because the
+   clock entered or left its `time_of_day` hours, and a market that opens
+   or closes with its merchant, change silently; report them as movers'
+   arrivals are reported.
 3. **M5c — quest lifecycle.** Quests that fail, carry world-time deadlines or
    are abandoned, plus repeatable offers: job templates whose parameters the
    saved RNG draws from authored candidate lists at an explicit gameplay
