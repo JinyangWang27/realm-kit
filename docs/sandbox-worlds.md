@@ -92,7 +92,7 @@ quest deadlines, offers, runtime instances) is optional.
 | Companion gear | retinue, equipment | None. Companions fight in encounters only where personal combat exists. |
 | Mass battle | retinue | Without morale or proficiencies, those terms leave the formula; without prisoners, losses are never captured; champion duels need personal combat. Rewards, loot and lasting injuries are separate parts; looted gear needs equipment. |
 | Prisoners | retinue, and mass battle or personal combat | Ransom needs the economy; escapes run on a prison tick, so they need recurring schedules; holding prisons need holdings. |
-| Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time; raiding needs factions at war; village unrest needs mass battle, and bandit trouble needs world agents and offers. Without factions, owners are characters. |
+| Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time; raiding needs factions at war; village unrest needs mass battle; demanding supplies and livestock need the economy; bandit trouble needs world agents and offers. Without factions, owners are characters. |
 | Politics and orders | factions and standing | Membership ranks, orders, marriage and a founded kingdom are separate parts. Marriage needs per-character relation tracks. |
 | Knowledge and news | none | Without world time, remembered prices and whereabouts carry no age; without the economy, nothing is remembered about prices; without characters who move, whereabouts are always current. |
 | World agents | recurring schedules | Without a retinue, parties carry no rosters and cannot fight; without mass battle, they never fight each other; without factions, there is no diplomacy; without the economy, no caravans trade. |
@@ -200,7 +200,10 @@ M5 slices.
      opens its own dialogue when it has one whose opening condition holds,
      otherwise the first matching dialogue of its roles, in order. A role's
      topics are choices appended to every member's opening node, after the
-     character's own choices, when their conditions hold.
+     character's own choices, when their conditions hold. A topic belongs to
+     the role: its `next`, and every `next` below it, names a node in the
+     role's own node list, so a shared topic can run several exchanges
+     without touching the member's dialogue.
    - Inside a conversation, conditions, effects and templates may refer to the
      **speaker**, the character being talked to, wherever they accept a
      character: `RelationAtLeast { with: Speaker }`, `HasTrait(Speaker, …)`,
@@ -237,7 +240,10 @@ M5 slices.
     of locations and a recurring schedule; on each occurrence the engine moves
     it to one of them, drawn from a `world` RNG domain. Its location is saved
     state keyed by its character ID, and it is present only where it
-    currently is.
+    currently is. While the character rides in a party, including the
+    player's retinue, or is held captive, its occurrences are skipped; when it
+    is released or leaves the party, it stays where that happened until its
+    next occurrence.
 
 Proficiencies such as trading, leadership and field surgery are not a
 foundation. They follow [Section 8](open-decisions.md#8-checks-and-proficiencies):
@@ -338,12 +344,13 @@ prices: the engine derives every price from them.
     at once. Dumping one cargo in one town stops paying.
   - Selling is limited by the merchant's currency, which the restock refills.
 - **Workshops.** The player may buy a workshop in a town, at most an authored
-  number per town, through a dialogue effect with the town's authored seller.
-  A workshop runs one processed good's recipe. On the economy's weekly schedule
-  it pays the output's local price × runs, minus the inputs' local prices and
-  the overhead, which can be a loss. Selling or closing it is another dialogue
-  effect. Workshops are owned property, not [holdings](#holdings): they have no
-  garrison and never change hands in a war.
+  number per town, through a dialogue effect with the town's authored seller. A
+  workshop runs one processed good's recipe. On the economy's weekly schedule it
+  pays the output's local price × runs, minus the inputs' local prices and the
+  overhead, which can be a loss. Currency never goes below zero: a loss takes at
+  most what the player holds, and an event reports any shortfall. Selling or
+  closing it is another dialogue effect. Workshops are owned property, not
+  [holdings](#holdings): they have no garrison and never change hands in a war.
 - **Commands.** Buy and sell. The engine previews the price, and the change the
   trade makes to it, before the player confirms. Buying and selling a workshop
   happen in dialogue.
@@ -549,22 +556,26 @@ battles out of personal combat. This capability resolves army against army.
   losing side's losses may instead become the winner's prisoners (see [Prisoners
   and ransom](#prisoners-and-ransom)). The player sees the result and the
   losses, not a blow-by-blow fight.
-- **Rewards.** A won battle grants XP to the player, to each companion who
-  fought and to the pools of surviving troop types, split by authored shares
-  of the defeated side's authored XP. It changes an authored standing track,
-  such as renown, by an amount that grows with the defeated side's strength
-  relative to the player's. Each defeated troop definition authors a loot
-  table; the battle's RNG domain draws from it, with more draws for a better
-  looting proficiency, into a loot pool the player takes from before leaving.
-  Anything left is lost. Looted equipment may start at an authored improvement
-  tier below the base, a worn or rusted copy, using the
-  [improvement tiers](equipment.md) that already exist.
+- **Rewards.** A won battle grants the defeated side's authored XP to the pools
+  of surviving troop types and, in worlds with character levels, to the player
+  and each companion who fought, split by authored shares. Without character
+  levels, those shares are simply not granted. It changes an authored standing
+  track, such as renown, by an amount that grows with the defeated side's
+  strength relative to the player's. Each defeated troop definition authors a
+  loot table; the battle's RNG domain draws from it, with more draws for a
+  better looting proficiency, into a loot pool the player takes from before
+  leaving. Anything left is lost. Improvement tiers only rise from an item's
+  base ([Equipment](equipment.md)), so a worn or rusted copy is its own authored
+  definition, which a loot table names like any other item.
 - **Lasting injuries.** A world may author injuries, each with stat
   penalties. Defeat in a battle, or an authored effect, may inflict one on the
   player or a companion, drawn from the battle's RNG domain with an authored
   chance. Injuries are saved as IDs keyed by the character; effective stats
-  subtract their penalties, like gear in reverse, so nothing is saved twice. An
-  authored effect, such as a physician's treatment, removes one.
+  subtract their penalties, like gear in reverse, so nothing is saved twice.
+  Subtraction saturates at each stat's lower bound (1 for HP and speed, 0 for
+  the others), as armour's speed penalty already does, so no combination of
+  injuries makes a stat invalid. An authored effect, such as a physician's
+  treatment, removes one.
 - **Ground.** Locations and roads both author a ground modifier, neutral when
   omitted, so a battle has ground wherever parties can meet: at a location or
   on a road between two.
@@ -579,8 +590,10 @@ battles out of personal combat. This capability resolves army against army.
 
 - **Ownership.** A holding is a location with an owner, a faction or a
   character, that can change during play.
-- **Income.** A holding produces income and supplies on a recurring schedule,
-  scaled by its market's [prosperity](#economy) where the economy exists.
+- **Income.** A holding produces income and supplies on a recurring schedule.
+  A holding that is also a market scales it by its own
+  [prosperity](#economy); one that is not, such as a castle, takes its
+  income unscaled.
 - **Garrison.** It keeps a garrison roster.
 - **Prison.** It holds prisoners within an authored limit that buildings can
   raise, and a captured lord taken there waits for ransom or escape.
@@ -599,12 +612,12 @@ battles out of personal combat. This capability resolves army against army.
     collected in person. Collecting may provoke unrest with an authored chance
     that low relation with the villagers raises, ending in a small mass battle
     or a lost share of the income.
-  - A hostile player may demand supplies or drive off livestock. Both are
-    engine-detected deeds that lower relation and prosperity, lighter than a
-    raid.
-  - Livestock is a trade good that authors itself as a herd: carried herds slow
-    travel by an authored penalty per head and can be slaughtered into an
-    authored provisions good.
+  - Where the economy exists, a hostile player may demand supplies or drive
+    off livestock, which take trade goods. Both are engine-detected deeds that
+    lower relation and prosperity, lighter than a raid.
+  - Livestock, also only with the economy, is a trade good that authors itself
+    as a herd: carried herds slow travel by an authored penalty per head and can
+    be slaughtered into an authored provisions good.
   - Bandit trouble is a village state that the world-agent tick sets with an
     authored chance. It lowers prosperity and empties the recruit pool until an
     offer from the village clears it, such as hunting the bandits down or
@@ -704,31 +717,32 @@ no language model and no per-faction script.
   the world-agent tick at the same minute. Factions act in authored order and
   draw from their own `faction` RNG domain.
 - **Stance.** Each faction holds one stance from a closed set: defend, gather,
-  campaign (with a target) and rest. Authored priority rules over typed
-  conditions choose it on each tick. A world might gather when at war and
-  rested for an authored time, campaign once the gathered strength reaches an
-  authored multiple of the target's garrison, and rest when the army falls
-  below an authored share of its gathered strength or the campaign runs past
-  an authored length.
+  campaign (with a target holding), raid (with a target village) and rest.
+  Authored priority rules over typed conditions choose it on each tick. A world
+  might gather when at war and rested for an authored time, campaign once the
+  gathered strength reaches an authored multiple of the target's garrison, and
+  rest when the army falls below an authored share of its gathered strength or
+  the campaign runs past an authored length.
 - **Marshal.** A faction may author that its ruler appoints a marshal. When the
   office is empty, the ruler picks the eligible member with the highest value
   of an authored standing track, such as renown, with ties broken by relation
-  with the ruler and then authored order. A player member can be appointed.
+  with the ruler, where the world has a per-character relation track, and
+  then authored order. A player member can be appointed.
   While the faction gathers or campaigns, the marshal's party leads and
   members' parties take the `follow` policy towards it, unless one of their own
   priorities wins, such as relieving their besieged holding.
 - **Targets.** A campaign targets the nearest enemy holding, by travel time
   from the marshal, whose garrison strength is below the army's by an
-  authored margin; a raid stance targets the nearest enemy village. Ties break
-  by authored location order.
+  authored margin; a raid targets the nearest enemy village by travel time
+  from the faction's ruler. Ties break by authored location order.
 - **The player in an army.** A player member receives the marshal's summons as
   an offer, and authored standing changes follow for answering or ignoring it.
   A player marshal chooses the target through commands instead.
 - **Fief grants.** A holding the faction takes is granted on its next tick: to
-  the player if the player asked for it and meets authored conditions,
-  otherwise to the member with the fewest holdings, ties broken by relation
-  with the ruler and then authored order. Members passed over lose authored
-  relation with the ruler.
+  the player if the player asked for it and meets authored conditions, otherwise
+  to the member with the fewest holdings, ties broken by relation with the
+  ruler, where that track exists, and then authored order. Members passed over
+  lose authored relation with the ruler.
 - **Defection.** A lord's faction membership is saved state keyed by the
   character ID. On the faction tick a member whose relation with its ruler is
   below an authored threshold may leave, with an authored chance, for the
@@ -755,8 +769,9 @@ The world changes while the player is elsewhere, and the player should learn
 of it the way a traveller would, not see everything at once.
 
 - **Notable events.** A closed set of world events is notable: war declared,
-  peace made, a holding changes owner, a siege begins, a village is raided, a
-  lord changes faction, a marshal is appointed. When a command crosses one, the
+  peace made, a faction changes stance, a holding changes owner, a siege
+  begins, a village is raided, a lord changes faction, a marshal is
+  appointed. When a command crosses one, the
   engine reports it after the command's own events. A world authors which of
   them the player hears at once (for example those involving the player's
   faction, holdings or companions); the rest reach the player on arrival at a

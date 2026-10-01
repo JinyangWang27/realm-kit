@@ -1162,7 +1162,8 @@ format as usual:
    off-screen change through notable events, a saved news journal, and
    remembered prices and whereabouts.
 7. **M6g — faction strategy.** A faction tick with its own RNG domain;
-   defend, gather, campaign and rest stances chosen by authored priorities; a
+   defend, gather, campaign, raid and rest stances chosen by authored
+   priorities; a
    marshal whose army members follow; campaign and raid targets on the road
    graph; fief grants; defection; truces and war-weariness inputs to diplomacy;
    feasts; and claimants backed through dormant factions. These are closed

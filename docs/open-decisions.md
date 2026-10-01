@@ -1506,7 +1506,8 @@ a proposed answer that still needs to be confirmed:
 - **Dialogue by role (M5e).** Proposed: roles are authored on characters and
   never change; a role's dialogues open for a member only when the member has
   no matching dialogue of its own, and its topics append after the member's own
-  choices. `Speaker` is a typed character reference usable wherever a
+  choices; a topic's `next` resolves in the role's own nodes. `Speaker` is a
+  typed character reference usable wherever a
   character is, resolved at evaluation; there is no variable binding beyond
   it. Line slots are validated per member against what the role's dialogue can
   reach. Still open: whether roles may also be derived from state (the holder
@@ -1530,7 +1531,8 @@ a proposed answer that still needs to be confirmed:
 - **Characters who move (M5b).** Proposed: a character may author a set of
   locations and a recurring schedule; each occurrence moves it to one of them,
   drawn from a `world` RNG domain, and its location is saved keyed by its ID.
-  Still open: whether a move may avoid the player's current location.
+  Occurrences are skipped while it rides in a party or is captive. Still open:
+  whether a move may avoid the player's current location.
 - **Proficiencies (M6).** Proposed: following [Section 8](#8-checks-and-proficiencies),
   each capability owns the proficiencies it needs (trading in the economy,
   leadership in the retinue, surgery in mass battle), with its own ranks and
@@ -1574,13 +1576,14 @@ a proposed answer that still needs to be confirmed:
   draw from their own RNG domain, separate from combat and offers.
 - **Faction strategy (M6g).** Proposed: a faction tick before the agent tick,
   with its own `faction` RNG domain; a closed stance enum (defend, gather,
-  campaign, rest) chosen by authored priority rules; a marshal picked by an
-  authored standing track with ties by relation and authored order; campaign
-  targets by travel time and garrison margin; fief grants to the player on
-  request, otherwise to the member with the fewest holdings; defection below an
-  authored relation threshold; truces after peace. Still open: whether several
-  allied factions can campaign together, and whether the player's own kingdom
-  uses the same stance rules for its vassals.
+  campaign, raid, rest) chosen by authored priority rules; a marshal picked by
+  an authored standing track with ties by relation, where a per-character
+  relation track exists, and then authored order; campaign targets by travel
+  time and garrison margin; fief grants to the player on request, otherwise to
+  the member with the fewest holdings; defection below an authored relation
+  threshold; truces after peace. Still open: whether several allied factions can
+  campaign together, and whether the player's own kingdom uses the same stance
+  rules for its vassals.
 - **Interception (M6f).** Proposed: travel along one road is atomic, but a tick
   that falls during the journey can stop the player at the road's midpoint when
   a hostile party shares that road; a battle there uses the road's ground.
@@ -1625,9 +1628,11 @@ a proposed answer that still needs to be confirmed:
   surviving troop pools by authored shares; changes an authored standing track
   by relative strength; and fills a loot pool from each defeated troop's loot
   table, drawn from the battle's RNG domain with more draws for better looting.
-  Looted equipment may start at an authored improvement tier below the base.
-  Lasting injuries are authored stat penalties saved as IDs per character and
-  subtracted during derivation. Still open: whether loot left in the pool can
+  Worn or rusted loot is its own authored definition, since improvement tiers
+  only rise from the base. Character XP shares apply only in worlds with
+  levels. Lasting injuries are authored stat penalties saved as IDs per
+  character and subtracted during derivation, saturating at each stat's lower
+  bound. Still open: whether loot left in the pool can
   go to companions' stash automatically.
 - **Personalities (M6b).** Proposed: a world declares a closed list of named
   traits and each character authors a few; traits never change during play.
@@ -1671,10 +1676,11 @@ a proposed answer that still needs to be confirmed:
   Still open: the journal's bound, and whether agents' own knowledge is ever
   limited, which the proposal does not do.
 - **Villages (M6e).** Proposed: rent may accrue and wait for collection in
-  person, with unrest drawn from its own RNG domain; demanding supplies and
-  driving off livestock are engine-detected deeds; livestock is a trade good
-  carried as a herd with a travel penalty; bandit trouble is a village state set
-  by the world-agent tick and cleared through an offer.
+  person, with unrest drawn from its own RNG domain; where the economy exists,
+  demanding supplies and driving off livestock are engine-detected deeds;
+  livestock is a trade good carried as a herd with a travel penalty; bandit
+  trouble is a village state set by the world-agent tick and cleared through an
+  offer.
 - **Marriage (M6h).** Proposed: courtship is authored dialogue over relation
   tracks, and `Marry` records at most one spouse per character, keyed by ID. No
   children, heirs or dynasties. Still open: whether a spouse can act for the

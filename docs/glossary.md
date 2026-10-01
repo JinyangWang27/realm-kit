@@ -294,8 +294,8 @@ engine-defined set. Agents move the world without the player.
 ## Faction Strategy
 
 Proposed for M6. The closed engine rules a faction applies on its own recurring
-tick: a stance (defend, gather, campaign, rest) chosen by authored priorities,
-a marshal whose army members follow, fief grants and defection. It is
+tick: a stance (defend, gather, campaign, raid, rest) chosen by authored
+priorities, a marshal whose army members follow, fief grants and defection. It is
 deterministic rule application, not a planner or a language model.
 
 ## Proficiency
