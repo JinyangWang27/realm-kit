@@ -219,6 +219,11 @@ impl<'w> Engine<'w> {
         rules::quote(self.world, &self.state, good)
     }
 
+    /// Who is here now: present under their conditions and not defeated.
+    pub fn present_here(&self) -> Vec<&'w Character> {
+        rules::present_here(self.world, &self.state)
+    }
+
     /// Whether a condition holds now; evaluating it changes nothing.
     pub fn holds(&self, condition: &Condition) -> bool {
         rules::holds(&self.state, condition)

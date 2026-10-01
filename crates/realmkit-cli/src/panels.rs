@@ -46,24 +46,15 @@ pub fn location(
     if !location.exits.is_empty() || roads.is_empty() {
         location_exits(output, engine, location)?;
     }
-    for id in engine.placed_here() {
-        let character = world.character(id).unwrap();
-        if !engine.allows(character.requires.as_ref()) {
-            continue;
-        }
-        let defeated = state
-            .combat
-            .as_ref()
-            .is_some_and(|c| c.defeated.contains(id));
+    for character in engine.present_here() {
         // A fighter shows its HP: current in a fight, full otherwise.
         let fighting = engine
             .encounter()
-            .and_then(|e| e.participants.iter().find(|p| &p.character == id));
+            .and_then(|e| e.participants.iter().find(|p| p.character == character.id));
         let hp = fighting
             .map(|p| p.hp)
             .or(character.combat.as_ref().map(|c| c.stats.hp));
         match hp {
-            _ if defeated => {}
             Some(0) => {}
             Some(hp) => writeln!(
                 output,

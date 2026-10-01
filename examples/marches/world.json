@@ -70,7 +70,7 @@
     "links": [{ "between": ["greyford", "ashmere"], "percent": 10 }],
     "index_bounds": [100, 10000],
     "spread_percent": 15,
-    "trade_step": { "buy": 26, "sell": 39 },
+    "trade_step": 26,
     "tick": {
       "schedule": { "at": 1440, "every": 1440 },
       "supply_step": 8,

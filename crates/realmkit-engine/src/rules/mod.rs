@@ -102,6 +102,16 @@ pub(super) fn placed_here<'a>(world: &'a WorldSpec, state: &GameState) -> Vec<&'
     placed.chain(movers).collect()
 }
 
+/// Who is at the player's location now: placed or moved here, present
+/// under their conditions and not defeated, in [`placed_here`] order.
+pub(super) fn present_here<'a>(world: &'a WorldSpec, state: &GameState) -> Vec<&'a Character> {
+    placed_here(world, state)
+        .into_iter()
+        .filter(|id| !defeated(state, id))
+        .filter_map(|id| character_here(world, state, id))
+        .collect()
+}
+
 /// At the player's location and present under its conditions.
 pub(super) fn character_here<'a>(
     world: &'a WorldSpec,
@@ -171,10 +181,10 @@ pub(super) fn execute(
             events.push(Event::MarketViewed)
         }
         Command::Buy { good, quantity } => {
-            economy::buy(world, state, &good, quantity, &mut events)?
+            economy::trade(world, state, &good, quantity, true, &mut events)?
         }
         Command::Sell { good, quantity } => {
-            economy::sell(world, state, &good, quantity, &mut events)?
+            economy::trade(world, state, &good, quantity, false, &mut events)?
         }
         Command::Move(direction) => move_to(world, state, direction, &mut events)?,
         Command::Travel(to) => time::travel(world, state, to, &mut events)?,
@@ -209,6 +219,16 @@ pub(super) fn execute(
     // A flag or quest this command changed may open a breakthrough gate.
     if !panel {
         techniques::promote(world, state, &mut events);
+        // Any change, such as a trade that empties a choice's condition, can
+        // leave the conversation with no speaker or nothing to say: it ends.
+        if let Some(open) = &state.dialogue {
+            if !npc_here(world, state, &open.npc)
+                || choices(world, state, &open.npc, &open.node).is_empty()
+            {
+                state.dialogue = None;
+                events.push(Event::DialogueEnded);
+            }
+        }
     }
     Ok(events)
 }

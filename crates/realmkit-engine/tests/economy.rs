@@ -123,7 +123,7 @@ fn buying_and_selling_move_currency_goods_and_the_index() {
     assert_eq!(index(&engine, "ashmere", "eels"), 517 + 3 * 26);
     assert_eq!(engine.state().player.inventory["eels"], 3);
     let spent = 100 - currency(&engine);
-    // Selling one back lowers the index by the sell step.
+    // Selling one back lowers the index by the same step.
     let events = engine.execute(sell("eels", 1)).unwrap();
     let earned = sell_price(15, 595, 25);
     assert_eq!(
@@ -134,7 +134,7 @@ fn buying_and_selling_move_currency_goods_and_the_index() {
             earned
         }]
     );
-    assert_eq!(index(&engine, "ashmere", "eels"), 595 - 39);
+    assert_eq!(index(&engine, "ashmere", "eels"), 595 - 26);
     assert_eq!(currency(&engine), 100 - spent + earned);
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }
@@ -452,4 +452,62 @@ fn trading_back_and_forth_never_makes_money() {
             }
         }
     }
+}
+
+#[test]
+fn selling_first_and_buying_back_never_makes_money_either() {
+    // A dear good, so rounding cannot hide a profit of a few units.
+    let mut world = marches();
+    world.world.economy.as_mut().unwrap().goods[3].price = PRICE_BOUND;
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    let mut stocked = engine.snapshot();
+    stocked.state.economy.as_mut().unwrap().currency = CURRENCY_BOUND / 2;
+    stocked.state.player.inventory.insert("eels".into(), 2_000);
+    // Greyford's 15% spread, near the bottom of the index, is the tightest
+    // margin: with a gentler buy than sell step, selling one unit at 150 and
+    // buying it straight back would pay.
+    let greyford = stocked.state.economy.as_mut().unwrap().prices.get_mut("greyford");
+    greyford.unwrap().insert("eels".into(), 150);
+    engine = Engine::restore(&world, stocked).unwrap();
+    for units in [1, 2, 10, 200, 1_000] {
+        for sell_first in [true, false] {
+            let before = currency(&engine);
+            let (first, second) = match sell_first {
+                true => (sell("eels", units), buy("eels", units)),
+                false => (buy("eels", units), sell("eels", units)),
+            };
+            engine.execute(first).unwrap();
+            engine.execute(second).unwrap();
+            assert!(
+                currency(&engine) <= before,
+                "{units} units, selling first: {sell_first}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_trade_that_empties_the_conversation_ends_it() {
+    let mut world = marches();
+    // The reeve speaks only to someone carrying eels.
+    let reeve = world
+        .dialogues
+        .iter_mut()
+        .find(|d| d.id == "reeve")
+        .unwrap();
+    for choice in &mut reeve.nodes[0].choices {
+        choice.requires = Some(Condition::Item {
+            item: "eels".into(),
+            quantity: 1,
+        });
+    }
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    engine.execute(Travel("ashmere".into())).unwrap();
+    engine.execute(buy("eels", 1)).unwrap();
+    engine.execute(Talk("reeve".into())).unwrap();
+    assert!(engine.state().dialogue.is_some());
+    let events = engine.execute(sell("eels", 1)).unwrap();
+    assert!(events.contains(&Event::DialogueEnded));
+    assert_eq!(engine.state().dialogue, None);
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }

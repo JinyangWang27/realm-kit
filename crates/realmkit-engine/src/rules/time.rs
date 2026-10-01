@@ -58,6 +58,7 @@ fn pass(
         .filter(|end| *end <= WORLD_TIME_BOUND)
         .ok_or(EngineError::NumericLimit)?;
     let due = schedules(world);
+    let before = events.len();
     // Everything up to (minute, index) has happened; at `start`, all of it.
     let mut cursor = (start, usize::MAX);
     loop {
@@ -87,7 +88,11 @@ fn pass(
     }
     state.time = Some(end);
     if minutes > 0 {
-        events.push(Event::TimePassed { minutes, now: end });
+        events.push(Event::TimePassed {
+            minutes,
+            now: end,
+            eventful: events.len() > before,
+        });
     }
     Ok(())
 }
@@ -109,6 +114,10 @@ fn occur(
         story::apply(world, state, effects, events).expect("setting flags cannot fail");
         return;
     }
+    // ponytail: one state copy per granting occurrence, and `pass` rescans
+    // every schedule per occurrence; a per-minute grant over a 30-day wait
+    // costs about 33 ms in release. Use a min-heap of next occurrences and a
+    // pre-check or undo for grants if worlds need many frequent events.
     let mut staged = state.clone();
     let mut happened = Vec::new();
     if story::apply(world, &mut staged, effects, &mut happened).is_ok() {

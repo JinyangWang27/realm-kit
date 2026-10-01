@@ -37,8 +37,9 @@ pub struct Economy {
     pub index_bounds: [u32; 2],
     /// Buying costs this much over the price, selling pays this much under it.
     pub spread_percent: u32,
-    /// Each unit bought raises the index by `buy`; each unit sold lowers it by `sell`.
-    pub trade_step: TradeStep,
+    /// Each unit bought raises the index by this much, and each unit sold
+    /// lowers it by the same, so trading back and forth never pays.
+    pub trade_step: u32,
     /// Prices move on this schedule; without one, only trade moves them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tick: Option<PriceTick>,
@@ -116,13 +117,6 @@ pub struct TradeLink {
     pub between: [Id; 2],
     /// Each side moves this share of the gap towards the other on a tick.
     pub percent: u32,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct TradeStep {
-    pub buy: u32,
-    pub sell: u32,
 }
 
 /// The recurring price update, in four phases over every market.

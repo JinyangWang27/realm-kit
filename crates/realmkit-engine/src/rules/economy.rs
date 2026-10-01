@@ -24,17 +24,17 @@ pub(crate) fn market_here<'w>(
     }
 }
 
-/// The index after one unit is bought: up by the buy step, within bounds.
+/// The index after one unit is bought: up by the trade step, within bounds.
 fn raised(economy: &Economy, index: u32) -> u32 {
     index
-        .saturating_add(economy.trade_step.buy)
+        .saturating_add(economy.trade_step)
         .min(economy.index_bounds[1])
 }
 
-/// The index after one unit is sold: down by the sell step, within bounds.
+/// The index after one unit is sold: down by the trade step, within bounds.
 fn lowered(economy: &Economy, index: u32) -> u32 {
     index
-        .saturating_sub(economy.trade_step.sell)
+        .saturating_sub(economy.trade_step)
         .max(economy.index_bounds[0])
 }
 
@@ -57,13 +57,16 @@ pub(crate) fn quote(world: &WorldSpec, state: &GameState, good: &str) -> Option<
     })
 }
 
-/// Buys units one at a time: each costs the price at the current index, then
-/// raises it by the buy step.
-pub(crate) fn buy(
+/// Buys or sells units one at a time: each trades at the price for the
+/// current index, then moves it one trade step, up for a purchase and down
+/// for a sale. The step is the same both ways, which validation relies on
+/// to keep trading back and forth from paying.
+pub(crate) fn trade(
     world: &WorldSpec,
     state: &mut GameState,
     good: &str,
     quantity: u64,
+    buying: bool,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let (economy, market) = market_here(world, state)?;
@@ -73,6 +76,19 @@ pub(crate) fn buy(
     if quantity == 0 || quantity > TRADE_BOUND {
         return Err(EngineError::InvalidQuantity);
     }
+    let stack = [realmkit_spec::ItemStack {
+        item: good.item.clone(),
+        quantity,
+    }];
+    if !buying {
+        story::take_items(state, &stack, &mut Vec::new())?;
+    }
+    type Price = fn(u64, u32, u32) -> u64;
+    type Step = fn(&Economy, u32) -> u32;
+    let (price, step): (Price, Step) = match buying {
+        true => (buy_price, raised),
+        false => (sell_price, lowered),
+    };
     let spread = economy.spread(market);
     let wallet = state.economy.as_mut().unwrap();
     let index = wallet
@@ -80,73 +96,36 @@ pub(crate) fn buy(
         .get_mut(&market.location)
         .and_then(|p| p.get_mut(&good.item))
         .unwrap();
-    let mut cost = 0_u64;
+    let mut total = 0_u64;
     for _ in 0..quantity {
-        cost = cost
-            .checked_add(buy_price(good.price, *index, spread))
+        total = total
+            .checked_add(price(good.price, *index, spread))
             .ok_or(EngineError::NumericLimit)?;
-        *index = raised(economy, *index);
+        *index = step(economy, *index);
     }
-    wallet.currency = wallet
-        .currency
-        .checked_sub(cost)
-        .ok_or(EngineError::NotEnoughCurrency)?;
-    let count = state.player.inventory.entry(good.item.clone()).or_default();
-    *count = count
-        .checked_add(quantity)
-        .ok_or(EngineError::NumericLimit)?;
-    events.push(Event::Bought {
-        good: good.item.clone(),
-        quantity,
-        cost,
-    });
-    Ok(())
-}
-
-/// Sells units one at a time: each fetches the price at the current index,
-/// then lowers it by the sell step.
-pub(crate) fn sell(
-    world: &WorldSpec,
-    state: &mut GameState,
-    good: &str,
-    quantity: u64,
-    events: &mut Vec<Event>,
-) -> Result<(), EngineError> {
-    let (economy, market) = market_here(world, state)?;
-    let good = economy
-        .good(good)
-        .ok_or_else(|| EngineError::NotTraded(good.into()))?;
-    if quantity == 0 || quantity > TRADE_BOUND {
-        return Err(EngineError::InvalidQuantity);
-    }
-    story::take_items(
-        state,
-        &[realmkit_spec::ItemStack {
-            item: good.item.clone(),
+    let good = good.item.clone();
+    if buying {
+        wallet.currency = wallet
+            .currency
+            .checked_sub(total)
+            .ok_or(EngineError::NotEnoughCurrency)?;
+        let count = state.player.inventory.entry(good.clone()).or_default();
+        *count = count
+            .checked_add(quantity)
+            .ok_or(EngineError::NumericLimit)?;
+        events.push(Event::Bought {
+            good,
             quantity,
-        }],
-        &mut Vec::new(),
-    )?;
-    let spread = economy.spread(market);
-    let wallet = state.economy.as_mut().unwrap();
-    let index = wallet
-        .prices
-        .get_mut(&market.location)
-        .and_then(|p| p.get_mut(&good.item))
-        .unwrap();
-    let mut earned = 0_u64;
-    for _ in 0..quantity {
-        earned = earned
-            .checked_add(sell_price(good.price, *index, spread))
-            .ok_or(EngineError::NumericLimit)?;
-        *index = lowered(economy, *index);
+            cost: total,
+        });
+    } else {
+        receive(wallet, total)?;
+        events.push(Event::Sold {
+            good,
+            quantity,
+            earned: total,
+        });
     }
-    receive(wallet, earned)?;
-    events.push(Event::Sold {
-        good: good.item.clone(),
-        quantity,
-        earned,
-    });
     Ok(())
 }
 

@@ -296,7 +296,7 @@ the index moves with what the market makes and needs.
   "links": [{ "between": ["greyford", "ashmere"], "percent": 10 }],
   "index_bounds": [100, 10000],
   "spread_percent": 15,
-  "trade_step": { "buy": 26, "sell": 39 },
+  "trade_step": 26,
   "tick": {
     "schedule": { "at": 1440, "every": 1440 },
     "supply_step": 8,
@@ -329,16 +329,19 @@ the index moves with what the market makes and needs.
 Buying one unit costs `price × index × (100 + spread) / 100,000`, at least 1;
 selling one fetches `price × index × 100 / (1,000 × (100 + spread))`, each
 rounded down once. Units trade one at a time: each bought unit raises the
-market's index by `trade_step.buy` and each sold one lowers it by
-`trade_step.sell`, within the bounds, so dumping a whole cargo in one town
-stops paying. `buy <item> [units]` and `sell <item> [units]` trade up to
-1,000 units at once, all or nothing; `market` shows the prices here.
+market's index by `trade_step` and each sold one lowers it by the same,
+within the bounds, so dumping a whole cargo in one town stops paying.
+`buy <item> [units]` and `sell <item> [units]` trade up to 1,000 units at
+once, all or nothing; `market` shows the prices here.
 
-Buying and selling straight back never pays. Validation requires
-`trade_step.sell` to be at least `trade_step.buy`, and every spread (the
-economy's and each market's) to satisfy (100 + spread)² × lowest index ≥
-10,000 × (lowest index + buy step) (`invalid_trade_step`, `invalid_spread`).
-With bounds from 100 and a buy step of 26, that is a spread of at least 13%.
+Trading back and forth never pays, in either order. One step moves the index
+both ways, so trades that end holding what the player started with leave the
+index where it was. Validation requires every spread (the economy's and each
+market's) to satisfy (100 + spread)² × lowest index ≥ 10,000 × (lowest index
++ `trade_step`) (`invalid_spread`). With bounds from 100 and a step of 26,
+that is a spread of at least 13%. Separate buy and sell steps would let a
+large stack bought or sold at one price come back at a profit, so there is
+one step.
 
 With a `tick` (which needs the time block), prices move on its schedule in
 four phases, each finished for every market before the next:

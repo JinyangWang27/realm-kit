@@ -35,7 +35,8 @@ fn a_road_takes_its_time_and_a_closed_one_changes_nothing() {
             },
             Event::TimePassed {
                 minutes: 120,
-                now: 600
+                now: 600,
+                eventful: false
             },
             Event::LocationViewed {
                 location: "ashmere".into()
@@ -258,7 +259,8 @@ fn resting_takes_the_authored_time_in_a_world_with_a_clock() {
     let events = engine.execute(Rest).unwrap();
     assert!(events.contains(&Event::TimePassed {
         minutes: 480,
-        now: 480
+        now: 480,
+        eventful: false
     }));
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }
@@ -469,4 +471,25 @@ fn nobody_is_seen_coming_or_going_from_the_road() {
             .any(|a| a.command == Talk("wenna".into()));
     }
     assert!(seen_on_arrival);
+}
+
+#[test]
+fn time_passing_says_whether_anything_happened_meanwhile() {
+    let world = marches();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    let passed = |events: &[Event]| {
+        events.iter().find_map(|e| match e {
+            Event::TimePassed { eventful, .. } => Some(*eventful),
+            _ => None,
+        })
+    };
+    assert_eq!(passed(&travel(&mut engine, "ashmere")), Some(false));
+    // Waiting until 13:00 on day 2, then travelling over the thaw at 14:00.
+    engine.execute(Wait(2_220 - 600 - 1)).unwrap();
+    engine.execute(Wait(1)).unwrap();
+    let events = travel(&mut engine, "greyford");
+    assert!(events.contains(&Event::StoryFlagSet {
+        flag: "thaw".into()
+    }));
+    assert_eq!(passed(&events), Some(true));
 }

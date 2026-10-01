@@ -253,14 +253,7 @@ pub fn events(
     let player = name(&world.world.player);
     // After travel the location shows the clock, so the time is repeated
     // only to date something that happened on the way.
-    let position = |f: fn(&Event) -> bool| events.iter().position(f);
-    let travelled = match (
-        position(|e| matches!(e, Event::Moved { .. })),
-        position(|e| matches!(e, Event::TimePassed { .. })),
-    ) {
-        (Some(moved), Some(passed)) => passed == moved + 1,
-        _ => false,
-    };
+    let travelled = events.iter().any(|e| matches!(e, Event::Moved { .. }));
     for event in events {
         match event {
             Event::LocationViewed { location } => {
@@ -423,8 +416,10 @@ pub fn events(
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,
             Event::QuestsViewed => panels::quests(output, engine, paint)?,
-            Event::TimePassed { .. } if travelled => {}
-            Event::TimePassed { minutes, now } => writeln!(
+            Event::TimePassed {
+                eventful: false, ..
+            } if travelled => {}
+            Event::TimePassed { minutes, now, .. } => writeln!(
                 output,
                 "{}",
                 paint.dim(&format!(
@@ -489,13 +484,14 @@ mod tests {
             from: "greyford".into(),
             to: "ashmere".into(),
         };
-        let passed = Event::TimePassed {
+        let passed = |eventful| Event::TimePassed {
             minutes: 120,
             now: 600,
+            eventful,
         };
-        let quiet = render(&[moved.clone(), passed.clone()]);
+        let quiet = render(&[moved.clone(), passed(false)]);
         assert!(!quiet.contains("later"), "{quiet}");
-        let eventful = render(&[moved, Event::CurrencyReceived { amount: 5 }, passed]);
+        let eventful = render(&[moved, Event::CurrencyReceived { amount: 5 }, passed(true)]);
         assert!(
             eventful.contains("Received: 5 silver\n2 h later: Day 1, 10:00"),
             "{eventful}"

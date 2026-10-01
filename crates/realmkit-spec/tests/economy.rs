@@ -141,8 +141,8 @@ fn economy_content_is_checked_with_stable_codes() {
             |w| economy(w).markets[1].spread_percent = Some(5),
             "invalid_spread",
         ),
-        // Selling more gently than buying lets a stack bought cheap sell dear.
-        (|w| economy(w).trade_step.sell = 25, "invalid_trade_step"),
+        // A step the spread does not cover: 1.3225 × 100 < 100 + 40.
+        (|w| economy(w).trade_step = 40, "invalid_spread"),
         // Maddoc never comes to Greyford, so its market would never open.
         (
             |w| economy(w).markets[0].merchant = Some("maddoc".into()),

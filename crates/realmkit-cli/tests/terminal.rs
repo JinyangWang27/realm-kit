@@ -549,10 +549,10 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         "Market at Greyford:\n  Grain — buy 17 silver · sell 13 silver · carried 0\n",
         "Bought: Smoked eels ×6 for 63 silver",
         "Received: 60 silver",
-        "Sold: Smoked eels ×6 for 90 silver",
+        "Sold: Smoked eels ×6 for 93 silver",
         "Bought: Cloth ×1 for 98 silver",
         "Sold: Cloth ×1 for 135 silver",
-        "Inventory:\n  224 silver\n",
+        "Inventory:\n  227 silver\n",
         "5. Market ›",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");

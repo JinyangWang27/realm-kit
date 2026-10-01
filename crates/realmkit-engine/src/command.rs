@@ -75,10 +75,12 @@ pub enum Event {
         from: Id,
         to: Id,
     },
-    /// World time moved on; `now` is the minute it reached.
+    /// World time moved on; `now` is the minute it reached. `eventful` says
+    /// whether anything happened meanwhile; those events come just before.
     TimePassed {
         minutes: u64,
         now: u64,
+        eventful: bool,
     },
     /// A character who moves came to the player's location.
     CharacterArrived {

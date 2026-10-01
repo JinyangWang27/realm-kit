@@ -68,9 +68,13 @@ pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy)
         );
     }
     bounded(out, owner, economy.spread_percent.into(), 1_000, "a spread");
-    for step in [economy.trade_step.buy, economy.trade_step.sell] {
-        bounded(out, owner, step.into(), INDEX_BOUND.into(), "a trade step");
-    }
+    bounded(
+        out,
+        owner,
+        economy.trade_step.into(),
+        INDEX_BOUND.into(),
+        "a trade step",
+    );
     goods(out, w, economy);
     producers(out, economy);
     markets(out, w, economy);
@@ -104,24 +108,16 @@ pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy)
     }
 }
 
-/// Buying and selling back at once never pays. Units trade one at a time,
-/// so the k-th unit sold back is priced at most one buy step above the unit
-/// it is paired with when selling moves the index at least as far as buying.
-/// Then it is enough that a unit bought at the lowest index cannot sell for
-/// more one buy step higher: (100 + spread)² × low ≥ 10,000 × (low + buy
-/// step), with the price's own rounding only lowering the sale. Without
-/// this, a package could hand the player unlimited currency.
+/// Trading back and forth never pays. One step moves the index both ways,
+/// so any trades that end holding what the player started with return the
+/// index to where it was, and the worst case is one unit traded across one
+/// step at the lowest index: (100 + spread)² × low ≥ 10,000 × (low + step).
+/// The price's own rounding only lowers a sale and raises a purchase. Steps
+/// that differ either way let a large stack bought (or sold) at one end come
+/// back at a profit, so the package has one step, not two. Without this, a
+/// package could hand the player unlimited currency.
 fn no_round_trip(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
     let owner = &w.world.id;
-    let step = economy.trade_step;
-    if step.sell < step.buy {
-        issue(
-            out,
-            owner,
-            "invalid_trade_step",
-            "selling moves the index at least as far as buying, or a stack bought cheap sells dear",
-        );
-    }
     let low = u64::from(economy.index_bounds[0]);
     // Bounds without a lowest price are reported on their own.
     if low == 0 {
@@ -131,14 +127,12 @@ fn no_round_trip(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
         .chain(economy.markets.iter().filter_map(|m| m.spread_percent));
     for spread in spreads {
         let margin = (100 + u64::from(spread)).pow(2) * low;
-        if margin < 10_000 * (low + u64::from(step.buy)) {
+        if margin < 10_000 * (low + u64::from(economy.trade_step)) {
             issue(
                 out,
                 owner,
                 "invalid_spread",
-                format!(
-                    "a spread of {spread}% lets a unit bought and sold back at once turn a profit"
-                ),
+                format!("a spread of {spread}% lets trading a unit back and forth turn a profit"),
             );
         }
     }
