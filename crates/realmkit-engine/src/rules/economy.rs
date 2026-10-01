@@ -14,7 +14,10 @@ pub(crate) fn market_here<'w>(
         .market(&state.player.location)
         .ok_or(EngineError::NoMarket)?;
     match &market.merchant {
-        Some(merchant) if character_here(world, state, merchant).is_none() => {
+        // A defeated merchant is gone, like its listing.
+        Some(merchant)
+            if character_here(world, state, merchant).is_none() || defeated(state, merchant) =>
+        {
             Err(EngineError::NotHere(merchant.clone()))
         }
         _ => Ok((economy, market)),

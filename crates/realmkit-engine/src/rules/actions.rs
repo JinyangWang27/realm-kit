@@ -116,12 +116,17 @@ fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     }
     for good in &economy.goods {
         if state.player.inventory.contains_key(&good.item) {
+            // Proceeds that would pass the currency bound cannot be taken.
+            let earned = sell_price(good.price, prices[&good.item], spread);
             actions.push(Action {
                 command: Command::Sell {
                     good: good.item.clone(),
                     quantity: 1,
                 },
-                available: true,
+                available: wallet
+                    .currency
+                    .checked_add(earned)
+                    .is_some_and(|total| total <= realmkit_spec::CURRENCY_BOUND),
             });
         }
     }

@@ -354,3 +354,64 @@ fn indices_stay_within_their_bounds_under_heavy_trade() {
         .flat_map(|p| p.values())
         .all(|i| (100..=10_000).contains(i)));
 }
+
+#[test]
+fn a_sale_that_would_pass_the_currency_bound_is_not_offered() {
+    let world = marches();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    engine.execute(Travel("ashmere".into())).unwrap();
+    engine.execute(buy("eels", 1)).unwrap();
+    assert!(offered(&engine).contains(&(sell("eels", 1), true)));
+    let mut rich = engine.snapshot();
+    rich.state.economy.as_mut().unwrap().currency = CURRENCY_BOUND - 1;
+    let mut rich = Engine::restore(&world, rich).unwrap();
+    assert!(offered(&rich).contains(&(sell("eels", 1), false)));
+    assert!(matches!(
+        rich.execute(sell("eels", 1)),
+        Err(EngineError::NumericLimit)
+    ));
+}
+
+#[test]
+fn a_defeated_merchant_trades_no_more() {
+    let mut world = marches();
+    // Hild can fight, and loses.
+    let combat: Combat = serde_json::from_str(
+        r#"{
+            "special_name": "Spirit",
+            "timeline": { "action_cost": 100000, "speed_cap": 200 },
+            "levels": [{ "xp": 0, "stats": { "hp": 50, "patk": 50, "pdef": 5, "satk": 0, "sdef": 5, "speed": 100 } }],
+            "narrative": { "attack": ["{attacker} {target} {damage}"], "hurt": ["{attacker} {target} {damage}"], "victory": "{target}", "death": "x" }
+        }"#,
+    )
+    .unwrap();
+    world.world.combat = Some(combat);
+    let hild = world
+        .characters
+        .iter_mut()
+        .find(|c| c.id == "hild")
+        .unwrap();
+    hild.requires = None;
+    hild.combat = Some(
+        serde_json::from_str(
+            r#"{ "stats": { "hp": 5, "patk": 1, "pdef": 0, "satk": 0, "sdef": 0, "speed": 100 }, "xp": 1 }"#,
+        )
+        .unwrap(),
+    );
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    engine.execute(buy("grain", 1)).unwrap();
+    engine.execute(Engage("hild".into())).unwrap();
+    fight_out(&mut engine);
+    assert!(engine
+        .state()
+        .combat
+        .as_ref()
+        .unwrap()
+        .defeated
+        .contains("hild"));
+    assert!(!offered(&engine).contains(&(Market, true)));
+    assert!(matches!(
+        engine.execute(buy("grain", 1)),
+        Err(EngineError::NotHere(merchant)) if merchant == "hild"
+    ));
+}

@@ -223,7 +223,8 @@ directed and take no time. Clients list roads in authored order.
 A `schedule` first falls at minute `at`, which must be after `start`, and then,
 if it has one, every `every` minutes (at least 1). An occurrence applies the
 event's `effects` in order when its optional `requires` holds, and does nothing
-otherwise. Events may `set_flag`, `grant_items`, `grant_currency` and
+otherwise. An occurrence whose effects cannot all apply, such as a grant past
+a bound, is skipped whole, so it never holds time back. Events may `set_flag`, `grant_items`, `grant_currency` and
 `grant_technique` (a recurring event without XP); they cannot accept or
 complete quests, take items or take payment, which belong to conversations.
 
@@ -316,8 +317,8 @@ the index moves with what the market makes and needs.
 - **Markets** are locations, at most one each. A market's `kind` chooses its
   demand, its `producers` say how many of each it has, and its starting
   `prices` are indices (1,000 when left out) within `index_bounds`. A market
-  with a `merchant` trades only while that character is present, so a
-  merchant's hours or travels close it. A market may replace the economy's
+  with a `merchant` trades only while that character is present and
+  undefeated, so a merchant's hours or travels close it. A market may replace the economy's
   `spread_percent`.
 - **Links** join two markets whose prices pull together; one market's links
   share at most 100 percent in total.

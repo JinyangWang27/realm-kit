@@ -175,3 +175,34 @@ fn items_effects_hand_over_are_not_bound_to_quest_rewards_in_saves() {
         Err(EngineError::InvalidSave(_))
     ));
 }
+
+#[test]
+fn an_item_that_effects_only_take_keeps_its_upper_bound_in_saves() {
+    let mut world = archive();
+    // Pell takes the key back; nothing but the quest ever grants it.
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    pell.nodes[0].choices.insert(
+        0,
+        DialogueChoice {
+            text: "Return the key.".into(),
+            next: None,
+            requires: Some(Condition::Item {
+                item: "vault_key".into(),
+                quantity: 1,
+            }),
+            effects: vec![Effect::TakeItems {
+                items: vec![ItemStack {
+                    item: "vault_key".into(),
+                    quantity: 1,
+                }],
+            }],
+        },
+    );
+    let engine = Engine::new(&world).unwrap();
+    let mut forged = engine.snapshot();
+    forged.state.player.inventory.insert("vault_key".into(), 5);
+    assert!(matches!(
+        Engine::restore(&world, forged),
+        Err(EngineError::InvalidSave(_))
+    ));
+}

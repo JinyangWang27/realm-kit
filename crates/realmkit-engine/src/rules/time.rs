@@ -66,7 +66,7 @@ pub(crate) fn advance(
         match due[index].1 {
             Due::Event(event) => {
                 if allowed(state, event.requires.as_ref()) {
-                    story::apply(world, state, &event.effects, events)?;
+                    occur(world, state, &event.effects, events);
                 }
             }
             Due::Mover(character) => relocate(state, character, events),
@@ -78,6 +78,23 @@ pub(crate) fn advance(
         events.push(Event::TimePassed { minutes, now: end });
     }
     Ok(())
+}
+
+/// Applies one occurrence's effects as a whole, or not at all: an occurrence
+/// that cannot happen (a grant past a bound) is skipped, so it never holds
+/// time back for every later command.
+fn occur(
+    world: &WorldSpec,
+    state: &mut GameState,
+    effects: &[realmkit_spec::Effect],
+    events: &mut Vec<Event>,
+) {
+    let mut staged = state.clone();
+    let mut happened = Vec::new();
+    if story::apply(world, &mut staged, effects, &mut happened).is_ok() {
+        *state = staged;
+        events.extend(happened);
+    }
 }
 
 /// Draws where a mover goes next from the world stream, and reports it if

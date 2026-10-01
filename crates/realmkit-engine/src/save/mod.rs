@@ -133,6 +133,25 @@ fn time(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     )
 }
 
+/// Effects that could have happened by the saved minute: every dialogue
+/// choice's, and every event's whose first occurrence has come.
+pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effect> {
+    let now = state.time.unwrap_or(0);
+    let choices = world
+        .dialogues
+        .iter()
+        .flat_map(|d| &d.nodes)
+        .flat_map(|n| &n.choices)
+        .flat_map(|c| &c.effects);
+    let events = world
+        .world
+        .events
+        .iter()
+        .filter(|e| e.schedule.at <= now)
+        .flat_map(|e| &e.effects);
+    choices.chain(events).collect()
+}
+
 /// Whether an optional requirement could have held at some earlier moment.
 fn lasting(state: &GameState, requires: Option<&Condition>) -> bool {
     requires.is_none_or(|c| could_have_been(state, c, true))
@@ -230,6 +249,9 @@ struct Progress<'w> {
     /// Items effects grant or take, which a choice can do any number of
     /// times, so their counts follow from nothing.
     loose: BTreeSet<&'w Id>,
+    /// Items effects only take, never grant: their counts can fall below
+    /// what progress granted, but never rise above it.
+    taken: BTreeSet<&'w Id>,
     /// Materials crafting spends: at most what progress granted, maybe less.
     spendable: BTreeSet<&'w Id>,
     /// Items crafting makes: at least what progress granted, maybe more.
@@ -295,17 +317,24 @@ impl<'w> Progress<'w> {
             .collect();
         // Trade goods come and go at markets too.
         let goods = world.economy().into_iter().flat_map(|e| &e.goods);
-        let loose = world
-            .effects()
-            .flat_map(|e| match e {
-                Effect::GrantItems { items } | Effect::TakeItems { items } => items.as_slice(),
+        let stacks = |taking: bool| {
+            fired(world, state).into_iter().flat_map(move |e| match e {
+                Effect::GrantItems { items } if !taking => items.as_slice(),
+                Effect::TakeItems { items } if taking => items.as_slice(),
                 _ => &[],
             })
+        };
+        let loose: BTreeSet<&Id> = stacks(false)
             .map(|s| &s.item)
             .chain(goods.map(|g| &g.item))
             .collect();
+        let taken = stacks(true)
+            .map(|s| &s.item)
+            .filter(|item| !loose.contains(item))
+            .collect();
         Ok(Self {
             loose,
+            taken,
             spendable,
             forged: recipes.map(|r| &r.output).collect(),
             inventory,
@@ -341,7 +370,9 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
             .inventory
             .iter()
             .filter(|(item, _)| {
-                !progress.spendable.contains(item) && !progress.loose.contains(item)
+                !progress.spendable.contains(item)
+                    && !progress.loose.contains(item)
+                    && !progress.taken.contains(item)
             })
             .all(|(item, count)| held.get(item).is_some_and(|h| h >= count))
             && held.iter().all(|(item, h)| {
@@ -349,7 +380,8 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
                 *h == granted
                     || progress.repeatable_loot.contains(item)
                     || progress.loose.contains(item)
-                    || (progress.spendable.contains(item) && *h < granted)
+                    || ((progress.spendable.contains(item) || progress.taken.contains(item))
+                        && *h < granted)
                     || progress.forged.contains(item)
             }),
         "inventory does not match progress",
@@ -365,9 +397,12 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
             let at = |spent: &BTreeMap<&Id, u64>| {
                 held.saturating_add(spent.get(*item).copied().unwrap_or(0))
             };
+            // Something taken may also have been handed over, so then only
+            // the upper bound holds.
             progress.repeatable_loot.contains(item)
                 || progress.loose.contains(item)
-                || (at(&least) <= granted && at(&most) >= granted)
+                || (at(&least) <= granted
+                    && (progress.taken.contains(item) || at(&most) >= granted))
         }),
         "crafting does not match the materials it needed",
     )
@@ -455,32 +490,40 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
         .flat_map(|g| g.victory_flags.iter().chain(&g.defeat_flags))
         .cloned()
         .collect();
-    // Events can have set their flags only once their first minute came.
-    let now = state.time.unwrap_or(0);
-    let dialogue_flags: BTreeSet<_> = world
-        .dialogues
-        .iter()
-        .flat_map(|d| &d.nodes)
-        .flat_map(|n| &n.choices)
-        .flat_map(|c| &c.effects)
-        .chain(
-            world
-                .world
-                .events
-                .iter()
-                .filter(|e| e.schedule.at <= now)
-                .flat_map(|e| &e.effects),
-        )
+    let effect_flags: BTreeSet<_> = fired(world, state)
+        .into_iter()
         .filter_map(|e| match e {
             Effect::SetFlag { flag } => Some(flag.clone()),
             _ => None,
         })
         .collect();
+    // An unconditional event that only sets flags cannot fail, so once its
+    // first minute has come, its flags are set.
+    let now = state.time.unwrap_or(0);
+    let mut required = world
+        .world
+        .events
+        .iter()
+        .filter(|e| e.requires.is_none() && e.schedule.at <= now)
+        .filter(|e| {
+            e.effects
+                .iter()
+                .all(|f| matches!(f, Effect::SetFlag { .. }))
+        })
+        .flat_map(|e| &e.effects)
+        .filter_map(|e| match e {
+            Effect::SetFlag { flag } => Some(flag),
+            _ => None,
+        });
+    ensure(
+        required.all(|flag| state.flags.contains(flag)),
+        "an event that has happened left no mark",
+    )?;
     ensure(
         progress.quest_flags.is_subset(&state.flags)
             && state.flags.iter().all(|f| {
                 progress.quest_flags.contains(f)
-                    || dialogue_flags.contains(f)
+                    || effect_flags.contains(f)
                     || group_flags.contains(f)
             }),
         "story flags do not match progress",

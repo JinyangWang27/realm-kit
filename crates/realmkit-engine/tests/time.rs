@@ -327,3 +327,95 @@ fn time_never_passes_beyond_its_bound() {
     assert_eq!(engine.state(), &before);
     engine.execute(Wait(60)).unwrap();
 }
+
+#[test]
+fn an_occurrence_that_cannot_happen_is_skipped_and_time_still_passes() {
+    let mut world = marches();
+    world.world.events.push(WorldEvent {
+        id: "stipend".into(),
+        schedule: Schedule {
+            at: 600,
+            every: Some(1_440),
+        },
+        requires: None,
+        effects: vec![Effect::GrantCurrency { amount: 10 }],
+    });
+    let mut full = Engine::new_with_seed(&world, 7).unwrap().snapshot();
+    full.state.economy.as_mut().unwrap().currency = CURRENCY_BOUND - 5;
+    let mut engine = Engine::restore(&world, full).unwrap();
+    // The stipend would pass the bound, so it does not happen; the wait does.
+    let events = engine.execute(Wait(3 * 60)).unwrap();
+    assert!(!events
+        .iter()
+        .any(|e| matches!(e, Event::CurrencyReceived { .. })));
+    assert_eq!(engine.state().time, Some(660));
+    assert_eq!(
+        engine.state().economy.as_ref().unwrap().currency,
+        CURRENCY_BOUND - 5
+    );
+}
+
+#[test]
+fn a_save_needs_the_flags_of_events_that_have_happened() {
+    let world = marches();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    engine.execute(Wait(2_280 - 480)).unwrap();
+    let mut thawless = engine.snapshot();
+    assert!(thawless.state.flags.remove("thaw"));
+    assert!(matches!(
+        Engine::restore(&world, thawless),
+        Err(EngineError::InvalidSave(why)) if why.contains("event")
+    ));
+}
+
+#[test]
+fn a_save_cannot_know_what_a_future_event_teaches() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect");
+    let mut world = WorldSpec::load(path).unwrap();
+    // Cloud Palm comes only from an event at minute 600, not from the master.
+    for choice in world
+        .dialogues
+        .iter_mut()
+        .flat_map(|d| &mut d.nodes)
+        .flat_map(|n| &mut n.choices)
+    {
+        choice
+            .effects
+            .retain(|e| !matches!(e, Effect::GrantTechnique(_)));
+    }
+    world.world.time = Some(WorldTime {
+        start: 480,
+        clock: TextTemplate("{day} {hour}:{minute}".into()),
+        wait: Some(60),
+        rest: None,
+    });
+    world.world.events.push(WorldEvent {
+        id: "lesson".into(),
+        schedule: Schedule {
+            at: 600,
+            every: None,
+        },
+        requires: None,
+        effects: vec![Effect::GrantTechnique(TechniqueGrant {
+            technique: "cloud_palm".into(),
+            rank: None,
+            xp: 0,
+        })],
+    });
+    let mut engine = Engine::new(&world).unwrap();
+    let mut early = engine.snapshot();
+    let mut later = Engine::new(&world).unwrap();
+    later.execute(Wait(120)).unwrap();
+    assert!(later
+        .state()
+        .combat
+        .as_ref()
+        .unwrap()
+        .techniques
+        .contains_key("cloud_palm"));
+    assert!(Engine::restore(&world, later.snapshot()).is_ok());
+    // The same technique in a save from before the lesson is impossible.
+    early.state.combat = later.state().combat.clone();
+    assert!(Engine::restore(&world, early).is_err());
+    engine.execute(Wait(60)).unwrap();
+}
