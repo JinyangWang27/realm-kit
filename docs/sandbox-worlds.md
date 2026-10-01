@@ -519,9 +519,10 @@ character can wear gear:
   companions levels), technique passives and worn gear, minus any
   [lasting injuries](#mass-battle). They are never saved.
 - **In fights.** Companions join personal encounters as allies on the player's
-  side, which the encounter state already supports, and count as leaders in a
-  mass battle. They are wounded rather than killed unless an authored rule says
-  otherwise.
+  side, which the encounter state already supports, and fight as individuals
+  in a mass battle. Like lords, they are never killed: at zero HP they are
+  knocked out, and on a losing side they may be captured
+  ([Prisoners and ransom](#prisoners-and-ransom)).
 - **Leaving.** A companion who leaves takes nothing with them by default; their
   worn pieces return to the stash unless an authored effect says otherwise.
 
@@ -575,8 +576,8 @@ battles out of personal combat. This capability resolves army against army.
   counting losses. At zero HP an individual is knocked out: out of the battle
   with 1 HP and never killed, since lords and companions can be captured but
   never die in battle ([Prisoners and ransom](#prisoners-and-ransom)), and a
-  knocked-out leader's leadership no longer counts. A player who fights alone, without a retinue,
-  is simply a side with one stack. A defeated player then falls to the world's
+  knocked-out leader's leadership no longer counts. A player who fights alone,
+  without a retinue, is simply a side with one stack. A defeated player then falls to the world's
   authored defeat rules (injury, capture). The battle stance holds every
   individual's HP and MP, so they still live in exactly one place.
 - **Strength.** One number compares armies wherever the rules need it: the
@@ -599,8 +600,9 @@ battles out of personal combat. This capability resolves army against army.
      power 100: the attacker's channel attack against that target's matching
      defence. Count × hit is scaled by percentage modifiers, multiplied in
      before one rounding: the class matchup for that pair from an authored
-     table, the ground's modifier for the attacker's class, the leader's
-     leadership, the side's current morale (100% at full morale, falling
+     table, the ground's modifier for the attacker's class, the highest
+     leadership among the side's standing individuals (neutral when none has
+     any), the side's current morale (100% at full morale, falling
      linearly to an authored floor at zero), and one roll per side per round,
      drawn from the battle's RNG domain between authored bounds such as 90 and
      110.
@@ -629,7 +631,8 @@ battles out of personal combat. This capability resolves army against army.
   ends battles before either side is wiped out.
 - **Without morale.** Morale is an optional part of the retinue. A world
   without it drops the morale modifier and step 5, so a battle ends only when
-  a side has no healthy troops or at the round cap, by the same end rules.
+  a side has no one left standing, at a retreat, or at the round cap, by the
+  same end rules.
 - **Troop classes.** A world authors its own classes, such as infantry,
   archers and cavalry, marks which are ranged and which are mounted, and
   authors the matchup table and the pursuit class. Frontage, the morale
@@ -642,14 +645,18 @@ battles out of personal combat. This capability resolves army against army.
   - **Hold.** The side's melee troops brace instead of pressing. Every melee
     hit that the holding side deals or takes that round is scaled by an
     authored hold percentage below 100, such as 60, while ranged troops on
-    both sides shoot as usual. Holding slows both sides' melee equally, so it
+    both sides shoot as usual. A hit is scaled once even when both sides
+    hold. Holding slows both sides' melee equally, so it
     pays only for a side whose ranged troops are the stronger.
   - **Flank.** The side's mounted stacks leave the frontage and attack the
     enemy's ranged stacks directly, as if they were exposed, with damage
     scaled by an authored flank percentage. Without enemy ranged stacks,
     mounted troops fight as in a charge. The rest of the side charges.
-  - **Retreat.** The side leaves the battle at once, and the enemy takes one
-    pursuit round against it, as after a rout.
+  - **Retreat.** The side leaves before the round is fought, so neither side
+    deals that round's ordinary damage. The enemy instead takes one pursuit
+    round against it, as after a rout, and wins with every reward, prisoners
+    from the pursuit included. If both sides retreat in the same round, the
+    battle is a draw with no pursuit and no rewards.
 - **Two ways to fight.** When the player's party joins a battle, the player
   chooses how it runs:
   - **Autoresolve.** The engine runs every round at once with both sides
