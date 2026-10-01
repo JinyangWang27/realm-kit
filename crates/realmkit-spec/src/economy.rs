@@ -156,12 +156,14 @@ impl Economy {
     pub fn spread(&self, market: &Market) -> u32 {
         market.spread_percent.unwrap_or(self.spread_percent)
     }
-    /// What a market makes and uses up of a good on one tick: its producers'
-    /// yields, and its kind's demand plus what its producers consume.
-    /// Saturating; validation keeps both within [`SUPPLY_BOUND`].
-    pub fn supply(&self, market: &Market, good: &Good) -> (u64, u64) {
-        let mut made = 0_u64;
-        let mut used = good.demand.get(&market.kind).copied().unwrap_or(0);
+    /// What a market makes and uses up of a good on one tick, at price
+    /// `index`: its producers' yields, and its kind's demand plus what its
+    /// producers consume. Producers make do with less of a dear good: while
+    /// the index is above 1,000, their consumption is scaled by 1,000 ÷
+    /// index, rounded down once. Saturating; validation keeps both within
+    /// [`SUPPLY_BOUND`] at the base price, where consumption is greatest.
+    pub fn supply(&self, market: &Market, good: &Good, index: u32) -> (u64, u64) {
+        let (mut made, mut industry) = (0_u64, 0_u64);
         for (id, count) in &market.producers {
             let Some(producer) = self.producer(id) else {
                 continue;
@@ -170,8 +172,12 @@ impl Economy {
                 count.saturating_mul(units.get(&good.item).copied().unwrap_or(0))
             };
             made = made.saturating_add(per(&producer.yields));
-            used = used.saturating_add(per(&producer.consumes));
+            industry = industry.saturating_add(per(&producer.consumes));
         }
-        (made, used)
+        if index > BASE_INDEX {
+            industry = industry.saturating_mul(u64::from(BASE_INDEX)) / u64::from(index);
+        }
+        let demand = good.demand.get(&market.kind).copied().unwrap_or(0);
+        (made, demand.saturating_add(industry))
     }
 }

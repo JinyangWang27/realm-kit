@@ -152,7 +152,8 @@ pub(crate) fn pay(
 /// One price tick, in four phases; each finishes for every market before the
 /// next begins. `scripts/combat_sim/economy.py` mirrors it exactly.
 ///
-/// 1. Supply: a surplus lowers the index by a draw below `supply_step` ×
+/// 1. Supply: production against consumption at the current index (see
+///    [`Economy::supply`]). A surplus lowers the index by a draw below `supply_step` ×
 ///    surplus, scaled by index ÷ `damp_below` while the index is below it; a
 ///    shortage raises it the same way, undamped. Draws come from the market
 ///    stream in market, then goods, order, only where supply is unbalanced.
@@ -222,10 +223,10 @@ fn supply<'w>(
     let step = u64::from(rules.supply_step);
     for market in &economy.markets {
         for good in &economy.goods {
-            let (made, used) = economy.supply(market, good);
             let value = index
                 .get_mut(&(market.location.as_str(), good.item.as_str()))
                 .unwrap();
+            let (made, used) = economy.supply(market, good, *value as u32);
             if made > used && step > 0 {
                 let mut fall = rng::below(stream, (made - used) * step) as i64;
                 if *value < i64::from(rules.damp_below) {

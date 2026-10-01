@@ -208,7 +208,7 @@ fn markets(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
             }
         }
         for good in &economy.goods {
-            let (made, used) = economy.supply(market, good);
+            let (made, used) = economy.supply(market, good, BASE_INDEX);
             if made > SUPPLY_BOUND || used > SUPPLY_BOUND {
                 issue(
                     out,

@@ -85,17 +85,20 @@ class Economy:
         market = self.market(location)
         return int(market.get("spread_percent", self.raw["spread_percent"]))
 
-    def supply(self, location: str, item: str) -> tuple[int, int]:
-        """What a market makes and uses up of a good on one tick."""
+    def supply(self, location: str, item: str, index: int) -> tuple[int, int]:
+        """What a market makes and uses up of a good on one tick at price `index`; producers
+        use less of a dear good, scaled by 1,000 / index above the base."""
         market = self.market(location)
         good = self.good(item)
-        made, used = 0, int(good.get("demand", {}).get(market["kind"], 0))
+        made, industry = 0, 0
         producers = {p["id"]: p for p in self.raw.get("producers", [])}
         for producer_id, count in market.get("producers", {}).items():
             producer = producers[producer_id]
             made += count * producer.get("yields", {}).get(item, 0)
-            used += count * producer.get("consumes", {}).get(item, 0)
-        return made, used
+            industry += count * producer.get("consumes", {}).get(item, 0)
+        if index > BASE_INDEX:
+            industry = industry * BASE_INDEX // index
+        return made, int(good.get("demand", {}).get(market["kind"], 0)) + industry
 
     def tick(self, stream: Stream) -> None:
         """One price tick in four phases, exactly as the engine runs it."""
@@ -107,8 +110,8 @@ class Economy:
         # 1. Supply: draws in market, then goods, order, only where unbalanced.
         for m in self.markets:
             for g in self.goods:
-                made, used = self.supply(m, g)
                 value = index[(m, g)]
+                made, used = self.supply(m, g, value)
                 if made > used and step > 0:
                     fall = stream.below((made - used) * step)
                     if value < damp_below:

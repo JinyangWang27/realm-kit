@@ -61,6 +61,16 @@ fn the_price_tick_matches_the_simulator() {
 }
 
 #[test]
+fn producers_use_less_of_a_dear_input_as_the_simulator_does() {
+    // Wool at twice its price: Vellmarket's looms use 18 × 1,000 / 2,000 = 9,
+    // so 24 made against 11 used, and cloth is pulled up after it.
+    let mut world = marches();
+    let economy = world.world.economy.as_mut().unwrap();
+    economy.markets[2].prices.insert("wool".into(), 2_000);
+    assert_eq!(after_ticks(&world, 7, 1)[2], [1606, 1929, 833, 1300]);
+}
+
+#[test]
 fn trade_prices_match_the_simulator() {
     assert_eq!(buy_price(120, 712, 15), 98);
     assert_eq!(sell_price(120, 1_309, 15), 136);

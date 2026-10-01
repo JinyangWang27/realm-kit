@@ -1550,7 +1550,9 @@ a proposed answer that still needs to be confirmed:
 - **Price model (M6a) · decided.** Prices follow production, not stock. Each
   market keeps a price index per good in thousandths of the base price, within
   authored bounds. A recurring price tick moves it against net supply
-  (production minus consumption from authored producer counts), reverts it
+  (production minus consumption from authored producer counts, where
+  producers' consumption of a good shrinks by 1,000 ÷ index while it is
+  dear), reverts it
   towards base, pulls processed goods up towards dearer inputs and converges
   linked markets, in four phases with draws in authored market and goods order
   and convergence applied from one snapshot; caravans will converge their

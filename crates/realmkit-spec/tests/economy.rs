@@ -17,14 +17,15 @@ fn the_marches_economy_validates_and_roundtrips() {
     assert_eq!(&serde_json::from_str::<Economy>(&json).unwrap(), economy);
     // Vellmarket's six looms make 12 cloth and use 18 wool; towns want 6 cloth.
     let vellmarket = economy.market("vellmarket").unwrap();
-    assert_eq!(
-        economy.supply(vellmarket, economy.good("cloth").unwrap()),
-        (12, 6)
+    let (cloth, wool) = (
+        economy.good("cloth").unwrap(),
+        economy.good("wool").unwrap(),
     );
-    assert_eq!(
-        economy.supply(vellmarket, economy.good("wool").unwrap()),
-        (24, 20)
-    );
+    assert_eq!(economy.supply(vellmarket, cloth, 1_000), (12, 6));
+    assert_eq!(economy.supply(vellmarket, wool, 745), (24, 20));
+    // Dear wool makes the looms use less: 18 × 1,000 / 1,500 = 12, plus 2.
+    assert_eq!(economy.supply(vellmarket, wool, 1_500), (24, 14));
+    assert_eq!(economy.supply(vellmarket, wool, 1_001), (24, 19));
     assert!(world.random_market());
 }
 

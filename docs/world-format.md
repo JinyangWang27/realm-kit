@@ -334,7 +334,10 @@ With a `tick` (which needs the time block), prices move on its schedule in
 four phases, each finished for every market before the next:
 
 1. **Supply.** Production is the market's producers' yields; consumption is
-   its kind's demand plus what its producers consume. A surplus lowers the
+   its kind's demand plus what its producers consume. Producers make do with
+   less of a dear good: while its index is above 1,000, what they consume of
+   it is scaled by 1,000 ÷ index, rounded down once, so an industry short of
+   its input does not drive the price to the bound. A surplus lowers the
    index by a draw below `supply_step` × the surplus, multiplied by index ÷
    `damp_below` while the index is below `damp_below`; a shortage raises it by
    a draw below `supply_step` × the shortage. The result stays within the
@@ -356,7 +359,8 @@ may be carried in any number.
 
 Validation keeps every authored number small enough that no tick or trade
 can overflow: at most 10,000 producers of a kind, units per producer and
-demand; at most 100,000,000 of a good made or used by one market per tick;
+demand; at most 100,000,000 of a good made or used by one market per tick
+(counted at the base price, where producers use the most);
 index bounds that contain 1,000 within 1 to 100,000.
 
 ## Characters

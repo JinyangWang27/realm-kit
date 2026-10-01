@@ -310,7 +310,8 @@ prices: the engine derives every price from them.
   updates every good's index in four phases. Each phase finishes for all markets
   before the next begins, and draws come from the economy's own `market` RNG
   domain in authored market order, then authored goods order:
-  - The net supply is production minus consumption. A surplus lowers the index
+  - The net supply is production minus consumption; producers use less of a
+    good while it is dear, scaled by 1,000 ÷ index above the base. A surplus lowers the index
     by a draw below an authored multiple of the surplus, damped once the index is
     already under an authored level; a shortage raises it the same way.
   - The index then reverts towards 1,000 by an authored share of the gap.
