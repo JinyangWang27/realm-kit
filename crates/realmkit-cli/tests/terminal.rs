@@ -375,6 +375,8 @@ fn the_arena_quartermaster_sells_a_draught_that_heals_mid_fight() {
         "Market at The Arena Gate:",
         "Wares:",
         "Healing draught — 8 marks",
+        // Gear shows what it would do before it is bought.
+        "Iron mail — 60 marks (Defence +6, Speed -10)",
         "Bought: Healing draught ×1 for 8 marks",
         "Use item ›",
         "You use Healing draught: +",
