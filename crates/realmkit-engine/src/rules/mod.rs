@@ -10,7 +10,7 @@ mod story;
 mod time;
 
 pub(super) use actions::actions;
-pub(super) use economy::quote;
+pub(super) use economy::{quote, ware_price};
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
 pub(super) use story::{choices, grant_items, grant_xp, progress, set_flag};
 

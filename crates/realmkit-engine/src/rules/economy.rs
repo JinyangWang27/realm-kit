@@ -70,12 +70,15 @@ pub(crate) fn trade(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let (economy, market) = market_here(world, state)?;
-    let good = economy
-        .good(good)
-        .ok_or_else(|| EngineError::NotTraded(good.into()))?;
     if quantity == 0 || quantity > TRADE_BOUND {
         return Err(EngineError::InvalidQuantity);
     }
+    if let (Some(ware), true) = (economy.ware(market, good), buying) {
+        return buy_ware(world, state, ware, quantity, events);
+    }
+    let good = economy
+        .good(good)
+        .ok_or_else(|| EngineError::NotTraded(good.into()))?;
     let stack = [realmkit_spec::ItemStack {
         item: good.item.clone(),
         quantity,
@@ -125,6 +128,42 @@ pub(crate) fn trade(
         });
     }
     Ok(())
+}
+
+/// Buys `quantity` of a ware at its fixed price, all or nothing.
+fn buy_ware(
+    world: &WorldSpec,
+    state: &mut GameState,
+    ware: &realmkit_spec::Ware,
+    quantity: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let cost = ware
+        .price
+        .checked_mul(quantity)
+        .ok_or(EngineError::NumericLimit)?;
+    let wallet = state.economy.as_mut().unwrap();
+    wallet.currency = wallet
+        .currency
+        .checked_sub(cost)
+        .ok_or(EngineError::NotEnoughCurrency)?;
+    let stack = [realmkit_spec::ItemStack {
+        item: ware.item.clone(),
+        quantity,
+    }];
+    story::grant_items(world, state, &stack, &mut Vec::new())?;
+    events.push(Event::Bought {
+        good: ware.item.clone(),
+        quantity,
+        cost,
+    });
+    Ok(())
+}
+
+/// One unit's price of a ware at the open market here.
+pub(crate) fn ware_price(world: &WorldSpec, state: &GameState, item: &str) -> Option<u64> {
+    let (economy, market) = market_here(world, state).ok()?;
+    Some(economy.ware(market, item)?.price)
 }
 
 fn receive(wallet: &mut EconomyState, amount: u64) -> Result<(), EngineError> {

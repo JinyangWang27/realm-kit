@@ -333,8 +333,13 @@ impl<'w> Progress<'w> {
             .chain(catalysts)
             .map(|s| &s.item)
             .collect();
-        // Trade goods come and go at markets too.
+        // Trade goods and wares come and go at markets too.
         let goods = world.economy().into_iter().flat_map(|e| &e.goods);
+        let wares = world
+            .economy()
+            .into_iter()
+            .flat_map(|e| &e.markets)
+            .flat_map(|m| &m.wares);
         let fired = fired(world, state);
         let stacks = |taking: bool| {
             fired.iter().flat_map(move |e| match e {
@@ -346,6 +351,7 @@ impl<'w> Progress<'w> {
         let loose: BTreeSet<&Id> = stacks(false)
             .map(|s| &s.item)
             .chain(goods.map(|g| &g.item))
+            .chain(wares.map(|w| &w.item))
             .collect();
         let taken = stacks(true)
             .map(|s| &s.item)
