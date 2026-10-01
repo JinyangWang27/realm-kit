@@ -1503,18 +1503,63 @@ a proposed answer that still needs to be confirmed:
   consumes no randomness ([Section 7](#7-randomness-and-reproducibility)).
   Still open: how many offers a
   giver holds at once, and when a refused offer comes back.
+- **Dialogue by role (M5e).** Proposed: roles are authored on characters and
+  never change; a role's dialogues open for a member only when the member has
+  no matching dialogue of its own, and its topics append after the member's own
+  choices; a topic's `next` resolves in the role's own nodes. `Speaker` is a
+  typed character reference usable wherever a
+  character is, resolved at evaluation; there is no variable binding beyond
+  it. Line slots are validated per member against what the role's dialogue can
+  reach. Still open: whether roles may also be derived from state (the holder
+  of a location, a faction's ruler) rather than listed, and whether a
+  character may suppress one inherited topic.
+- **Text variants (M5e).** Proposed: any player-facing text may be a list of
+  `{ when, text }` variants ending in an unconditional one; the first that
+  holds is shown. Evaluation is pure, so displaying text never draws or
+  mutates. Still open: whether combat prose variants move to the same rule.
+- **Several languages (M5e).** Proposed: a package keeps exactly one language.
+  A source that carries several produces one package per language from the
+  same authoring data, with identical IDs. Still open: a save is bound to the
+  package revision, which includes text, so it cannot move between language
+  packages; decide whether the revision should hash rules and text separately.
+- **Start choices (M5f).** Proposed: a route may author start questions shown
+  at New Game; each option applies an ordered effect list to the initial state,
+  and the save keeps only the resulting state plus the chosen option IDs. This
+  is authored initial state, not runtime identity editing, so it stays within
+  the original-character rules above. Still open: whether an option may skip
+  or add later questions.
+- **Characters who move (M5b).** Proposed: a character may author a set of
+  locations and a recurring schedule; each occurrence moves it to one of them,
+  drawn from a `world` RNG domain, and its location is saved keyed by its ID.
+  Occurrences are skipped while it rides in a party or is captive. Still open:
+  whether a move may avoid the player's current location.
 - **Proficiencies (M6).** Proposed: following [Section 8](#8-checks-and-proficiencies),
   each capability owns the proficiencies it needs (trading in the economy,
   leadership in the retinue, surgery in mass battle), with its own ranks and
   checks. A technique rank is not such a proficiency. Still open: M4d gates
   recipes on a Smithing *technique*, which blurs that separation. Either keep
   it as a deliberate exception or move crafting to a crafting-owned proficiency
-  before sandbox proficiencies copy the pattern.
-- **Price model (M6a).** Proposed: integer price = base × market modifier ×
-  stock factor, each a bounded percentage, with one final rounding. The selling
-  price sits below the buying price by an authored spread that the economy's
-  trading proficiency can narrow. Still open: whether player sales feed stock
-  immediately or only at restock.
+  before sandbox proficiencies copy the pattern. Proposed growth: proficiency
+  points per level from the level table, saved as an allocation per character
+  and optionally capped by an authored stat; each proficiency is personal or
+  party, and a party proficiency uses the best rank in the retinue; items can
+  teach a rank through study over world time or grant a bonus while carried.
+- **Price model (M6a).** Decided: prices follow production, not stock. Each
+  market keeps a price index per good in thousandths of the base price, within
+  authored bounds. A recurring price tick moves it against net supply
+  (production minus consumption from authored producer counts), reverts it
+  towards base, pulls processed goods up towards dearer inputs and converges
+  linked markets, in four phases with draws in authored market and goods order
+  and convergence applied from one snapshot; caravans converge their destination
+  on arrival. The player's own purchases and sales move the index at once by an
+  authored step. The buying and selling prices sit either side of base × index
+  by an authored spread that trading narrows, with one final rounding.
+  Prosperity drifts daily towards an ideal set by scarcity and buildings, and
+  scales income, tariffs, stock and recruit pools
+  ([Economy](sandbox-worlds.md#economy)). Still open: how many warm-up rounds an
+  authoring tool runs for initial prices, and whether the price tick's draws
+  should be replaced by fixed fractions of the bound, which would drop the
+  `market` RNG domain from prices entirely.
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.
@@ -1526,11 +1571,21 @@ a proposed answer that still needs to be confirmed:
   tests pin its numbers. Still open: how troop quality beyond combat stats
   counts, and whether a champion duel can end a battle outright.
 - **Agent policies (M6f).** Proposed: a closed enum (patrol, raid, escort,
-  besiege, return home), chosen by authored priority rules over typed
+  besiege, follow, trade, return home), chosen by authored priority rules over typed
   conditions. Parties act in stable instance order. "Nearest" and every route
   a party takes are shortest total travel time on the road graph, with ties
   broken by authored road order; there is no free-space pathfinding. Agents
   draw from their own RNG domain, separate from combat and offers.
+- **Faction strategy (M6g).** Proposed: a faction tick before the agent tick,
+  with its own `faction` RNG domain; a closed stance enum (defend, gather,
+  campaign, raid, rest) chosen by authored priority rules; a marshal picked by
+  an authored standing track with ties by relation, where a per-character
+  relation track exists, and then authored order; campaign targets by travel
+  time and garrison margin; fief grants to the player on request, otherwise to
+  the member with the fewest holdings; defection below an authored relation
+  threshold; truces after peace. Still open: whether several allied factions can
+  campaign together, and whether the player's own kingdom uses the same stance
+  rules for its vassals.
 - **Interception (M6f).** Proposed: travel along one road is atomic, but a tick
   that falls during the journey can stop the player at the road's midpoint when
   a hostile party shares that road; a battle there uses the road's ground.
@@ -1570,13 +1625,25 @@ a proposed answer that still needs to be confirmed:
   captivity is an ordinary setback, not an outcome. Escapes run on the world's
   prison schedule with their own `captivity` RNG domain. Still open: what
   happens to the player's retinue and stash when the player is captured.
+- **Battle rewards and injuries (M6d).** Proposed: a victory splits the
+  defeated side's authored XP between the player, companions who fought and
+  surviving troop pools by authored shares; changes an authored standing track
+  by relative strength; and fills a loot pool from each defeated troop's loot
+  table, drawn from the battle's RNG domain with more draws for better looting.
+  Worn or rusted loot is its own authored definition, since improvement tiers
+  only rise from the base. Character XP shares apply only in worlds with
+  levels. Lasting injuries are authored stat penalties saved as IDs per
+  character and subtracted during derivation, saturating at each stat's lower
+  bound. Still open: whether loot left in the pool can
+  go to companions' stash automatically.
 - **Personalities (M6b).** Proposed: a world declares a closed list of named
   traits and each character authors a few; traits never change during play.
   Agent policy priorities and diplomacy weights may test a leader's traits.
   Reactions are authored rules of the form trait × deed → standing change.
-  Deeds are either a closed set the engine detects (raiding a village, which is
-  a holdings action, releasing or ransoming a prisoner, unpaid wages) or world-declared IDs that an authored
-  `ReportDeed` effect reports, such as a tournament win or a broken promise.
+  Deeds are either a closed set the engine detects (raiding a village,
+  demanding its supplies or driving off its livestock, which are holdings
+  actions; releasing or ransoming a prisoner; unpaid wages) or world-declared
+  IDs that an authored `ReportDeed` effect reports, such as a tournament win or a broken promise.
   Companion friction takes effect in the transition that lowers the relation,
   with no tick. Still open: whether any world needs traits that change.
 - **Wounded, provisions and morale (M6c, M6d).** Proposed: the roster saves a
@@ -1597,8 +1664,26 @@ a proposed answer that still needs to be confirmed:
   prisoners and a bonus from pathfinding, in integers with one rounding. A
   party with no healthy troops moves at the base speed. Roads with an authored
   duration take at least one minute; roads without one take no time. Agent
-  parties use the same rule.
-- **Marriage (M6g).** Proposed: courtship is authored dialogue over relation
+  parties use the same rule. Where equipment exists, a worn mount's authored
+  travel speed replaces the base for its wearer, and the slowest counts.
+- **Recruit pools (M6c).** Proposed: each recruiting location saves a count per
+  troop definition that recruiting consumes and an authored schedule refills,
+  scaled by prosperity and gated by standing where those exist.
+- **Knowledge and news (M6f).** Proposed: a closed set of notable world events
+  is reported after the command that crossed it, either at once or on arrival
+  at a town as the world authors, and kept in a bounded saved journal. The
+  player remembers each market's prices and each moving character's location
+  as last seen, with the minute; authored effects reveal them. Clients show
+  only this knowledge ([Section 14](#14-presentation-and-information-disclosure)).
+  Still open: the journal's bound, and whether agents' own knowledge is ever
+  limited, which the proposal does not do.
+- **Villages (M6e).** Proposed: rent may accrue and wait for collection in
+  person, with unrest drawn from a `villages` RNG domain; where the economy
+  exists, demanding supplies and driving off livestock are engine-detected
+  deeds; livestock is a trade good carried as a herd with a travel penalty;
+  bandit trouble is a village state set on the holdings' own village schedule,
+  from the same `villages` domain, and cleared through an offer.
+- **Marriage (M6h).** Proposed: courtship is authored dialogue over relation
   tracks, and `Marry` records at most one spouse per character, keyed by ID. No
   children, heirs or dynasties. Still open: whether a spouse can act for the
   player, for example running a holding while the player travels.

@@ -96,6 +96,12 @@ explicit gameplay transition, never when a menu opens. An offer is an activity
 rather than a side questline, so the bounded waves that gate side questlines do
 not apply to it.
 
+## Start Choice
+
+Proposed for M5. An authored question a route asks at New Game, such as the
+player's background. Each option applies an ordered list of effects to the
+route's initial state; nothing re-runs it once play begins.
+
 ## Story Phase
 
 A discrete narrative/canonical progression period shared by the world. Story
@@ -224,9 +230,22 @@ relation with the player. Conditions read it and effects change it.
 
 ## Market
 
-Proposed for M6. A location that trades an authored set of goods. The engine
-computes its integer prices from authored base prices, the market's modifier and
-its current stock.
+Proposed for M6. A location that trades an authored set of goods. Each good has
+a saved price index, in thousandths of its base price, that a recurring tick
+moves against the market's authored production and demand. The engine derives
+integer buying and selling prices from it.
+
+## Prosperity
+
+Proposed for M6. A market's bounded integer measure of wealth. It drifts towards
+an ideal set by scarcity and buildings, rises with trade, falls with raids and
+sieges, and scales income, tariffs, merchant stock and recruit pools.
+
+## Workshop
+
+Proposed for M6. A player-owned business in a town that runs one processed
+good's recipe and pays the local profit, possibly a loss, on a recurring
+schedule. It is owned property, not a holding.
 
 ## Retinue
 
@@ -249,6 +268,18 @@ as cautious or cruel. Characters author a few; traits never change during play.
 Agent policies, diplomacy weights, dialogue and reactions to the player's deeds
 may test them.
 
+## Dialogue Role
+
+Proposed for M5. An authored role such as lord, guild master or companion that
+characters list. Its dialogues, topics and line slots are shared by every
+member, and inside them `Speaker` refers to the member being talked to.
+
+## Lasting Injury
+
+Proposed for M6. An authored injury with stat penalties that a defeat or an
+effect inflicts on the player or a companion. It is saved as an ID per
+character; derived stats subtract its penalties until an effect removes it.
+
 ## Holding
 
 Proposed for M6. A location owned by a faction or character that can change
@@ -259,6 +290,13 @@ hands during play, with income, a garrison and authored buildings.
 Proposed for M6. A runtime party instance, such as a lord's war party, a bandit
 gang or a caravan, that acts on world ticks by applying a policy from a closed,
 engine-defined set. Agents move the world without the player.
+
+## Faction Strategy
+
+Proposed for M6. The closed engine rules a faction applies on its own recurring
+tick: a stance (defend, gather, campaign, raid, rest) chosen by authored
+priorities, a marshal whose army members follow, fief grants and defection. It is
+deterministic rule application, not a planner or a language model.
 
 ## Proficiency
 
