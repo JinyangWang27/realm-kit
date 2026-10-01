@@ -426,9 +426,10 @@ they do, without scripting each character.
 ### Retinue
 
 - **Troops.** Troop definitions optionally carry wages, an upgrade path
-  (recruit → footman → sergeant), a travel speed where the world uses travel
-  speed, a mass-battle strength where the world has mass battles, and a
-  personal-combat profile only where troops also join encounters.
+  (recruit → footman → sergeant) and a travel speed where the world uses travel
+  speed. They carry a combat profile (stats and channel) wherever the world has
+  mass battles or troops join encounters, since the
+  [round rule](#mass-battle) fights with those stats.
 - **Upkeep tick.** The retinue's periodic rules run on one recurring schedule
   that the world authors for it, typically daily: wages, provisions, wounded
   recovery, morale drift and desertion, in that fixed order. Its random draws
@@ -482,9 +483,10 @@ they do, without scripting each character.
 - **Morale.** A bounded integer for the whole retinue, raised and lowered by
   authored amounts for meals, variety of food, paid or missed wages, victories
   and defeats, companion friction and the leadership proficiency. Low morale
-  lowers mass-battle strength, and below an authored threshold troops desert on
-  upkeep ticks, drawn from the `retinue` RNG domain. Agent parties use their
-  template's fixed morale unless a world authors more.
+  lowers mass-battle damage and strength through the morale modifier, and
+  below an authored threshold troops desert on upkeep ticks, drawn from the
+  `retinue` RNG domain. Agent parties use their template's fixed morale unless
+  a world authors more.
 - **Travel speed.** A road's authored duration is scaled by the party's speed:
   the slowest of the world's authored base party speed (which covers the player
   and companions) and each healthy troop type's speed, minus authored penalties
@@ -562,13 +564,20 @@ battles out of personal combat. This capability resolves army against army.
   healthy count. Troops never get individual HP, so a battle and its save stay
   small however large the armies are. The side that starts the battle (by
   attacking, or by intercepting) is the attacker.
-- **Individuals.** The player, companions and leaders do not fight in the
-  round rule and are never its targets. They count through leadership and the
-  optional champion duel. A side whose stacks have no healthy troops left has
-  lost, whoever still stands with it; a defeated player then falls to the
-  world's authored defeat rules (injury, capture). Fighting personally in the
-  line is an open question
-  ([Section 18](open-decisions.md#18-living-sandbox-worlds)).
+- **Individuals.** The player, companions and leaders fight as stacks of one,
+  with their effective stats and their current HP, placed before the troop
+  stacks in roster order. Damage they take lowers their HP directly instead of
+  counting losses. At zero HP an individual is knocked out: out of the battle
+  with 1 HP, never killed by the round rule, and a knocked-out leader's
+  leadership no longer counts. A player who fights alone, without a retinue,
+  is simply a side with one stack. A defeated player then falls to the world's
+  authored defeat rules (injury, capture). The battle stance holds every
+  individual's HP and MP, so they still live in exactly one place.
+- **Strength.** One number compares armies wherever the rules need it: the
+  round summary, renown, the round cap, and agents' and factions' decisions. A
+  stack's strength is its healthy count × HP × its channel attack ÷ 100, an
+  individual's is its current HP × attack ÷ 100, and a side's is the sum,
+  scaled by its morale modifier, rounded down once.
 - **Rounds.** A battle runs for at most an authored number of rounds. Both
   sides resolve from the counts at the start of the round, so neither side
   acts first:
@@ -594,18 +603,20 @@ battles out of personal combat. This capability resolves army against army.
      count, and the remainder carries to the next round, so partial damage is
      never lost.
   5. **Morale.** Morale falls by the round's losses × an authored factor ÷ the
-     side's starting size. A side whose morale drops below its authored rout
-     threshold breaks.
+     side's starting size, and the remainder of that division carries to the
+     next round, as damage's does, so a large army's small losses still add up.
+     A knocked-out individual counts as one loss. A side whose morale drops
+     below its authored rout threshold breaks.
   6. **End.** After the round:
-     - If exactly one side broke or has no healthy troops, the other side wins
-       and takes one pursuit round in which the routed side deals no damage
-       and an authored pursuit class, such as cavalry, counts double.
-     - If both sides broke or have no healthy troops in the same round, the
+     - If exactly one side broke or has no one left standing, the other side
+       wins and takes one pursuit round in which the routed side deals no
+       damage and an authored pursuit class, such as cavalry, counts double.
+     - If both sides broke or have no one left standing in the same round, the
        battle is a draw: there is no pursuit, no winner's rewards, and both
        sides withdraw.
-     - At the round cap the side with the smaller remaining healthy HP (count
-       × HP over its stacks) withdraws without a pursuit round, and the
-       attacker withdraws when the two are equal.
+     - At the round cap the side with the smaller strength withdraws, and the
+       attacker withdraws when the two are equal. The other side wins with
+       every reward, prisoners included, but takes no pursuit round.
 
   Damage grows with headcount, so numbers matter more than linearly; the
   frontage keeps a much larger army from winning without losses; and morale
@@ -622,10 +633,11 @@ battles out of personal combat. This capability resolves army against army.
   the default: autoresolve, agent parties and a commanded side that gives no
   other order always charge.
   - **Charge.** The round rule exactly as above.
-  - **Hold.** The side's melee troops wait in place. If the enemy also holds,
-    neither side's melee troops fight that round and only ranged troops shoot.
-    If the enemy charges, melee fights as usual and the holding side's melee
-    damage is scaled by an authored hold percentage, such as 120.
+  - **Hold.** The side's melee troops brace instead of pressing. Every melee
+    hit that the holding side deals or takes that round is scaled by an
+    authored hold percentage below 100, such as 60, while ranged troops on
+    both sides shoot as usual. Holding slows both sides' melee equally, so it
+    pays only for a side whose ranged troops are the stronger.
   - **Flank.** The side's mounted stacks leave the frontage and attack the
     enemy's ranged stacks directly, as if they were exposed, with damage
     scaled by an authored flank percentage. Without enemy ranged stacks,
@@ -637,8 +649,7 @@ battles out of personal combat. This capability resolves army against army.
   - **Autoresolve.** The engine runs every round at once with both sides
     charging, and the player sees the result and the losses.
   - **Command.** The battle becomes the player's stance, a third one beside
-    exploring and fighting, so the player's HP and MP still live in exactly one
-    place. Each round the player gives an order and then sees that round's
+    exploring and fighting. Each round the player gives an order and then sees that round's
     summary: each side's strength, losses and morale. The player may
     autoresolve the rest of a commanded battle at any round.
 
@@ -671,12 +682,17 @@ battles out of personal combat. This capability resolves army against army.
   the others), as armour's speed penalty already does, so no combination of
   injuries makes a stat invalid. An authored effect, such as a physician's
   treatment, removes one.
-- **Ground.** Locations and roads both author a ground modifier, neutral when
-  omitted, so a battle has ground wherever parties can meet: at a location or
-  on a road between two.
+- **Ground.** A world authors ground types, each with a percentage per troop
+  class (a forest might give cavalry 70 and archers 80). Locations and roads
+  name a ground type, and an omitted one is neutral, 100 for every class, so
+  a battle has ground wherever parties can meet: at a location or on a road
+  between two.
 - **Champions.** Optionally, the author can let the player fight a personal
-  encounter against the enemy commander at a chosen moment. The result of that
-  duel modifies the battle.
+  encounter against the enemy commander at a chosen moment. While the duel
+  runs, the battle stance holds that encounter, and the player's and the
+  commander's HP and MP live in the encounter until it ends and then return to
+  the battle, so they never live in two places. The result of that duel
+  modifies the battle.
 - **Simulator parity.** The formula must be mirrored in `scripts/combat_sim`
   before its numbers are pinned in tests, exactly as the personal-combat
   formulas are.
@@ -821,9 +837,10 @@ no language model and no per-faction script.
   campaign (with a target holding), raid (with a target village) and rest.
   Authored priority rules over typed conditions choose it on each tick. A world
   might gather when at war and rested for an authored time, campaign once the
-  gathered strength reaches an authored multiple of the target's garrison, and
-  rest when the army falls below an authored share of its gathered strength or
-  the campaign runs past an authored length.
+  gathered strength (as [mass battle](#mass-battle) defines it) reaches an
+  authored multiple of the target's garrison, and rest when the army falls
+  below an authored share of its gathered strength or the campaign runs past
+  an authored length.
 - **Marshal.** A faction may author that its ruler appoints a marshal. When the
   office is empty, the ruler picks the eligible member with the highest value
   of an authored standing track, such as renown, with ties broken by relation
@@ -943,7 +960,11 @@ overland travel.
   `map zoom <n> <place>` prints a closer view centred on a place.
 - **Waypoints.** Authors make the network dense by adding ordinary locations
   along long roads, such as bridges, fords, crossroads and camps, and splitting
-  each road at them so the legs add up to the old travel time. A group or
+  each road at them so the legs' authored minutes add up to the old road's.
+  Travel speed scales and rounds each leg on its own, with its one-minute
+  minimum, so for a party not at the base speed a split road can take a few
+  minutes more or less than the whole one did, and interception stops a party
+  at the middle of a leg, not of the old road. A group or
   character placed at a waypoint, such as a bandit camp, gives the player an
   encounter on the way before [interception](#world-agents) exists, and
   waypoints give interception natural places to stop the player later. The

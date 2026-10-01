@@ -1567,39 +1567,44 @@ a proposed answer that still needs to be confirmed:
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.
-- **Mass-battle formula (M6d).** Proposed: rosters fight as stacks of counts,
-  never as individuals, over at most an authored number of rounds
+- **Mass-battle formula (M6d).** Proposed: troops fight as stacks of counts,
+  and the player, companions and leaders as stacks of one with their own HP,
+  over at most an authored number of rounds
   ([Mass battle](sandbox-worlds.md#mass-battle)). Each round both sides deal
   count × the personal damage formula at power 100, limited to an authored
   melee frontage, split over the enemy's exposed stacks by count, computed per
   attacking and target stack, and scaled by an authored class matchup, the
-  ground (an authored modifier that both locations and roads carry, neutral
-  when omitted), leadership, current morale and one bounded roll per side from
-  a dedicated `battle` domain. Each target stack's damage divided by its HP
-  gives its losses, with the remainder carried per stack; morale falls with
-  losses, and a rout ends the battle with a pursuit round. Simultaneous routs
-  are a draw, and at the round cap the side with less healthy HP withdraws, the
-  attacker on a tie. Individuals count only through leadership and the
-  champion duel. Without morale, the battle ends only by exhaustion or the
-  round cap. Everything is integer and both sides resolve at once. It follows the
-  simulator-parity rule: `scripts/combat_sim` mirrors it before tests pin its
-  numbers. Still open: how troop quality beyond combat stats counts; whether
-  troop classes and the matchup table are authored per world (proposed) or a
-  fixed engine set; defaults for frontage, the morale factor and the rout
-  threshold; whether companions and lords can die in battle or are only
-  wounded or captured; and whether a champion duel can end a battle outright.
+  ground (an authored type with a percentage per class that locations and
+  roads name, neutral when omitted), leadership, current morale and one
+  bounded roll per side from a dedicated `battle` domain. Each target stack's
+  damage divided by its HP gives its losses, with the remainder carried per
+  stack; individuals lose HP instead and are knocked out, never killed, at
+  zero. Morale falls with losses, carrying its remainder too, and a rout ends
+  the battle with a pursuit round. Simultaneous routs are a draw; at the round
+  cap the side with less strength withdraws, the attacker on a tie, and the
+  other side wins without a pursuit. Strength, one number (count × HP ×
+  attack ÷ 100, scaled by morale), serves the summary, renown, the round cap
+  and AI decisions. Without morale, the battle ends only by exhaustion or the
+  round cap. Everything is integer and both sides resolve at once. It follows
+  the simulator-parity rule: `scripts/combat_sim` mirrors it before tests pin
+  its numbers. Still open: how troop quality beyond combat stats counts;
+  whether troop classes and the matchup table are authored per world
+  (proposed) or a fixed engine set; defaults for frontage, the morale factor,
+  the rout threshold and the hold percentage; whether a knocked-out companion
+  or lord may afterwards be killed or captured; and whether a champion duel can
+  end a battle outright.
 - **Battle modes (M6d).** Proposed: when the player's party joins a battle, the
   player chooses autoresolve or command. A commanded battle is a third stance
-  beside exploring and fighting, so the player's HP and MP keep exactly one
-  home. Each round the player gives one order from a closed set (charge, the
-  default; hold; flank with mounted troops; retreat), each a fixed change to
-  the round rule with authored percentages, and sees a round summary, and may
-  autoresolve the rest at any round. Both modes run the same round rule, and a
-  commanded battle that only charges matches autoresolve exactly. Agent battles always autoresolve. Still open:
-  how much each round's summary shows (proposed: strength, losses and morale
-  per side, not per stack), and whether the player can later fight personally
-  in the line, with a short personal encounter against troops from the enemy
-  front whose kills come off that stack.
+  beside exploring and fighting that holds every individual's HP and MP, and a
+  champion duel's encounter while it runs, so each keeps exactly one home.
+  Each round the player gives one order from a closed set (charge, the
+  default; hold, which slows melee on both sides; flank with mounted troops;
+  retreat), each a fixed change to the round rule with authored percentages,
+  sees a round summary, and may autoresolve the rest at any round. Both modes
+  run the same round rule, and a commanded battle that only charges matches
+  autoresolve exactly. Agent battles always autoresolve. Still open: how much
+  each round's summary shows (proposed: strength, losses and morale per side,
+  not per stack).
 - **Overland map (presentation).** Proposed: locations may author integer
   display positions and a kind from a closed list, all or none per world; the
   engine answers one map-view query that respects player knowledge; the
