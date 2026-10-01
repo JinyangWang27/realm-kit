@@ -29,14 +29,26 @@ fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
     events.chain(movers).chain(prices).collect()
 }
 
-/// Moves world time on by `minutes`, resolving every occurrence it crosses
-/// in chronological order, ties in schedule order. A world without a clock
-/// ignores it.
+/// Moves world time on by `minutes` while the player stays where they are,
+/// resolving every occurrence it crosses in chronological order, ties in
+/// schedule order. A world without a clock ignores it.
 pub(crate) fn advance(
     world: &WorldSpec,
     state: &mut GameState,
     minutes: u64,
     events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    pass(world, state, minutes, events, true)
+}
+
+/// [`advance`], with the player at their location (`present`) or on the
+/// road, where nobody's comings and goings are seen.
+fn pass(
+    world: &WorldSpec,
+    state: &mut GameState,
+    minutes: u64,
+    events: &mut Vec<Event>,
+    present: bool,
 ) -> Result<(), EngineError> {
     let Some(start) = state.time else {
         return Ok(());
@@ -69,7 +81,7 @@ pub(crate) fn advance(
                     occur(world, state, &event.effects, events);
                 }
             }
-            Due::Mover(character) => relocate(state, character, events),
+            Due::Mover(character) => relocate(state, character, events, present),
             Due::PriceTick => economy::tick(world, state),
         }
     }
@@ -106,8 +118,8 @@ fn occur(
 }
 
 /// Draws where a mover goes next from the world stream, and reports it if
-/// it comes to or leaves the player.
-fn relocate(state: &mut GameState, character: &Character, events: &mut Vec<Event>) {
+/// it comes to or leaves the player standing there.
+fn relocate(state: &mut GameState, character: &Character, events: &mut Vec<Event>, present: bool) {
     let among = &character.moves.as_ref().unwrap().among;
     let stream = state.rng.as_mut().unwrap().world.as_mut().unwrap();
     let to = &among[rng::below(stream, among.len() as u64) as usize];
@@ -117,7 +129,7 @@ fn relocate(state: &mut GameState, character: &Character, events: &mut Vec<Event
         .unwrap();
     let here = &state.player.location;
     // A character absent under its conditions comes and goes unseen.
-    if from == *to || !allowed(state, character.requires.as_ref()) {
+    if !present || from == *to || !allowed(state, character.requires.as_ref()) {
         return;
     }
     if from == *here {
@@ -152,7 +164,8 @@ pub(crate) fn travel(
         from,
         to: to.clone(),
     });
-    advance(world, state, road.minutes, events)?;
+    // On the road: the destination shows who is there on arrival.
+    pass(world, state, road.minutes, events, false)?;
     events.push(Event::LocationViewed { location: to });
     Ok(())
 }

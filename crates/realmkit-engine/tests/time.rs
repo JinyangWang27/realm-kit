@@ -444,3 +444,29 @@ fn a_mover_absent_under_its_conditions_comes_and_goes_unseen() {
         );
     }
 }
+
+#[test]
+fn nobody_is_seen_coming_or_going_from_the_road() {
+    let world = marches();
+    let mut seen_on_arrival = false;
+    for seed in 0..20 {
+        let mut engine = Engine::new_with_seed(&world, seed).unwrap();
+        travel(&mut engine, "ashmere");
+        // Leave Ashmere at 05:00 on day 2; Wenna moves at 06:00, mid-journey.
+        engine.execute(Wait(1_740 - 600)).unwrap();
+        let events = travel(&mut engine, "greyford");
+        assert!(
+            !events.iter().any(|e| matches!(
+                e,
+                Event::CharacterArrived { .. } | Event::CharacterLeft { .. }
+            )),
+            "seed {seed}: {events:?}"
+        );
+        // Arriving shows who is there.
+        seen_on_arrival |= engine
+            .actions()
+            .iter()
+            .any(|a| a.command == Talk("wenna".into()));
+    }
+    assert!(seen_on_arrival);
+}

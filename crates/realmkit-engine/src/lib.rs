@@ -213,6 +213,12 @@ impl<'w> Engine<'w> {
         rules::placed_here(self.world, &self.state)
     }
 
+    /// A good's prices at the open market here: one unit now, and the next
+    /// after it. `None` away from an open market or for an untraded good.
+    pub fn quote(&self, good: &str) -> Option<Quote> {
+        rules::quote(self.world, &self.state, good)
+    }
+
     /// Whether a condition holds now; evaluating it changes nothing.
     pub fn holds(&self, condition: &Condition) -> bool {
         rules::holds(&self.state, condition)

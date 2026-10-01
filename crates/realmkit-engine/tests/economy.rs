@@ -430,3 +430,26 @@ fn buying_is_not_offered_when_the_count_cannot_hold_another_unit() {
         Err(EngineError::NumericLimit)
     ));
 }
+
+#[test]
+fn trading_back_and_forth_never_makes_money() {
+    let world = marches();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    let mut rich = engine.snapshot();
+    rich.state.economy.as_mut().unwrap().currency = 100_000_000;
+    engine = Engine::restore(&world, rich).unwrap();
+    for place in ["greyford", "ashmere", "greyford"] {
+        if engine.state().player.location != place {
+            engine.execute(Travel(place.into())).unwrap();
+        }
+        for good in ["grain", "wool", "cloth", "eels"] {
+            // Single round trips, and whole stacks, down at the lowest prices too.
+            for units in [1, 10, 200, 1_000] {
+                let before = currency(&engine);
+                engine.execute(buy(good, units)).unwrap();
+                engine.execute(sell(good, units)).unwrap();
+                assert!(currency(&engine) <= before, "{good} ×{units} at {place}");
+            }
+        }
+    }
+}

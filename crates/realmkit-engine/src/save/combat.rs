@@ -108,14 +108,10 @@ fn techniques(
         .iter()
         .chain(crafting)
         .chain(world.quests.iter().flat_map(|q| &q.reward_techniques))
-        .chain(
-            super::fired(world, state)
-                .into_iter()
-                .filter_map(|e| match e {
-                    Effect::GrantTechnique(grant) => Some(grant),
-                    _ => None,
-                }),
-        )
+        .chain(progress.fired.iter().filter_map(|e| match e {
+            Effect::GrantTechnique(grant) => Some(grant),
+            _ => None,
+        }))
         .map(|g| &g.technique)
         .collect();
     ensure(

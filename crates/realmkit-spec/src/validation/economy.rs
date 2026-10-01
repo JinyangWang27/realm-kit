@@ -75,6 +75,7 @@ pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy)
     producers(out, economy);
     markets(out, w, economy);
     links(out, w, economy);
+    no_round_trip(out, w, economy);
     if let Some(tick) = &economy.tick {
         time::needed(out, w, owner);
         time::schedule(out, w, owner, &tick.schedule);
@@ -100,6 +101,46 @@ pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy)
             100,
             "an input pull",
         );
+    }
+}
+
+/// Buying and selling back at once never pays. Units trade one at a time,
+/// so the k-th unit sold back is priced at most one buy step above the unit
+/// it is paired with when selling moves the index at least as far as buying.
+/// Then it is enough that a unit bought at the lowest index cannot sell for
+/// more one buy step higher: (100 + spread)² × low ≥ 10,000 × (low + buy
+/// step), with the price's own rounding only lowering the sale. Without
+/// this, a package could hand the player unlimited currency.
+fn no_round_trip(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
+    let owner = &w.world.id;
+    let step = economy.trade_step;
+    if step.sell < step.buy {
+        issue(
+            out,
+            owner,
+            "invalid_trade_step",
+            "selling moves the index at least as far as buying, or a stack bought cheap sells dear",
+        );
+    }
+    let low = u64::from(economy.index_bounds[0]);
+    // Bounds without a lowest price are reported on their own.
+    if low == 0 {
+        return;
+    }
+    let spreads = std::iter::once(economy.spread_percent)
+        .chain(economy.markets.iter().filter_map(|m| m.spread_percent));
+    for spread in spreads {
+        let margin = (100 + u64::from(spread)).pow(2) * low;
+        if margin < 10_000 * (low + u64::from(step.buy)) {
+            issue(
+                out,
+                owner,
+                "invalid_spread",
+                format!(
+                    "a spread of {spread}% lets a unit bought and sold back at once turn a profit"
+                ),
+            );
+        }
     }
 }
 

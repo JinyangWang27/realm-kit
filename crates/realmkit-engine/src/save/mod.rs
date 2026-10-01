@@ -249,6 +249,8 @@ struct Progress<'w> {
     /// Items effects grant or take, which a choice can do any number of
     /// times, so their counts follow from nothing.
     loose: BTreeSet<&'w Id>,
+    /// Effects that could have happened by the saved minute.
+    fired: Vec<&'w Effect>,
     /// Items effects only take, never grant: their counts can fall below
     /// what progress granted, but never rise above it.
     taken: BTreeSet<&'w Id>,
@@ -317,8 +319,9 @@ impl<'w> Progress<'w> {
             .collect();
         // Trade goods come and go at markets too.
         let goods = world.economy().into_iter().flat_map(|e| &e.goods);
+        let fired = fired(world, state);
         let stacks = |taking: bool| {
-            fired(world, state).into_iter().flat_map(move |e| match e {
+            fired.iter().flat_map(move |e| match e {
                 Effect::GrantItems { items } if !taking => items.as_slice(),
                 Effect::TakeItems { items } if taking => items.as_slice(),
                 _ => &[],
@@ -333,6 +336,7 @@ impl<'w> Progress<'w> {
             .filter(|item| !loose.contains(item))
             .collect();
         Ok(Self {
+            fired,
             loose,
             taken,
             spendable,
@@ -490,8 +494,9 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
         .flat_map(|g| g.victory_flags.iter().chain(&g.defeat_flags))
         .cloned()
         .collect();
-    let effect_flags: BTreeSet<_> = fired(world, state)
-        .into_iter()
+    let effect_flags: BTreeSet<_> = progress
+        .fired
+        .iter()
         .filter_map(|e| match e {
             Effect::SetFlag { flag } => Some(flag.clone()),
             _ => None,

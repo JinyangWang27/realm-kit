@@ -94,44 +94,39 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
 /// At an open market: its prices, then buying one unit of each good, where
 /// affordable, and selling one of each good the player carries.
 fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
-    let Ok((economy, market)) = economy::market_here(world, state) else {
+    let Ok((economy, _)) = economy::market_here(world, state) else {
         return Vec::new();
     };
     let wallet = state.economy.as_ref().unwrap();
-    let prices = &wallet.prices[&market.location];
-    let spread = economy.spread(market);
+    let held = |good: &Id| state.player.inventory.get(good).copied();
     let mut actions = vec![Action {
         command: Command::Market,
         available: true,
     }];
     for good in &economy.goods {
-        let cost = buy_price(good.price, prices[&good.item], spread);
+        let quote = economy::quote(world, state, &good.item).unwrap();
         actions.push(Action {
             command: Command::Buy {
                 good: good.item.clone(),
                 quantity: 1,
             },
             // Carrying one more must fit the count too.
-            available: wallet.currency >= cost
-                && state
-                    .player
-                    .inventory
-                    .get(&good.item)
-                    .is_none_or(|held| held.checked_add(1).is_some()),
+            available: wallet.currency >= quote.buy
+                && held(&good.item).is_none_or(|n| n.checked_add(1).is_some()),
         });
     }
     for good in &economy.goods {
-        if state.player.inventory.contains_key(&good.item) {
-            // Proceeds that would pass the currency bound cannot be taken.
-            let earned = sell_price(good.price, prices[&good.item], spread);
+        if held(&good.item).is_some() {
+            let quote = economy::quote(world, state, &good.item).unwrap();
             actions.push(Action {
                 command: Command::Sell {
                     good: good.item.clone(),
                     quantity: 1,
                 },
+                // Proceeds that would pass the currency bound cannot be taken.
                 available: wallet
                     .currency
-                    .checked_add(earned)
+                    .checked_add(quote.sell)
                     .is_some_and(|total| total <= realmkit_spec::CURRENCY_BOUND),
             });
         }

@@ -243,7 +243,9 @@ At each occurrence it goes to one of `among` (two or more locations), drawn
 from the world's seeded random stream; it may stay where it is. It starts
 where it is placed, which must be exactly one location of `among`, and is
 present only where it is now. A mover has no combat profile. The client is
-told when it arrives at or leaves the player's location.
+told when it arrives at or leaves the player's location, while it is present
+under its conditions; nobody is seen coming or going while the player is on
+the road, and the destination shows who is there on arrival.
 
 When time passes, every occurrence it crosses happens in chronological order,
 with the clock at that occurrence's minute. Occurrences at the same minute go
@@ -331,6 +333,12 @@ market's index by `trade_step.buy` and each sold one lowers it by
 `trade_step.sell`, within the bounds, so dumping a whole cargo in one town
 stops paying. `buy <item> [units]` and `sell <item> [units]` trade up to
 1,000 units at once, all or nothing; `market` shows the prices here.
+
+Buying and selling straight back never pays. Validation requires
+`trade_step.sell` to be at least `trade_step.buy`, and every spread (the
+economy's and each market's) to satisfy (100 + spread)² × lowest index ≥
+10,000 × (lowest index + buy step) (`invalid_trade_step`, `invalid_spread`).
+With bounds from 100 and a buy step of 26, that is a spread of at least 13%.
 
 With a `tick` (which needs the time block), prices move on its schedule in
 four phases, each finished for every market before the next:

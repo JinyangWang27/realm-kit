@@ -24,6 +24,39 @@ pub(crate) fn market_here<'w>(
     }
 }
 
+/// The index after one unit is bought: up by the buy step, within bounds.
+fn raised(economy: &Economy, index: u32) -> u32 {
+    index
+        .saturating_add(economy.trade_step.buy)
+        .min(economy.index_bounds[1])
+}
+
+/// The index after one unit is sold: down by the sell step, within bounds.
+fn lowered(economy: &Economy, index: u32) -> u32 {
+    index
+        .saturating_sub(economy.trade_step.sell)
+        .max(economy.index_bounds[0])
+}
+
+/// A good's prices at the open market here, as trading would charge them.
+pub(crate) fn quote(world: &WorldSpec, state: &GameState, good: &str) -> Option<Quote> {
+    let (economy, market) = market_here(world, state).ok()?;
+    let price = economy.good(good)?.price;
+    let index = *state
+        .economy
+        .as_ref()?
+        .prices
+        .get(&market.location)?
+        .get(good)?;
+    let spread = economy.spread(market);
+    Some(Quote {
+        buy: buy_price(price, index, spread),
+        sell: sell_price(price, index, spread),
+        next_buy: buy_price(price, raised(economy, index), spread),
+        next_sell: sell_price(price, lowered(economy, index), spread),
+    })
+}
+
 /// Buys units one at a time: each costs the price at the current index, then
 /// raises it by the buy step.
 pub(crate) fn buy(
@@ -41,7 +74,6 @@ pub(crate) fn buy(
         return Err(EngineError::InvalidQuantity);
     }
     let spread = economy.spread(market);
-    let high = economy.index_bounds[1];
     let wallet = state.economy.as_mut().unwrap();
     let index = wallet
         .prices
@@ -53,7 +85,7 @@ pub(crate) fn buy(
         cost = cost
             .checked_add(buy_price(good.price, *index, spread))
             .ok_or(EngineError::NumericLimit)?;
-        *index = index.saturating_add(economy.trade_step.buy).min(high);
+        *index = raised(economy, *index);
     }
     wallet.currency = wallet
         .currency
@@ -96,7 +128,6 @@ pub(crate) fn sell(
         &mut Vec::new(),
     )?;
     let spread = economy.spread(market);
-    let low = economy.index_bounds[0];
     let wallet = state.economy.as_mut().unwrap();
     let index = wallet
         .prices
@@ -108,7 +139,7 @@ pub(crate) fn sell(
         earned = earned
             .checked_add(sell_price(good.price, *index, spread))
             .ok_or(EngineError::NumericLimit)?;
-        *index = index.saturating_sub(economy.trade_step.sell).max(low);
+        *index = lowered(economy, *index);
     }
     receive(wallet, earned)?;
     events.push(Event::Sold {
@@ -183,30 +214,37 @@ pub(crate) fn tick(world: &WorldSpec, state: &mut GameState) {
         let gap = *value - i64::from(BASE_INDEX);
         *value = i64::from(BASE_INDEX) + gap * (100 - i64::from(rules.revert_percent)) / 100;
     }
-    let reverted = index.clone();
+    // Phases 3 and 4 measure every move on the previous phase's prices, so
+    // each gathers its moves first and applies them together.
+    let mut pulls = Vec::new();
     for market in &economy.markets {
         for good in &economy.goods {
             let Some(input) = &good.input else {
                 continue;
             };
-            let made_from = reverted[&(market.location.as_str(), input.as_str())];
-            let own = reverted[&(market.location.as_str(), good.item.as_str())];
+            let made_from = index[&(market.location.as_str(), input.as_str())];
+            let own = index[&(market.location.as_str(), good.item.as_str())];
             if made_from > own {
                 let pull = (made_from - own) * i64::from(rules.input_pull_percent) / 100;
-                index.insert((&market.location, &good.item), own + pull);
+                pulls.push(((market.location.as_str(), good.item.as_str()), pull));
             }
         }
     }
-    let pulled = index.clone();
+    for (key, pull) in pulls {
+        *index.get_mut(&key).unwrap() += pull;
+    }
+    let mut moves = Vec::new();
     for link in &economy.links {
         let [a, b] = &link.between;
         for good in &economy.goods {
-            let at = |m: &str| pulled[&(m, good.item.as_str())];
-            let gap = at(b) - at(a);
-            let share = i64::from(link.percent);
-            *index.get_mut(&(a.as_str(), good.item.as_str())).unwrap() += gap * share / 100;
-            *index.get_mut(&(b.as_str(), good.item.as_str())).unwrap() -= gap * share / 100;
+            let at = |m: &str| index[&(m, good.item.as_str())];
+            let step = (at(b) - at(a)) * i64::from(link.percent) / 100;
+            moves.push(((a.as_str(), good.item.as_str()), step));
+            moves.push(((b.as_str(), good.item.as_str()), -step));
         }
+    }
+    for (key, step) in moves {
+        *index.get_mut(&key).unwrap() += step;
     }
     for ((market, good), value) in index {
         let value = value.clamp(low, high);

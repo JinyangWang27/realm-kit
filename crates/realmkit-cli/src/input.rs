@@ -214,13 +214,9 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
 mod tests {
     use super::*;
 
+    /// A world without a clock, roads or markets, as the demo is.
     fn parse(line: &str) -> Result<Input, &'static str> {
-        let world = WorldSpec::load(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/demo-world"
-        ))
-        .unwrap();
-        super::parse(&world, line)
+        parse_with(line, Context::default())
     }
 
     #[test]

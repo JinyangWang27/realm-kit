@@ -3,7 +3,7 @@ use crate::{
     render::Paint,
     render::{direction_name, duration, gear_name, money, piece_name, stat_name},
 };
-use realmkit_engine::{buy_price, sell_price, Command, Engine};
+use realmkit_engine::{Command, Engine};
 use realmkit_spec::{Resource, Stat};
 use std::io::{self, Write};
 
@@ -338,31 +338,22 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         // "Buy Cloth — 129 silver (next 133)": this unit's price and the
         // next one's after the index moves; unaffordable goods stay listed.
         Command::Buy { good, .. } => {
-            let quote = Quote::of(engine, good)?;
+            let quote = engine.quote(good)?;
             let name = &world.item(good)?.name;
-            let cost = buy_price(quote.price, quote.index, quote.spread);
             if !action.available {
-                let why = if quote.currency < cost {
-                    AFFORD
-                } else {
-                    LOCKED
-                };
-                return Some(format!("{BUY} {name} — {} {why}", money(world, cost)));
+                let currency = engine.state().economy.as_ref()?.currency;
+                let why = if currency < quote.buy { AFFORD } else { LOCKED };
+                return Some(format!("{BUY} {name} — {} {why}", money(world, quote.buy)));
             }
-            let next = (quote.index + quote.steps.buy).min(quote.bounds[1]);
             format!(
                 "{BUY} {name} — {} ({NEXT_PRICE} {})",
-                money(world, cost),
-                money(world, buy_price(quote.price, next, quote.spread))
+                money(world, quote.buy),
+                money(world, quote.next_buy)
             )
         }
         Command::Sell { .. } if !action.available => return None,
         Command::Sell { good, .. } => {
-            let quote = Quote::of(engine, good)?;
-            let next = quote
-                .index
-                .saturating_sub(quote.steps.sell)
-                .max(quote.bounds[0]);
+            let quote = engine.quote(good)?;
             let held = engine
                 .state()
                 .player
@@ -373,8 +364,8 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             format!(
                 "{SELL} {} ({held}) — {} ({NEXT_PRICE} {})",
                 world.item(good)?.name,
-                money(world, sell_price(quote.price, quote.index, quote.spread)),
-                money(world, sell_price(quote.price, next, quote.spread))
+                money(world, quote.sell),
+                money(world, quote.next_sell)
             )
         }
         Command::Market => PRICES.into(),
@@ -416,33 +407,6 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Techniques => TECHNIQUES.into(),
         _ => return None,
     })
-}
-
-/// What a good trades at here, read from the state rather than by trading.
-struct Quote {
-    price: u64,
-    index: u32,
-    spread: u32,
-    steps: realmkit_spec::TradeStep,
-    bounds: [u32; 2],
-    currency: u64,
-}
-
-impl Quote {
-    fn of(engine: &Engine<'_>, good: &str) -> Option<Self> {
-        let economy = engine.world().economy()?;
-        let here = &engine.state().player.location;
-        let market = economy.market(here)?;
-        let wallet = engine.state().economy.as_ref()?;
-        Some(Self {
-            price: economy.good(good)?.price,
-            index: *wallet.prices.get(here)?.get(good)?,
-            spread: economy.spread(market),
-            steps: economy.trade_step,
-            bounds: economy.index_bounds,
-            currency: wallet.currency,
-        })
-    }
 }
 
 /// "2 Iron ingot, 1 Leather strip".

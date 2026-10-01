@@ -90,3 +90,13 @@ pub fn sell_price(price: u64, index: u32, spread: u32) -> u64 {
     let raw = u128::from(price) * u128::from(index) * 100 / (1_000 * (100 + u128::from(spread)));
     u64::try_from(raw).unwrap_or(u64::MAX)
 }
+
+/// One unit of a good at a market: what it costs and fetches now, and after
+/// one unit has been bought or sold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Quote {
+    pub buy: u64,
+    pub sell: u64,
+    pub next_buy: u64,
+    pub next_sell: u64,
+}

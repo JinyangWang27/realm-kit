@@ -16,13 +16,13 @@ pub enum EngineError {
     RoadBlocked { road: Id },
     #[error("time cannot be passed by waiting in this world")]
     NoWaiting,
-    #[error("a wait lasts 1 to 43,200 minutes")]
+    #[error("a wait lasts 1 to {} minutes", realmkit_spec::DURATION_BOUND)]
     InvalidWait,
     #[error("there is no market here")]
     NoMarket,
     #[error("{0} is not traded here")]
     NotTraded(Id),
-    #[error("trade 1 to 1,000 units at a time")]
+    #[error("trade 1 to {} units at a time", realmkit_spec::TRADE_BOUND)]
     InvalidQuantity,
     #[error("you cannot afford that")]
     NotEnoughCurrency,

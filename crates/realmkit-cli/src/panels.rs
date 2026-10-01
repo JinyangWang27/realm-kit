@@ -1,7 +1,7 @@
 //! Panels: views of the current state that spend no time.
 
 use crate::render::{clock, direction_name, duration, money, piece_name, stat_name, Paint};
-use realmkit_engine::{buy_price, sell_price, Engine};
+use realmkit_engine::Engine;
 use realmkit_spec::Stat;
 use std::io::{self, Write};
 
@@ -114,16 +114,17 @@ pub fn market(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
     };
     let name = &world.location(&market.location).unwrap().name;
     writeln!(output, "{}", paint.title(&format!("Market at {name}:")))?;
-    let spread = economy.spread(market);
     for good in &economy.goods {
-        let index = wallet.prices[&market.location][&good.item];
+        let Some(quote) = engine.quote(&good.item) else {
+            continue;
+        };
         let held = state.player.inventory.get(&good.item).copied().unwrap_or(0);
         writeln!(
             output,
             "  {} — buy {} · sell {} · carried {held}",
             world.item(&good.item).unwrap().name,
-            money(world, buy_price(good.price, index, spread)),
-            money(world, sell_price(good.price, index, spread)),
+            money(world, quote.buy),
+            money(world, quote.sell),
         )?;
     }
     writeln!(output, "  {}", money(world, wallet.currency))

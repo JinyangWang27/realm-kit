@@ -251,8 +251,16 @@ pub fn events(
     let world = engine.world();
     let name = |id: &str| &world.character(id).unwrap().name;
     let player = name(&world.world.player);
-    // After travel the location shows the clock, so the time is not repeated.
-    let travelled = events.iter().any(|e| matches!(e, Event::Moved { .. }));
+    // After travel the location shows the clock, so the time is repeated
+    // only to date something that happened on the way.
+    let position = |f: fn(&Event) -> bool| events.iter().position(f);
+    let travelled = match (
+        position(|e| matches!(e, Event::Moved { .. })),
+        position(|e| matches!(e, Event::TimePassed { .. })),
+    ) {
+        (Some(moved), Some(passed)) => passed == moved + 1,
+        _ => false,
+    };
     for event in events {
         match event {
             Event::LocationViewed { location } => {
@@ -463,6 +471,36 @@ pub fn events(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_journey_is_dated_only_when_something_happened_on_the_way() {
+        let world = realmkit_spec::WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/marches"
+        ))
+        .unwrap();
+        let engine = Engine::new(&world).unwrap();
+        let render = |batch: &[Event]| {
+            let mut output = Vec::new();
+            events(&mut output, &engine, batch, Paint::default()).unwrap();
+            String::from_utf8(output).unwrap()
+        };
+        let moved = Event::Moved {
+            from: "greyford".into(),
+            to: "ashmere".into(),
+        };
+        let passed = Event::TimePassed {
+            minutes: 120,
+            now: 600,
+        };
+        let quiet = render(&[moved.clone(), passed.clone()]);
+        assert!(!quiet.contains("later"), "{quiet}");
+        let eventful = render(&[moved, Event::CurrencyReceived { amount: 5 }, passed]);
+        assert!(
+            eventful.contains("Received: 5 silver\n2 h later: Day 1, 10:00"),
+            "{eventful}"
+        );
+    }
 
     #[test]
     fn interpolation_preserves_unicode_and_does_not_reinterpret_values() {
