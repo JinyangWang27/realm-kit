@@ -138,6 +138,13 @@ fn buy_ware(
     quantity: u64,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
+    // A purchase is a grant: equipment comes at most a grant's worth at once.
+    let wearable = world
+        .item(&ware.item)
+        .is_some_and(|i| i.equipment.is_some());
+    if wearable && quantity > realmkit_spec::GEAR_STACK_BOUND {
+        return Err(EngineError::InvalidQuantity);
+    }
     let cost = ware
         .price
         .checked_mul(quantity)

@@ -627,3 +627,21 @@ fn a_ware_won_as_loot_cannot_vanish_from_a_save() {
     gear.remove(&mail);
     assert!(Engine::restore(&world, snapshot).is_err());
 }
+
+#[test]
+fn gear_wares_are_bought_at_most_a_grant_at_a_time() {
+    // Validation caps any grant of equipment at GEAR_STACK_BOUND pieces;
+    // buying is a grant too, so a mistyped count cannot flood the pack.
+    let mut rich = arena();
+    rich.world.economy.as_mut().unwrap().currency.start = CURRENCY_BOUND;
+    let mut engine = Engine::new_with_seed(&rich, 7).unwrap();
+    let before = engine.state().clone();
+    assert!(matches!(
+        engine.execute(buy("iron_mail", GEAR_STACK_BOUND + 1)),
+        Err(EngineError::InvalidQuantity)
+    ));
+    assert_eq!(engine.state(), &before);
+    engine.execute(buy("iron_mail", GEAR_STACK_BOUND)).unwrap();
+    // Counted wares are bounded by trading's own limit only.
+    engine.execute(buy("healing_draught", 1_000)).unwrap();
+}
