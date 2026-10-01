@@ -466,7 +466,13 @@ fn selling_first_and_buying_back_never_makes_money_either() {
     // Greyford's 15% spread, near the bottom of the index, is the tightest
     // margin: with a gentler buy than sell step, selling one unit at 150 and
     // buying it straight back would pay.
-    let greyford = stocked.state.economy.as_mut().unwrap().prices.get_mut("greyford");
+    let greyford = stocked
+        .state
+        .economy
+        .as_mut()
+        .unwrap()
+        .prices
+        .get_mut("greyford");
     greyford.unwrap().insert("eels".into(), 150);
     engine = Engine::restore(&world, stocked).unwrap();
     for units in [1, 2, 10, 200, 1_000] {
