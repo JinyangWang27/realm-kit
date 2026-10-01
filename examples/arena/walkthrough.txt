@@ -2,8 +2,13 @@ look
 status
 allocate patk 2
 allocate hp
+market
+buy healing_draught
 north
 engage grey_wolf
+flee
+engage grey_wolf
+use healing_draught
 flee
 south
 inventory
@@ -14,6 +19,7 @@ engage rat
 attack rat
 inventory
 west
+sell rat_tail 2
 rest
 west
 engage holt

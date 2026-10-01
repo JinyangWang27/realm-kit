@@ -118,6 +118,17 @@ pub fn market(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
             money(world, quote.sell),
         )?;
     }
+    if !market.wares.is_empty() {
+        writeln!(output, "  {}", paint.title("Wares:"))?;
+        for ware in &market.wares {
+            writeln!(
+                output,
+                "  {} — {}",
+                world.item(&ware.item).unwrap().name,
+                money(world, ware.price)
+            )?;
+        }
+    }
     writeln!(output, "  {}", money(world, wallet.currency))
 }
 
