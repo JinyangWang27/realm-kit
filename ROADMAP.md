@@ -1014,6 +1014,12 @@ milestones. They change how play reads, never the engine or its rules.
    last six lines of the fight (the latest turn marked) and the menu. When
    it ends, scrollback keeps only the opening line and the final turn. Line
    mode and pipes keep the full log.
+6. **Overland map** · proposed. A map of places and roads drawn from authored
+   display positions, with zoom, panning and labels that make room for each
+   other, and a fixed view in line mode
+   ([Overland map](docs/sandbox-worlds.md#overland-map)). Unlike the items
+   above, it needs a package field for positions and an engine query, so it
+   bumps the format.
 
 ## M5 — Longer authored adventures and source-specific mechanics
 
@@ -1139,8 +1145,11 @@ format as usual:
    that refill on a schedule, and travel speed from the slowest troops, the
    party's mounts and its load.
 4. **M6d — mass battle.** Army-against-army resolution from rosters, leaders and
-   ground (authored on locations and roads), with seeded casualties and an
-   optional champion duel. The formula is mirrored in `scripts/combat_sim`
+   ground (authored on locations and roads): stacks of troops fight in rounds
+   with an authored frontage, class matchups, morale and a rout, with seeded
+   casualties and an optional champion duel. The player chooses to autoresolve
+   a battle or command it round by round with a closed set of orders; both run
+   the same round rule. The formula is mirrored in `scripts/combat_sim`
    before tests pin its numbers. Losses split into killed and wounded, and
    wounded troops recover on the retinue's upkeep tick or, for agent parties,
    the world-agent tick. Battles take prisoners: troop prisoners to sell or

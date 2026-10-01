@@ -1259,6 +1259,10 @@ automatically reveal every location. A world that needs discovery/fog-of-war may
 track the smallest typed discovery state required; worlds where geography is common
 knowledge need no universal knowledge database.
 
+For overland worlds, the [overland map](sandbox-worlds.md#overland-map) proposal
+applies this: authored display positions, an engine map-view query, and a
+client-owned viewport with zoom and panning.
+
 ### Preview/detail policy
 
 RealmKit does not globally require exact or qualitative previews. The
@@ -1563,13 +1567,44 @@ a proposed answer that still needs to be confirmed:
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.
-- **Mass-battle formula (M6d).** Proposed: one integer strength formula over
-  rosters, leaders and an authored ground modifier that both locations and
-  roads carry (neutral when omitted), resolved in a fixed
-  number of rounds with one RNG draw per round from a dedicated domain. It
-  follows the simulator-parity rule: `scripts/combat_sim` mirrors it before
-  tests pin its numbers. Still open: how troop quality beyond combat stats
-  counts, and whether a champion duel can end a battle outright.
+- **Mass-battle formula (M6d).** Proposed: rosters fight as stacks of counts,
+  never as individuals, over at most an authored number of rounds
+  ([Mass battle](sandbox-worlds.md#mass-battle)). Each round both sides deal
+  count × the personal damage formula at power 100, limited to an authored
+  melee frontage and scaled by an authored class matchup, the ground (an
+  authored modifier that both locations and roads carry, neutral when omitted),
+  leadership and one bounded roll per side from a dedicated `battle` domain.
+  Damage divided by the target's HP gives losses, with the remainder carried;
+  morale falls with losses, and a rout ends the battle with a pursuit round.
+  Everything is integer and both sides resolve at once. It follows the
+  simulator-parity rule: `scripts/combat_sim` mirrors it before tests pin its
+  numbers. Still open: how troop quality beyond combat stats counts; whether
+  troop classes and the matchup table are authored per world (proposed) or a
+  fixed engine set; defaults for frontage, the morale factor and the rout
+  threshold; whether companions and lords can die in battle or are only
+  wounded or captured; and whether a champion duel can end a battle outright.
+- **Battle modes (M6d).** Proposed: when the player's party joins a battle, the
+  player chooses autoresolve or command. A commanded battle is a third stance
+  beside exploring and fighting, so the player's HP and MP keep exactly one
+  home. Each round the player gives one order from a closed set (charge, hold,
+  fire at will, flank with mounted troops, fall back, retreat) and sees a
+  round summary, and may autoresolve the rest at any round. Both modes run the
+  same round rule, and a commanded battle that only gives default orders
+  matches autoresolve exactly. Agent battles always autoresolve. Still open:
+  how much each round's summary shows (proposed: strength, losses and morale
+  per side, not per stack), and whether the player can later fight personally
+  in the line, with a short personal encounter against troops from the enemy
+  front whose kills come off that stack.
+- **Overland map (presentation).** Proposed: locations may author integer
+  display positions and a kind from a closed list, all or none per world; the
+  engine answers one map-view query that respects player knowledge; the
+  terminal client owns the viewport, zoom, panning and label placement, and
+  line mode prints a fixed 80 × 24 view
+  ([Overland map](sandbox-worlds.md#overland-map)). Authors densify long roads
+  with waypoint locations rather than any free movement. Still open: the
+  closed list of kinds, the coordinate bound, whether the map is a panel in
+  play or a screen of its own, and whether positions belong to areas
+  ([Spatial presentation](#spatial-presentation)) or to the world as one area.
 - **Agent policies (M6f).** Proposed: a closed enum (patrol, raid, escort,
   besiege, follow, trade, return home), chosen by authored priority rules over typed
   conditions. Parties act in stable instance order. "Nearest" and every route

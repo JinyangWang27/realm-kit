@@ -558,14 +558,62 @@ character can wear gear:
 The [capability catalog](capabilities.md#combat-across-sources) keeps mass
 battles out of personal combat. This capability resolves army against army.
 
-- **Resolution.** The engine computes each side's strength from its healthy
-  roster, its leaders, its morale and the ground. It draws from the RNG and
-  distributes losses over several rounds.
+- **Stacks.** A side is a list of stacks, one per troop definition with its
+  healthy count, plus the player, companions and leaders as individuals.
+  Troops never get individual HP, so a battle and its save stay small however
+  large the armies are.
+- **Rounds.** A battle runs for at most an authored number of rounds. Both
+  sides deal damage from the counts at the start of the round, so neither side
+  acts first:
+  1. A troop's hit is the world's personal damage formula at power 100: its
+     channel's attack against the target's matching defence.
+  2. Only an authored frontage of melee troops per side fights in a round,
+     filled from stacks in roster order; every ranged troop shoots. A side's
+     damage is the sum of count × hit over the troops that fight.
+  3. Percentage modifiers multiply in before one rounding: the class matchup
+     from an authored table, the ground's modifier for that class, the
+     leader's leadership, and one roll per side per round, drawn from the
+     battle's RNG domain between authored bounds such as 90 and 110.
+  4. That damage plus the side's carried remainder, divided by the target
+     stack's HP, gives the losses, and the remainder carries to the next round,
+     so partial damage is never lost. Losses fall on exposed stacks first,
+     melee before ranged, split by count with the largest remainders and ties
+     in roster order.
+  5. Morale falls by the round's losses × an authored factor ÷ the side's
+     starting size. A side whose morale drops below its authored rout
+     threshold breaks, and the winner takes one pursuit round in which the
+     routed side deals no damage and an authored pursuit class, such as
+     cavalry, counts double. A battle also ends when a side has no healthy
+     troops, or at the round cap, when the weaker side withdraws.
+
+  Damage grows with headcount, so numbers matter more than linearly; the
+  frontage keeps a much larger army from winning without losses; and morale
+  ends battles before either side is wiped out.
+- **Troop classes.** A world authors its own classes, such as infantry,
+  archers and cavalry, marks which are ranged, and authors the matchup table
+  and the pursuit class. Frontage, the morale factor and the rout threshold are
+  world content too, not engine constants.
+- **Two ways to fight.** When the player's party joins a battle, the player
+  chooses how it runs:
+  - **Autoresolve.** The engine runs every round at once, each side following
+    its default order, and the player sees the result and the losses.
+  - **Command.** The battle becomes the player's stance, a third one beside
+    exploring and fighting, so the player's HP and MP still live in exactly one
+    place. Each round the player gives an order and then sees that round's
+    summary: each side's strength, losses and morale. Orders come from a closed
+    set (charge, hold, fire at will, flank with mounted troops, fall back,
+    retreat) and change which stacks engage, which are exposed and which
+    matchups apply. Retreat leaves the battle at the cost of a rear-guard loss.
+    The player may autoresolve the rest of a commanded battle at any round.
+
+  Both modes run the same round rule, so a commanded battle in which every
+  order is the default one ends exactly as autoresolve would. Battles between
+  agent parties away from the player always autoresolve.
 - **Losses.** Each loss is killed or wounded by an authored share that the
   side's surgery proficiency raises. Wounded winners stay in their roster; the
   losing side's losses may instead become the winner's prisoners (see [Prisoners
-  and ransom](#prisoners-and-ransom)). The player sees the result and the
-  losses, not a blow-by-blow fight.
+  and ransom](#prisoners-and-ransom)). The player sees each round's summary in
+  a commanded battle and the losses at the end, never a blow-by-blow fight.
 - **Rewards.** A won battle grants the defeated side's authored XP to the pools
   of surviving troop types and, in worlds with character levels, to the player
   and each companion who fought, split by authored shares. Without character
@@ -595,6 +643,10 @@ battles out of personal combat. This capability resolves army against army.
 - **Simulator parity.** The formula must be mirrored in `scripts/combat_sim`
   before its numbers are pinned in tests, exactly as the personal-combat
   formulas are.
+
+  A `battle` mode in the simulator comes first, so authors can tune frontage,
+  morale and the matchup table on their own troops before any engine code
+  exists.
 
 ### Holdings
 
@@ -805,6 +857,64 @@ of it the way a traveller would, not see everything at once.
 Tournaments, arena fights and wagers need no capability. They are encounters
 plus currency effects, gated by standing or world time.
 
+## Overland map
+
+The road graph is the map in the rules. This section describes how a client
+draws it, and how authors make a road network dense enough to feel like
+overland travel.
+
+- **Positions.** A location may author a display position, integer
+  coordinates within a bound, and a kind from a closed list such as town,
+  castle, village or waypoint. Either every location in a world has a position
+  or none does. Positions never create, block or time roads: travel time stays
+  each road's authored minutes, and a client draws a road as a line between
+  its two ends.
+- **Map view.** The engine answers one query with the places the player may
+  know, the roads between them, the player's location and moving characters
+  where they were last seen. Until [knowledge and news](#knowledge-and-news)
+  exists, the player knows every place. The client never decides what is
+  hidden.
+- **Viewport.** The terminal client draws a window onto the world, not the
+  whole world squeezed into the terminal width. The view has a centre and a
+  scale in world units per cell. The first zoom level fits every place; each
+  step in halves the scale. Rows count double, since terminal cells are about
+  twice as tall as they are wide. Resizing the terminal keeps the zoom level
+  and changes only how much is visible.
+
+  | Key | Action |
+  |---|---|
+  | `+` / `-` | Zoom in or out |
+  | arrows | Pan by a quarter of the screen |
+  | `0` | Fit every place |
+  | `c` | Centre on the player |
+  | `Tab` | Cycle through the places reachable from here, with road times |
+  | `Esc` | Back to play |
+
+  The map opens centred on the player, at the zoom level last used.
+- **Detail by zoom.** Zoomed out, towns and castles carry names while villages
+  and waypoints show only their glyph; further in, villages are named; closest
+  in, waypoints are named and roads show their travel time. Labels are placed
+  in priority order (the player, towns, castles, villages, waypoints). A label
+  that would overlap one already placed tries the other side, then above or
+  below, and is otherwise dropped; its glyph always stays. When two places fall
+  in one cell, the more important one is drawn with a mark that another hides
+  there.
+- **Line mode.** Pipes and `--line` have no terminal size, so `map` prints the
+  fit-all view at a fixed 80 × 24, which terminal tests compare byte for byte.
+  `map zoom <n> <place>` prints a closer view centred on a place.
+- **Waypoints.** Authors make the network dense by adding ordinary locations
+  along long roads, such as bridges, fords, crossroads and camps, and splitting
+  each road at them so the legs add up to the old travel time. A group or
+  character placed at a waypoint, such as a bandit camp, gives the player an
+  encounter on the way before [interception](#world-agents) exists, and
+  waypoints give interception natural places to stop the player later. The
+  cost is one move per leg.
+- **Travel to a place.** A later command plans the shortest route by travel
+  time to a place the player knows and walks it one road at a time. It stops
+  at anything that would stop an ordinary move, such as an interception, a
+  closed road or an event that needs the player, so it never skips an authored
+  consequence ([Spatial presentation](open-decisions.md#spatial-presentation)).
+
 ## Reference fixture
 
 Every capability ships with a fixture that proves it. The sandbox fixture is a
@@ -827,8 +937,9 @@ covers 30 or more in-world days. During them:
 - a scripting or behaviour language, or per-character AI scripts;
 - real-time play, or any gameplay tied to the wall clock;
 - terrain, continuous coordinates or free-space pathfinding in the rules (the
-  road graph is the map, and routing is shortest travel time on it; clients may
-  draw it however they like);
+  road graph is the map, and routing is shortest travel time on it; display
+  positions only tell clients where to draw places, see
+  [Overland map](#overland-map));
 - entities created at runtime other than instances of authored definitions;
 - a generic bag of numeric variables;
 - importing data from other games.
