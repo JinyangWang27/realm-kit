@@ -1571,12 +1571,17 @@ a proposed answer that still needs to be confirmed:
   never as individuals, over at most an authored number of rounds
   ([Mass battle](sandbox-worlds.md#mass-battle)). Each round both sides deal
   count × the personal damage formula at power 100, limited to an authored
-  melee frontage and scaled by an authored class matchup, the ground (an
-  authored modifier that both locations and roads carry, neutral when omitted),
-  leadership and one bounded roll per side from a dedicated `battle` domain.
-  Damage divided by the target's HP gives losses, with the remainder carried;
-  morale falls with losses, and a rout ends the battle with a pursuit round.
-  Everything is integer and both sides resolve at once. It follows the
+  melee frontage, split over the enemy's exposed stacks by count, computed per
+  attacking and target stack, and scaled by an authored class matchup, the
+  ground (an authored modifier that both locations and roads carry, neutral
+  when omitted), leadership, current morale and one bounded roll per side from
+  a dedicated `battle` domain. Each target stack's damage divided by its HP
+  gives its losses, with the remainder carried per stack; morale falls with
+  losses, and a rout ends the battle with a pursuit round. Simultaneous routs
+  are a draw, and at the round cap the side with less healthy HP withdraws, the
+  attacker on a tie. Individuals count only through leadership and the
+  champion duel. Without morale, the battle ends only by exhaustion or the
+  round cap. Everything is integer and both sides resolve at once. It follows the
   simulator-parity rule: `scripts/combat_sim` mirrors it before tests pin its
   numbers. Still open: how troop quality beyond combat stats counts; whether
   troop classes and the matchup table are authored per world (proposed) or a
@@ -1586,11 +1591,11 @@ a proposed answer that still needs to be confirmed:
 - **Battle modes (M6d).** Proposed: when the player's party joins a battle, the
   player chooses autoresolve or command. A commanded battle is a third stance
   beside exploring and fighting, so the player's HP and MP keep exactly one
-  home. Each round the player gives one order from a closed set (charge, hold,
-  fire at will, flank with mounted troops, fall back, retreat) and sees a
-  round summary, and may autoresolve the rest at any round. Both modes run the
-  same round rule, and a commanded battle that only gives default orders
-  matches autoresolve exactly. Agent battles always autoresolve. Still open:
+  home. Each round the player gives one order from a closed set (charge, the
+  default; hold; flank with mounted troops; retreat), each a fixed change to
+  the round rule with authored percentages, and sees a round summary, and may
+  autoresolve the rest at any round. Both modes run the same round rule, and a
+  commanded battle that only charges matches autoresolve exactly. Agent battles always autoresolve. Still open:
   how much each round's summary shows (proposed: strength, losses and morale
   per side, not per stack), and whether the player can later fight personally
   in the line, with a short personal encounter against troops from the enemy

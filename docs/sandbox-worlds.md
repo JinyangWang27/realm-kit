@@ -559,56 +559,93 @@ The [capability catalog](capabilities.md#combat-across-sources) keeps mass
 battles out of personal combat. This capability resolves army against army.
 
 - **Stacks.** A side is a list of stacks, one per troop definition with its
-  healthy count, plus the player, companions and leaders as individuals.
-  Troops never get individual HP, so a battle and its save stay small however
-  large the armies are.
+  healthy count. Troops never get individual HP, so a battle and its save stay
+  small however large the armies are. The side that starts the battle (by
+  attacking, or by intercepting) is the attacker.
+- **Individuals.** The player, companions and leaders do not fight in the
+  round rule and are never its targets. They count through leadership and the
+  optional champion duel. A side whose stacks have no healthy troops left has
+  lost, whoever still stands with it; a defeated player then falls to the
+  world's authored defeat rules (injury, capture). Fighting personally in the
+  line is an open question
+  ([Section 18](open-decisions.md#18-living-sandbox-worlds)).
 - **Rounds.** A battle runs for at most an authored number of rounds. Both
-  sides deal damage from the counts at the start of the round, so neither side
+  sides resolve from the counts at the start of the round, so neither side
   acts first:
-  1. A troop's hit is the world's personal damage formula at power 100: its
-     channel's attack against the target's matching defence.
-  2. Only an authored frontage of melee troops per side fights in a round,
-     filled from stacks in roster order; every ranged troop shoots. A side's
-     damage is the sum of count × hit over the troops that fight.
-  3. Percentage modifiers multiply in before one rounding: the class matchup
-     from an authored table, the ground's modifier for that class, the
-     leader's leadership, and one roll per side per round, drawn from the
-     battle's RNG domain between authored bounds such as 90 and 110.
-  4. That damage plus the side's carried remainder, divided by the target
-     stack's HP, gives the losses, and the remainder carries to the next round,
-     so partial damage is never lost. Losses fall on exposed stacks first,
-     melee before ranged, split by count with the largest remainders and ties
-     in roster order.
-  5. Morale falls by the round's losses × an authored factor ÷ the side's
-     starting size. A side whose morale drops below its authored rout
-     threshold breaks, and the winner takes one pursuit round in which the
-     routed side deals no damage and an authored pursuit class, such as
-     cavalry, counts double. A battle also ends when a side has no healthy
-     troops, or at the round cap, when the weaker side withdraws.
+  1. **Who fights.** Only an authored frontage of melee troops per side fights,
+     filled from stacks in roster order; every ranged troop shoots. The side's
+     orders can change this (see the orders below).
+  2. **Who is targeted.** A side's exposed stacks are its melee stacks, or its
+     ranged stacks once no melee troops are left. Each fighting stack splits
+     its fighting count across the enemy's exposed stacks in proportion to
+     their counts, with the largest remainders and ties in roster order. Every
+     pair of attacking and target stack is then computed on its own.
+  3. **Damage per pair.** The hit is the world's personal damage formula at
+     power 100: the attacker's channel attack against that target's matching
+     defence. Count × hit is scaled by percentage modifiers, multiplied in
+     before one rounding: the class matchup for that pair from an authored
+     table, the ground's modifier for the attacker's class, the leader's
+     leadership, the side's current morale (100% at full morale, falling
+     linearly to an authored floor at zero), and one roll per side per round,
+     drawn from the battle's RNG domain between authored bounds such as 90 and
+     110.
+  4. **Losses.** Each target stack sums the damage it takes and adds its own
+     carried remainder; that divided by its HP gives its losses, capped at its
+     count, and the remainder carries to the next round, so partial damage is
+     never lost.
+  5. **Morale.** Morale falls by the round's losses × an authored factor ÷ the
+     side's starting size. A side whose morale drops below its authored rout
+     threshold breaks.
+  6. **End.** After the round:
+     - If exactly one side broke or has no healthy troops, the other side wins
+       and takes one pursuit round in which the routed side deals no damage
+       and an authored pursuit class, such as cavalry, counts double.
+     - If both sides broke or have no healthy troops in the same round, the
+       battle is a draw: there is no pursuit, no winner's rewards, and both
+       sides withdraw.
+     - At the round cap the side with the smaller remaining healthy HP (count
+       × HP over its stacks) withdraws without a pursuit round, and the
+       attacker withdraws when the two are equal.
 
   Damage grows with headcount, so numbers matter more than linearly; the
   frontage keeps a much larger army from winning without losses; and morale
   ends battles before either side is wiped out.
+- **Without morale.** Morale is an optional part of the retinue. A world
+  without it drops the morale modifier and step 5, so a battle ends only when
+  a side has no healthy troops or at the round cap, by the same end rules.
 - **Troop classes.** A world authors its own classes, such as infantry,
-  archers and cavalry, marks which are ranged, and authors the matchup table
-  and the pursuit class. Frontage, the morale factor and the rout threshold are
-  world content too, not engine constants.
+  archers and cavalry, marks which are ranged and which are mounted, and
+  authors the matchup table and the pursuit class. Frontage, the morale
+  factor, the morale floor, the rout threshold and the order percentages below
+  are world content too, not engine constants.
+- **Orders.** Each side gives one order per round from a closed set. Charge is
+  the default: autoresolve, agent parties and a commanded side that gives no
+  other order always charge.
+  - **Charge.** The round rule exactly as above.
+  - **Hold.** The side's melee troops wait in place. If the enemy also holds,
+    neither side's melee troops fight that round and only ranged troops shoot.
+    If the enemy charges, melee fights as usual and the holding side's melee
+    damage is scaled by an authored hold percentage, such as 120.
+  - **Flank.** The side's mounted stacks leave the frontage and attack the
+    enemy's ranged stacks directly, as if they were exposed, with damage
+    scaled by an authored flank percentage. Without enemy ranged stacks,
+    mounted troops fight as in a charge. The rest of the side charges.
+  - **Retreat.** The side leaves the battle at once, and the enemy takes one
+    pursuit round against it, as after a rout.
 - **Two ways to fight.** When the player's party joins a battle, the player
   chooses how it runs:
-  - **Autoresolve.** The engine runs every round at once, each side following
-    its default order, and the player sees the result and the losses.
+  - **Autoresolve.** The engine runs every round at once with both sides
+    charging, and the player sees the result and the losses.
   - **Command.** The battle becomes the player's stance, a third one beside
     exploring and fighting, so the player's HP and MP still live in exactly one
     place. Each round the player gives an order and then sees that round's
-    summary: each side's strength, losses and morale. Orders come from a closed
-    set (charge, hold, fire at will, flank with mounted troops, fall back,
-    retreat) and change which stacks engage, which are exposed and which
-    matchups apply. Retreat leaves the battle at the cost of a rear-guard loss.
-    The player may autoresolve the rest of a commanded battle at any round.
+    summary: each side's strength, losses and morale. The player may
+    autoresolve the rest of a commanded battle at any round.
 
-  Both modes run the same round rule, so a commanded battle in which every
-  order is the default one ends exactly as autoresolve would. Battles between
-  agent parties away from the player always autoresolve.
+  Both modes run the same round rule, so a commanded battle in which the
+  player always charges ends exactly as autoresolve would; tests hold the two
+  to that. Battles between agent parties away from the player always
+  autoresolve.
 - **Losses.** Each loss is killed or wounded by an authored share that the
   side's surgery proficiency raises. Wounded winners stay in their roster; the
   losing side's losses may instead become the winner's prisoners (see [Prisoners
@@ -866,12 +903,14 @@ overland travel.
 - **Positions.** A location may author a display position, integer
   coordinates within a bound, and a kind from a closed list such as town,
   castle, village or waypoint. Either every location in a world has a position
-  or none does. Positions never create, block or time roads: travel time stays
-  each road's authored minutes, and a client draws a road as a line between
-  its two ends.
+  or none does. Positions never create, block or time roads. A road is
+  two-way with one authored duration, so a client draws it as a line between
+  its two ends. A directed exit between two positioned places is drawn with an
+  arrowhead towards its destination, and no time, since exits take none.
 - **Map view.** The engine answers one query with the places the player may
-  know, the roads between them, the player's location and moving characters
-  where they were last seen. Until [knowledge and news](#knowledge-and-news)
+  know, the roads and exits between them, each road's travel time for the
+  player's party (after [travel speed](#retinue) where it exists), the
+  player's location and moving characters where they were last seen. Until [knowledge and news](#knowledge-and-news)
   exists, the player knows every place. The client never decides what is
   hidden.
 - **Viewport.** The terminal client draws a window onto the world, not the
@@ -910,7 +949,8 @@ overland travel.
   waypoints give interception natural places to stop the player later. The
   cost is one move per leg.
 - **Travel to a place.** A later command plans the shortest route by travel
-  time to a place the player knows and walks it one road at a time. It stops
+  time to a place the player knows, with ties broken by authored road order as
+  for [world agents](#world-agents), and walks it one road at a time. It stops
   at anything that would stop an ordinary move, such as an interception, a
   closed road or an event that needs the player, so it never skips an authored
   consequence ([Spatial presentation](open-decisions.md#spatial-presentation)).

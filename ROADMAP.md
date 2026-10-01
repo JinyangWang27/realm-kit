@@ -1148,7 +1148,8 @@ format as usual:
    ground (authored on locations and roads): stacks of troops fight in rounds
    with an authored frontage, class matchups, morale and a rout, with seeded
    casualties and an optional champion duel. The player chooses to autoresolve
-   a battle or command it round by round with a closed set of orders; both run
+   a battle or command it round by round with a closed set of orders (charge,
+   hold, flank, retreat); both run
    the same round rule. The formula is mirrored in `scripts/combat_sim`
    before tests pin its numbers. Losses split into killed and wounded, and
    wounded troops recover on the retinue's upkeep tick or, for agent parties,
