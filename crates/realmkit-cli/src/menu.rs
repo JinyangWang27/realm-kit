@@ -761,6 +761,7 @@ mod tests {
             [
                 "Rest",
                 "Train stats — 3 points ›",
+                "Market ›",
                 "Inventory",
                 "Character",
                 "Quests"

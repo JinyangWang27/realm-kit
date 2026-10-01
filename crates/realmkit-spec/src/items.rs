@@ -18,6 +18,19 @@ pub struct Item {
     /// Makes the item wearable; each one obtained is an individual piece.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub equipment: Option<Equipment>,
+    /// Makes the item usable: each use spends one and restores vitals.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consumable: Option<Consumable>,
+}
+
+/// What using one unit restores, each capped at the maximum.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Consumable {
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub hp: u32,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub mp: u32,
 }
 
 /// What wearing an item does.

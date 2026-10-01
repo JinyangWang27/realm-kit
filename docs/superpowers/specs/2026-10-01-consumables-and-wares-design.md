@@ -43,11 +43,11 @@ capped at the player's effective maximum.
   opponents act until the player's next turn (`advance`).
   - Using an item that restores nothing is refused in a fight too.
   - It earns no technique XP and builds no rage, as with flee's turn.
-- **Other refusals:** `NotCarried` (no unit held), `NotConsumable`, a dead
-  player, and an open dialogue, which `Use` closes like other exploring
-  commands do.
-- **Events:** `ItemUsed { item }`, then `Restored { hp, mp }` with the amounts
-  actually gained.
+- **Other refusals:** `NotEnoughMaterials` (no unit held), `NotConsumable`,
+  and a dead player. An open dialogue closes, as other exploring commands
+  close it.
+- **Events:** one `Consumed { item, hp, mp }`, with the amounts actually
+  gained.
 - **Simulator parity:** the damage and timeline formulas are unchanged; `Use`
   only spends a turn. `scripts/combat_sim` needs no change.
 
@@ -89,7 +89,8 @@ items, exactly as for items that effects only take. Check `Progress` in
   - `invalid_price` for a price outside 1..=`PRICE_BOUND`.
   - `invalid_ware` when the item is also a good, or listed twice at one
     market.
-  - `combat_disabled` when a ware is equipment in a world without combat.
+  - No separate check for equipment wares without combat: equipment items
+    are already `combat_disabled` there.
 
 ### Rules
 
@@ -125,18 +126,17 @@ check exists and add wares as a source if so.
 `FORMAT_VERSION` and `SAVE_FORMAT_VERSION` become 13, and every `examples/*`
 package is bumped.
 
-## Fixture: `examples/marches`
+## Fixture: `examples/arena`
 
-Marches has no combat today; it gains the minimum needed:
+Marches has nothing to fight, so nothing there could be healed; PR 2 adds
+combat to it. The arena demonstrates both features instead:
 
-- A `combat` block with a short level table and `special_name`, and one safe
-  location. No fighters yet; PR 2 adds troops and armies there.
-- One consumable trade good, such as smoked eels at `{"hp": 15}`.
-- A smith's wares at the town: one weapon, one armour piece and one counted
-  consumable ware.
-- The walkthrough buys and equips the weapon, buys a consumable ware and uses
-  it, and keeps every existing step. The CLI terminal tests pick up the new
-  output.
+- The gate gains a quartermaster market (`{amount} marks`, 10 to start).
+  Its wares are a healing draught (`{"hp": 30}`, 8 marks) and iron mail
+  (60). Rat tails become a good (price 6), so the repeatable warren pays for
+  draughts.
+- The walkthrough buys a draught, drinks it mid-fight and sells rat tails.
+  The CLI terminal tests cover the new output.
 
 ## Tests
 
@@ -154,7 +154,7 @@ Marches has no combat today; it gains the minimum needed:
   - Gear wares arrive as `n` separate pieces with fresh IDs.
   - Unaffordable purchases and selling a ware are refused.
   - Merchant absence closes wares too.
-- **Spec:** every new diagnostic code above, plus marches round-trips.
+- **Spec:** every new diagnostic code above, plus the arena round-trip.
 - **CLI:** menu tests for `Use item ›` and ware entries, and the terminal
   walkthrough.
 

@@ -46,6 +46,29 @@ pub(super) fn header(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             );
         }
     }
+    for item in &w.items {
+        let Some(consumable) = item.consumable else {
+            continue;
+        };
+        if w.combat().is_none() {
+            issue(
+                out,
+                &item.id,
+                "combat_disabled",
+                "this world has no combat block, so there are no HP or MP to restore",
+            );
+        }
+        let restores = consumable.hp > 0 || consumable.mp > 0;
+        let bounded = consumable.hp <= STAT_BOUND && consumable.mp <= STAT_BOUND;
+        if !restores || !bounded || item.equipment.is_some() {
+            issue(
+                out,
+                &item.id,
+                "invalid_consumable",
+                format!("a consumable restores 1 to {STAT_BOUND} HP or MP and is not equipment"),
+            );
+        }
+    }
     ids(out, "quest", w.quests.iter().map(|v| v.id.as_str()));
     ids(out, "dialogue", w.dialogues.iter().map(|v| v.id.as_str()));
     ids(out, "flag", w.world.flags.iter().map(String::as_str));

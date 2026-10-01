@@ -1,6 +1,12 @@
 [
   { "id": "rat_tail", "name": "Rat tail", "description": "Proof of a job done, again." },
   {
+    "id": "healing_draught",
+    "name": "Healing draught",
+    "description": "Bitter, green, and better than bleeding.",
+    "consumable": { "hp": 30 }
+  },
+  {
     "id": "practice_sword",
     "name": "Practice sword",
     "description": "Blunt, but it has taught a thousand recruits.",

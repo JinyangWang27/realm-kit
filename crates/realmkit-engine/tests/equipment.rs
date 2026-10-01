@@ -330,6 +330,7 @@ fn many_worn_modifiers_combine_exactly() {
                     modifiers,
                     tiers: Vec::new(),
                 }),
+                consumable: None,
             });
         }
         world
