@@ -85,10 +85,33 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 .map(|(id, _)| available(Command::Equip(*id))),
         );
     }
+    actions.extend(consumables(world, state));
     actions.extend(crafting::offered(world, state));
     actions.extend(trade(world, state));
     actions.extend(panels);
     actions
+}
+
+/// One entry per carried consumable, in inventory order; unavailable when
+/// it would restore nothing.
+fn consumables(world: &WorldSpec, state: &GameState) -> Vec<Action> {
+    let (Some(combat), Some(now)) = (&state.combat, player_vitals(state)) else {
+        return Vec::new();
+    };
+    let max = player_stats(world, combat);
+    state
+        .player
+        .inventory
+        .keys()
+        .filter_map(|id| {
+            let restores = consume::consumable(world, id).ok()?;
+            let (hp, mp) = consume::gain(now.hp, now.mp, max, restores);
+            Some(Action {
+                command: Command::Use(id.clone()),
+                available: hp > 0 || mp > 0,
+            })
+        })
+        .collect()
 }
 
 /// At an open market: its prices, then buying one unit of each good, where
@@ -179,6 +202,7 @@ fn fight_actions(
             available: encounter::check_skill(player, level, s).is_ok(),
         }));
     }
+    actions.extend(consumables(world, state));
     if !encounter::group(world, encounter).is_some_and(|g| g.no_flee) {
         actions.push(available(Command::Flee));
     }

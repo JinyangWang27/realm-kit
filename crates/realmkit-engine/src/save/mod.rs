@@ -267,8 +267,8 @@ struct Progress<'w> {
     loose: BTreeSet<&'w Id>,
     /// Effects that could have happened by the saved minute.
     fired: Vec<&'w Effect>,
-    /// Items effects only take, never grant: their counts can fall below
-    /// what progress granted, but never rise above it.
+    /// Items effects take or players use up, never grant: their counts can
+    /// fall below what progress granted, but never rise above it.
     taken: BTreeSet<&'w Id>,
     /// Materials crafting spends: at most what progress granted, maybe less.
     spendable: BTreeSet<&'w Id>,
@@ -353,8 +353,14 @@ impl<'w> Progress<'w> {
             .chain(goods.map(|g| &g.item))
             .chain(wares.map(|w| &w.item))
             .collect();
+        let consumables = world
+            .items
+            .iter()
+            .filter(|i| i.consumable.is_some())
+            .map(|i| &i.id);
         let taken = stacks(true)
             .map(|s| &s.item)
+            .chain(consumables)
             .filter(|item| !loose.contains(item))
             .collect();
         Ok(Self {

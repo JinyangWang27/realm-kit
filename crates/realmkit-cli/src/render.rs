@@ -366,6 +366,21 @@ pub fn events(
                 let restored = if mp { "Health and MP" } else { "Health" };
                 writeln!(output, "You rest. {restored} restored.")?
             }
+            Event::Consumed { item, hp, mp } => {
+                let mut gains = Vec::new();
+                if *hp > 0 {
+                    gains.push(format!("+{hp} HP"));
+                }
+                if *mp > 0 {
+                    gains.push(format!("+{mp} MP"));
+                }
+                writeln!(
+                    output,
+                    "You use {}: {}.",
+                    world.item(item).unwrap().name,
+                    gains.join(", ")
+                )?
+            }
             Event::EnemyDefeated { monster } => writeln!(
                 output,
                 "{}",

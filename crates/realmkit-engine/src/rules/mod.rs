@@ -3,6 +3,7 @@
 use super::*;
 
 mod actions;
+mod consume;
 mod crafting;
 mod economy;
 mod player;
@@ -161,7 +162,7 @@ pub(super) fn execute(
     }
     let combat_action = matches!(
         command,
-        Command::Attack(_) | Command::UseSkill { .. } | Command::Flee
+        Command::Attack(_) | Command::UseSkill { .. } | Command::Flee | Command::Use(_)
     );
     // During an encounter only combat actions and panels are possible.
     if fighting(state).is_some() && !panel && !combat_action {
@@ -215,6 +216,7 @@ pub(super) fn execute(
             crafting::enchant(world, state, piece, &enchantment, &mut events)?
         }
         Command::Rest => player::rest(world, state, &mut events)?,
+        Command::Use(item) => consume::consume(world, state, item, &mut events)?,
     }
     // A flag or quest this command changed may open a breakthrough gate.
     if !panel {
