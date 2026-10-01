@@ -533,9 +533,14 @@ character can wear gear:
   Prisoners have their own authored limit per holder.
 - **Taking prisoners.** When a mass battle ends, an authored share of the
   losing side's casualties, drawn from the battle's RNG domain, become the
-  winner's prisoners instead of dying, up to the winner's limit. A defeated
-  unique leader is captured, not killed, unless an authored rule says
-  otherwise. A personal encounter can capture a yielding opponent the same way.
+  winner's prisoners instead of dying, up to the winner's limit. Lords and
+  companions are never killed in battle. Each one on the losing side, whether
+  knocked out or still standing at the rout, is captured with an authored
+  chance drawn from the battle's RNG domain, in side order, and otherwise
+  escapes: a lord to an authored place of its faction, and the player's
+  companion as the player's own capture authors. Unique characters do not
+  count against the winner's prisoner limit. A personal encounter can capture
+  a yielding opponent the same way.
 - **Using prisoners.**
   - Sell troop prisoners to a ransom broker at a location, for an
     engine-computed price per troop definition (economy).
@@ -568,8 +573,9 @@ battles out of personal combat. This capability resolves army against army.
   with their effective stats and their current HP, placed before the troop
   stacks in roster order. Damage they take lowers their HP directly instead of
   counting losses. At zero HP an individual is knocked out: out of the battle
-  with 1 HP, never killed by the round rule, and a knocked-out leader's
-  leadership no longer counts. A player who fights alone, without a retinue,
+  with 1 HP and never killed, since lords and companions can be captured but
+  never die in battle ([Prisoners and ransom](#prisoners-and-ransom)), and a
+  knocked-out leader's leadership no longer counts. A player who fights alone, without a retinue,
   is simply a side with one stack. A defeated player then falls to the world's
   authored defeat rules (injury, capture). The battle stance holds every
   individual's HP and MP, so they still live in exactly one place.

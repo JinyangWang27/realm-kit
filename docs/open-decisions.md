@@ -1590,8 +1590,7 @@ a proposed answer that still needs to be confirmed:
   its numbers. Still open: how troop quality beyond combat stats counts;
   whether troop classes and the matchup table are authored per world
   (proposed) or a fixed engine set; defaults for frontage, the morale factor,
-  the rout threshold and the hold percentage; whether a knocked-out companion
-  or lord may afterwards be killed or captured; and whether a champion duel can
+  the rout threshold and the hold percentage; and whether a champion duel can
   end a battle outright.
 - **Battle modes (M6d).** Proposed: when the player's party joins a battle, the
   player chooses autoresolve or command. A commanded battle is a third stance
@@ -1665,10 +1664,12 @@ a proposed answer that still needs to be confirmed:
   through techniques and gear.
 - **Prisoners (M6d).** Proposed: captures are an authored share of the losing
   side's casualties, drawn from the battle's RNG domain and capped by the
-  winner's prisoner limit; unique leaders are captured rather than killed by
-  default; captivity of a unique character is state keyed by its ID. Player
-  captivity is an ordinary setback, not an outcome. Escapes run on the world's
-  prison schedule with their own `captivity` RNG domain. Still open: what
+  winner's prisoner limit; captivity of a unique character is state keyed by
+  its ID. Player captivity is an ordinary setback, not an outcome. Escapes run on the world's
+  prison schedule with their own `captivity` RNG domain. Decided: lords and
+  companions are never killed in battle; each one on the losing side is
+  captured with an authored chance from the battle's RNG domain and otherwise
+  escapes, outside the winner's prisoner limit. Still open: what
   happens to the player's retinue and stash when the player is captured.
 - **Battle rewards and injuries (M6d).** Proposed: a victory splits the
   defeated side's authored XP between the player, companions who fought and
