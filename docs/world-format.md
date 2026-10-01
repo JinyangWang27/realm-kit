@@ -1,9 +1,11 @@
-# World package format 12
+# World package format 13
 
-Format 12 composes conditions with `all`, `any` and `not`, gives dialogue
-choices ordered effect lists, and adds optional world time with roads,
-scheduled events and characters who move, and an optional economy of
-currency and markets whose prices follow production. Combat stays optional. The level table and combat prose live in an
+Format 13 adds consumable items that restore HP and MP, and wares that
+markets sell at fixed prices. Format 12 composed conditions with `all`,
+`any` and `not`, gave dialogue choices ordered effect lists, and added
+optional world time with roads, scheduled events and characters who move,
+and an optional economy of currency and markets whose prices follow
+production. Combat stays optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -33,9 +35,9 @@ there is no migration. Convert them by hand:
   becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
   dialogue choice's `effect` becomes a one-element `effects` list.
 
-Format 12 represents one fixed player-controlled character and one playable
+Format 13 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 12 does not serialize a route collection
+stable logical route ID `default`; Format 13 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -50,7 +52,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 12 also requires item and quest tables because they serve the current demo.
+Format 13 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -85,7 +87,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 12 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 13 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -325,6 +327,12 @@ the index moves with what the market makes and needs.
   `spread_percent`.
 - **Links** join two markets whose prices pull together; one market's links
   share at most 100 percent in total.
+- **Wares** are items a market sells at a fixed price, listed as
+  `"wares": [{ "item": "healing_draught", "price": 8 }]`. They are buy-only,
+  never run out and never move the market's prices. Equipment bought this
+  way arrives as separate pieces. A ware's price is 1 to 1,000,000
+  (`invalid_price`), and it is sold once per market and is not also a good
+  (`invalid_ware`). Wares follow the market's merchant: no merchant, no sale.
 
 Buying one unit costs `price × index × (100 + spread) / 100,000`, at least 1;
 selling one fetches `price × index × 100 / (1,000 × (100 + spread))`, each
@@ -416,7 +424,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 12 has a single flat quest collection. The long-term model should retain
+Format 13 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -666,6 +674,30 @@ an item with an `equipment` part can be worn:
   every slot, with levels, points and technique bonuses, must keep each stat
   within 9,999.
 
+### Consumables
+
+An item with a `consumable` part restores HP and MP when used:
+
+```json
+{
+  "id": "healing_draught",
+  "name": "Healing draught",
+  "description": "Bitter, green, and better than bleeding.",
+  "consumable": { "hp": 30 }
+}
+```
+
+- `hp` and `mp` each default to 0. At least one is positive, both are at
+  most 9,999, and a consumable is not also equipment (`invalid_consumable`).
+  A world without combat has no HP or MP to restore (`combat_disabled`).
+- `use <item>` spends one unit and restores up to the effective maxima. A
+  use that would restore nothing is refused, and nothing is spent.
+- In an encounter a use is the player's turn: it takes one basic action's
+  time and the opponents act before the player's next turn. It earns no rage
+  and no technique XP.
+- A consumable may also be a trade good or a ware, so food bought cheaply in
+  one place heals in another.
+
 ### Forging and improvement
 
 A location can offer crafting `stations`, and the combat block lists
@@ -852,7 +884,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 12 currently selects combat prose variants from the current
+Format 13 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
