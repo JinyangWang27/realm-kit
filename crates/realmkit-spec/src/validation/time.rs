@@ -116,7 +116,7 @@ fn roads(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 
 /// Every occurrence is after the start of play, so nothing is due at once
 /// and nothing can schedule itself at its own minute.
-fn schedule(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, schedule: &Schedule) {
+pub(super) fn schedule(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, schedule: &Schedule) {
     let start = w.world.time.as_ref().map_or(0, |t| t.start);
     if schedule.at <= start || schedule.at > WORLD_TIME_BOUND {
         issue(
@@ -149,7 +149,9 @@ fn event_effect(
     recurs: bool,
 ) {
     match effect {
-        Effect::SetFlag { .. } | Effect::GrantItems { .. } => story::effect(out, w, owner, effect),
+        Effect::SetFlag { .. } | Effect::GrantItems { .. } | Effect::GrantCurrency { .. } => {
+            story::effect(out, w, owner, effect)
+        }
         // A one-shot event happens once, so it may grant XP like a quest.
         Effect::GrantTechnique(grant) => {
             progression::technique_grant(out, w, owner, grant);
@@ -162,14 +164,15 @@ fn event_effect(
                 );
             }
         }
-        Effect::AcceptQuest { .. } | Effect::CompleteQuest { .. } | Effect::TakeItems { .. } => {
-            issue(
-                out,
-                owner,
-                "invalid_effect",
-                "an event may set flags, grant items and teach techniques",
-            )
-        }
+        Effect::AcceptQuest { .. }
+        | Effect::CompleteQuest { .. }
+        | Effect::TakeItems { .. }
+        | Effect::PayCurrency { .. } => issue(
+            out,
+            owner,
+            "invalid_effect",
+            "an event may set flags, grant items or currency and teach techniques",
+        ),
     }
 }
 

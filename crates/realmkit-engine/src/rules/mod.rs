@@ -4,6 +4,7 @@ use super::*;
 
 mod actions;
 mod crafting;
+mod economy;
 mod player;
 mod story;
 mod time;
@@ -31,6 +32,10 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
             .get(item)
             .is_some_and(|n| n >= quantity),
         // Validation keeps time conditions to worlds with a clock.
+        Condition::Currency { amount } => state
+            .economy
+            .as_ref()
+            .is_some_and(|e| e.currency >= *amount),
         Condition::TimeOfDay { from, to } => state.time.is_some_and(|now| {
             let minute = now % realmkit_spec::MINUTES_PER_DAY;
             if from < to {
@@ -130,6 +135,7 @@ pub(super) fn is_panel(command: &Command) -> bool {
             | Command::Inventory
             | Command::Quests
             | Command::Techniques
+            | Command::Market
     )
 }
 
@@ -159,6 +165,16 @@ pub(super) fn execute(
         Command::Status => events.push(Event::StatusViewed),
         Command::Quests => events.push(Event::QuestsViewed),
         Command::Techniques => events.push(Event::TechniquesViewed),
+        Command::Market => {
+            economy::market_here(world, state)?;
+            events.push(Event::MarketViewed)
+        }
+        Command::Buy { good, quantity } => {
+            economy::buy(world, state, &good, quantity, &mut events)?
+        }
+        Command::Sell { good, quantity } => {
+            economy::sell(world, state, &good, quantity, &mut events)?
+        }
         Command::Move(direction) => move_to(world, state, direction, &mut events)?,
         Command::Travel(to) => time::travel(world, state, to, &mut events)?,
         Command::Wait(minutes) => time::wait(world, state, minutes, &mut events)?,

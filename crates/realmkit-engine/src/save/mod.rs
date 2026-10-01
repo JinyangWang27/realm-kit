@@ -72,11 +72,38 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                 r.version == RNG_VERSION
                     && r.combat.is_some() == world.random_combat()
                     && r.world.is_some() == world.random_world()
+                    && r.market.is_some() == world.random_market()
             }
         },
         "random state does not match the world",
     )?;
-    time(world, state)
+    time(world, state)?;
+    economy(world, state)
+}
+
+/// Currency within its bound, and an index for every good at every market
+/// within the index bounds.
+fn economy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let valid = match (world.economy(), &state.economy) {
+        (None, None) => true,
+        (Some(economy), Some(wallet)) => {
+            let [low, high] = economy.index_bounds;
+            wallet.currency <= realmkit_spec::CURRENCY_BOUND
+                && wallet.prices.len() == economy.markets.len()
+                && economy.markets.iter().all(|market| {
+                    wallet.prices.get(&market.location).is_some_and(|prices| {
+                        prices.len() == economy.goods.len()
+                            && economy.goods.iter().all(|good| {
+                                prices
+                                    .get(&good.item)
+                                    .is_some_and(|i| (low..=high).contains(i))
+                            })
+                    })
+                })
+        }
+        _ => false,
+    };
+    ensure(valid, "currency or prices do not match the world")
 }
 
 /// The clock is within its bounds, and every mover is somewhere it may be.
@@ -266,6 +293,8 @@ impl<'w> Progress<'w> {
             .chain(catalysts)
             .map(|s| &s.item)
             .collect();
+        // Trade goods come and go at markets too.
+        let goods = world.economy().into_iter().flat_map(|e| &e.goods);
         let loose = world
             .effects()
             .flat_map(|e| match e {
@@ -273,6 +302,7 @@ impl<'w> Progress<'w> {
                 _ => &[],
             })
             .map(|s| &s.item)
+            .chain(goods.map(|g| &g.item))
             .collect();
         Ok(Self {
             loose,

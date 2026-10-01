@@ -277,6 +277,12 @@ the world authors it, and it arrives with a fixture that proves it.
 
 ### Economy
 
+M6a-1 delivers goods, producers, markets, the price tick, links, buying and
+selling, merchants who must be present and currency conditions and effects
+([Economy](world-format.md#economy)). Prosperity, merchants' stock,
+workshops and the trading proficiency follow in M6a-2. A village does not
+yet count towards its market town's trade; link the two instead.
+
 Prices come from what each place makes and needs. A town surrounded by
 vineyards sells wine cheaply; a town with looms but no flocks pays well for
 wool. Caravans carrying goods between towns pull their prices together, and

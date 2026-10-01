@@ -1,9 +1,9 @@
 use crate::{
     input,
     render::Paint,
-    render::{direction_name, duration, gear_name, piece_name, stat_name},
+    render::{direction_name, duration, gear_name, money, piece_name, stat_name},
 };
-use realmkit_engine::{Command, Engine};
+use realmkit_engine::{buy_price, sell_price, Command, Engine};
 use realmkit_spec::{Resource, Stat};
 use std::io::{self, Write};
 
@@ -26,6 +26,12 @@ const RESPEC: &str = "Refund stat points";
 const TRAIN_GROUP: &str = "Train stats";
 const EQUIPMENT_GROUP: &str = "Equipment";
 const SMITHING_GROUP: &str = "Smithing";
+const MARKET_GROUP: &str = "Market";
+const PRICES: &str = "Prices";
+const BUY: &str = "Buy";
+const SELL: &str = "Sell";
+const NEXT_PRICE: &str = "next";
+const AFFORD: &str = "[cannot afford]";
 const ENCHANTING_GROUP: &str = "Enchanting";
 const ENCHANT: &str = "Enchant";
 const FORGE: &str = "Forge";
@@ -73,6 +79,7 @@ pub enum Group {
     Equipment,
     Smithing,
     Enchanting,
+    Market,
 }
 
 impl Group {
@@ -82,6 +89,7 @@ impl Group {
             Command::Equip(_) => Some(Self::Equipment),
             Command::Forge(_) | Command::Improve(_) => Some(Self::Smithing),
             Command::Enchant { .. } => Some(Self::Enchanting),
+            Command::Market | Command::Buy { .. } | Command::Sell { .. } => Some(Self::Market),
             _ => None,
         }
     }
@@ -202,6 +210,7 @@ fn group_label(engine: &Engine<'_>, group: Group) -> String {
         Group::Equipment => format!("{EQUIPMENT_GROUP} {OPENS}"),
         Group::Smithing => format!("{SMITHING_GROUP} {OPENS}"),
         Group::Enchanting => format!("{ENCHANTING_GROUP} {OPENS}"),
+        Group::Market => format!("{MARKET_GROUP} {OPENS}"),
     }
 }
 
@@ -324,6 +333,51 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 bonuses.join(", ")
             )
         }
+        // "Buy Cloth — 129 silver (next 133)", from the engine's own trade on
+        // a copy; unaffordable goods stay listed to show the price.
+        Command::Buy { good, .. } => {
+            let mut probe = engine.clone();
+            let name = &world.item(good)?.name;
+            let Ok(events) = probe.execute(action.command.clone()) else {
+                let (economy, wallet) = (world.economy()?, engine.state().economy.as_ref()?);
+                let market = economy.market(&here.id)?;
+                let index = wallet.prices[&here.id][good];
+                let price = buy_price(economy.good(good)?.price, index, economy.spread(market));
+                return Some(format!("{BUY} {name} — {} {AFFORD}", money(world, price)));
+            };
+            let cost = events.iter().find_map(|e| match e {
+                realmkit_engine::Event::Bought { cost, .. } => Some(*cost),
+                _ => None,
+            })?;
+            let next = next_price(&probe, good, true)?;
+            format!(
+                "{BUY} {name} — {} ({NEXT_PRICE} {})",
+                money(world, cost),
+                money(world, next)
+            )
+        }
+        Command::Sell { good, .. } => {
+            let mut probe = engine.clone();
+            let events = probe.execute(action.command.clone()).ok()?;
+            let earned = events.iter().find_map(|e| match e {
+                realmkit_engine::Event::Sold { earned, .. } => Some(*earned),
+                _ => None,
+            })?;
+            let held = engine
+                .state()
+                .player
+                .inventory
+                .get(good)
+                .copied()
+                .unwrap_or(0);
+            format!(
+                "{SELL} {} ({held}) — {} ({NEXT_PRICE} {})",
+                world.item(good)?.name,
+                money(world, earned),
+                money(world, next_price(&probe, good, false)?)
+            )
+        }
+        Command::Market => PRICES.into(),
         _ if !action.available => return None,
         Command::Rest => REST.into(),
         Command::Wait(minutes) => format!("{WAIT} — {}", duration(*minutes)),
@@ -361,6 +415,20 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Quests => QUESTS.into(),
         Command::Techniques => TECHNIQUES.into(),
         _ => return None,
+    })
+}
+
+/// The price of the next unit at this market, buying or selling.
+fn next_price(engine: &Engine<'_>, good: &str, buying: bool) -> Option<u64> {
+    let world = engine.world();
+    let economy = world.economy()?;
+    let here = &engine.state().player.location;
+    let market = economy.market(here)?;
+    let index = engine.state().economy.as_ref()?.prices[here][good];
+    let price = economy.good(good)?.price;
+    Some(match buying {
+        true => buy_price(price, index, economy.spread(market)),
+        false => sell_price(price, index, economy.spread(market)),
     })
 }
 

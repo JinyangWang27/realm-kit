@@ -3,7 +3,7 @@
     "id": "greyford",
     "name": "Greyford",
     "description": "A market town where three roads meet at a stone bridge. Barges wait below for the river to rise.",
-    "characters": ["wenna"]
+    "characters": ["hild", "wenna"]
   },
   {
     "id": "ashmere",
@@ -20,6 +20,7 @@
   {
     "id": "vellmarket",
     "name": "Vellmarket",
-    "description": "A walled town of wool merchants. Bales stand in the square under oiled cloth."
+    "description": "A walled town of wool merchants. Bales stand in the square under oiled cloth.",
+    "characters": ["maddoc"]
   }
 ]

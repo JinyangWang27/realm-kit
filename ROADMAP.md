@@ -1125,8 +1125,10 @@ Hard dependencies between capabilities are few and validated, interactions
 happen only when both sides are present, and the full sandbox is simply the
 world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
 
-Depends on M5a–M5f. Deliver in slices, each bumping the package and save
-format as usual:
+Each slice depends on the M5 foundations it uses, following the hard
+requirements in [Modularity](docs/sandbox-worlds.md#modularity): the economy
+needs only M5a's effects and M5b's schedules, so it came first. Deliver in
+slices, each bumping the package and save format as usual:
 
 1. **M6a — economy.** Currency; markets whose per-good price index follows
    authored production and demand on a recurring price tick; linked markets
@@ -1135,7 +1137,16 @@ format as usual:
    schedules. Trading is the first proficiency, so the proficiency mechanism
    arrives here too: points per level, personal or party proficiencies, and
    study from items over world time. The price tick is mirrored in
-   `scripts/combat_sim` before tests pin its numbers.
+   `scripts/combat_sim` before tests pin its numbers. Delivered in two parts.
+   **M6a-1 · delivered** (Format 12): currency, goods, producer kinds,
+   town and village markets with authored starting indices, the four-phase
+   price tick on its own `market` stream, links, merchants who must be
+   present, buying and selling with a spread, per-unit index steps and an
+   engine-computed preview, and currency conditions and effects;
+   `scripts/combat_sim/economy.py` mirrors the tick and computes warm-up
+   prices for authors; `examples/marches` trades. **M6a-2:** prosperity,
+   merchants' stock and currency, workshops, upkeep and the trading
+   proficiency.
 2. **M6b — factions and standing.** War and peace between factions, authored
    standing tracks such as renown and relation, and the conditions and effects
    that read and change them. Authored personality traits steer dialogue and

@@ -10,6 +10,8 @@ pub const RNG_VERSION: u32 = 1;
 const DOMAIN_COMBAT: u64 = 0x636f_6d62_6174;
 /// "world" in ASCII: characters who move.
 const DOMAIN_WORLD: u64 = 0x77_6f72_6c64;
+/// "market" in ASCII: the price tick.
+const DOMAIN_MARKET: u64 = 0x6d61_726b_6574;
 
 /// Saved generator state, one stream per random domain. A domain exists
 /// only in worlds whose content draws from it.
@@ -23,6 +25,9 @@ pub struct RngState {
     /// Characters who move.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub world: Option<u64>,
+    /// The price tick.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub market: Option<u64>,
 }
 
 impl RngState {
@@ -32,8 +37,9 @@ impl RngState {
             version: RNG_VERSION,
             combat: world.random_combat().then_some(seed ^ DOMAIN_COMBAT),
             world: world.random_world().then_some(seed ^ DOMAIN_WORLD),
+            market: world.random_market().then_some(seed ^ DOMAIN_MARKET),
         };
-        (state.combat.is_some() || state.world.is_some()).then_some(state)
+        world.stochastic().then_some(state)
     }
 }
 

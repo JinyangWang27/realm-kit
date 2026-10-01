@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, path::Path};
 
 mod combat;
 mod crafting;
+mod economy;
 mod items;
 mod places;
 mod stats;
@@ -14,6 +15,7 @@ mod time;
 mod validation;
 pub use combat::*;
 pub use crafting::*;
+pub use economy::*;
 pub use items::*;
 pub use places::*;
 pub use stats::*;
@@ -60,6 +62,9 @@ pub struct World {
     /// Effects that happen on a schedule; they need world time.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<WorldEvent>,
+    /// Absent in a world without currency or trade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub economy: Option<Economy>,
 }
 
 // Serde defaults shared by several content types.
@@ -137,7 +142,7 @@ impl WorldSpec {
     /// Whether any content draws random numbers; only then does play keep a
     /// seeded generator.
     pub fn stochastic(&self) -> bool {
-        self.random_combat() || self.random_world()
+        self.random_combat() || self.random_world() || self.random_market()
     }
     /// Whether fights draw random numbers: some hit can be critical.
     pub fn random_combat(&self) -> bool {
@@ -151,6 +156,13 @@ impl WorldSpec {
     /// Whether the world draws random numbers: some character moves.
     pub fn random_world(&self) -> bool {
         self.characters.iter().any(|c| c.moves.is_some())
+    }
+    /// Whether prices draw random numbers: the economy has a price tick.
+    pub fn random_market(&self) -> bool {
+        self.economy().is_some_and(|e| e.tick.is_some())
+    }
+    pub fn economy(&self) -> Option<&Economy> {
+        self.world.economy.as_ref()
     }
     pub fn technique(&self, id: &str) -> Option<&Technique> {
         self.combat()?.techniques.iter().find(|v| v.id == id)

@@ -2,7 +2,8 @@
 
 Format 12 composes conditions with `all`, `any` and `not`, gives dialogue
 choices ordered effect lists, and adds optional world time with roads,
-scheduled events and characters who move. Combat stays optional. The level table and combat prose live in an
+scheduled events and characters who move, and an optional economy of
+currency and markets whose prices follow production. Combat stays optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -61,7 +62,7 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat` and `time` blocks, optional `roads` and `events` |
+| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads` and `events` |
 | `locations.json` | Array of locations with descriptions, directional exits and placed character IDs |
 | `characters.json` | Array of characters with descriptions, availability conditions, and optional dialogue and combat profile |
 | `items.json` | Array of items with names and descriptions |
@@ -151,6 +152,8 @@ composition of others:
   counted item; equipment pieces are individuals and cannot be counted.
 - `time_of_day` holds during part of each day; see
   [World time](#world-time-roads-and-events).
+- `currency` (`{ "kind": "currency", "amount": 150 }`) holds while the player
+  has at least that much; see [Economy](#economy).
 - `all` holds when every condition in `of` does, `any` when at least one
   does, and `not` when its `condition` does not. `of` must not be empty.
 
@@ -220,9 +223,9 @@ directed and take no time. Clients list roads in authored order.
 A `schedule` first falls at minute `at`, which must be after `start`, and then,
 if it has one, every `every` minutes (at least 1). An occurrence applies the
 event's `effects` in order when its optional `requires` holds, and does nothing
-otherwise. Events may `set_flag`, `grant_items` and `grant_technique` (a
-recurring event without XP); they cannot accept or complete quests or take
-items, which belong to conversations.
+otherwise. Events may `set_flag`, `grant_items`, `grant_currency` and
+`grant_technique` (a recurring event without XP); they cannot accept or
+complete quests, take items or take payment, which belong to conversations.
 
 A character may move among locations on a schedule:
 
@@ -243,7 +246,8 @@ told when it arrives at or leaves the player's location.
 
 When time passes, every occurrence it crosses happens in chronological order,
 with the clock at that occurrence's minute. Occurrences at the same minute go
-in schedule order: events in authored order, then movers in character order.
+in schedule order: events in authored order, movers in character order, then
+the economy's price tick.
 Because every first occurrence is after `start`, nothing is due when play
 begins, and an occurrence can never schedule another at its own minute. Saves
 keep the minute and each mover's location; the next occurrence of every
@@ -258,6 +262,102 @@ A `time_of_day` condition holds while the minute of the day is in
 
 It needs the time block, as do events, movers and roads with minutes
 (`time_disabled` otherwise).
+
+## Economy
+
+The optional `economy` block in `world.json` gives the player currency and
+lets locations be markets. Prices are not authored as prices: each market
+keeps a price index per good, in thousandths of the good's base price, and
+the index moves with what the market makes and needs.
+
+```json
+"economy": {
+  "currency": { "format": "{amount} silver", "start": 100 },
+  "goods": [
+    { "item": "wool", "price": 40, "demand": { "town": 2 } },
+    { "item": "cloth", "price": 120, "demand": { "town": 6, "village": 1 }, "input": "wool" }
+  ],
+  "producers": [
+    { "id": "flocks", "name": "Sheep runs", "yields": { "wool": 4 } },
+    { "id": "looms", "name": "Looms", "yields": { "cloth": 2 }, "consumes": { "wool": 3 } }
+  ],
+  "markets": [
+    {
+      "location": "vellmarket",
+      "kind": "town",
+      "merchant": "maddoc",
+      "producers": { "flocks": 6, "looms": 6 },
+      "prices": { "wool": 745, "cloth": 712 }
+    }
+  ],
+  "links": [{ "between": ["greyford", "ashmere"], "percent": 10 }],
+  "index_bounds": [100, 10000],
+  "spread_percent": 15,
+  "trade_step": { "buy": 26, "sell": 39 },
+  "tick": {
+    "schedule": { "at": 1440, "every": 1440 },
+    "supply_step": 8,
+    "damp_below": 900,
+    "revert_percent": 3,
+    "input_pull_percent": 10
+  }
+}
+```
+
+- **Currency.** `format` shows an amount through `{amount}`, in the world's
+  language; `start` is what a new game begins with. The player holds at most
+  10^12.
+- **Goods** are counted items, each listed once, traded at every market. A
+  good has a base `price` (1 to 1,000,000), the units each kind of market
+  (`town` or `village`) consumes on a tick as `demand`, and optionally the
+  good it is made from as `input`.
+- **Producers** are kinds such as fields, flocks or looms, named in the
+  world's language: what one unit `yields` and `consumes` on a tick.
+- **Markets** are locations, at most one each. A market's `kind` chooses its
+  demand, its `producers` say how many of each it has, and its starting
+  `prices` are indices (1,000 when left out) within `index_bounds`. A market
+  with a `merchant` trades only while that character is present, so a
+  merchant's hours or travels close it. A market may replace the economy's
+  `spread_percent`.
+- **Links** join two markets whose prices pull together; one market's links
+  share at most 100 percent in total.
+
+Buying one unit costs `price × index × (100 + spread) / 100,000`, at least 1;
+selling one fetches `price × index × 100 / (1,000 × (100 + spread))`, each
+rounded down once. Units trade one at a time: each bought unit raises the
+market's index by `trade_step.buy` and each sold one lowers it by
+`trade_step.sell`, within the bounds, so dumping a whole cargo in one town
+stops paying. `buy <item> [units]` and `sell <item> [units]` trade up to
+1,000 units at once, all or nothing; `market` shows the prices here.
+
+With a `tick` (which needs the time block), prices move on its schedule in
+four phases, each finished for every market before the next:
+
+1. **Supply.** Production is the market's producers' yields; consumption is
+   its kind's demand plus what its producers consume. A surplus lowers the
+   index by a draw below `supply_step` × the surplus, multiplied by index ÷
+   `damp_below` while the index is below `damp_below`; a shortage raises it by
+   a draw below `supply_step` × the shortage. The result stays within the
+   bounds. Draws come from the economy's own `market` random stream, in market
+   order, then goods order, only where supply is unbalanced.
+2. **Revert.** The gap between the index and 1,000 shrinks by
+   `revert_percent`, rounded towards zero.
+3. **Inputs.** A good whose input is dearer moves `input_pull_percent` of the
+   gap up towards it, measured on the phase-2 prices.
+4. **Links.** Both markets of a link move `percent` of their gap towards each
+   other, measured on the phase-3 prices and applied together.
+
+Without a tick, only trade moves prices, and the world draws nothing for
+them. The engine never warms prices up: the package authors starting indices.
+`python3 -m scripts.combat_sim economy <world> --ticks 30 --prices` runs the
+tick offline and prints indices to author, and the engine's tests pin numbers
+that simulator produces. Saves keep the currency and every index; trade goods
+may be carried in any number.
+
+Validation keeps every authored number small enough that no tick or trade
+can overflow: at most 10,000 producers of a kind, units per producer and
+demand; at most 100,000,000 of a good made or used by one market per tick;
+index bounds that contain 1,000 within 1 to 100,000.
 
 ## Characters
 
@@ -318,6 +418,8 @@ Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 { "kind": "grant_technique", "technique": "cloud_palm", "rank": 1, "xp": 0 }
 { "kind": "grant_items", "items": [{ "item": "pen", "quantity": 1 }] }
 { "kind": "take_items", "items": [{ "item": "pen", "quantity": 1 }] }
+{ "kind": "grant_currency", "amount": 60 }
+{ "kind": "pay_currency", "amount": 150 }
 ```
 
 Effects apply in authored order to the staged state, and the choice commits
@@ -325,6 +427,8 @@ or fails as a whole: if any effect is refused, such as taking items the player
 does not carry or completing a quest that is not ready, nothing the earlier
 effects did is kept. `grant_items` gives items as quest rewards do (equipment
 arrives as individual pieces); `take_items` hands over counted items only.
+`grant_currency` and `pay_currency` need the economy; paying more than the
+player has refuses the choice.
 A choice can be taken again while its condition holds, so a one-time gift
 pairs `grant_items` with `set_flag` under a `not` condition on that flag.
 

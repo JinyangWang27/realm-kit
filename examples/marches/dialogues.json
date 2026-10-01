@@ -20,7 +20,10 @@
             "text": "The steward has your letter.",
             "next": "thanks",
             "requires": { "kind": "quest", "quest": "carry_letter", "status": "ready" },
-            "effects": [{ "kind": "complete_quest", "quest": "carry_letter" }]
+            "effects": [
+              { "kind": "complete_quest", "quest": "carry_letter" },
+              { "kind": "grant_currency", "amount": 60 }
+            ]
           },
           {
             "text": "When will the causeway open?",

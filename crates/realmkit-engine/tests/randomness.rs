@@ -35,6 +35,7 @@ fn a_world_without_random_content_keeps_no_generator() {
             version: RNG_VERSION,
             combat: Some(7 ^ 0x636f_6d62_6174),
             world: None,
+            market: None,
         })
     );
 }

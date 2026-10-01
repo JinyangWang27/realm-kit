@@ -88,6 +88,20 @@ impl<'w> Engine<'w> {
                         Some((c.id.clone(), start.id.clone()))
                     })
                     .collect(),
+                economy: world.economy().map(|economy| EconomyState {
+                    currency: economy.currency.start,
+                    prices: economy
+                        .markets
+                        .iter()
+                        .map(|m| {
+                            let prices = economy.goods.iter().map(|g| {
+                                let index = m.prices.get(&g.item).copied();
+                                (g.item.clone(), index.unwrap_or(realmkit_spec::BASE_INDEX))
+                            });
+                            (m.location.clone(), prices.collect())
+                        })
+                        .collect(),
+                }),
             },
         };
         // Starting techniques, then vitals at the maxima their passives give.

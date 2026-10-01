@@ -10,6 +10,18 @@ pub enum Command {
     Travel(Id),
     /// Lets this many minutes of world time pass.
     Wait(u64),
+    /// Buys units of a good at this location's market.
+    Buy {
+        good: Id,
+        quantity: u64,
+    },
+    /// Sells units of a good at this location's market.
+    Sell {
+        good: Id,
+        quantity: u64,
+    },
+    /// Shows this location's prices; only at a market.
+    Market,
     /// Starts an encounter with a fighter at the current location.
     Engage(Id),
     /// In an encounter: a basic attack in the player's basic-attack channel.
@@ -76,6 +88,23 @@ pub enum Event {
     CharacterLeft {
         character: Id,
     },
+    Bought {
+        good: Id,
+        quantity: u64,
+        cost: u64,
+    },
+    Sold {
+        good: Id,
+        quantity: u64,
+        earned: u64,
+    },
+    CurrencyReceived {
+        amount: u64,
+    },
+    CurrencyPaid {
+        amount: u64,
+    },
+    MarketViewed,
     /// `skill` is `None` for a basic attack, which uses narrative `variant`.
     DamageDealt {
         target: Id,

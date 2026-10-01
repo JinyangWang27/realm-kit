@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 
 mod combat;
 mod crafting;
+mod economy;
 mod equipment;
 mod progression;
 mod story;
@@ -53,6 +54,9 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     story::quests(&mut out, w, &placed);
     story::dialogues(&mut out, w);
     time::rules(&mut out, w);
+    if let Some(economy) = w.economy() {
+        economy::rules(&mut out, w, economy);
+    }
     if let Some(combat) = w.combat() {
         combat::rules(&mut out, w, combat);
     }
@@ -162,6 +166,7 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
             }
             time::needed(out, w, owner);
         }
+        Condition::Currency { amount } => economy::amount(out, w, owner, *amount),
     }
 }
 

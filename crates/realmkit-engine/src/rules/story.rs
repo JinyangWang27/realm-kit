@@ -207,6 +207,8 @@ pub(crate) fn apply(
             Effect::GrantTechnique(grant) => techniques::grant(world, state, grant, events)?,
             Effect::GrantItems { items } => grant_items(world, state, items, events)?,
             Effect::TakeItems { items } => take_items(state, items, events)?,
+            Effect::GrantCurrency { amount } => economy::grant(state, *amount, events)?,
+            Effect::PayCurrency { amount } => economy::pay(state, *amount, events)?,
         }
     }
     Ok(())

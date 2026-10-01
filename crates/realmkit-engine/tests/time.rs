@@ -315,6 +315,7 @@ fn time_never_passes_beyond_its_bound() {
     let mut world = marches();
     world.world.time.as_mut().unwrap().start = WORLD_TIME_BOUND - 60;
     world.world.events.clear();
+    world.world.economy.as_mut().unwrap().tick = None;
     world.characters.retain(|c| c.moves.is_none());
     world.locations[0].characters.clear();
     let mut engine = Engine::new(&world).unwrap();

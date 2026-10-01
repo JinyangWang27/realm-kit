@@ -112,7 +112,7 @@ belongs to another package, revision or route, or holds impossible state.
 Given the same world and command sequence, state and events are identical.
 There are no wall clocks, network clients or AI SDKs in gameplay. Randomness exists
 only in worlds that author it (critical hits in `examples/arena`, a wandering
-storyteller in `examples/marches`), and comes from
+storyteller and daily price changes in `examples/marches`), and comes from
 a seeded, versioned generator saved with the game: `--seed <n>` replays a run
 exactly, and without it the CLI picks a seed from the clock and prints it.
 
@@ -141,6 +141,11 @@ authored time (`Travel to Ashmere — 2 h`, or `travel ashmere`), `wait 2h` lets
 time pass, some people keep hours, others wander from town to town on a
 schedule, and events such as a thaw that opens a causeway happen at set times
 whether or not you are there. Time moves only when you travel, wait or rest.
+Worlds with an economy have currency and markets: buy smoked eels where the
+fen is full of them and sell them where they are scarce (`Market ›`, or
+`buy eels 6`, `sell eels 6`, `market`). Every unit you trade nudges the local
+price, and once a day each market's prices drift with what it makes and
+needs, so a good route stops paying if you flood it.
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting

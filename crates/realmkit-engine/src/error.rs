@@ -18,6 +18,14 @@ pub enum EngineError {
     NoWaiting,
     #[error("a wait lasts 1 to 43,200 minutes")]
     InvalidWait,
+    #[error("there is no market here")]
+    NoMarket,
+    #[error("{0} is not traded here")]
+    NotTraded(Id),
+    #[error("trade 1 to 1,000 units at a time")]
+    InvalidQuantity,
+    #[error("you cannot afford that")]
+    NotEnoughCurrency,
     #[error("{0} is not available here")]
     NotHere(Id),
     #[error("{0} has already been defeated")]

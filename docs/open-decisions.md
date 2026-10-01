@@ -1547,22 +1547,24 @@ a proposed answer that still needs to be confirmed:
   and optionally capped by an authored stat; each proficiency is personal or
   party, and a party proficiency uses the best rank in the retinue; items can
   teach a rank through study over world time or grant a bonus while carried.
-- **Price model (M6a).** Decided: prices follow production, not stock. Each
+- **Price model (M6a) · decided.** Prices follow production, not stock. Each
   market keeps a price index per good in thousandths of the base price, within
   authored bounds. A recurring price tick moves it against net supply
   (production minus consumption from authored producer counts), reverts it
   towards base, pulls processed goods up towards dearer inputs and converges
   linked markets, in four phases with draws in authored market and goods order
-  and convergence applied from one snapshot; caravans converge their destination
-  on arrival. The player's own purchases and sales move the index at once by an
-  authored step. The buying and selling prices sit either side of base × index
-  by an authored spread that trading narrows, with one final rounding.
+  and convergence applied from one snapshot; caravans will converge their
+  destination on arrival. The player's own purchases and sales move the index
+  at once by an authored step per unit. Buying costs base × index × (100 +
+  spread) and selling fetches base × index ÷ (100 + spread), with one final
+  rounding, as the source does; a trading proficiency will narrow the spread.
   Prosperity drifts daily towards an ideal set by scarcity and buildings, and
   scales income, tariffs, stock and recruit pools
-  ([Economy](sandbox-worlds.md#economy)). Still open: how many warm-up rounds an
-  authoring tool runs for initial prices, and whether the price tick's draws
-  should be replaced by fixed fractions of the bound, which would drop the
-  `market` RNG domain from prices entirely.
+  ([Economy](sandbox-worlds.md#economy)). As delivered in M6a-1: the supply
+  draws stay, from their own `market` stream; phase 1 clamps to the bounds so
+  later phases work on valid indices; and warm-up rounds are an authoring
+  choice, run by `scripts/combat_sim economy --prices`, never by the engine.
+  Prosperity, stock, workshops and proficiency wait for M6a-2.
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.

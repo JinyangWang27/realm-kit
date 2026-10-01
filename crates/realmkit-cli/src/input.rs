@@ -26,6 +26,9 @@ pub fn help(world: &WorldSpec) -> String {
     if !world.world.roads.is_empty() {
         attack += "travel <location-id> — take the road there (or go <location-id>)\n";
     }
+    if world.economy().is_some() {
+        attack += "market — prices here\nbuy <item> [units]\nsell <item> [units]\n";
+    }
     if world.world.time.as_ref().is_some_and(|t| t.wait.is_some()) {
         attack += "wait [minutes] — let time pass (90, 2h or 1d)\n";
     }
@@ -75,6 +78,14 @@ fn direction(value: &str) -> Option<Direction> {
         "up" | "u" => Some(Direction::Up),
         "down" | "d" => Some(Direction::Down),
         _ => None,
+    }
+}
+
+/// A trade's optional unit count; one unless given.
+fn quantity(rest: &[&str]) -> Result<u64, &'static str> {
+    match rest {
+        [n] => n.parse().map_err(|_| "expected a number of units"),
+        _ => Ok(1),
     }
 }
 
@@ -130,6 +141,15 @@ fn parse_with(line: &str, wait_step: Option<u64>) -> Result<Input, &'static str>
             None => Command::Travel((*value).into()),
         },
         ("travel", [id]) => Command::Travel((*id).into()),
+        ("market" | "m", []) => Command::Market,
+        ("buy", [good, rest @ ..]) if rest.len() <= 1 => Command::Buy {
+            good: (*good).into(),
+            quantity: quantity(rest)?,
+        },
+        ("sell", [good, rest @ ..]) if rest.len() <= 1 => Command::Sell {
+            good: (*good).into(),
+            quantity: quantity(rest)?,
+        },
         ("wait", []) => Command::Wait(wait_step.ok_or("this world has no waiting")?),
         ("wait", [value]) => Command::Wait(minutes(&value.to_ascii_lowercase())?),
         ("engage", [id]) => Command::Engage((*id).into()),
@@ -251,6 +271,22 @@ mod tests {
             parse("go Ashmere"),
             Ok(Input::Command(Command::Travel("Ashmere".into())))
         );
+        assert_eq!(parse("market"), Ok(Input::Command(Command::Market)));
+        assert_eq!(
+            parse("buy cloth 3"),
+            Ok(Input::Command(Command::Buy {
+                good: "cloth".into(),
+                quantity: 3
+            }))
+        );
+        assert_eq!(
+            parse("sell eels"),
+            Ok(Input::Command(Command::Sell {
+                good: "eels".into(),
+                quantity: 1
+            }))
+        );
+        assert!(parse("buy cloth many").is_err());
         assert_eq!(parse("wait 90"), Ok(Input::Command(Command::Wait(90))));
         assert_eq!(parse("wait 2h"), Ok(Input::Command(Command::Wait(120))));
         assert_eq!(parse("wait 1D"), Ok(Input::Command(Command::Wait(1_440))));

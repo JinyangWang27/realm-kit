@@ -86,7 +86,45 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         );
     }
     actions.extend(crafting::offered(world, state));
+    actions.extend(trade(world, state));
     actions.extend(panels);
+    actions
+}
+
+/// At an open market: its prices, then buying one unit of each good, where
+/// affordable, and selling one of each good the player carries.
+fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
+    let Ok((economy, market)) = economy::market_here(world, state) else {
+        return Vec::new();
+    };
+    let wallet = state.economy.as_ref().unwrap();
+    let prices = &wallet.prices[&market.location];
+    let spread = economy.spread(market);
+    let mut actions = vec![Action {
+        command: Command::Market,
+        available: true,
+    }];
+    for good in &economy.goods {
+        let cost = buy_price(good.price, prices[&good.item], spread);
+        actions.push(Action {
+            command: Command::Buy {
+                good: good.item.clone(),
+                quantity: 1,
+            },
+            available: wallet.currency >= cost,
+        });
+    }
+    for good in &economy.goods {
+        if state.player.inventory.contains_key(&good.item) {
+            actions.push(Action {
+                command: Command::Sell {
+                    good: good.item.clone(),
+                    quantity: 1,
+                },
+                available: true,
+            });
+        }
+    }
     actions
 }
 

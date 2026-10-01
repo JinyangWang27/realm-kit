@@ -76,6 +76,10 @@ pub enum Condition {
         from: u64,
         to: u64,
     },
+    /// The player holds at least this much currency.
+    Currency {
+        amount: u64,
+    },
 }
 
 impl Condition {
@@ -152,5 +156,12 @@ pub enum Effect {
     /// The player hands over counted items; without enough, nothing happens.
     TakeItems {
         items: Vec<ItemStack>,
+    },
+    GrantCurrency {
+        amount: u64,
+    },
+    /// The player pays; without enough, nothing happens.
+    PayCurrency {
+        amount: u64,
     },
 }

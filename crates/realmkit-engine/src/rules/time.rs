@@ -5,10 +5,11 @@ use super::*;
 use realmkit_spec::{Schedule, DURATION_BOUND, WORLD_TIME_BOUND};
 
 /// Something that happens on a schedule. Occurrences at the same minute go
-/// in this order: authored events, then characters who move.
+/// in this order: authored events, characters who move, then the price tick.
 enum Due<'w> {
     Event(&'w realmkit_spec::WorldEvent),
     Mover(&'w Character),
+    PriceTick,
 }
 
 fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
@@ -21,7 +22,11 @@ fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
         .characters
         .iter()
         .filter_map(|c| Some((c.moves.as_ref()?.schedule, Due::Mover(c))));
-    events.chain(movers).collect()
+    let prices = world
+        .economy()
+        .and_then(|e| e.tick)
+        .map(|t| (t.schedule, Due::PriceTick));
+    events.chain(movers).chain(prices).collect()
 }
 
 /// Moves world time on by `minutes`, resolving every occurrence it crosses
@@ -65,6 +70,7 @@ pub(crate) fn advance(
                 }
             }
             Due::Mover(character) => relocate(state, character, events),
+            Due::PriceTick => economy::tick(world, state),
         }
     }
     state.time = Some(end);

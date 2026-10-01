@@ -156,21 +156,22 @@ fn everything_that_takes_time_needs_a_clock() {
     let mut world = marches();
     world.world.time = None;
     let codes = codes(&world);
-    // Four timed roads, the thaw, the steward's hours and Wenna.
+    // Four timed roads, the thaw, two people's hours, Wenna and the price tick.
     assert_eq!(
         codes.iter().filter(|c| *c == "time_disabled").count(),
-        7,
+        9,
         "{codes:?}"
     );
     // A road without minutes takes no time, so it needs no clock.
     let mut world = marches();
     world.world.time = None;
     world.world.events.clear();
-    world
-        .characters
-        .retain(|c| c.moves.is_none() && c.requires.is_none());
-    world.locations[0].characters.clear();
-    world.locations[2].characters.clear();
+    world.world.economy.as_mut().unwrap().tick = None;
+    world.characters.retain(|c| c.moves.is_none());
+    world.locations[0].characters.retain(|c| c != "wenna");
+    for character in &mut world.characters {
+        character.requires = None;
+    }
     for road in &mut world.world.roads {
         road.minutes = 0;
     }

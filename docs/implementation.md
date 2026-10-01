@@ -93,6 +93,14 @@ proves the complete single-player loop with authored content.
   condition. Occurrences resolve in chronological, then schedule, order, and
   saves keep only the minute and each mover's location. `examples/marches`
   exercises it. Package and save format 12.
+- [x] Economy core (M6a): currency with a world-language format, goods,
+  producer kinds and markets whose price index per good follows production
+  and demand on a scheduled four-phase price tick drawn from its own
+  `market` stream, linked markets that converge, merchants who must be
+  present, buying and selling with a spread and per-unit index steps, and
+  currency conditions and effects. `scripts/combat_sim/economy.py` mirrors
+  the tick and the trade prices, and engine tests pin its numbers. Package
+  and save format 12.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

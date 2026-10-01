@@ -14,6 +14,17 @@
     "dialogue": "steward"
   },
   {
+    "id": "hild",
+    "name": "Hild the chandler",
+    "description": "Her stall under the bridge sells everything from rope to barley.",
+    "requires": { "kind": "time_of_day", "from": 360, "to": 1320 }
+  },
+  {
+    "id": "maddoc",
+    "name": "Maddoc the wool factor",
+    "description": "He weighs every bale twice and trusts neither weighing."
+  },
+  {
     "id": "wenna",
     "name": "Old Wenna",
     "description": "A storyteller who sleeps wherever the last tale ran out.",

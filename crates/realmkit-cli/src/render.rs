@@ -95,6 +95,17 @@ pub fn stat_name(world: &realmkit_spec::WorldSpec, stat: Stat) -> String {
     }
 }
 
+/// An amount in the world's currency, such as "120 silver".
+pub fn money(world: &realmkit_spec::WorldSpec, amount: u64) -> String {
+    let amount = amount.to_string();
+    match world.economy() {
+        Some(economy) => {
+            interpolate(&economy.currency.format, &[("amount", &amount)]).unwrap_or(amount)
+        }
+        None => amount,
+    }
+}
+
 /// "45 min", "1 h 30 min", "2 d 4 h".
 pub fn duration(minutes: u64) -> String {
     let (days, hours, mins) = (minutes / 1_440, minutes % 1_440 / 60, minutes % 60);
@@ -418,6 +429,31 @@ pub fn events(
                 writeln!(output, "{} arrives.", name(character))?
             }
             Event::CharacterLeft { character } => writeln!(output, "{} leaves.", name(character))?,
+            Event::Bought {
+                good,
+                quantity,
+                cost,
+            } => writeln!(
+                output,
+                "Bought: {} ×{quantity} for {}",
+                world.item(good).unwrap().name,
+                money(world, *cost)
+            )?,
+            Event::Sold {
+                good,
+                quantity,
+                earned,
+            } => writeln!(
+                output,
+                "Sold: {} ×{quantity} for {}",
+                world.item(good).unwrap().name,
+                money(world, *earned)
+            )?,
+            Event::CurrencyReceived { amount } => {
+                writeln!(output, "Received: {}", money(world, *amount))?
+            }
+            Event::CurrencyPaid { amount } => writeln!(output, "Paid: {}", money(world, *amount))?,
+            Event::MarketViewed => panels::market(output, engine, paint)?,
             Event::Moved { .. } | Event::DialogueEnded | Event::StoryFlagSet { .. } => {}
         }
     }

@@ -1,7 +1,7 @@
 //! Panels: views of the current state that spend no time.
 
-use crate::render::{clock, direction_name, duration, piece_name, stat_name, Paint};
-use realmkit_engine::Engine;
+use crate::render::{clock, direction_name, duration, money, piece_name, stat_name, Paint};
+use realmkit_engine::{buy_price, sell_price, Engine};
 use realmkit_spec::Stat;
 use std::io::{self, Write};
 
@@ -101,11 +101,42 @@ fn location_exits(
     writeln!(output)
 }
 
+/// The market here: each good's buying and selling price, and how many the
+/// player carries.
+pub fn market(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
+    let world = engine.world();
+    let state = engine.state();
+    let (Some(economy), Some(wallet)) = (world.economy(), &state.economy) else {
+        return Ok(());
+    };
+    let Some(market) = economy.market(&state.player.location) else {
+        return Ok(());
+    };
+    let name = &world.location(&market.location).unwrap().name;
+    writeln!(output, "{}", paint.title(&format!("Market at {name}:")))?;
+    let spread = economy.spread(market);
+    for good in &economy.goods {
+        let index = wallet.prices[&market.location][&good.item];
+        let held = state.player.inventory.get(&good.item).copied().unwrap_or(0);
+        writeln!(
+            output,
+            "  {} — buy {} · sell {} · carried {held}",
+            world.item(&good.item).unwrap().name,
+            money(world, buy_price(good.price, index, spread)),
+            money(world, sell_price(good.price, index, spread)),
+        )?;
+    }
+    writeln!(output, "  {}", money(world, wallet.currency))
+}
+
 /// Pieces of equipment by number, then counted items.
 pub fn inventory(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();
     let state = engine.state();
     writeln!(output, "{}", paint.title("Inventory:"))?;
+    if let Some(wallet) = &state.economy {
+        writeln!(output, "  {}", money(world, wallet.currency))?;
+    }
     let gear = state.combat.as_ref().map(|c| &c.gear);
     if state.player.inventory.is_empty() && gear.is_none_or(|g| g.is_empty()) {
         writeln!(output, "  Empty")?;
