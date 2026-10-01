@@ -599,3 +599,31 @@ fn wares_are_offered_only_at_an_open_market() {
         Err(EngineError::NotHere(_))
     ));
 }
+
+#[test]
+fn a_ware_won_as_loot_cannot_vanish_from_a_save() {
+    // Wares can only be bought, so a piece a defeat granted is still owed:
+    // the ogre's reward stays in the save even though the gate sells mail.
+    let mut world = arena();
+    let combat = world.world.combat.as_mut().unwrap();
+    combat
+        .groups
+        .iter_mut()
+        .find(|g| g.id == "warren")
+        .unwrap()
+        .repeatable = false;
+    combatant(&mut world, "rat").loot = vec![ItemStack {
+        item: "iron_mail".into(),
+        quantity: 1,
+    }];
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    engine.execute(Move(Direction::East)).unwrap();
+    engine.execute(Engage("rat".into())).unwrap();
+    fight_out(&mut engine);
+    let mut snapshot = engine.snapshot();
+    Engine::restore(&world, snapshot.clone()).unwrap();
+    let gear = &mut snapshot.state.combat.as_mut().unwrap().gear;
+    let mail = *gear.iter().find(|(_, g)| g.item == "iron_mail").unwrap().0;
+    gear.remove(&mail);
+    assert!(Engine::restore(&world, snapshot).is_err());
+}

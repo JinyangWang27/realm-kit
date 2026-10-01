@@ -261,7 +261,10 @@ struct Progress<'w> {
     xp_floor: u64,
     xp_ceiling: u64,
     any_repeatable: bool,
-    repeatable_loot: BTreeSet<&'w Id>,
+    /// Items that can come again and again (a repeatable group's loot, a
+    /// market's wares): counts may rise above what progress granted, never
+    /// fall below it.
+    renewable: BTreeSet<&'w Id>,
     /// Items effects grant or take, which a choice can do any number of
     /// times, so their counts follow from nothing.
     loose: BTreeSet<&'w Id>,
@@ -333,7 +336,7 @@ impl<'w> Progress<'w> {
             .chain(catalysts)
             .map(|s| &s.item)
             .collect();
-        // Trade goods and wares come and go at markets too.
+        // Trade goods come and go at markets too; wares only come.
         let goods = world.economy().into_iter().flat_map(|e| &e.goods);
         let wares = world
             .economy()
@@ -351,7 +354,6 @@ impl<'w> Progress<'w> {
         let loose: BTreeSet<&Id> = stacks(false)
             .map(|s| &s.item)
             .chain(goods.map(|g| &g.item))
-            .chain(wares.map(|w| &w.item))
             .collect();
         let consumables = world
             .items
@@ -374,10 +376,11 @@ impl<'w> Progress<'w> {
             xp_floor: floor,
             xp_ceiling: ceiling,
             any_repeatable: repeaters.clone().next().is_some(),
-            repeatable_loot: repeaters
+            renewable: repeaters
                 .filter_map(|c| c.combat.as_ref())
                 .flat_map(|m| &m.loot)
                 .map(|s| &s.item)
+                .chain(wares.map(|w| &w.item))
                 .collect(),
         })
     }
@@ -410,7 +413,7 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
             && held.iter().all(|(item, h)| {
                 let granted = progress.inventory.get(item).copied().unwrap_or(0);
                 *h == granted
-                    || progress.repeatable_loot.contains(item)
+                    || progress.renewable.contains(item)
                     || progress.loose.contains(item)
                     || ((progress.spendable.contains(item) || progress.taken.contains(item))
                         && *h < granted)
@@ -431,7 +434,7 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
             };
             // Something taken may also have been handed over, so then only
             // the upper bound holds.
-            progress.repeatable_loot.contains(item)
+            progress.renewable.contains(item)
                 || progress.loose.contains(item)
                 || (at(&least) <= granted
                     && (progress.taken.contains(item) || at(&most) >= granted))
@@ -485,7 +488,7 @@ fn spent<'w>(
             // exact check searches assignments of recipes to pieces.
             let cheapest = recipes.iter().map(cost).min().unwrap_or(0);
             let dearest = recipes.iter().map(cost).max().unwrap_or(0);
-            if !progress.repeatable_loot.contains(output) && !progress.loose.contains(output) {
+            if !progress.renewable.contains(output) && !progress.loose.contains(output) {
                 add(&mut least, material, cheapest.saturating_mul(forged));
             }
             add(&mut most, material, dearest.saturating_mul(forged));
