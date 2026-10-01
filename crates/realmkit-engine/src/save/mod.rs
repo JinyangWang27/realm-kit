@@ -71,15 +71,28 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     )
 }
 
-/// Conditions that, once true, stay true: flags are never cleared and ranks
-/// never fall. A quest's status moves on, so it proves nothing later.
-fn lasting(state: &GameState, conditions: &[Condition]) -> bool {
-    let lasting: Vec<_> = conditions
-        .iter()
-        .filter(|c| !matches!(c, Condition::Quest { .. }))
-        .cloned()
-        .collect();
-    rules::conditions_met(state, &lasting)
+/// Whether an optional requirement could have held at some earlier moment.
+fn lasting(state: &GameState, requires: Option<&Condition>) -> bool {
+    requires.is_none_or(|c| could_have_been(state, c, true))
+}
+
+/// Whether `condition` could once have evaluated to `value`. Flags are never
+/// cleared and ranks never fall, so a flag or rank that was once required
+/// still holds. Every flag starts unset, and quest states and items move both
+/// ways, so anything else proves nothing. Branches are judged separately,
+/// which can only accept more.
+fn could_have_been(state: &GameState, condition: &Condition, value: bool) -> bool {
+    match condition {
+        Condition::All { of } if value => of.iter().all(|c| could_have_been(state, c, true)),
+        Condition::All { of } => of.iter().any(|c| could_have_been(state, c, false)),
+        Condition::Any { of } if value => of.iter().any(|c| could_have_been(state, c, true)),
+        Condition::Any { of } => of.iter().all(|c| could_have_been(state, c, false)),
+        Condition::Not { condition } => could_have_been(state, condition, !value),
+        Condition::Flag { .. } | Condition::Technique { .. } if value => {
+            rules::holds(state, condition)
+        }
+        _ => true,
+    }
 }
 
 /// Crafting that trains a technique teaches it, so it must be learned.
@@ -94,8 +107,8 @@ fn trained(state: &GameState, grant: Option<&realmkit_spec::TechniqueGrant>) -> 
 
 /// A recipe the player could have used, as far as a snapshot can tell.
 fn qualified(state: &GameState, recipe: &realmkit_spec::Recipe) -> bool {
-    lasting(state, &recipe.known_when)
-        && lasting(state, &recipe.requires)
+    lasting(state, recipe.known_when.as_ref())
+        && lasting(state, recipe.requires.as_ref())
         && trained(state, recipe.trains.as_ref())
 }
 
@@ -152,6 +165,9 @@ struct Progress<'w> {
     xp_ceiling: u64,
     any_repeatable: bool,
     repeatable_loot: BTreeSet<&'w Id>,
+    /// Items effects grant or take, which a choice can do any number of
+    /// times, so their counts follow from nothing.
+    loose: BTreeSet<&'w Id>,
     /// Materials crafting spends: at most what progress granted, maybe less.
     spendable: BTreeSet<&'w Id>,
     /// Items crafting makes: at least what progress granted, maybe more.
@@ -215,7 +231,16 @@ impl<'w> Progress<'w> {
             .chain(catalysts)
             .map(|s| &s.item)
             .collect();
+        let loose = world
+            .effects()
+            .flat_map(|e| match e {
+                Effect::GrantItems { items } | Effect::TakeItems { items } => items.as_slice(),
+                _ => &[],
+            })
+            .map(|s| &s.item)
+            .collect();
         Ok(Self {
+            loose,
             spendable,
             forged: recipes.map(|r| &r.output).collect(),
             inventory,
@@ -250,12 +275,15 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
         progress
             .inventory
             .iter()
-            .filter(|(item, _)| !progress.spendable.contains(item))
+            .filter(|(item, _)| {
+                !progress.spendable.contains(item) && !progress.loose.contains(item)
+            })
             .all(|(item, count)| held.get(item).is_some_and(|h| h >= count))
             && held.iter().all(|(item, h)| {
                 let granted = progress.inventory.get(item).copied().unwrap_or(0);
                 *h == granted
                     || progress.repeatable_loot.contains(item)
+                    || progress.loose.contains(item)
                     || (progress.spendable.contains(item) && *h < granted)
                     || progress.forged.contains(item)
             }),
@@ -273,6 +301,7 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
                 held.saturating_add(spent.get(*item).copied().unwrap_or(0))
             };
             progress.repeatable_loot.contains(item)
+                || progress.loose.contains(item)
                 || (at(&least) <= granted && at(&most) >= granted)
         }),
         "crafting does not match the materials it needed",
@@ -324,7 +353,7 @@ fn spent<'w>(
             // exact check searches assignments of recipes to pieces.
             let cheapest = recipes.iter().map(cost).min().unwrap_or(0);
             let dearest = recipes.iter().map(cost).max().unwrap_or(0);
-            if !progress.repeatable_loot.contains(output) {
+            if !progress.repeatable_loot.contains(output) && !progress.loose.contains(output) {
                 add(&mut least, material, cheapest.saturating_mul(forged));
             }
             add(&mut most, material, dearest.saturating_mul(forged));
@@ -362,12 +391,9 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
         .cloned()
         .collect();
     let dialogue_flags: BTreeSet<_> = world
-        .dialogues
-        .iter()
-        .flat_map(|d| &d.nodes)
-        .flat_map(|n| &n.choices)
-        .filter_map(|c| match &c.effect {
-            Some(DialogueEffect::SetFlag { flag }) => Some(flag.clone()),
+        .effects()
+        .filter_map(|e| match e {
+            Effect::SetFlag { flag } => Some(flag.clone()),
             _ => None,
         })
         .collect();

@@ -130,16 +130,17 @@ These are general improvements that a sandbox needs first. Most of them are
 already planned or decided for authored adventures. The roadmap delivers them as
 M5 slices.
 
-1. **Condition tree.** Conditions become `All / Any / Not` over typed leaf
-   predicates, and a `requires` list becomes one condition. A sandbox adds many
+1. **Condition tree** (delivered in M5a). Conditions are `All / Any / Not`
+   over typed leaf predicates, and a `requires` list became one condition. A sandbox adds many
    numeric predicates: currency held, standing with a faction, whether two
    factions are at war, who holds a location, the world time. Each predicate
    stays domain-typed, for example `CurrencyAtLeast`, `StandingAtLeast`,
    `AtWar`, `HoldsLocation` or `WorldTimeWithin`. There is still no generic
    numeric comparison and no variable bag
    ([Section 6](open-decisions.md#6-conditions-and-effects)).
-2. **Effect lists.** A dialogue choice carries `effects`, a list applied in
-   authored order to staged state, in place of today's single optional `effect`.
+2. **Effect lists** (delivered in M5a). A dialogue choice carries `effects`, a
+   list applied in authored order to staged state, in place of the single
+   optional `effect` it had before.
    The whole transition commits or fails together. Each effect variant arrives
    with the capability that owns its state: paying coin, changing standing,
    adding troops, granting a holding.

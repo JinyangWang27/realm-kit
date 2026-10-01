@@ -108,17 +108,10 @@ fn techniques(
         .iter()
         .chain(crafting)
         .chain(world.quests.iter().flat_map(|q| &q.reward_techniques))
-        .chain(
-            world
-                .dialogues
-                .iter()
-                .flat_map(|d| &d.nodes)
-                .flat_map(|n| &n.choices)
-                .filter_map(|c| match &c.effect {
-                    Some(DialogueEffect::GrantTechnique(grant)) => Some(grant),
-                    _ => None,
-                }),
-        )
+        .chain(world.effects().filter_map(|e| match e {
+            Effect::GrantTechnique(grant) => Some(grant),
+            _ => None,
+        }))
         .map(|g| &g.technique)
         .collect();
     ensure(
@@ -133,7 +126,7 @@ fn techniques(
                         && t.ranks.get(learned.rank).is_none_or(|next| {
                             learned.xp < next.xp
                                 || (learned.xp == next.xp
-                                    && !rules::conditions_met(state, &next.requires))
+                                    && !rules::allowed(state, next.requires.as_ref()))
                         })
                 })
         }) && rules.player_techniques.iter().all(|grant| {
@@ -162,8 +155,8 @@ fn crafting(
         gear.enchantment.as_ref().is_none_or(|id| {
             world.enchantment(id).is_some_and(|e| {
                 e.fits(equipment)
-                    && lasting(state, &e.known_when)
-                    && lasting(state, &e.requires)
+                    && lasting(state, e.known_when.as_ref())
+                    && lasting(state, e.requires.as_ref())
                     && trained(state, e.trains.as_ref())
             })
         })
@@ -178,13 +171,14 @@ fn crafting(
             .tiers;
         tiers[..gear.tier.min(tiers.len())]
             .iter()
-            .all(|t| lasting(state, &t.requires) && trained(state, t.trains.as_ref()))
+            .all(|t| lasting(state, t.requires.as_ref()) && trained(state, t.trains.as_ref()))
     });
     let forged_ok = progress.forged.iter().all(|output| {
         let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
         let granted = progress.inventory.get(*output).copied().unwrap_or(0);
         pieces <= granted
             || progress.repeatable_loot.contains(output)
+            || progress.loose.contains(output)
             || rules
                 .recipes
                 .iter()
@@ -205,10 +199,13 @@ fn crafting_lessons<'w>(
     rules: &'w Combat,
     progress: &Progress,
 ) -> Vec<&'w realmkit_spec::TechniqueGrant> {
-    let needs_itself = |grant: &realmkit_spec::TechniqueGrant, conditions: &[&[Condition]]| {
-        conditions.iter().flat_map(|c| c.iter()).any(|c| {
-            matches!(c, Condition::Technique { technique, .. } if *technique == grant.technique)
-        })
+    let needs_itself = |grant: &realmkit_spec::TechniqueGrant,
+                        conditions: &[Option<&Condition>]| {
+        conditions.iter().flatten().any(|c| {
+                c.requires(&|leaf| {
+                    matches!(leaf, Condition::Technique { technique, .. } if *technique == grant.technique)
+                })
+            })
     };
     let mut lessons = Vec::new();
     for recipe in &rules.recipes {
@@ -219,11 +216,9 @@ fn crafting_lessons<'w>(
             .count() as u64;
         let granted = progress.inventory.get(&recipe.output).copied().unwrap_or(0);
         let forged = pieces > granted || progress.repeatable_loot.contains(&recipe.output);
-        if let Some(grant) = recipe
-            .trains
-            .as_ref()
-            .filter(|g| forged && !needs_itself(g, &[&recipe.known_when, &recipe.requires]))
-        {
+        if let Some(grant) = recipe.trains.as_ref().filter(|g| {
+            forged && !needs_itself(g, &[recipe.known_when.as_ref(), recipe.requires.as_ref()])
+        }) {
             lessons.push(grant);
         }
     }
@@ -239,7 +234,7 @@ fn crafting_lessons<'w>(
             if let Some(grant) = tier
                 .trains
                 .as_ref()
-                .filter(|g| !needs_itself(g, &[&tier.requires]))
+                .filter(|g| !needs_itself(g, &[tier.requires.as_ref()]))
             {
                 lessons.push(grant);
             }
@@ -249,7 +244,7 @@ fn crafting_lessons<'w>(
             if let Some(grant) = e
                 .trains
                 .as_ref()
-                .filter(|g| !needs_itself(g, &[&e.known_when, &e.requires]))
+                .filter(|g| !needs_itself(g, &[e.known_when.as_ref(), e.requires.as_ref()]))
             {
                 lessons.push(grant);
             }

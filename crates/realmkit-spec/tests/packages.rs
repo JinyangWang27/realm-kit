@@ -52,9 +52,9 @@ fn refuses_unsupported_versions_duplicate_ids_and_dangling_references() {
         |w| w.world.player = "missing".into(),
         |w| w.dialogues[0].nodes[0].choices[0].next = Some("missing".into()),
         |w| {
-            w.dialogues[0].nodes[0].choices[0].effect = Some(DialogueEffect::AcceptQuest {
+            w.dialogues[0].nodes[0].choices[0].effects = vec![Effect::AcceptQuest {
                 quest: "missing".into(),
-            })
+            }]
         },
         |w| wolf(w).combat.as_mut().unwrap().loot[0].item = "missing".into(),
         |w| {
@@ -73,10 +73,10 @@ fn refuses_unsupported_versions_duplicate_ids_and_dangling_references() {
                 .exits
                 .get_mut(&Direction::East)
                 .unwrap()
-                .requires = vec![Condition::Quest {
+                .requires = Some(Condition::Quest {
                 quest: "missing".into(),
                 status: QuestStatus::Completed,
-            }]
+            })
         },
     ];
     for (index, change) in changes.into_iter().enumerate() {

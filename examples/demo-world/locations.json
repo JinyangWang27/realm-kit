@@ -7,7 +7,7 @@
       "north": { "destination": "forest", "blocked_text": "The pine track is closed." },
       "east": {
         "destination": "ruins",
-        "requires": [{ "kind": "flag", "flag": "ruins_open" }],
+        "requires": { "kind": "flag", "flag": "ruins_open" },
         "blocked_text": "The elder keeps the chapel gate locked. Speak with her first."
       }
     },

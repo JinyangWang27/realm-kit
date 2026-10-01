@@ -11,8 +11,12 @@ pub(super) use actions::actions;
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
 pub(super) use story::{choices, grant_items, grant_xp, progress, set_flag};
 
-pub(super) fn conditions_met(state: &GameState, conditions: &[Condition]) -> bool {
-    conditions.iter().all(|condition| match condition {
+/// Evaluates a condition against the state; pure, so it may run any number of times.
+pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
+    match condition {
+        Condition::All { of } => of.iter().all(|c| holds(state, c)),
+        Condition::Any { of } => of.iter().any(|c| holds(state, c)),
+        Condition::Not { condition } => !holds(state, condition),
         Condition::Flag { flag } => state.flags.contains(flag),
         Condition::Quest { quest, status } => state.quests.get(quest) == Some(status),
         Condition::Technique { technique, rank } => state
@@ -20,7 +24,17 @@ pub(super) fn conditions_met(state: &GameState, conditions: &[Condition]) -> boo
             .as_ref()
             .and_then(|c| c.techniques.get(technique))
             .is_some_and(|learned| learned.rank >= *rank),
-    })
+        Condition::Item { item, quantity } => state
+            .player
+            .inventory
+            .get(item)
+            .is_some_and(|n| n >= quantity),
+    }
+}
+
+/// An optional requirement: absent means always.
+pub(super) fn allowed(state: &GameState, requires: Option<&Condition>) -> bool {
+    requires.is_none_or(|c| holds(state, c))
 }
 
 pub(super) fn player_vitals(state: &GameState) -> Option<Vitals> {
@@ -68,7 +82,7 @@ pub(super) fn character_here<'a>(
         .any(|c| c == id);
     world
         .character(id)
-        .filter(|c| placed && conditions_met(state, &c.requires))
+        .filter(|c| placed && allowed(state, c.requires.as_ref()))
 }
 
 /// Can be talked to here; a defeated fighter is gone, like its listing.
@@ -157,7 +171,7 @@ fn move_to(
 ) -> Result<(), EngineError> {
     let location = world.location(&state.player.location).unwrap();
     let exit = location.exits.get(&direction).ok_or(EngineError::NoExit)?;
-    if !conditions_met(state, &exit.requires) {
+    if !allowed(state, exit.requires.as_ref()) {
         return Err(EngineError::ExitLocked {
             location: location.id.clone(),
             direction,

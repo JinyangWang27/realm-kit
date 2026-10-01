@@ -1,5 +1,5 @@
 {
-  "format_version": 11,
+  "format_version": 12,
   "id": "cloud_sect",
   "name": "The Cloud Sect",
   "language": "en",
@@ -45,7 +45,7 @@
             "name": "Third Layer",
             "xp": 30,
             "passive": { "mp": 35, "satk": 7 },
-            "requires": [{ "kind": "flag", "flag": "scripture_found" }]
+            "requires": { "kind": "flag", "flag": "scripture_found" }
           }
         ]
       },

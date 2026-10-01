@@ -8,7 +8,7 @@ use realmkit_spec::{Recipe, TechniqueGrant, Tier};
 fn known<'w>(world: &'w WorldSpec, state: &GameState, id: &str) -> Option<&'w Recipe> {
     world
         .recipe(id)
-        .filter(|r| conditions_met(state, &r.known_when))
+        .filter(|r| allowed(state, r.known_when.as_ref()))
 }
 
 /// The next tier of an owned piece, if it has one.
@@ -23,14 +23,14 @@ fn ready(
     world: &WorldSpec,
     state: &GameState,
     station: &Id,
-    requires: &[Condition],
+    requires: Option<&Condition>,
     materials: &[ItemStack],
 ) -> Result<(), EngineError> {
     let here = world.location(&state.player.location).unwrap();
     if !here.stations.contains(station) {
         return Err(EngineError::NoStation(station.clone()));
     }
-    if !conditions_met(state, requires) {
+    if !allowed(state, requires) {
         return Err(EngineError::RequirementsUnmet);
     }
     for stack in materials {
@@ -85,7 +85,7 @@ pub(crate) fn forge(
         world,
         state,
         &recipe.station,
-        &recipe.requires,
+        recipe.requires.as_ref(),
         &recipe.inputs,
     )?;
     spend(state, &recipe.inputs, events);
@@ -112,7 +112,13 @@ pub(crate) fn improve(
         .and_then(|c| c.gear.get(&piece))
         .ok_or(EngineError::NoSuchGear(piece))?;
     let tier = next_tier(world, gear).ok_or(EngineError::NoHigherTier(piece))?;
-    ready(world, state, &tier.station, &tier.requires, &tier.cost)?;
+    ready(
+        world,
+        state,
+        &tier.station,
+        tier.requires.as_ref(),
+        &tier.cost,
+    )?;
     spend(state, &tier.cost, events);
     let gear = state.combat.as_mut().unwrap().gear.get_mut(&piece).unwrap();
     gear.tier += 1;
@@ -142,7 +148,7 @@ pub(crate) fn enchant(
         .ok_or(EngineError::NoSuchGear(piece))?;
     let enchantment = world
         .enchantment(id)
-        .filter(|e| conditions_met(state, &e.known_when))
+        .filter(|e| allowed(state, e.known_when.as_ref()))
         .ok_or_else(|| EngineError::UnknownEnchantment(id.clone()))?;
     if gear.enchantment.is_some() {
         return Err(EngineError::AlreadyEnchanted(piece));
@@ -158,7 +164,7 @@ pub(crate) fn enchant(
         world,
         state,
         &enchantment.station,
-        &enchantment.requires,
+        enchantment.requires.as_ref(),
         &enchantment.catalyst,
     )?;
     spend(state, &enchantment.catalyst, events);
@@ -183,24 +189,31 @@ pub(crate) fn offered(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     let forge = rules
         .recipes
         .iter()
-        .filter(|r| here.stations.contains(&r.station) && conditions_met(state, &r.known_when))
+        .filter(|r| here.stations.contains(&r.station) && allowed(state, r.known_when.as_ref()))
         .map(|r| Action {
             command: Command::Forge(r.id.clone()),
-            available: ready(world, state, &r.station, &r.requires, &r.inputs).is_ok(),
+            available: ready(world, state, &r.station, r.requires.as_ref(), &r.inputs).is_ok(),
         });
     let pieces = state.combat.iter().flat_map(|c| &c.gear);
     let improve = pieces.filter_map(|(id, gear)| {
         let tier = next_tier(world, gear).filter(|t| here.stations.contains(&t.station))?;
         Some(Action {
             command: Command::Improve(*id),
-            available: ready(world, state, &tier.station, &tier.requires, &tier.cost).is_ok(),
+            available: ready(
+                world,
+                state,
+                &tier.station,
+                tier.requires.as_ref(),
+                &tier.cost,
+            )
+            .is_ok(),
         })
     });
     // Every known enchantment here, on every unenchanted piece it fits.
     let enchant = rules
         .enchantments
         .iter()
-        .filter(|e| here.stations.contains(&e.station) && conditions_met(state, &e.known_when))
+        .filter(|e| here.stations.contains(&e.station) && allowed(state, e.known_when.as_ref()))
         .flat_map(|e| {
             let pieces = state.combat.iter().flat_map(|c| &c.gear);
             pieces.filter_map(move |(id, gear)| {
@@ -210,7 +223,8 @@ pub(crate) fn offered(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                         piece: *id,
                         enchantment: e.id.clone(),
                     },
-                    available: ready(world, state, &e.station, &e.requires, &e.catalyst).is_ok(),
+                    available: ready(world, state, &e.station, e.requires.as_ref(), &e.catalyst)
+                        .is_ok(),
                 })
             })
         });

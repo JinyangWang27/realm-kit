@@ -92,6 +92,6 @@ pub fn open_pit() -> WorldSpec {
         .get_mut(&Down)
         .unwrap()
         .requires
-        .clear();
+        .take();
     world
 }

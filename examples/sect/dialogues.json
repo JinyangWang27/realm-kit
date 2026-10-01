@@ -10,13 +10,13 @@
           {
             "text": "Teach me the Cloud Palm.",
             "next": "taught",
-            "effect": { "kind": "grant_technique", "technique": "cloud_palm" }
+            "effects": [{ "kind": "grant_technique", "technique": "cloud_palm" }]
           },
           {
             "text": "Do you have the lost volume of the Azure Breath?",
             "next": "volume",
-            "requires": [{ "kind": "quest", "quest": "lost_volume", "status": "active" }],
-            "effect": { "kind": "set_flag", "flag": "scripture_found" }
+            "requires": { "kind": "quest", "quest": "lost_volume", "status": "active" },
+            "effects": [{ "kind": "set_flag", "flag": "scripture_found" }]
           },
           { "text": "Farewell, Elder." }
         ]
@@ -36,13 +36,13 @@
           {
             "text": "Is something missing?",
             "next": "request",
-            "requires": [{ "kind": "quest", "quest": "lost_volume", "status": "available" }]
+            "requires": { "kind": "quest", "quest": "lost_volume", "status": "available" }
           },
           {
             "text": "The elder had the volume. Here it is.",
             "next": "thanks",
-            "requires": [{ "kind": "quest", "quest": "lost_volume", "status": "ready" }],
-            "effect": { "kind": "complete_quest", "quest": "lost_volume" }
+            "requires": { "kind": "quest", "quest": "lost_volume", "status": "ready" },
+            "effects": [{ "kind": "complete_quest", "quest": "lost_volume" }]
           },
           { "text": "Leave him to his counting." }
         ]
@@ -51,7 +51,7 @@
         "id": "request",
         "text": "'The third volume of the Azure Breath. Will you look for it?'",
         "choices": [
-          { "text": "I will.", "next": "accepted", "effect": { "kind": "accept_quest", "quest": "lost_volume" } },
+          { "text": "I will.", "next": "accepted", "effects": [{ "kind": "accept_quest", "quest": "lost_volume" }] },
           { "text": "Not now." }
         ]
       },

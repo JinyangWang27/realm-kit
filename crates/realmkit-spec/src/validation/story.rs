@@ -120,23 +120,29 @@ pub(super) fn dialogues(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                     dialogue.nodes.iter().any(|n| &n.id == next),
                 );
             }
-            conditions(out, w, &dialogue.id, &choice.requires);
-            if let Some(effect) = &choice.effect {
+            condition(out, w, &dialogue.id, choice.requires.as_ref());
+            for effect in &choice.effects {
                 dialogue_effect(out, w, &dialogue.id, effect);
             }
         }
     }
 }
 
-fn dialogue_effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effect: &DialogueEffect) {
+fn dialogue_effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effect: &Effect) {
     match effect {
-        DialogueEffect::AcceptQuest { quest } | DialogueEffect::CompleteQuest { quest } => {
+        Effect::AcceptQuest { quest } | Effect::CompleteQuest { quest } => {
             reference(out, owner, "quest", quest, w.quest(quest).is_some())
         }
-        DialogueEffect::SetFlag { flag } => {
+        Effect::SetFlag { flag } => {
             reference(out, owner, "flag", flag, w.world.flags.contains(flag))
         }
-        DialogueEffect::GrantTechnique(grant) => {
+        Effect::GrantItems { items: stacks } => items(out, w, owner, stacks),
+        Effect::TakeItems { items } => {
+            for stack in items {
+                counted(out, w, owner, &stack.item, stack.quantity);
+            }
+        }
+        Effect::GrantTechnique(grant) => {
             progression::technique_grant(out, w, owner, grant);
             // A choice can be taken again; teaching a rank is idempotent,
             // XP would not be. One-time XP comes from quest rewards.

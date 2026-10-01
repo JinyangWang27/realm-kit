@@ -9,7 +9,7 @@
       "west": { "destination": "ring", "blocked_text": "The ring is closed." },
       "down": {
         "destination": "pit",
-        "requires": [{ "kind": "flag", "flag": "spar_won" }],
+        "requires": { "kind": "flag", "flag": "spar_won" },
         "blocked_text": "Sergeant Holt bars the pit until you best him in the ring."
       }
     },

@@ -536,9 +536,11 @@ Decisions:
   deterministic behavior; higher-level validation/simulation can diagnose bad
   content when concrete cases justify it.
 
-The current Format 1 `requires: Vec<Condition>` is implicitly conjunctive and is
-an implementation limitation. A future format revision can introduce the
-composable condition tree when richer story branching first needs it.
+Format 12 (M5a) delivers the condition tree and effect lists: every
+`requires` and `known_when` is one optional condition composed with `all`,
+`any` and `not`, and a dialogue choice carries an ordered `effects` list that
+commits or fails as a whole. Format 11's implicitly conjunctive lists are
+rejected, not migrated.
 
 ## 7. Randomness and reproducibility
 

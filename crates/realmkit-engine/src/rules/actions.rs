@@ -41,7 +41,7 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     }
     actions.extend(location.exits.iter().map(|(direction, exit)| Action {
         command: Command::Move(*direction),
-        available: conditions_met(state, &exit.requires),
+        available: allowed(state, exit.requires.as_ref()),
     }));
     if state.combat.is_some() && location.safe {
         actions.push(available(Command::Rest));

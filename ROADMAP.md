@@ -1068,11 +1068,14 @@ M5 also lays the general foundations that
 these slices. The investigation fixture, optional Inventory and authored endings
 above are delivered alongside them, in whichever order a fixture needs them.
 
-1. **M5a — condition tree and effect lists.** `requires` becomes one condition
-   composed with `All / Any / Not` over typed leaf predicates, and a dialogue
-   choice carries an ordered list of `effects` in place of one optional
-   `effect`, applied atomically. Numeric predicates stay domain-typed, as
-   [decided](docs/open-decisions.md#6-conditions-and-effects).
+1. **M5a — condition tree and effect lists · delivered.** `requires` becomes
+   one condition composed with `All / Any / Not` over typed leaf predicates,
+   and a dialogue choice carries an ordered list of `effects` in place of one
+   optional `effect`, applied atomically. Numeric predicates stay
+   domain-typed, as [decided](docs/open-decisions.md#6-conditions-and-effects).
+   As delivered (Format 12): an `item` predicate for carried counted items and
+   `grant_items`/`take_items` effects arrive with it, and
+   `examples/quiet-archive` uses `any`, `not` and multi-effect choices.
 2. **M5b — world time, travel and recurring schedules.** Optional World Time
    as specified above; roads with authored travel durations and exits beyond
    the six compass directions; wait and rest actions that consume time; and

@@ -298,16 +298,16 @@ fn a_save_cannot_hold_a_technique_nothing_teaches() {
 fn a_technique_condition_tests_the_rank_reached() {
     let world = sect();
     let mut engine = Engine::new(&world).unwrap();
-    let storm = [Condition::Technique {
+    let storm = Condition::Technique {
         technique: "cloud_palm".into(),
         rank: 2,
-    }];
-    let breath = [Condition::Technique {
+    };
+    let breath = Condition::Technique {
         technique: "azure_breath".into(),
         rank: 1,
-    }];
-    assert!(engine.conditions_met(&breath));
-    assert!(!engine.conditions_met(&storm));
+    };
+    assert!(engine.holds(&breath));
+    assert!(!engine.holds(&storm));
     learn_palm(&mut engine);
     engine.execute(Move(North)).unwrap();
     while learned(&engine, "cloud_palm").unwrap().rank == 1 {
@@ -316,7 +316,7 @@ fn a_technique_condition_tests_the_rank_reached() {
         }
         engine.execute(palm("palm_drifting")).unwrap();
     }
-    assert!(engine.conditions_met(&storm));
+    assert!(engine.holds(&storm));
 }
 
 #[test]

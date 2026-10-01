@@ -78,6 +78,13 @@ proves the complete single-player loop with authored content.
   for a catalyst, known and gated like recipes, and kept through
   improvement. `examples/smithy` now plays forge → equip → improve → enchant
   → save/load. Package and save format 11.
+- [x] Condition trees and effect lists (M5a): `requires` and `known_when` are
+  one optional condition composed with `all`, `any` and `not` over typed
+  leaves, now including carried counted items; dialogue choices apply an
+  ordered `effects` list, including `grant_items` and `take_items`, that
+  commits or fails as a whole. Saves judge a condition by whether it could
+  once have held, and items that effects hand over are loose in the
+  inventory check. Package and save format 12.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

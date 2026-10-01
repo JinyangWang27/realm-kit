@@ -21,7 +21,7 @@ pub use techniques::*;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 11;
+pub const FORMAT_VERSION: u32 = 12;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -157,6 +157,14 @@ impl WorldSpec {
     }
     pub fn dialogue(&self, id: &str) -> Option<&Dialogue> {
         self.dialogues.iter().find(|v| v.id == id)
+    }
+    /// Every authored effect, wherever it is written.
+    pub fn effects(&self) -> impl Iterator<Item = &Effect> {
+        self.dialogues
+            .iter()
+            .flat_map(|d| &d.nodes)
+            .flat_map(|n| &n.choices)
+            .flat_map(|c| &c.effects)
     }
 }
 

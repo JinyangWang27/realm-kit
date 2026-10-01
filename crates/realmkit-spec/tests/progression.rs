@@ -131,9 +131,9 @@ fn techniques_have_named_rising_ranks_and_valid_grants() {
         |w| w.world.combat.as_mut().unwrap().techniques[1].ranks[0].skill = Some("missing".into()),
         |w| {
             w.world.combat.as_mut().unwrap().techniques[0].ranks[2].requires =
-                vec![Condition::Flag {
+                Some(Condition::Flag {
                     flag: "missing".into(),
-                }]
+                })
         },
         |w| {
             let combat = w.world.combat.as_mut().unwrap();
@@ -162,11 +162,11 @@ fn techniques_have_named_rising_ranks_and_valid_grants() {
         // A dialogue choice can be repeated, so it may not hand out XP.
         |w| {
             let choice = &mut w.dialogues[0].nodes[0].choices[0];
-            choice.effect = Some(DialogueEffect::GrantTechnique(TechniqueGrant {
+            choice.effects = vec![Effect::GrantTechnique(TechniqueGrant {
                 technique: "cloud_palm".into(),
                 rank: None,
                 xp: 5,
-            }))
+            })]
         },
         // Technique conditions name a technique and one of its ranks.
         |w| {
@@ -174,20 +174,20 @@ fn techniques_have_named_rising_ranks_and_valid_grants() {
                 .exits
                 .get_mut(&Direction::North)
                 .unwrap()
-                .requires = vec![Condition::Technique {
+                .requires = Some(Condition::Technique {
                 technique: "missing".into(),
                 rank: 1,
-            }]
+            })
         },
         |w| {
             w.locations[0]
                 .exits
                 .get_mut(&Direction::North)
                 .unwrap()
-                .requires = vec![Condition::Technique {
+                .requires = Some(Condition::Technique {
                 technique: "cloud_palm".into(),
                 rank: 3,
-            }]
+            })
         },
         // A core art nothing can teach would never show a realm.
         |w| {

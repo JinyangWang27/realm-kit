@@ -38,9 +38,22 @@ pub enum QuestStatus {
     Completed,
 }
 
+/// A pure query over the playthrough: typed leaf predicates composed with
+/// `all`, `any` and `not`. Evaluating one never changes anything.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Condition {
+    /// Every condition holds.
+    All {
+        of: Vec<Condition>,
+    },
+    /// At least one condition holds.
+    Any {
+        of: Vec<Condition>,
+    },
+    Not {
+        condition: Box<Condition>,
+    },
     Flag {
         flag: Id,
     },
@@ -53,6 +66,33 @@ pub enum Condition {
         technique: Id,
         rank: usize,
     },
+    /// The player carries at least `quantity` of a counted item.
+    Item {
+        item: Id,
+        quantity: u64,
+    },
+}
+
+impl Condition {
+    /// Whether this condition can only hold while `leaf` holds: `leaf` is
+    /// required on every branch, never under a `not`.
+    pub fn requires(&self, leaf: &dyn Fn(&Condition) -> bool) -> bool {
+        match self {
+            Self::All { of } => of.iter().any(|c| c.requires(leaf)),
+            Self::Any { of } => !of.is_empty() && of.iter().all(|c| c.requires(leaf)),
+            Self::Not { .. } => false,
+            _ => leaf(self),
+        }
+    }
+
+    /// Every leaf predicate, depth first.
+    pub fn leaves(&self) -> Vec<&Condition> {
+        match self {
+            Self::All { of } | Self::Any { of } => of.iter().flat_map(|c| c.leaves()).collect(),
+            Self::Not { condition } => condition.leaves(),
+            _ => vec![self],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -77,14 +117,18 @@ pub struct DialogueNode {
 pub struct DialogueChoice {
     pub text: String,
     pub next: Option<Id>,
-    #[serde(default)]
-    pub requires: Vec<Condition>,
-    pub effect: Option<DialogueEffect>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<Condition>,
+    /// Applied in order; if one fails, the choice changes nothing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub effects: Vec<Effect>,
 }
 
+/// A typed state change. Effects in one list apply in authored order, and the
+/// whole transition commits or fails together.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub enum DialogueEffect {
+pub enum Effect {
     AcceptQuest {
         quest: Id,
     },
@@ -96,4 +140,12 @@ pub enum DialogueEffect {
     },
     /// A master, manual or chance encounter teaches or deepens a technique.
     GrantTechnique(TechniqueGrant),
+    /// The player receives items; equipment arrives as individual pieces.
+    GrantItems {
+        items: Vec<ItemStack>,
+    },
+    /// The player hands over counted items; without enough, nothing happens.
+    TakeItems {
+        items: Vec<ItemStack>,
+    },
 }

@@ -27,7 +27,7 @@ pub fn location(
             output,
             " {}{}",
             direction_name(*direction),
-            if engine.conditions_met(&exit.requires) {
+            if engine.allows(exit.requires.as_ref()) {
                 ""
             } else {
                 " (locked)"
@@ -40,7 +40,7 @@ pub fn location(
     writeln!(output)?;
     for id in &location.characters {
         let character = world.character(id).unwrap();
-        if !engine.conditions_met(&character.requires) {
+        if !engine.allows(character.requires.as_ref()) {
             continue;
         }
         let defeated = state

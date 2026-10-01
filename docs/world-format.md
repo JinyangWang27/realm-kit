@@ -1,6 +1,7 @@
-# World package format 11
+# World package format 12
 
-Format 11 makes combat optional. The level table and combat prose live in an
+Format 12 composes conditions with `all`, `any` and `not` and gives dialogue
+choices ordered effect lists. Combat stays optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -24,13 +25,15 @@ there is no migration. Convert them by hand:
   `groups` are optional. Then apply the Formats 5–10 step.
 - **Formats 5–10** (M3c-2, M3d, M4a, M4b, M4c, M4d): only raise the number;
   `crit`, `stat_points`, techniques, equipment, recipes, tiers and
-  enchantments are optional.
+  enchantments are optional. Then apply the Format 11 steps.
+- **Format 11** (M4e): every `requires` and `known_when` list becomes one
+  condition. A list of one condition becomes that condition; a longer list
+  becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
+  dialogue choice's `effect` becomes a one-element `effects` list.
 
-A world without combat only needs its `format_version` raised.
-
-Format 11 represents one fixed player-controlled character and one playable
+Format 12 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 11 does not serialize a route collection
+stable logical route ID `default`; Format 12 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -45,7 +48,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 11 also requires item and quest tables because they serve the current demo.
+Format 12 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -80,7 +83,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 11 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 12 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -116,35 +119,42 @@ explicit and does not require a universal z-axis.
   "exits": {
     "north": {
       "destination": "hall",
-      "requires": [{ "kind": "flag", "flag": "hall_open" }],
+      "requires": { "kind": "flag", "flag": "hall_open" },
       "blocked_text": "The hall is locked."
     }
   }
 }
 ```
 
-`requires` lists are AND conditions and default to empty. They can appear on
-exits, characters and dialogue choices. A condition tests a declared flag, a
-quest state or a technique's rank:
+A `requires` condition can appear on exits, characters and dialogue choices;
+left out, it always holds. A condition is one typed leaf predicate, or a
+composition of others:
 
 ```json
+{ "kind": "flag", "flag": "hall_open" }
 { "kind": "quest", "quest": "quiet_the_track", "status": "ready" }
 { "kind": "technique", "technique": "azure_breath", "rank": 2 }
+{ "kind": "item", "item": "pen", "quantity": 1 }
+{ "kind": "all", "of": [ ... ] }
+{ "kind": "any", "of": [ ... ] }
+{ "kind": "not", "condition": { ... } }
 ```
 
-A technique condition holds once the player has learned the technique at
-least to that rank (see [Techniques](#techniques)), so a realm can gate an
-exit, a dialogue choice or a character.
+- `flag` holds once the declared flag is set.
+- `quest` holds while the quest has that status: `available`, `active`,
+  `ready` or `completed`.
+- `technique` holds once the player has learned the technique at least to
+  that rank (see [Techniques](#techniques)), so a realm can gate an exit, a
+  dialogue choice or a character.
+- `item` holds while the player carries at least `quantity` (1 or more) of a
+  counted item; equipment pieces are individuals and cannot be counted.
+- `all` holds when every condition in `of` does, `any` when at least one
+  does, and `not` when its `condition` does not. `of` must not be empty.
 
-Quest statuses are `available`, `active`, `ready`, `completed`. All flags start
-unset. Dialogue `set_flag` effects and quest completion flags set them; flags
-are monotonic in this version. Conditions govern availability/choice visibility.
-
-This flat conjunctive representation is a Format 11 limitation. The long-term
-condition model uses pure typed predicates composed with `All / Any / Not`;
-predicates remain domain-specific and typed rather than becoming arbitrary
-expressions/property paths. Typed effects execute in authored order as part of the
-engine's atomic state transition.
+All flags start unset. Dialogue `set_flag` effects and quest completion flags
+set them; flags are monotonic in this version. Evaluating a condition is pure:
+showing a menu or a choice never changes state. Predicates stay typed: there
+are no property paths, formula strings or generic numeric comparisons.
 
 ## Characters
 
@@ -171,7 +181,7 @@ Talking and fighting are optional components:
 `world.player` names the player character. It has no dialogue or combat profile
 and is placed nowhere; in a combat world its numbers come from the level table.
 A location's `characters` list places the others. A placed character is present
-while its `requires` conditions hold; the player can talk to it if it has a
+while its `requires` condition holds; the player can talk to it if it has a
 `dialogue` and attack it if it has a `combat` profile: its `stats` (see
 [Stats](#stats-damage-and-skills)), the `xp` granted on defeat, optional `loot`,
 optional `skills` (skill IDs, usable once the profile's `level` reaches each
@@ -186,7 +196,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 11 has a single flat quest collection. The long-term model should retain
+Format 12 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -194,15 +204,26 @@ explicit main-story/story-phase conditions, and side outcomes may feed typed
 state into later main-quest conditions.
 
 Each dialogue has a `start` node ID and a `nodes` array. A node has authored
-`text` and optional `choices`. Each choice has authored `text`, optional
-`requires`, optional `next`, and an optional typed `effect`:
+`text` and optional `choices`. Each choice has authored `text`, an optional
+`requires` condition, optional `next`, and an optional list of typed
+`effects`:
 
 ```json
 { "kind": "accept_quest", "quest": "quiet_the_track" }
 { "kind": "complete_quest", "quest": "quiet_the_track" }
 { "kind": "set_flag", "flag": "hall_open" }
 { "kind": "grant_technique", "technique": "cloud_palm", "rank": 1, "xp": 0 }
+{ "kind": "grant_items", "items": [{ "item": "pen", "quantity": 1 }] }
+{ "kind": "take_items", "items": [{ "item": "pen", "quantity": 1 }] }
 ```
+
+Effects apply in authored order to the staged state, and the choice commits
+or fails as a whole: if any effect is refused, such as taking items the player
+does not carry or completing a quest that is not ready, nothing the earlier
+effects did is kept. `grant_items` gives items as quest rewards do (equipment
+arrives as individual pieces); `take_items` hands over counted items only.
+A choice can be taken again while its condition holds, so a one-time gift
+pairs `grant_items` with `set_flag` under a `not` condition on that flag.
 
 Choices are filtered and then numbered contiguously from one. Omitting `next`
 ends the conversation. A node with no visible choices displays its text and
@@ -339,7 +360,7 @@ source's own terms; players see that name, never a number:
       { "name": "First Layer", "xp": 0, "passive": { "mp": 10, "satk": 2 } },
       { "name": "Second Layer", "xp": 10, "passive": { "mp": 20, "satk": 4 } },
       { "name": "Third Layer", "xp": 30, "passive": { "mp": 35, "satk": 7 },
-        "requires": [{ "kind": "flag", "flag": "scripture_found" }] }
+        "requires": { "kind": "flag", "flag": "scripture_found" } }
     ]
   },
   {
@@ -365,7 +386,7 @@ source's own terms; players see that name, never a number:
   `technique_xp_per_use` (default 10), with the same level falloff as character
   XP. Each victory also gives every learned technique its `xp_share_percent` of
   the character XP earned; keep it small so internal arts deepen slowly.
-- **Gates.** A rank's `requires` conditions are a breakthrough gate: technique
+- **Gates.** A rank's `requires` condition is a breakthrough gate: technique
   XP waits at that rank's threshold until they hold, and the technique rises
   as soon as they do.
 - **Grants** (`player_techniques`, the `grant_technique` dialogue effect and
@@ -436,8 +457,8 @@ A location can offer crafting `stations`, and the combat block lists
   "station": "anvil",
   "inputs": [{ "item": "iron_ingot", "quantity": 2 }],
   "output": "iron_sword",
-  "known_when": [{ "kind": "flag", "flag": "taught_forging" }],
-  "requires": [{ "kind": "technique", "technique": "smithing", "rank": 1 }],
+  "known_when": { "kind": "flag", "flag": "taught_forging" },
+  "requires": { "kind": "technique", "technique": "smithing", "rank": 1 },
   "trains": { "technique": "smithing", "xp": 10 }
 }
 ```
@@ -451,7 +472,7 @@ An item's `equipment` can list improvement `tiers`, in order:
   "speed_penalty": 5,
   "station": "anvil",
   "cost": [{ "item": "iron_ingot", "quantity": 1 }],
-  "requires": [{ "kind": "technique", "technique": "smithing", "rank": 2 }]
+  "requires": { "kind": "technique", "technique": "smithing", "rank": 2 }
 }]
 ```
 
@@ -486,8 +507,8 @@ The combat block can list `enchantments`, each laid on a piece at a station:
   "bonuses": { "patk": 2 },
   "station": "altar",
   "catalyst": [{ "item": "ember_shard", "quantity": 1 }],
-  "known_when": [{ "kind": "flag", "flag": "taught_enchanting" }],
-  "requires": [{ "kind": "technique", "technique": "enchanting", "rank": 1 }],
+  "known_when": { "kind": "flag", "flag": "taught_enchanting" },
+  "requires": { "kind": "technique", "technique": "enchanting", "rank": 1 },
   "trains": { "technique": "enchanting", "xp": 10 }
 }
 ```
@@ -604,7 +625,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 11 currently selects combat prose variants from the current
+Format 12 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -624,12 +645,14 @@ order. `validate()` returns `SpecError::Validation` with those diagnostics if
 any are errors. `load()` validates before returning a playable world. File I/O
 and JSON syntax/type errors retain the file path and underlying error.
 
-Checks include version, IDs, references, dialogue links/effects, declared flags,
+Checks include version, IDs, references (in every leaf of a condition tree),
+non-empty `all`/`any`, counted items in item conditions and `take_items`,
+dialogue links/effects, declared flags,
 the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
 skill references, usable and affordable skills, loot quantities, fighter
 placement and template placeholders. `load()` reports a package whose
-`format_version` is not 9 as `SpecError::UnsupportedFormat` before parsing it.
+`format_version` is not 12 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.

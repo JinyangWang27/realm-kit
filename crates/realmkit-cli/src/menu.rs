@@ -261,7 +261,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             let recipe = world.recipe(id).unwrap();
             let output = &world.item(&recipe.output).unwrap().name;
             let cost = materials(world, &recipe.inputs);
-            let why = missing(engine, &recipe.requires, &recipe.inputs);
+            let why = missing(engine, recipe.requires.as_ref(), &recipe.inputs);
             format!("{FORGE} {output} — {cost}{why}")
         }
         // "Improve #1 Iron sword → Fine Iron sword (Attack +4 → +6) — 1 Iron
@@ -274,7 +274,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             next.tier += 1;
             let changes = tier_changes(world, equipment, gear.tier);
             let cost = materials(world, &tier.cost);
-            let why = missing(engine, &tier.requires, &tier.cost);
+            let why = missing(engine, tier.requires.as_ref(), &tier.cost);
             format!(
                 "{IMPROVE} {} → {}{changes} — {cost}{why}",
                 gear_name(engine, *piece),
@@ -296,7 +296,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 })
                 .collect();
             let cost = materials(world, &enchantment.catalyst);
-            let why = missing(engine, &enchantment.requires, &enchantment.catalyst);
+            let why = missing(engine, enchantment.requires.as_ref(), &enchantment.catalyst);
             format!(
                 "{ENCHANT} {} → {} ({}) — {cost}{why}",
                 gear_name(engine, *piece),
@@ -356,16 +356,13 @@ fn materials(world: &realmkit_spec::WorldSpec, stacks: &[realmkit_spec::ItemStac
 /// " [needs Journeyman Smithing]", " [needs 2 Iron ingot]", or nothing.
 fn missing(
     engine: &Engine<'_>,
-    requires: &[realmkit_spec::Condition],
+    requires: Option<&realmkit_spec::Condition>,
     stacks: &[realmkit_spec::ItemStack],
 ) -> String {
     let world = engine.world();
-    let unmet = requires
-        .iter()
-        .find(|c| !engine.conditions_met(std::slice::from_ref(*c)));
-    if let Some(condition) = unmet {
-        return match condition {
-            realmkit_spec::Condition::Technique { technique, rank } => {
+    if let Some(condition) = requires.filter(|c| !engine.holds(c)) {
+        return match unmet(engine, condition) {
+            Some(realmkit_spec::Condition::Technique { technique, rank }) => {
                 let technique = world.technique(technique).unwrap();
                 let rank = &technique.ranks[rank - 1].name;
                 format!(" [{NEEDS} {rank} {}]", technique.name)
@@ -384,6 +381,20 @@ fn missing(
             world.item(&s.item).unwrap().name
         ),
         None => String::new(),
+    }
+}
+
+/// The first unmet leaf that a failed condition needs, if it can be named:
+/// through `all` only, since `any` and `not` have no single reason.
+fn unmet<'c>(
+    engine: &Engine<'_>,
+    condition: &'c realmkit_spec::Condition,
+) -> Option<&'c realmkit_spec::Condition> {
+    use realmkit_spec::Condition;
+    match condition {
+        Condition::All { of } => unmet(engine, of.iter().find(|c| !engine.holds(c))?),
+        Condition::Any { .. } | Condition::Not { .. } => None,
+        leaf => Some(leaf),
     }
 }
 

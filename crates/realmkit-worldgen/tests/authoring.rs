@@ -29,7 +29,7 @@ fn typed_edits_link_locations_and_report_repairable_diagnostics() {
     );
     let exit = Exit {
         destination: "garden".into(),
-        requires: vec![],
+        requires: None,
         blocked_text: "The gate is shut.".into(),
     };
     draft
@@ -49,7 +49,7 @@ fn typed_edits_link_locations_and_report_repairable_diagnostics() {
             Direction::East,
             Exit {
                 destination: "missing".into(),
-                requires: vec![],
+                requires: None,
                 blocked_text: String::new()
             }
         )

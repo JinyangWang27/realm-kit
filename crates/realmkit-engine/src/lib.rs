@@ -1,7 +1,7 @@
 //! Synchronous gameplay; no generation or presentation dependencies.
 
 use realmkit_spec::{
-    Channel, Character, Condition, DialogueChoice, DialogueEffect, Direction, Id, ItemStack,
+    Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack,
     QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat, Stats, WorldSpec,
     BASIC_POWER,
 };
@@ -179,7 +179,12 @@ impl<'w> Engine<'w> {
         })
     }
 
-    pub fn conditions_met(&self, conditions: &[Condition]) -> bool {
-        rules::conditions_met(&self.state, conditions)
+    /// Whether a condition holds now; evaluating it changes nothing.
+    pub fn holds(&self, condition: &Condition) -> bool {
+        rules::holds(&self.state, condition)
+    }
+    /// Whether an optional requirement is met; an absent one always is.
+    pub fn allows(&self, requires: Option<&Condition>) -> bool {
+        rules::allowed(&self.state, requires)
     }
 }
