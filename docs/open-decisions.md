@@ -1549,15 +1549,17 @@ a proposed answer that still needs to be confirmed:
   authored bounds. A recurring price tick moves it against net supply
   (production minus consumption from authored producer counts), reverts it
   towards base, pulls processed goods up towards dearer inputs and converges
-  linked markets; caravans converge their destination on arrival. The player's
-  own purchases and sales move the index at once by an authored step. The buying
-  and selling prices sit either side of base × index by an authored spread that
-  trading narrows, with one final rounding. Prosperity drifts daily towards an
-  ideal set by scarcity and buildings, and scales income, tariffs, stock and
-  recruit pools ([Economy](sandbox-worlds.md#economy)). Still open: how many
-  warm-up rounds an authoring tool runs for initial prices, and whether the
-  price tick's draws should be replaced by fixed fractions of the bound, which
-  would drop the `market` RNG domain from prices entirely.
+  linked markets, in four phases with draws in authored market and goods order
+  and convergence applied from one snapshot; caravans converge their destination
+  on arrival. The player's own purchases and sales move the index at once by an
+  authored step. The buying and selling prices sit either side of base × index
+  by an authored spread that trading narrows, with one final rounding.
+  Prosperity drifts daily towards an ideal set by scarcity and buildings, and
+  scales income, tariffs, stock and recruit pools
+  ([Economy](sandbox-worlds.md#economy)). Still open: how many warm-up rounds an
+  authoring tool runs for initial prices, and whether the price tick's draws
+  should be replaced by fixed fractions of the bound, which would drop the
+  `market` RNG domain from prices entirely.
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.
@@ -1676,11 +1678,11 @@ a proposed answer that still needs to be confirmed:
   Still open: the journal's bound, and whether agents' own knowledge is ever
   limited, which the proposal does not do.
 - **Villages (M6e).** Proposed: rent may accrue and wait for collection in
-  person, with unrest drawn from its own RNG domain; where the economy exists,
-  demanding supplies and driving off livestock are engine-detected deeds;
-  livestock is a trade good carried as a herd with a travel penalty; bandit
-  trouble is a village state set by the world-agent tick and cleared through an
-  offer.
+  person, with unrest drawn from a `villages` RNG domain; where the economy
+  exists, demanding supplies and driving off livestock are engine-detected
+  deeds; livestock is a trade good carried as a herd with a travel penalty;
+  bandit trouble is a village state set on the holdings' own village schedule,
+  from the same `villages` domain, and cleared through an offer.
 - **Marriage (M6h).** Proposed: courtship is authored dialogue over relation
   tracks, and `Marry` records at most one spouse per character, keyed by ID. No
   children, heirs or dynasties. Still open: whether a spouse can act for the

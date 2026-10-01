@@ -92,11 +92,11 @@ quest deadlines, offers, runtime instances) is optional.
 | Companion gear | retinue, equipment | None. Companions fight in encounters only where personal combat exists. |
 | Mass battle | retinue | Without morale or proficiencies, those terms leave the formula; without prisoners, losses are never captured; champion duels need personal combat. Rewards, loot and lasting injuries are separate parts; looted gear needs equipment. |
 | Prisoners | retinue, and mass battle or personal combat | Ransom needs the economy; escapes run on a prison tick, so they need recurring schedules; holding prisons need holdings. |
-| Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time; raiding needs factions at war; village unrest needs mass battle; demanding supplies and livestock need the economy; bandit trouble needs world agents and offers. Without factions, owners are characters. |
+| Holdings | none | Income needs the economy and schedules; garrisons need the retinue; sieges need mass battle; buildings need the economy and world time; raiding needs factions at war; village unrest needs mass battle; demanding supplies and livestock need the economy; bandit trouble needs recurring schedules and offers. Without factions, owners are characters. |
 | Politics and orders | factions and standing | Membership ranks, orders, marriage and a founded kingdom are separate parts. Marriage needs per-character relation tracks. |
 | Knowledge and news | none | Without world time, remembered prices and whereabouts carry no age; without the economy, nothing is remembered about prices; without characters who move, whereabouts are always current. |
 | World agents | recurring schedules | Without a retinue, parties carry no rosters and cannot fight; without mass battle, they never fight each other; without factions, there is no diplomacy; without the economy, no caravans trade. |
-| Faction strategy | factions and standing, world agents | The marshal, fief grants, defection, feasts and claimants are separate parts. Campaigns need holdings and mass battle; fief grants and feasts need holdings; defection needs per-character relation tracks; truces need world time. Without campaigns, factions only defend, raid and rest. |
+| Faction strategy | factions and standing, world agents | The marshal, fief grants, defection, feasts and claimants are separate parts. Campaigns need holdings and mass battle; fief grants and feasts need holdings; defection needs per-character relation tracks. Without campaigns, factions only defend, rest and, where holdings exist, raid. |
 
 Every periodic rule runs on a recurring schedule that belongs to its own
 capability (the retinue's upkeep tick, the prison tick, the world-agent tick),
@@ -298,9 +298,11 @@ prices: the engine derives every price from them.
     price: 1,000 is the base price. It stays within authored bounds, typically
     100 to 10,000, so a price moves between a tenth and ten times its base.
   - Each market's **prosperity**, a bounded integer.
-  - Each merchant's current stock of trade goods.
-- **Price tick.** On the economy's recurring price schedule, each market
-  updates each good's index, drawing from its own `market` RNG domain:
+  - Each merchant's current stock of trade goods and currency.
+- **Price tick.** On the economy's recurring price schedule, every market
+  updates every good's index in four phases. Each phase finishes for all markets
+  before the next begins, and draws come from the economy's own `market` RNG
+  domain in authored market order, then authored goods order:
   - The net supply is production minus consumption. A surplus lowers the index
     by a draw below an authored multiple of the surplus, damped once the index is
     already under an authored level; a shortage raises it the same way.
@@ -310,7 +312,10 @@ prices: the engine derives every price from them.
     than its input for long.
   - Linked markets, a village and its market town or two towns joined by an
     authored trade link, each move an authored share of the gap towards the
-    other.
+    other. Every gap is measured on the values the third phase left, and each
+    market applies the sum of its links' moves at once, so the result does not
+    depend on link order. Validation keeps the shares of one market's links at
+    or below 100% in total, so convergence never overshoots.
 - **Initial prices.** The package authors each market's starting indices. An
   authoring tool may compute them by running the price tick offline for a number
   of warm-up rounds; the engine never warms up at runtime, so New Game draws no
@@ -346,19 +351,24 @@ prices: the engine derives every price from them.
 - **Workshops.** The player may buy a workshop in a town, at most an authored
   number per town, through a dialogue effect with the town's authored seller. A
   workshop runs one processed good's recipe. On the economy's weekly schedule it
-  pays the output's local price × runs, minus the inputs' local prices and the
-  overhead, which can be a loss. Currency never goes below zero: a loss takes at
-  most what the player holds, and an event reports any shortfall. Selling or
-  closing it is another dialogue effect. Workshops are owned property, not
-  [holdings](#holdings): they have no garrison and never change hands in a war.
+  pays the output's value × runs, minus the inputs' values and the overhead,
+  which can be a loss. Values use the local base price × index ÷ 1,000, with no
+  spread, since the workshop trades in its own town rather than with the player,
+  and its runs do not move the index. Currency never goes below zero: a loss
+  takes at most what the player holds, and an event reports any shortfall.
+  Selling or closing it is another dialogue effect. Workshops are owned
+  property, not [holdings](#holdings): they have no garrison and never change
+  hands in a war.
 - **Commands.** Buy and sell. The engine previews the price, and the change the
   trade makes to it, before the player confirms. Buying and selling a workshop
   happen in dialogue.
 - **Conditions and effects.** `CurrencyAtLeast`, `OwnsWorkshop`; `PayCurrency`,
   `GrantCurrency`, `BuyWorkshop` and `SellWorkshop`.
-- **Bounds.** Validation caps indices, prosperity, producer counts, stock,
-  currency and every authored rate so that engine arithmetic stays small,
-  following the existing `*_BOUND` pattern.
+- **Bounds.** Validation caps indices, prosperity, producer counts, stock, the
+  player's and merchants' currency and every authored rate so that engine
+  arithmetic stays small, following the existing `*_BOUND` pattern. Save
+  validation checks every saved index, prosperity, stock and currency against
+  the same bounds.
 - **Simulator parity.** The price tick is a formula over authored numbers, like
   damage. `scripts/combat_sim` gains an economy model that mirrors it before
   tests pin its numbers, and authors use it to check that trade routes pay
@@ -618,10 +628,12 @@ battles out of personal combat. This capability resolves army against army.
   - Livestock, also only with the economy, is a trade good that authors itself
     as a herd: carried herds slow travel by an authored penalty per head and can
     be slaughtered into an authored provisions good.
-  - Bandit trouble is a village state that the world-agent tick sets with an
-    authored chance. It lowers prosperity and empties the recruit pool until an
-    offer from the village clears it, such as hunting the bandits down or
-    training the villagers to resist.
+  - Bandit trouble is a village state that the holdings' own village schedule
+    sets with an authored chance, drawn from the `villages` RNG domain that
+    collection unrest also uses, so worlds with and without agents draw the
+    same. It lowers prosperity and empties the recruit pool until an offer from
+    the village clears it, such as hunting the bandits down or training the
+    villagers to resist.
 - **Conditions and effects.** `HoldsLocation`, `VillageTroubled`;
   `GrantHolding`, `TransferHolding`.
 
