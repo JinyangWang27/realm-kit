@@ -1,0 +1,25 @@
+[
+  {
+    "id": "greyford",
+    "name": "Greyford",
+    "description": "A market town where three roads meet at a stone bridge. Barges wait below for the river to rise.",
+    "characters": ["wenna"]
+  },
+  {
+    "id": "ashmere",
+    "name": "Ashmere",
+    "description": "Reed roofs and smoking chimneys on the edge of the fen. Eel traps dry on every fence.",
+    "characters": ["reeve"]
+  },
+  {
+    "id": "hollin_keep",
+    "name": "Hollin Keep",
+    "description": "A square tower on a holly-covered rise, watching both roads. Its gate closes at dusk.",
+    "characters": ["steward"]
+  },
+  {
+    "id": "vellmarket",
+    "name": "Vellmarket",
+    "description": "A walled town of wool merchants. Bales stand in the square under oiled cloth."
+  }
+]

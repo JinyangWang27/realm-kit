@@ -8,6 +8,7 @@ mod crafting;
 mod equipment;
 mod progression;
 mod story;
+mod time;
 mod world;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -51,6 +52,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     world::characters(&mut out, w);
     story::quests(&mut out, w, &placed);
     story::dialogues(&mut out, w);
+    time::rules(&mut out, w);
     if let Some(combat) = w.combat() {
         combat::rules(&mut out, w, combat);
     }
@@ -149,6 +151,17 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
             }
         }
         Condition::Item { item, quantity } => counted(out, w, owner, item, *quantity),
+        Condition::TimeOfDay { from, to } => {
+            if *from >= MINUTES_PER_DAY || *to >= MINUTES_PER_DAY || from == to {
+                issue(
+                    out,
+                    owner,
+                    "invalid_condition",
+                    "a time of day is two different minutes of the day, 0 to 1439",
+                );
+            }
+            time::needed(out, w, owner);
+        }
     }
 }
 

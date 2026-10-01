@@ -1485,19 +1485,19 @@ and the roadmap schedules them as
 [M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). Each question below has
 a proposed answer that still needs to be confirmed:
 
-- **Recurring schedules (M5b).** Proposed: a schedule authors a period of at
-  least one minute, checked by validation, and a first occurrence strictly after
-  the route's initial world time. A zero period would make each occurrence due
-  again at its own minute and break the no-loop guarantee above. The dispatch
-  cursor from [Section 9](#9-time-models) expands a schedule lazily, one due
-  occurrence at a time. Only the next occurrence is saved, never an expanded
-  list. Ties with one-shot events keep stable authored declaration order. Still
-  open: whether an effect may start or stop a schedule, or only authored
-  conditions gate what each occurrence does.
-- **Exits beyond compass directions (M5b).** Proposed: roads are named exits
-  keyed by an ASCII ID, with an authored travel duration. Compass directions
-  remain for worlds that use them. Still open: whether one world may mix the
-  two.
+- **Recurring schedules (M5b) · decided.** A schedule authors a first minute
+  strictly after the route's initial world time and an optional period of at
+  least one minute, checked by validation. The dispatch cursor expands it
+  lazily, one due occurrence at a time. Nothing about a schedule is saved:
+  its next occurrence follows from the saved minute. Ties at one minute go in
+  schedule order (authored events, then movers; later capabilities append
+  their own schedules after these). Effects cannot start or stop a schedule;
+  an occurrence's authored condition decides whether it does anything.
+- **Exits beyond compass directions (M5b) · decided.** Roads are an undirected
+  list in `world.json`, each with an ASCII ID, two ends and optional travel
+  minutes, condition and blocked text; at most one road joins a pair, so
+  travel names its destination. A world, and even one location, may mix
+  roads with compass exits.
 - **Offers (M5c).** Proposed: the saved RNG draws an offer's parameters from
   authored candidate lists only at an explicit gameplay transition, such as the
   giver's recurring refresh or the player's arrival, and the drawn offer is
@@ -1530,11 +1530,12 @@ a proposed answer that still needs to be confirmed:
   is authored initial state, not runtime identity editing, so it stays within
   the original-character rules above. Still open: whether an option may skip
   or add later questions.
-- **Characters who move (M5b).** Proposed: a character may author a set of
+- **Characters who move (M5b) · decided.** A character may author a set of
   locations and a recurring schedule; each occurrence moves it to one of them,
-  drawn from a `world` RNG domain, and its location is saved keyed by its ID.
-  Occurrences are skipped while it rides in a party or is captive. Still open:
-  whether a move may avoid the player's current location.
+  uniformly drawn from a `world` RNG domain, possibly where it already is or
+  where the player stands, and its location is saved keyed by its ID. A mover
+  starts at its one placement and has no combat profile. Occurrences will be
+  skipped while it rides in a party or is captive, once those exist.
 - **Proficiencies (M6).** Proposed: following [Section 8](#8-checks-and-proficiencies),
   each capability owns the proficiencies it needs (trading in the economy,
   leadership in the retinue, surgery in mass battle), with its own ranks and

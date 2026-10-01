@@ -1,6 +1,6 @@
 //! Panels: views of the current state that spend no time.
 
-use crate::render::{direction_name, piece_name, stat_name, Paint};
+use crate::render::{clock, direction_name, duration, piece_name, stat_name, Paint};
 use realmkit_engine::Engine;
 use realmkit_spec::Stat;
 use std::io::{self, Write};
@@ -15,30 +15,38 @@ pub fn location(
     let world = engine.world();
     let state = engine.state();
     let location = world.location(location).unwrap();
-    writeln!(
-        output,
-        "{}\n{}",
-        paint.title(&location.name),
-        location.description
-    )?;
-    write!(output, "Exits:")?;
-    for (direction, exit) in &location.exits {
-        write!(
-            output,
-            " {}{}",
-            direction_name(*direction),
-            if engine.allows(exit.requires.as_ref()) {
-                ""
-            } else {
-                " (locked)"
+    writeln!(output, "{}", paint.title(&location.name))?;
+    if let Some(now) = state.time.and_then(|now| clock(world, now)) {
+        writeln!(output, "{}", paint.dim(&now))?;
+    }
+    writeln!(output, "{}", location.description)?;
+    let roads: Vec<String> = world
+        .world
+        .roads
+        .iter()
+        .filter_map(|road| {
+            let to = world.location(road.leads(&location.id)?)?;
+            let mut notes = Vec::new();
+            if road.minutes > 0 {
+                notes.push(duration(road.minutes));
             }
-        )?;
+            if !engine.allows(road.requires.as_ref()) {
+                notes.push("closed".into());
+            }
+            Some(match notes.is_empty() {
+                true => to.name.clone(),
+                false => format!("{} ({})", to.name, notes.join(", ")),
+            })
+        })
+        .collect();
+    if !roads.is_empty() {
+        writeln!(output, "Roads: {}", roads.join(", "))?;
     }
-    if location.exits.is_empty() {
-        write!(output, " none")?;
+    // A place reached only by road has no compass exits to list.
+    if !location.exits.is_empty() || roads.is_empty() {
+        location_exits(output, engine, location)?;
     }
-    writeln!(output)?;
-    for id in &location.characters {
+    for id in engine.placed_here() {
         let character = world.character(id).unwrap();
         if !engine.allows(character.requires.as_ref()) {
             continue;
@@ -66,6 +74,31 @@ pub fn location(
         }
     }
     Ok(())
+}
+
+/// "Exits: north east (locked)", or "Exits: none".
+fn location_exits(
+    output: &mut impl Write,
+    engine: &Engine<'_>,
+    location: &realmkit_spec::Location,
+) -> io::Result<()> {
+    write!(output, "Exits:")?;
+    for (direction, exit) in &location.exits {
+        write!(
+            output,
+            " {}{}",
+            direction_name(*direction),
+            if engine.allows(exit.requires.as_ref()) {
+                ""
+            } else {
+                " (locked)"
+            }
+        )?;
+    }
+    if location.exits.is_empty() {
+        write!(output, " none")?;
+    }
+    writeln!(output)
 }
 
 /// Pieces of equipment by number, then counted items.

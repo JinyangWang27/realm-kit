@@ -6,6 +6,10 @@ use super::*;
 pub enum Command {
     Look,
     Move(Direction),
+    /// Takes the road from here to a location, passing its travel time.
+    Travel(Id),
+    /// Lets this many minutes of world time pass.
+    Wait(u64),
     /// Starts an encounter with a fighter at the current location.
     Engage(Id),
     /// In an encounter: a basic attack in the player's basic-attack channel.
@@ -58,6 +62,19 @@ pub enum Event {
     Moved {
         from: Id,
         to: Id,
+    },
+    /// World time moved on; `now` is the minute it reached.
+    TimePassed {
+        minutes: u64,
+        now: u64,
+    },
+    /// A character who moves came to the player's location.
+    CharacterArrived {
+        character: Id,
+    },
+    /// A character who moves left the player's location.
+    CharacterLeft {
+        character: Id,
     },
     /// `skill` is `None` for a basic attack, which uses narrative `variant`.
     DamageDealt {

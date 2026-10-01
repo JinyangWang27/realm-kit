@@ -71,6 +71,11 @@ pub enum Condition {
         item: Id,
         quantity: u64,
     },
+    /// The minute of the day is in `from..to`; past midnight when `from > to`.
+    TimeOfDay {
+        from: u64,
+        to: u64,
+    },
 }
 
 impl Condition {

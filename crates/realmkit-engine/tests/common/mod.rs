@@ -95,3 +95,11 @@ pub fn open_pit() -> WorldSpec {
         .take();
     world
 }
+
+pub fn marches() -> WorldSpec {
+    WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/marches"
+    ))
+    .unwrap()
+}

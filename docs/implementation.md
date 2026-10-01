@@ -85,6 +85,14 @@ proves the complete single-player loop with authored content.
   commits or fails as a whole. Saves judge a condition by whether it could
   once have held, and items that effects hand over are loose in the
   inventory check. Package and save format 12.
+- [x] World time, roads and schedules (M5b): an optional clock in minutes
+  that only travel, waiting and resting move; undirected roads with travel
+  minutes and conditions beside compass exits; one-shot and recurring events
+  with conditions and effects; characters who move among locations on a
+  schedule, drawn from their own `world` random stream; and a time-of-day
+  condition. Occurrences resolve in chronological, then schedule, order, and
+  saves keep only the minute and each mover's location. `examples/marches`
+  exercises it. Package and save format 12.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

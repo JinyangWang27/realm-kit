@@ -64,10 +64,45 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
         state.combat.is_some() == world.combat().is_some(),
         "combat state does not match the world",
     )?;
+    // Each stream exists exactly when content draws from it.
     ensure(
-        state.rng.is_some() == world.stochastic()
-            && state.rng.is_none_or(|r| r.version == RNG_VERSION),
+        match state.rng {
+            None => !world.stochastic(),
+            Some(r) => {
+                r.version == RNG_VERSION
+                    && r.combat.is_some() == world.random_combat()
+                    && r.world.is_some() == world.random_world()
+            }
+        },
         "random state does not match the world",
+    )?;
+    time(world, state)
+}
+
+/// The clock is within its bounds, and every mover is somewhere it may be.
+fn time(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    ensure(
+        match (&world.world.time, state.time) {
+            (Some(time), Some(now)) => now >= time.start && now <= realmkit_spec::WORLD_TIME_BOUND,
+            (None, None) => true,
+            _ => false,
+        },
+        "world time does not match the world",
+    )?;
+    let movers: Vec<_> = world
+        .characters
+        .iter()
+        .filter_map(|c| Some((&c.id, &c.moves.as_ref()?.among)))
+        .collect();
+    ensure(
+        state.whereabouts.len() == movers.len()
+            && movers.iter().all(|(id, among)| {
+                state
+                    .whereabouts
+                    .get(*id)
+                    .is_some_and(|at| among.contains(at))
+            }),
+        "a character who moves is somewhere it cannot be",
     )
 }
 
@@ -390,8 +425,22 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
         .flat_map(|g| g.victory_flags.iter().chain(&g.defeat_flags))
         .cloned()
         .collect();
+    // Events can have set their flags only once their first minute came.
+    let now = state.time.unwrap_or(0);
     let dialogue_flags: BTreeSet<_> = world
-        .effects()
+        .dialogues
+        .iter()
+        .flat_map(|d| &d.nodes)
+        .flat_map(|n| &n.choices)
+        .flat_map(|c| &c.effects)
+        .chain(
+            world
+                .world
+                .events
+                .iter()
+                .filter(|e| e.schedule.at <= now)
+                .flat_map(|e| &e.effects),
+        )
         .filter_map(|e| match e {
             Effect::SetFlag { flag } => Some(flag.clone()),
             _ => None,

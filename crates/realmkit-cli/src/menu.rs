@@ -1,7 +1,7 @@
 use crate::{
     input,
     render::Paint,
-    render::{direction_name, gear_name, piece_name, stat_name},
+    render::{direction_name, duration, gear_name, piece_name, stat_name},
 };
 use realmkit_engine::{Command, Engine};
 use realmkit_spec::{Resource, Stat};
@@ -12,6 +12,8 @@ use std::io::{self, Write};
 const TALK: &str = "Talk to";
 const ATTACK: &str = "Attack";
 const TRAVEL: &str = "Travel";
+const TRAVEL_TO: &str = "Travel to";
+const WAIT: &str = "Wait";
 const LOCKED: &str = "[locked]";
 const ON: &str = "on";
 const ENGAGE: &str = "Engage";
@@ -221,6 +223,24 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 format!(" {LOCKED}")
             }
         ),
+        // "Travel to Ashmere — 2 h", or "[locked]" like an exit.
+        Command::Travel(to) => {
+            let road = world.road(&here.id, to)?;
+            format!(
+                "{TRAVEL_TO} {}{}{}",
+                world.location(to)?.name,
+                if road.minutes > 0 {
+                    format!(" — {}", duration(road.minutes))
+                } else {
+                    String::new()
+                },
+                if action.available {
+                    String::new()
+                } else {
+                    format!(" {LOCKED}")
+                }
+            )
+        }
         // Like a locked exit, choosing it explains why it cannot be used.
         Command::UseSkill { skill, target } => {
             let skill = world.skill(skill).unwrap();
@@ -306,6 +326,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         }
         _ if !action.available => return None,
         Command::Rest => REST.into(),
+        Command::Wait(minutes) => format!("{WAIT} — {}", duration(*minutes)),
         Command::Flee => FLEE.into(),
         // "Train Attack: 12 → 13", from the same effective stats the engine uses.
         Command::Allocate { stat, .. } => {
@@ -598,7 +619,7 @@ impl Menu {
             Key::Char(c @ '1'..='9') => return self.choose(c as usize - '0' as usize),
             // Letter shortcuts (movement, panels) apply only outside dialogue focus.
             Key::Char(c) if !self.dialogue => {
-                return match input::parse(&c.to_string()) {
+                return match input::shortcut(c) {
                     Ok(input::Input::Command(command)) => Outcome::Run(command),
                     Ok(input::Input::Help) => Outcome::Help,
                     _ => Outcome::Ignore,

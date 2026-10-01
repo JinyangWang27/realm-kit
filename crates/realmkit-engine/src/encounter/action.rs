@@ -91,8 +91,8 @@ fn hit(
         Some(s) => s.crit,
         None => basic_crit(world, a),
     };
-    let critical = match (crit, rng.as_mut()) {
-        (Some(c), Some(rng)) => rng::chance(&mut rng.combat, c.chance_percent),
+    let critical = match (crit, rng.as_mut().and_then(|r| r.combat.as_mut())) {
+        (Some(c), Some(stream)) => rng::chance(stream, c.chance_percent),
         _ => false,
     };
     let multiplier = crit

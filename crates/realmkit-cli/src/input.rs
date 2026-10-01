@@ -23,6 +23,12 @@ pub fn help(world: &WorldSpec) -> String {
     if combat.is_some_and(|c| c.stat_points.is_some()) {
         attack += "allocate hp|mp|patk|pdef|satk|sdef|speed [points]\nrespec — refund stat points, where allowed\n";
     }
+    if !world.world.roads.is_empty() {
+        attack += "travel <location-id> — take the road there (or go <location-id>)\n";
+    }
+    if world.world.time.as_ref().is_some_and(|t| t.wait.is_some()) {
+        attack += "wait [minutes] — let time pass (90, 2h or 1d)\n";
+    }
     format!("<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\n{attack}talk <character-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nsave\nload [number] — list saves, or restore one\nhelp\nquit")
 }
 
@@ -72,7 +78,32 @@ fn direction(value: &str) -> Option<Direction> {
     }
 }
 
-pub fn parse(line: &str) -> Result<Input, &'static str> {
+/// Minutes as typed: a number, optionally ending in `m`, `h` or `d`.
+fn minutes(value: &str) -> Result<u64, &'static str> {
+    let (number, unit) = match value.char_indices().last() {
+        Some((i, 'm')) => (&value[..i], 1),
+        Some((i, 'h')) => (&value[..i], 60),
+        Some((i, 'd')) => (&value[..i], 1_440),
+        _ => (value, 1),
+    };
+    number
+        .parse::<u64>()
+        .ok()
+        .and_then(|n| n.checked_mul(unit))
+        .ok_or("expected minutes, such as 90, 2h or 1d")
+}
+
+pub fn parse(world: &WorldSpec, line: &str) -> Result<Input, &'static str> {
+    parse_with(line, world.world.time.as_ref().and_then(|t| t.wait))
+}
+
+/// A one-letter key typed outside a conversation, such as `n` or `i`.
+pub fn shortcut(key: char) -> Result<Input, &'static str> {
+    parse_with(&key.to_string(), None)
+}
+
+/// `wait` alone waits the world's authored step, if it has one.
+fn parse_with(line: &str, wait_step: Option<u64>) -> Result<Input, &'static str> {
     let words: Vec<_> = line.split_whitespace().collect();
     let Some(verb) = words.first() else {
         return Ok(Input::Blank);
@@ -93,9 +124,14 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
         ("status" | "c", []) => Command::Status,
         ("quests" | "q", []) => Command::Quests,
         ("techniques" | "t", []) => Command::Techniques,
-        ("go", [value]) => {
-            Command::Move(direction(&value.to_ascii_lowercase()).ok_or("unknown direction")?)
-        }
+        // A direction, or else a location a road leads to.
+        ("go", [value]) => match direction(&value.to_ascii_lowercase()) {
+            Some(direction) => Command::Move(direction),
+            None => Command::Travel((*value).into()),
+        },
+        ("travel", [id]) => Command::Travel((*id).into()),
+        ("wait", []) => Command::Wait(wait_step.ok_or("this world has no waiting")?),
+        ("wait", [value]) => Command::Wait(minutes(&value.to_ascii_lowercase())?),
         ("engage", [id]) => Command::Engage((*id).into()),
         ("attack", [id]) => Command::Attack((*id).into()),
         ("use", [skill, target]) => Command::UseSkill {
@@ -136,6 +172,15 @@ pub fn parse(line: &str) -> Result<Input, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse(line: &str) -> Result<Input, &'static str> {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/demo-world"
+        ))
+        .unwrap();
+        super::parse(&world, line)
+    }
 
     #[test]
     fn maps_all_directions_and_preserves_entity_ids() {
@@ -197,6 +242,26 @@ mod tests {
             Ok(Input::Command(Command::Forge("iron_sword".into())))
         );
         assert_eq!(parse("improve #1"), Ok(Input::Command(Command::Improve(1))));
+        assert_eq!(
+            parse("travel ashmere"),
+            Ok(Input::Command(Command::Travel("ashmere".into())))
+        );
+        // `go` takes a direction, or else a place a road leads to.
+        assert_eq!(
+            parse("go Ashmere"),
+            Ok(Input::Command(Command::Travel("Ashmere".into())))
+        );
+        assert_eq!(parse("wait 90"), Ok(Input::Command(Command::Wait(90))));
+        assert_eq!(parse("wait 2h"), Ok(Input::Command(Command::Wait(120))));
+        assert_eq!(parse("wait 1D"), Ok(Input::Command(Command::Wait(1_440))));
+        assert!(parse("wait soon").is_err());
+        assert!(parse("wait h").is_err());
+        // The demo has no clock, so a bare wait has no step to take.
+        assert!(parse("wait").is_err());
+        assert_eq!(
+            super::parse_with("wait", Some(60)),
+            Ok(Input::Command(Command::Wait(60)))
+        );
         assert_eq!(
             parse("enchant 2 keenness"),
             Ok(Input::Command(Command::Enchant {

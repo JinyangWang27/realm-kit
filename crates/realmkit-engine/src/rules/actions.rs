@@ -23,26 +23,34 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         return fight_actions(world, state, encounter, panels);
     }
     let location = world.location(&state.player.location).unwrap();
-    let mut actions: Vec<_> = location
-        .characters
+    let here = placed_here(world, state);
+    let mut actions: Vec<_> = here
         .iter()
         .filter(|id| npc_here(world, state, id))
-        .map(|id| available(Command::Talk(id.clone())))
+        .map(|id| available(Command::Talk((*id).clone())))
         .collect();
     if state.combat.is_some() {
         actions.extend(
-            location
-                .characters
-                .iter()
+            here.iter()
                 .filter(|id| !defeated(state, id))
                 .filter(|id| character_here(world, state, id).is_some_and(|c| c.combat.is_some()))
-                .map(|id| available(Command::Engage(id.clone()))),
+                .map(|id| available(Command::Engage((*id).clone()))),
         );
     }
     actions.extend(location.exits.iter().map(|(direction, exit)| Action {
         command: Command::Move(*direction),
         available: allowed(state, exit.requires.as_ref()),
     }));
+    // Roads in authored order; a closed one is listed to explain itself.
+    actions.extend(world.world.roads.iter().filter_map(|road| {
+        Some(Action {
+            command: Command::Travel(road.leads(&location.id)?.clone()),
+            available: allowed(state, road.requires.as_ref()),
+        })
+    }));
+    if let Some(step) = world.world.time.as_ref().and_then(|t| t.wait) {
+        actions.push(available(Command::Wait(step)));
+    }
     if state.combat.is_some() && location.safe {
         actions.push(available(Command::Rest));
     }

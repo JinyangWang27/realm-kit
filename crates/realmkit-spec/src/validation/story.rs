@@ -122,13 +122,13 @@ pub(super) fn dialogues(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             }
             condition(out, w, &dialogue.id, choice.requires.as_ref());
             for effect in &choice.effects {
-                dialogue_effect(out, w, &dialogue.id, effect);
+                self::effect(out, w, &dialogue.id, effect);
             }
         }
     }
 }
 
-fn dialogue_effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effect: &Effect) {
+pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effect: &Effect) {
     match effect {
         Effect::AcceptQuest { quest } | Effect::CompleteQuest { quest } => {
             reference(out, owner, "quest", quest, w.quest(quest).is_some())

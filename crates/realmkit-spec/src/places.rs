@@ -54,6 +54,9 @@ pub struct Character {
     pub dialogue: Option<Id>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub combat: Option<CombatProfile>,
+    /// Moves among locations on a schedule instead of staying where placed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moves: Option<Moves>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

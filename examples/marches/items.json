@@ -1,0 +1,4 @@
+[
+  { "id": "sealed_letter", "name": "Sealed letter", "description": "The reeve's seal, pressed hard into green wax." },
+  { "id": "keep_token", "name": "Keep token", "description": "A holly-leaf badge that opens the keep's gate after dusk." }
+]

@@ -95,6 +95,29 @@ pub fn stat_name(world: &realmkit_spec::WorldSpec, stat: Stat) -> String {
     }
 }
 
+/// "45 min", "1 h 30 min", "2 d 4 h".
+pub fn duration(minutes: u64) -> String {
+    let (days, hours, mins) = (minutes / 1_440, minutes % 1_440 / 60, minutes % 60);
+    let parts: Vec<String> = [(days, "d"), (hours, "h"), (mins, "min")]
+        .into_iter()
+        .filter(|(n, _)| *n > 0)
+        .map(|(n, unit)| format!("{n} {unit}"))
+        .collect();
+    if parts.is_empty() {
+        "0 min".into()
+    } else {
+        parts.join(" ")
+    }
+}
+
+/// The world's clock at `minute`, from its authored template.
+pub fn clock(world: &realmkit_spec::WorldSpec, minute: u64) -> Option<String> {
+    let time = world.world.time.as_ref()?;
+    let values = realmkit_spec::clock_values(minute);
+    let values: Vec<(&str, &str)> = values.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    interpolate(&time.clock, &values).ok()
+}
+
 pub fn direction_name(direction: Direction) -> &'static str {
     match direction {
         Direction::North => "north",
@@ -217,6 +240,8 @@ pub fn events(
     let world = engine.world();
     let name = |id: &str| &world.character(id).unwrap().name;
     let player = name(&world.world.player);
+    // After travel the location shows the clock, so the time is not repeated.
+    let travelled = events.iter().any(|e| matches!(e, Event::Moved { .. }));
     for event in events {
         match event {
             Event::LocationViewed { location } => {
@@ -379,6 +404,20 @@ pub fn events(
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,
             Event::QuestsViewed => panels::quests(output, engine, paint)?,
+            Event::TimePassed { .. } if travelled => {}
+            Event::TimePassed { minutes, now } => writeln!(
+                output,
+                "{}",
+                paint.dim(&format!(
+                    "{} later: {}",
+                    duration(*minutes),
+                    clock(world, *now).unwrap_or_default()
+                ))
+            )?,
+            Event::CharacterArrived { character } => {
+                writeln!(output, "{} arrives.", name(character))?
+            }
+            Event::CharacterLeft { character } => writeln!(output, "{} leaves.", name(character))?,
             Event::Moved { .. } | Event::DialogueEnded | Event::StoryFlagSet { .. } => {}
         }
     }

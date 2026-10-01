@@ -144,7 +144,7 @@ M5 slices.
    The whole transition commits or fails together. Each effect variant arrives
    with the capability that owns its state: paying coin, changing standing,
    adding troops, granting a holding.
-3. **World time and travel.** Optional world time follows
+3. **World time and travel** (delivered in M5b). Optional world time follows
    [Section 9](open-decisions.md#9-time-models): minutes from an authored epoch,
    advanced only by explicit actions. The sandbox needs three additions:
    - Roads carry an authored travel duration.
@@ -235,8 +235,8 @@ M5 slices.
    chosen identity. The answers themselves are saved only as the state they
    produced and a list of chosen option IDs for display. Start choices are
    not runtime identity editing: once play begins, nothing re-runs them.
-10. **Characters who move.** Lords travel with their parties, but other
-    characters move too: a travelling storyteller, a ransom broker or an
+10. **Characters who move** (delivered in M5b). Lords travel with their
+    parties, but other characters move too: a travelling storyteller, a ransom broker or an
     unhired companion who drifts between taverns. A character may author a set
     of locations and a recurring schedule; on each occurrence the engine moves
     it to one of them, drawn from a `world` RNG domain. Its location is saved

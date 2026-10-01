@@ -1,7 +1,8 @@
 # World package format 12
 
-Format 12 composes conditions with `all`, `any` and `not` and gives dialogue
-choices ordered effect lists. Combat stays optional. The level table and combat prose live in an
+Format 12 composes conditions with `all`, `any` and `not`, gives dialogue
+choices ordered effect lists, and adds optional world time with roads,
+scheduled events and characters who move. Combat stays optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
@@ -60,7 +61,7 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat` block |
+| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat` and `time` blocks, optional `roads` and `events` |
 | `locations.json` | Array of locations with descriptions, directional exits and placed character IDs |
 | `characters.json` | Array of characters with descriptions, availability conditions, and optional dialogue and combat profile |
 | `items.json` | Array of items with names and descriptions |
@@ -148,6 +149,8 @@ composition of others:
   dialogue choice or a character.
 - `item` holds while the player carries at least `quantity` (1 or more) of a
   counted item; equipment pieces are individuals and cannot be counted.
+- `time_of_day` holds during part of each day; see
+  [World time](#world-time-roads-and-events).
 - `all` holds when every condition in `of` does, `any` when at least one
   does, and `not` when its `condition` does not. `of` must not be empty.
 
@@ -155,6 +158,106 @@ All flags start unset. Dialogue `set_flag` effects and quest completion flags
 set them; flags are monotonic in this version. Evaluating a condition is pure:
 showing a menu or a choice never changes state. Predicates stay typed: there
 are no property paths, formula strings or generic numeric comparisons.
+
+## World time, roads and events
+
+A world may keep a clock. The optional `time` block in `world.json` counts
+minutes from an authored epoch; the clock moves only when the player travels a
+road, waits or rests, never on its own and never for other commands. A world
+without it has no time at all, and its saves carry none.
+
+```json
+"time": {
+  "start": 480,
+  "clock": "Day {day}, {hour}:{minute}",
+  "wait": 60,
+  "rest": 480
+}
+```
+
+- `start` is the minute a new game begins at (here 08:00 on day 1), at most
+  1,000,000,000.
+- `clock` is how clients show the time: `{day}` counts from 1, `{hour}` and
+  `{minute}` have two digits. A day has 1,440 minutes.
+- `wait`, if present, lets the player wait; the menu offers this many minutes
+  at a time and `wait <minutes>` (or `wait 2h`, `wait 1d`) any length from 1
+  to 43,200 minutes. Without it there is no waiting.
+- `rest`, if present, is how long resting at a safe place takes; it needs the
+  combat block.
+
+`roads` join locations, in either direction:
+
+```json
+"roads": [
+  { "id": "greyford-ashmere", "between": ["greyford", "ashmere"], "minutes": 120 },
+  {
+    "id": "fen-causeway",
+    "between": ["ashmere", "vellmarket"],
+    "minutes": 180,
+    "requires": { "kind": "flag", "flag": "thaw" },
+    "blocked_text": "Meltwater still covers the fen causeway."
+  }
+]
+```
+
+A road joins two different locations, and at most one road joins any pair.
+`travel <location-id>` (or `go <location-id>`) takes the road from the
+player's location: the player arrives, then its `minutes` (up to 43,200) pass.
+A road without minutes takes no time and needs no clock. A road may have a
+`requires` condition, and then needs a `blocked_text` shown when it does not
+hold. Roads and compass exits can be mixed, even at one location; exits stay
+directed and take no time. Clients list roads in authored order.
+
+`events` happen on a schedule:
+
+```json
+"events": [
+  { "id": "thaw", "schedule": { "at": 2280 }, "effects": [{ "kind": "set_flag", "flag": "thaw" }] },
+  { "id": "bell", "schedule": { "at": 1800, "every": 1440 }, "requires": { ... }, "effects": [ ... ] }
+]
+```
+
+A `schedule` first falls at minute `at`, which must be after `start`, and then,
+if it has one, every `every` minutes (at least 1). An occurrence applies the
+event's `effects` in order when its optional `requires` holds, and does nothing
+otherwise. Events may `set_flag`, `grant_items` and `grant_technique` (a
+recurring event without XP); they cannot accept or complete quests or take
+items, which belong to conversations.
+
+A character may move among locations on a schedule:
+
+```json
+{
+  "id": "wenna",
+  "name": "Old Wenna",
+  "dialogue": "wenna",
+  "moves": { "among": ["greyford", "ashmere", "vellmarket"], "schedule": { "at": 1800, "every": 1440 } }
+}
+```
+
+At each occurrence it goes to one of `among` (two or more locations), drawn
+from the world's seeded random stream; it may stay where it is. It starts
+where it is placed, which must be exactly one location of `among`, and is
+present only where it is now. A mover has no combat profile. The client is
+told when it arrives at or leaves the player's location.
+
+When time passes, every occurrence it crosses happens in chronological order,
+with the clock at that occurrence's minute. Occurrences at the same minute go
+in schedule order: events in authored order, then movers in character order.
+Because every first occurrence is after `start`, nothing is due when play
+begins, and an occurrence can never schedule another at its own minute. Saves
+keep the minute and each mover's location; the next occurrence of every
+schedule follows from the minute, so nothing else is saved.
+
+A `time_of_day` condition holds while the minute of the day is in
+`from..to`, wrapping past midnight when `from` is larger:
+
+```json
+{ "kind": "time_of_day", "from": 480, "to": 1200 }
+```
+
+It needs the time block, as do events, movers and roads with minutes
+(`time_disabled` otherwise).
 
 ## Characters
 
@@ -602,8 +705,11 @@ A skill's `crit`, the combat block's `player_basic_crit` and a profile's
 
 The chance is 1–100% and the multiplier 101–1,000% of a normal hit, applied
 inside the damage formula before its single rounding. A world that authors any
-crit keeps a seeded random stream in its saved state (SplitMix64, versioned);
-every other world keeps none and plays exactly as it did. A draw happens only
+crit keeps a seeded `combat` stream in its saved state (SplitMix64, versioned),
+and a world with characters who move keeps a separate `world` stream; each
+starts from the seed mixed with its own constant, so draws in one never shift
+the other. A world with neither keeps no random state and plays exactly as it
+did. A draw happens only
 when an action with a crit resolves, so a refused command never consumes one,
 and the same seed and commands always replay identically. Clients choose the
 seed (the CLI takes `--seed`, else uses the clock, and prints it).

@@ -6,6 +6,7 @@ mod actions;
 mod crafting;
 mod player;
 mod story;
+mod time;
 
 pub(super) use actions::actions;
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
@@ -29,6 +30,15 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
             .inventory
             .get(item)
             .is_some_and(|n| n >= quantity),
+        // Validation keeps time conditions to worlds with a clock.
+        Condition::TimeOfDay { from, to } => state.time.is_some_and(|now| {
+            let minute = now % realmkit_spec::MINUTES_PER_DAY;
+            if from < to {
+                (*from..*to).contains(&minute)
+            } else {
+                minute >= *from || minute < *to
+            }
+        }),
     }
 }
 
@@ -68,21 +78,42 @@ fn fighting(state: &GameState) -> Option<&Encounter> {
     }
 }
 
-/// Placed at the player's location and present under its conditions.
+/// Characters at the player's location, whatever their conditions: those
+/// placed here in the location's order, then movers who are here now.
+pub(super) fn placed_here<'a>(world: &'a WorldSpec, state: &GameState) -> Vec<&'a Id> {
+    let here = &state.player.location;
+    let placed = world
+        .location(here)
+        .unwrap()
+        .characters
+        .iter()
+        .filter(|id| !state.whereabouts.contains_key(*id));
+    let movers = world
+        .characters
+        .iter()
+        .filter(|c| state.whereabouts.get(&c.id) == Some(here))
+        .map(|c| &c.id);
+    placed.chain(movers).collect()
+}
+
+/// At the player's location and present under its conditions.
 pub(super) fn character_here<'a>(
     world: &'a WorldSpec,
     state: &GameState,
     id: &str,
 ) -> Option<&'a Character> {
-    let placed = world
-        .location(&state.player.location)
-        .unwrap()
-        .characters
-        .iter()
-        .any(|c| c == id);
+    let here = match state.whereabouts.get(id) {
+        Some(at) => *at == state.player.location,
+        None => world
+            .location(&state.player.location)
+            .unwrap()
+            .characters
+            .iter()
+            .any(|c| c == id),
+    };
     world
         .character(id)
-        .filter(|c| placed && allowed(state, c.requires.as_ref()))
+        .filter(|c| here && allowed(state, c.requires.as_ref()))
 }
 
 /// Can be talked to here; a defeated fighter is gone, like its listing.
@@ -129,6 +160,8 @@ pub(super) fn execute(
         Command::Quests => events.push(Event::QuestsViewed),
         Command::Techniques => events.push(Event::TechniquesViewed),
         Command::Move(direction) => move_to(world, state, direction, &mut events)?,
+        Command::Travel(to) => time::travel(world, state, to, &mut events)?,
+        Command::Wait(minutes) => time::wait(world, state, minutes, &mut events)?,
         Command::Talk(id) => story::talk(world, state, id, &mut events)?,
         Command::ChooseDialogue(number) => story::choose(world, state, number, &mut events)?,
         Command::AcceptQuest(id) => {

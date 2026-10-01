@@ -1081,7 +1081,15 @@ above are delivered alongside them, in whichever order a fixture needs them.
    the six compass directions; wait and rest actions that consume time; and
    recurring schedules that the dispatch cursor expands lazily, one due
    occurrence at a time; and characters who move among authored locations on
-   a schedule, drawn from a `world` RNG domain.
+   a schedule, drawn from a `world` RNG domain. **Delivered** (Format 12):
+   undirected roads with minutes, conditions and blocked text, mixable with
+   compass exits; `wait` with an authored menu step and `rest` with an
+   authored duration; one-shot and recurring authored events whose effects
+   are flags, items and technique grants; movers; and a `time_of_day`
+   condition. Only the minute and movers' locations are saved, since every
+   next occurrence follows from the minute. Effects cannot start or stop a
+   schedule; conditions gate what an occurrence does. `examples/marches`
+   begins here.
 3. **M5c — quest lifecycle.** Quests that fail, carry world-time deadlines or
    are abandoned, plus repeatable offers: job templates whose parameters the
    saved RNG draws from authored candidate lists at an explicit gameplay

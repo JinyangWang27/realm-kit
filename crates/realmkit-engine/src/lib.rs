@@ -73,7 +73,21 @@ impl<'w> Engine<'w> {
                 flags: BTreeSet::new(),
                 dialogue: None,
                 turn: 0,
-                rng: world.stochastic().then(|| RngState::new(seed)),
+                rng: RngState::for_world(world, seed),
+                time: world.world.time.as_ref().map(|t| t.start),
+                // Each mover starts where it is placed.
+                whereabouts: world
+                    .characters
+                    .iter()
+                    .filter(|c| c.moves.is_some())
+                    .filter_map(|c| {
+                        let start = world
+                            .locations
+                            .iter()
+                            .find(|l| l.characters.contains(&c.id))?;
+                        Some((c.id.clone(), start.id.clone()))
+                    })
+                    .collect(),
             },
         };
         // Starting techniques, then vitals at the maxima their passives give.
@@ -177,6 +191,12 @@ impl<'w> Engine<'w> {
                 .map(|c| c.text.as_str())
                 .collect()
         })
+    }
+
+    /// Characters at the player's location, whatever their conditions: those
+    /// placed here, then characters who move and are here now.
+    pub fn placed_here(&self) -> Vec<&'w Id> {
+        rules::placed_here(self.world, &self.state)
     }
 
     /// Whether a condition holds now; evaluating it changes nothing.

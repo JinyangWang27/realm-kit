@@ -1,0 +1,33 @@
+{
+  "format_version": 12,
+  "id": "marches",
+  "name": "The Marches",
+  "language": "en",
+  "start": "greyford",
+  "player": "traveller",
+  "flags": ["letter_delivered", "thaw"],
+  "time": {
+    "start": 480,
+    "clock": "Day {day}, {hour}:{minute}",
+    "wait": 60
+  },
+  "roads": [
+    { "id": "greyford-ashmere", "between": ["greyford", "ashmere"], "minutes": 120 },
+    { "id": "greyford-hollin", "between": ["greyford", "hollin_keep"], "minutes": 240 },
+    { "id": "hollin-vellmarket", "between": ["hollin_keep", "vellmarket"], "minutes": 300 },
+    {
+      "id": "fen-causeway",
+      "between": ["ashmere", "vellmarket"],
+      "minutes": 180,
+      "requires": { "kind": "flag", "flag": "thaw" },
+      "blocked_text": "Meltwater still covers the fen causeway."
+    }
+  ],
+  "events": [
+    {
+      "id": "thaw",
+      "schedule": { "at": 2280 },
+      "effects": [{ "kind": "set_flag", "flag": "thaw" }]
+    }
+  ]
+}

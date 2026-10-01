@@ -1,0 +1,18 @@
+look
+travel ashmere
+talk reeve
+choose 1
+travel greyford
+travel hollin_keep
+talk steward
+choose 1
+travel greyford
+travel ashmere
+talk reeve
+choose 1
+travel vellmarket
+wait 16h
+travel vellmarket
+inventory
+quests
+quit

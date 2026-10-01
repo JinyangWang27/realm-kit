@@ -1,0 +1,23 @@
+[
+  { "id": "traveller", "name": "You", "description": "A traveller with a good pair of boots." },
+  {
+    "id": "reeve",
+    "name": "Reeve Odda",
+    "description": "She keeps the village tally on a notched stick she never puts down.",
+    "dialogue": "reeve"
+  },
+  {
+    "id": "steward",
+    "name": "Steward Brannoc",
+    "description": "He holds the keep while its lord rides the border.",
+    "requires": { "kind": "time_of_day", "from": 480, "to": 1200 },
+    "dialogue": "steward"
+  },
+  {
+    "id": "wenna",
+    "name": "Old Wenna",
+    "description": "A storyteller who sleeps wherever the last tale ran out.",
+    "dialogue": "wenna",
+    "moves": { "among": ["greyford", "ashmere", "vellmarket"], "schedule": { "at": 1800, "every": 1440 } }
+  }
+]

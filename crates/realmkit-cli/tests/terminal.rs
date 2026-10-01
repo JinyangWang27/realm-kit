@@ -519,3 +519,44 @@ fn the_smithy_forges_improves_and_keeps_copies_apart() {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
 }
+
+const MARCHES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/marches");
+
+#[test]
+fn the_marches_pass_time_on_roads_and_by_waiting() {
+    let dir = saves_dir("marches");
+    let walkthrough = std::fs::read_to_string(format!("{MARCHES}/walkthrough.txt")).unwrap();
+    let output = run(
+        &["play", MARCHES, "--line", "--seed", "7", "--saves", &dir],
+        &walkthrough,
+    );
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "Greyford\nDay 1, 08:00\n",
+        "Roads: Ashmere (2 h), Hollin Keep (4 h)\n",
+        "2. Travel to Ashmere — 2 h",
+        "3. Travel to Vellmarket — 3 h [locked]",
+        "4. Wait — 1 h",
+        "Ashmere\nDay 1, 10:00\n",
+        "Roads: Greyford (2 h), Vellmarket (3 h, closed)",
+        "Hollin Keep\nDay 1, 16:00\n",
+        "Meltwater still covers the fen causeway.",
+        "16 h later: Day 2, 14:00",
+        "Vellmarket\nDay 2, 17:00\n",
+        "The Reeve's Letter [carry_letter]: Completed",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    // Travel shows the clock once, at the destination.
+    assert!(!text.contains("2 h later"), "{text}");
+    let help = String::from_utf8(run(&["play", MARCHES], "help\n").stdout).unwrap();
+    assert!(help.contains("travel <location-id>"));
+    assert!(help.contains("wait [minutes]"));
+    // A save made on the road resumes at the same minute.
+    let resumed = run(&["play", MARCHES, "--line", "--saves", &dir], "load\n");
+    assert!(String::from_utf8(resumed.stdout)
+        .unwrap()
+        .contains("Loaded save 2."));
+    std::fs::remove_dir_all(dir).unwrap();
+}

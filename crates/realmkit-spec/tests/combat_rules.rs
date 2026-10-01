@@ -158,6 +158,7 @@ fn groups_and_profile_levels_are_validated() {
                 requires: None,
                 dialogue: Some("orders".into()),
                 combat: None,
+                moves: None,
             });
             w.dialogues.push(Dialogue {
                 id: "orders".into(),

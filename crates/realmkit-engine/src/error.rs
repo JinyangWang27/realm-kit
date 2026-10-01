@@ -10,6 +10,14 @@ pub enum EngineError {
     NoExit,
     #[error("that exit is locked")]
     ExitLocked { location: Id, direction: Direction },
+    #[error("there is no road from here to {0}")]
+    NoRoad(Id),
+    #[error("that road is closed")]
+    RoadBlocked { road: Id },
+    #[error("time cannot be passed by waiting in this world")]
+    NoWaiting,
+    #[error("a wait lasts 1 to 43,200 minutes")]
+    InvalidWait,
     #[error("{0} is not available here")]
     NotHere(Id),
     #[error("{0} has already been defeated")]
