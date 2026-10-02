@@ -95,6 +95,14 @@ pub fn stat_name(world: &realmkit_spec::WorldSpec, stat: Stat) -> String {
     }
 }
 
+/// A soldier's name at a line's 1-based level, as the line authors it.
+pub fn soldier(world: &realmkit_spec::WorldSpec, line: &str, level: usize) -> String {
+    world
+        .troops()
+        .and_then(|t| t.line(line))
+        .map_or_else(|| line.to_string(), |l| l.name_at(level).to_string())
+}
+
 /// An amount in the world's currency, such as "120 silver".
 pub fn money(world: &realmkit_spec::WorldSpec, amount: u64) -> String {
     let amount = amount.to_string();
@@ -366,6 +374,45 @@ pub fn events(
                 let restored = if mp { "Health and MP" } else { "Health" };
                 writeln!(output, "You rest. {restored} restored.")?
             }
+            Event::Recruited { line, quantity, .. } => {
+                writeln!(output, "Recruited: {} ×{quantity}", soldier(world, line, 1))?
+            }
+            Event::Upgraded {
+                line, to, quantity, ..
+            } => {
+                let from = world.troops().unwrap().line(line).unwrap().levels.len();
+                writeln!(
+                    output,
+                    "{} ×{quantity} become {}.",
+                    soldier(world, line, from),
+                    soldier(world, to, 1)
+                )?
+            }
+            Event::Promoted { line, level, count } => writeln!(
+                output,
+                "{}",
+                paint.good(&format!(
+                    "Promoted: {} ×{count} (level {level}).",
+                    soldier(world, line, *level)
+                ))
+            )?,
+            Event::WagesPaid { amount } => {
+                writeln!(output, "Wages paid: {}", money(world, *amount))?
+            }
+            Event::Deserted { line, level, count } => writeln!(
+                output,
+                "{}",
+                paint.bad(&format!(
+                    "Unpaid, {} ×{count} desert.",
+                    soldier(world, line, *level)
+                ))
+            )?,
+            Event::Recovered { line, level, count } => writeln!(
+                output,
+                "Recovered: {} ×{count}",
+                soldier(world, line, *level)
+            )?,
+            Event::RetinueViewed => panels::retinue(output, engine, paint)?,
             Event::Consumed { item, hp, mp } => {
                 let mut gains = Vec::new();
                 if *hp > 0 {

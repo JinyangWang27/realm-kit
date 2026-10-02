@@ -138,6 +138,37 @@ pub struct GameState {
     /// Currency and prices; present only in worlds with an economy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub economy: Option<EconomyState>,
+    /// Soldiers and recruiting pools; present only in worlds with troops.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retinue: Option<RetinueState>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RetinueState {
+    /// Soldiers by line, then 1-based level. A squad is never empty.
+    pub roster: BTreeMap<Id, BTreeMap<usize, Squad>>,
+    /// Recruits left at each recruiting place, by line.
+    pub pools: BTreeMap<Id, BTreeMap<Id, u64>>,
+}
+
+/// The soldiers of one line at one level, who share their XP.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Squad {
+    pub healthy: u64,
+    pub wounded: u64,
+    pub xp: u64,
+}
+
+impl Squad {
+    pub fn heads(&self) -> u64 {
+        self.healthy + self.wounded
+    }
+    /// Each soldier's part of the XP, rounded down.
+    pub fn share(&self) -> u64 {
+        self.xp.checked_div(self.heads()).unwrap_or(0)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

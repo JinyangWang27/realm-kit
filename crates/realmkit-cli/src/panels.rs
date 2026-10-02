@@ -156,6 +156,58 @@ fn bonuses(world: &realmkit_spec::WorldSpec, equipment: &realmkit_spec::Equipmen
     }
 }
 
+/// Soldiers by line and level, with the wounded, each squad's XP toward its
+/// next level, the head count against the limit and the wages they draw.
+pub fn retinue(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
+    let world = engine.world();
+    let (Some(troops), Some(retinue)) = (world.troops(), &engine.state().retinue) else {
+        return Ok(());
+    };
+    let heads: u64 = retinue
+        .roster
+        .values()
+        .flat_map(|l| l.values())
+        .map(|s| s.heads())
+        .sum();
+    writeln!(
+        output,
+        "{}",
+        paint.title(&format!("Retinue: {heads}/{}", troops.limit))
+    )?;
+    if heads == 0 {
+        writeln!(output, "  Nobody yet")?;
+    }
+    let mut wages = 0;
+    for line in &troops.lines {
+        let Some(levels) = retinue.roster.get(&line.id) else {
+            continue;
+        };
+        for (level, squad) in levels.iter().rev() {
+            wages += line.wage_at(*level) * squad.heads();
+            let wounded = if squad.wounded > 0 {
+                format!(" · {} wounded", squad.wounded)
+            } else {
+                String::new()
+            };
+            let progress = match line.levels.get(*level) {
+                Some(next) => format!(" · XP {}/{}", squad.share(), next.xp),
+                None if !line.upgrades.is_empty() => " · ready to upgrade".into(),
+                None => String::new(),
+            };
+            writeln!(
+                output,
+                "  {} (L{level}) ×{}{wounded}{progress}",
+                line.name_at(*level),
+                squad.heads()
+            )?;
+        }
+    }
+    if wages > 0 {
+        writeln!(output, "  Wages due: {}", money(world, wages))?;
+    }
+    Ok(())
+}
+
 /// Pieces of equipment by number, then counted items.
 pub fn inventory(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();

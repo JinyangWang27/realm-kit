@@ -7,6 +7,7 @@ mod consume;
 mod crafting;
 mod economy;
 mod player;
+mod retinue;
 mod story;
 mod time;
 
@@ -148,6 +149,7 @@ pub(super) fn is_panel(command: &Command) -> bool {
             | Command::Quests
             | Command::Techniques
             | Command::Market
+            | Command::Retinue
     )
 }
 
@@ -177,6 +179,18 @@ pub(super) fn execute(
         Command::Status => events.push(Event::StatusViewed),
         Command::Quests => events.push(Event::QuestsViewed),
         Command::Techniques => events.push(Event::TechniquesViewed),
+        Command::Retinue => {
+            if state.retinue.is_none() {
+                return Err(EngineError::NoRetinue);
+            }
+            events.push(Event::RetinueViewed)
+        }
+        Command::Recruit { line, quantity } => {
+            retinue::recruit(world, state, line, quantity, &mut events)?
+        }
+        Command::Upgrade { line, to, quantity } => {
+            retinue::upgrade(world, state, line, to, quantity, &mut events)?
+        }
         Command::Market => {
             economy::market_here(world, state)?;
             events.push(Event::MarketViewed)

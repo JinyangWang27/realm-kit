@@ -15,6 +15,9 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     if world.combat().is_some_and(|c| !c.techniques.is_empty()) {
         panels.push(available(Command::Techniques));
     }
+    if state.retinue.is_some() {
+        panels.push(available(Command::Retinue));
+    }
     // Death is not a locked door: offer only what can still be done.
     if dead(state) {
         return panels;
@@ -86,9 +89,54 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         );
     }
     actions.extend(consumables(world, state));
+    actions.extend(soldiers(world, state));
     actions.extend(crafting::offered(world, state));
     actions.extend(trade(world, state));
     actions.extend(panels);
+    actions
+}
+
+/// Recruiting one of each line offered here, then upgrading one soldier of
+/// each last-level squad into each branch; unaffordable or impossible ones
+/// stay listed to explain themselves.
+fn soldiers(world: &WorldSpec, state: &GameState) -> Vec<Action> {
+    let (Some(troops), Some(retinue)) = (world.troops(), &state.retinue) else {
+        return Vec::new();
+    };
+    let currency = state.economy.as_ref().map_or(0, |e| e.currency);
+    let here = world.location(&state.player.location).unwrap();
+    let room = retinue::heads(retinue) < troops.limit;
+    let mut actions: Vec<_> = here
+        .recruits
+        .iter()
+        .flat_map(|r| &r.troops)
+        .map(|offer| Action {
+            command: Command::Recruit {
+                line: offer.line.clone(),
+                quantity: 1,
+            },
+            available: room && retinue.pools[&here.id][&offer.line] > 0 && currency >= offer.price,
+        })
+        .collect();
+    for line in &troops.lines {
+        let last = line.levels.len();
+        let ready = retinue
+            .roster
+            .get(&line.id)
+            .and_then(|l| l.get(&last))
+            .is_some_and(|s| s.healthy > 0);
+        if !ready {
+            continue;
+        }
+        actions.extend(line.upgrades.iter().map(|upgrade| Action {
+            command: Command::Upgrade {
+                line: line.id.clone(),
+                to: upgrade.to.clone(),
+                quantity: 1,
+            },
+            available: currency >= upgrade.cost,
+        }));
+    }
     actions
 }
 

@@ -76,6 +76,18 @@ pub enum EngineError {
     NotFighting,
     #[error("this is not a safe place to rest")]
     NotSafe,
+    #[error("{0} are not recruited here")]
+    NotRecruitedHere(Id),
+    #[error("no more {0} can be recruited here for now")]
+    PoolEmpty(Id),
+    #[error("this world has no soldiers")]
+    NoRetinue,
+    #[error("your retinue is full")]
+    RosterFull,
+    #[error("you do not have that many {0} to upgrade")]
+    NotEnoughTroops(Id),
+    #[error("{0} cannot be upgraded into {1}")]
+    NoSuchUpgrade(Id, Id),
     #[error("{0} cannot be used")]
     NotConsumable(Id),
     #[error("that would restore nothing")]

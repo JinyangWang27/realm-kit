@@ -5,11 +5,14 @@ use super::*;
 use realmkit_spec::{Schedule, DURATION_BOUND, WORLD_TIME_BOUND};
 
 /// Something that happens on a schedule. Occurrences at the same minute go
-/// in this order: authored events, characters who move, then the price tick.
+/// in this order: authored events, characters who move, the price tick, the
+/// retinue's upkeep, then recruiting pools refilling in location order.
 enum Due<'w> {
     Event(&'w realmkit_spec::WorldEvent),
     Mover(&'w Character),
     PriceTick,
+    Upkeep,
+    Refill(&'w realmkit_spec::Location),
 }
 
 fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
@@ -26,7 +29,20 @@ fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
         .economy()
         .and_then(|e| e.tick)
         .map(|t| (t.schedule, Due::PriceTick));
-    events.chain(movers).chain(prices).collect()
+    let upkeep = world
+        .troops()
+        .and_then(|t| t.upkeep)
+        .map(|u| (u.schedule, Due::Upkeep));
+    let refills = world.locations.iter().filter_map(|l| {
+        let refill = l.recruits.as_ref()?.refill?;
+        Some((refill.schedule, Due::Refill(l)))
+    });
+    events
+        .chain(movers)
+        .chain(prices)
+        .chain(upkeep)
+        .chain(refills)
+        .collect()
 }
 
 /// Moves world time on by `minutes` while the player stays where they are,
@@ -84,6 +100,8 @@ fn pass(
             }
             Due::Mover(character) => relocate(state, character, events, present),
             Due::PriceTick => economy::tick(world, state),
+            Due::Upkeep => retinue::upkeep(world, state, events),
+            Due::Refill(location) => retinue::refill(world, state, &location.id),
         }
     }
     state.time = Some(end);

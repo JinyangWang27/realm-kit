@@ -88,6 +88,19 @@ impl<'w> Engine<'w> {
                         Some((c.id.clone(), start.id.clone()))
                     })
                     .collect(),
+                // Every recruiting pool starts full.
+                retinue: world.troops().map(|_| RetinueState {
+                    roster: BTreeMap::new(),
+                    pools: world
+                        .locations
+                        .iter()
+                        .filter_map(|l| {
+                            let recruits = l.recruits.as_ref()?;
+                            let pools = recruits.troops.iter().map(|o| (o.line.clone(), o.size));
+                            Some((l.id.clone(), pools.collect()))
+                        })
+                        .collect(),
+                }),
                 economy: world.economy().map(|economy| EconomyState {
                     currency: economy.currency.start,
                     prices: economy

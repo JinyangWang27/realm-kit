@@ -4,6 +4,7 @@
 use super::*;
 
 mod combat;
+mod retinue;
 
 fn ensure(ok: bool, problem: &str) -> Result<(), String> {
     if ok {
@@ -28,6 +29,7 @@ pub(super) fn check(
     if let (Some(combat), Some(rules)) = (&state.combat, world.combat()) {
         combat::check(world, state, combat, rules, &progress)?;
     }
+    retinue::check(world, state)?;
     inventory(world, state, &progress)?;
     flags(world, state, &progress)?;
     dialogue(world, state)
@@ -73,6 +75,7 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                     && r.combat.is_some() == world.random_combat()
                     && r.world.is_some() == world.random_world()
                     && r.market.is_some() == world.random_market()
+                    && r.battle.is_some() == world.random_battle()
             }
         },
         "random state does not match the world",

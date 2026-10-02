@@ -35,6 +35,19 @@ pub enum Command {
     Flee,
     /// Restores HP and MP at a safe location.
     Rest,
+    /// Raises soldiers of a line from this location's pool.
+    Recruit {
+        line: Id,
+        quantity: u64,
+    },
+    /// Turns last-level soldiers of a line into level-1 soldiers of a branch.
+    Upgrade {
+        line: Id,
+        to: Id,
+        quantity: u64,
+    },
+    /// Shows the roster; only in worlds with troops.
+    Retinue,
     /// Uses one carried consumable: restores HP and MP; in an encounter, it
     /// is the player's turn.
     Use(Id),
@@ -144,6 +157,39 @@ pub enum Event {
         outcome: Outcome,
     },
     Rested,
+    Recruited {
+        line: Id,
+        quantity: u64,
+        cost: u64,
+    },
+    Upgraded {
+        line: Id,
+        to: Id,
+        quantity: u64,
+        cost: u64,
+    },
+    /// A squad rose to `level` together.
+    Promoted {
+        line: Id,
+        level: usize,
+        count: u64,
+    },
+    WagesPaid {
+        amount: u64,
+    },
+    /// Soldiers left over unpaid wages.
+    Deserted {
+        line: Id,
+        level: usize,
+        count: u64,
+    },
+    /// Wounded soldiers fit to fight again.
+    Recovered {
+        line: Id,
+        level: usize,
+        count: u64,
+    },
+    RetinueViewed,
     /// One unit of `item` was used; `hp` and `mp` are what it restored.
     Consumed {
         item: Id,
