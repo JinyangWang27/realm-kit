@@ -337,9 +337,13 @@ def main(argv: list[str]) -> None:
     market, stock = Stream(args.seed ^ DOMAIN_MARKET), Stream(args.seed ^ DOMAIN_STOCK)
     tick = economy.raw["tick"]["schedule"]
     for n in range(1, args.ticks + 1):
-        # Through the nth price tick's minute, so its prosperity, restock and
-        # settlement, which come after it at that minute, have happened too.
-        end = tick["at"] + (n - 1) * tick.get("every", 0)
+        # Through the nth price tick's minute, strictly after the last, as the
+        # engine finds it, so its prosperity, restock and settlement, which
+        # come after it at that minute, have happened too. A one-off tick
+        # has no second occurrence.
+        end = next_minute(tick, start, False)
+        if end is None:
+            break
         economy.run(start, end, market, stock)
         start = end
         if not args.prices:
