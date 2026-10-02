@@ -202,6 +202,17 @@ pub struct Squad {
     pub xp: u64,
 }
 
+impl RetinueState {
+    /// Healthy and wounded soldiers in every squad.
+    pub fn heads(&self) -> u64 {
+        self.roster
+            .values()
+            .flat_map(|levels| levels.values())
+            .map(Squad::heads)
+            .sum()
+    }
+}
+
 impl Squad {
     pub fn heads(&self) -> u64 {
         self.healthy + self.wounded

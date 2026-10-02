@@ -163,12 +163,7 @@ pub fn retinue(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io
     let (Some(troops), Some(retinue)) = (world.troops(), &engine.state().retinue) else {
         return Ok(());
     };
-    let heads: u64 = retinue
-        .roster
-        .values()
-        .flat_map(|l| l.values())
-        .map(|s| s.heads())
-        .sum();
+    let heads = retinue.heads();
     writeln!(
         output,
         "{}",

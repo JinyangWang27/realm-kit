@@ -8,19 +8,9 @@ fn troops(world: &WorldSpec) -> &Troops {
     world.troops().unwrap()
 }
 
-/// Healthy and wounded soldiers in every squad.
-pub(crate) fn heads(retinue: &RetinueState) -> u64 {
-    retinue
-        .roster
-        .values()
-        .flat_map(|levels| levels.values())
-        .map(Squad::heads)
-        .sum()
-}
-
 /// Removes `count` soldiers who take their shares with them; a squad left
 /// empty drops whatever XP remains.
-fn leave(squad: &mut Squad, healthy: u64, wounded: u64) {
+pub(crate) fn leave(squad: &mut Squad, healthy: u64, wounded: u64) {
     let share = squad.share();
     squad.xp -= share * (healthy + wounded);
     squad.healthy -= healthy;
@@ -45,7 +35,7 @@ fn add(roster: &mut BTreeMap<Id, BTreeMap<usize, Squad>>, line: &str, level: usi
     into.xp = into.xp.saturating_add(squad.xp);
 }
 
-fn prune(retinue: &mut RetinueState) {
+pub(crate) fn prune(retinue: &mut RetinueState) {
     for levels in retinue.roster.values_mut() {
         levels.retain(|_, squad| squad.heads() > 0);
     }
@@ -105,7 +95,7 @@ pub(crate) fn recruit(
         return Err(EngineError::InvalidQuantity);
     }
     let retinue = state.retinue.as_mut().unwrap();
-    let full = heads(retinue) + quantity > troops(world).limit;
+    let full = retinue.heads() + quantity > troops(world).limit;
     let pool = retinue
         .pools
         .get_mut(&here.id)

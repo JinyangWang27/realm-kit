@@ -533,13 +533,10 @@ fn finish(
                 .get_mut(&start.line)
                 .and_then(|l| l.get_mut(&start.level))
                 .unwrap();
-            let share = squad.share();
-            squad.xp -= share * (lost - hurt);
-            squad.healthy -= lost;
+            // The killed take their shares; the wounded stay, out of the fight.
+            rules::leave(squad, lost - hurt, 0);
+            squad.healthy -= hurt;
             squad.wounded += hurt;
-            if squad.heads() == 0 {
-                squad.xp = 0;
-            }
             if hurt > 0 {
                 wounded.push((start.line.clone(), start.level, hurt));
             }
@@ -547,10 +544,7 @@ fn finish(
                 killed.push((start.line.clone(), start.level, lost - hurt));
             }
         }
-        for levels in retinue.roster.values_mut() {
-            levels.retain(|_, s| s.heads() > 0);
-        }
-        retinue.roster.retain(|_, l| !l.is_empty());
+        rules::prune(retinue);
     }
     state.combat.as_mut().unwrap().stance = Stance::Exploring(Vitals {
         hp: battle.hp.max(1),
