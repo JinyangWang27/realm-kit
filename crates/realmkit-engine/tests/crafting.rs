@@ -654,3 +654,47 @@ fn a_starting_technique_was_never_unlearned() {
         Err(EngineError::InvalidSave(why)) if why.contains("crafting")
     ));
 }
+
+#[test]
+fn a_sword_for_sale_is_no_evidence_of_forging_one() {
+    // A recipe that alone teaches Metalcraft, with no requirements of its own.
+    let mut world = smithy();
+    let combat = world.world.combat.as_mut().unwrap();
+    let mut metalcraft = combat.techniques[0].clone();
+    metalcraft.id = "metalcraft".into();
+    metalcraft.name = "Metalcraft".into();
+    combat.techniques.push(metalcraft);
+    combat.recipes[0].known_when = None;
+    combat.recipes[0].requires = None;
+    combat.recipes[0].trains = Some(TechniqueGrant {
+        technique: "metalcraft".into(),
+        rank: None,
+        xp: 0,
+    });
+    // Metalcraft learned, but no sword held: nothing was forged.
+    let claims_the_lesson = |world: &WorldSpec| -> bool {
+        let mut snapshot = Engine::new(world).unwrap().snapshot();
+        let combat = snapshot.state.combat.as_mut().unwrap();
+        combat
+            .techniques
+            .insert("metalcraft".into(), TechniqueState { rank: 1, xp: 0 });
+        Engine::restore(world, snapshot).is_ok()
+    };
+    assert!(!claims_the_lesson(&world));
+    // A forge that also sells swords changes nothing: buying teaches nothing.
+    world.world.economy = Some(
+        serde_json::from_str(
+            r#"{
+                "currency": { "format": "{amount} pence" },
+                "goods": [],
+                "markets": [{ "location": "forge", "kind": "town",
+                              "wares": [{ "item": "iron_sword", "price": 5 }] }],
+                "index_bounds": [100, 10000],
+                "spread_percent": 15,
+                "trade_step": 26
+            }"#,
+        )
+        .unwrap(),
+    );
+    assert!(!claims_the_lesson(&world));
+}

@@ -215,7 +215,10 @@ fn crafting_lessons<'w>(
             .filter(|g| g.item == recipe.output)
             .count() as u64;
         let granted = progress.inventory.get(&recipe.output).copied().unwrap_or(0);
-        let forged = pieces > granted || progress.renewable.contains(&recipe.output);
+        // Pieces are never taken away, so only a piece beyond those granted
+        // can have been forged; one bought or looted again is no lesson, but
+        // with no way to tell them apart, any extra piece may be.
+        let forged = pieces > granted;
         if let Some(grant) = recipe.trains.as_ref().filter(|g| {
             forged && !needs_itself(g, &[recipe.known_when.as_ref(), recipe.requires.as_ref()])
         }) {
