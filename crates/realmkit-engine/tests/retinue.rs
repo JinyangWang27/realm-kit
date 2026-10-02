@@ -287,6 +287,15 @@ fn saves_reject_rosters_the_rules_could_not_produce() {
                 .or_default()
                 .insert(1, healthy(2, 12));
         },
+        // Counts so large their sum would overflow are refused, not a crash.
+        |r| {
+            let huge = Squad {
+                healthy: u64::MAX,
+                wounded: 2,
+                xp: 0,
+            };
+            r.roster.entry("levy".into()).or_default().insert(3, huge);
+        },
         // A pool past its size, or where nobody recruits.
         |r| {
             r.pools.get_mut("ashmere").unwrap().insert("levy".into(), 9);

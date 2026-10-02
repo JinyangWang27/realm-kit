@@ -27,10 +27,11 @@ pub(super) fn check(
     basics(world, state)?;
     quests(world, fresh, state)?;
     let progress = Progress::of(world, state)?;
+    // The roster first: a battle's check sums its bounded squads.
+    retinue::check(world, state)?;
     if let (Some(combat), Some(rules)) = (&state.combat, world.combat()) {
         combat::check(world, state, combat, rules, &progress)?;
     }
-    retinue::check(world, state)?;
     inventory(world, state, &progress)?;
     flags(world, state, &progress)?;
     dialogue(world, state)

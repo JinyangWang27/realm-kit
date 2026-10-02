@@ -18,18 +18,21 @@ pub(super) fn check(world: &WorldSpec, state: &GameState) -> Result<(), String> 
             && levels.iter().all(|(level, squad)| {
                 // A squad short of its last level would have risen already.
                 let next = line.levels.get(*level).map(|l| l.xp);
-                (1..=line.levels.len()).contains(level)
+                // Bounded first, so the head count below cannot overflow.
+                squad.healthy <= troops.limit
+                    && squad.wounded <= troops.limit
+                    && (1..=line.levels.len()).contains(level)
                     && squad.heads() > 0
                     && next.is_none_or(|xp| squad.share() < xp)
             })
     });
     ensure(squads_ok, "invalid roster")?;
-    let heads: u64 = retinue
+    let heads = retinue
         .roster
         .values()
         .flat_map(|l| l.values())
-        .map(Squad::heads)
-        .sum();
+        .try_fold(0_u64, |sum, s| sum.checked_add(s.heads()))
+        .ok_or("the roster is past its limit")?;
     ensure(heads <= troops.limit, "the roster is past its limit")?;
     let recruiting: Vec<_> = world
         .locations

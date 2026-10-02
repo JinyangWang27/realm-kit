@@ -316,6 +316,9 @@ fn saves_reject_battles_the_rules_could_not_produce() {
         |b| b.sides[0].morale = 101,
         |b| b.sides[1].stacks[0].remainder = 18,
         |b| b.allies.push("warden".into()),
+        // Levels the line does not have are refused, not a crash.
+        |b| b.sides[1].stacks[0].level = 0,
+        |b| b.sides[1].stacks[0].level = 99,
     ];
     for (i, corrupt) in broken.into_iter().enumerate() {
         let mut snapshot = good.clone();

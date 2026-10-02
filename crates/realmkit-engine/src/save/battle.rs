@@ -37,7 +37,8 @@ pub(super) fn check(
             && side.stacks.iter().zip(start).all(|(now, then)| {
                 let hp = troops
                     .line(&now.line)
-                    .map(|l| l.levels[now.level - 1].stats.hp);
+                    .and_then(|l| l.levels.get(now.level.checked_sub(1)?))
+                    .map(|l| l.stats.hp);
                 now.line == then.line
                     && now.level == then.level
                     && now.count <= then.count
