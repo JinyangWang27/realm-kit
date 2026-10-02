@@ -307,3 +307,24 @@ fn saves_reject_rosters_the_rules_could_not_produce() {
     snapshot.state.retinue = None;
     assert!(Engine::restore(&world, snapshot).is_err());
 }
+
+#[test]
+fn deserters_leave_behind_xp_that_may_promote_the_rest() {
+    // Five unpaid levies with 29 XP (5 each): one deserts with 5, and the
+    // remaining 24 among four is a share of 6, enough for level 2.
+    let world = marches_with(0);
+    let squad = Squad {
+        healthy: 5,
+        wounded: 0,
+        xp: 29,
+    };
+    let mut engine = with_roster(&world, &[("levy", 1, squad)]);
+    engine.execute(Wait(1_440 - 480)).unwrap();
+    assert!(squad_at(&engine, 1).is_none());
+    assert_eq!(squad_at(&engine, 2).map(|s| s.healthy), Some(4));
+    Engine::restore(&world, engine.snapshot()).unwrap();
+}
+
+fn squad_at(engine: &Engine<'_>, level: usize) -> Option<Squad> {
+    squad(engine, "levy", level)
+}

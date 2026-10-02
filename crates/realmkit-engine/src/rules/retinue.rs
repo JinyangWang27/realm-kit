@@ -241,6 +241,8 @@ pub(crate) fn upkeep(world: &WorldSpec, state: &mut GameState, events: &mut Vec<
     }
     mend(retinue, Some(rules.recover_percent), events);
     prune(retinue);
+    // Deserters take their shares rounded down, which can promote the rest.
+    promote(world, state, events);
 }
 
 /// Wounded soldiers heal: a share of each squad, rounded up, or all of them.

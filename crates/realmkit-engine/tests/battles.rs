@@ -370,3 +370,22 @@ fn a_beaten_army_is_recorded_and_its_spoils_stay_owed() {
     eaten.state.player.inventory.remove("keep_token");
     assert!(Engine::restore(&world, eaten).is_err());
 }
+
+#[test]
+fn a_lost_battle_promotes_a_squad_its_leftover_xp_now_lifts() {
+    // Six levies with 35 XP (5 each, 6 to rise). The three killed take 15;
+    // the 20 left over among three is a share of 6, enough for level 2.
+    let world = marches();
+    let squad35 = Squad {
+        healthy: 6,
+        wounded: 0,
+        xp: 35,
+    };
+    let mut engine = before_the_outlaws(&world, &[("levy", 1, squad35)]);
+    engine.execute(Engage("outlaws".into())).unwrap();
+    let events = engine.execute(Autoresolve).unwrap();
+    assert_eq!(outcome(&events), Some(BattleOutcome::Defeat));
+    assert!(squad(&engine, "levy", 1).is_none());
+    assert!(squad(&engine, "levy", 2).is_some());
+    Engine::restore(&world, engine.snapshot()).unwrap();
+}

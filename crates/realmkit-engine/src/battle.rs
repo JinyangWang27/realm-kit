@@ -562,6 +562,9 @@ fn finish(
         killed,
     });
     if outcome != BattleOutcome::Victory {
+        // The dead take their shares rounded down, so what they leave behind
+        // can lift the survivors' share past the next level.
+        rules::promote(world, state, events);
         return Ok(());
     }
     let army = world
