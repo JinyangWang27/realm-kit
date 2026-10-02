@@ -1,5 +1,5 @@
 """Command line: python3 -m scripts.combat_sim [report|check|tune] [--formula ...], or
-python3 -m scripts.combat_sim economy <world> [--seed N] [--ticks N] [--prices], or
+python3 -m scripts.combat_sim economy <world> [--seed N] [--ticks N] [--trading RANK] [--prices], or
 python3 -m scripts.combat_sim battle <world> --army ID [--roster line:level:count] [--orders ...] [--seed N]"""
 
 from __future__ import annotations
