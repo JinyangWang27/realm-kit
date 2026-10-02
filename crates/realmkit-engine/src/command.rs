@@ -48,6 +48,10 @@ pub enum Command {
     },
     /// Shows the roster; only in worlds with troops.
     Retinue,
+    /// In a battle: fight one round under this order.
+    Order(BattleOrder),
+    /// In a battle: charge every remaining round.
+    Autoresolve,
     /// Uses one carried consumable: restores HP and MP; in an encounter, it
     /// is the player's turn.
     Use(Id),
@@ -190,6 +194,29 @@ pub enum Event {
         count: u64,
     },
     RetinueViewed,
+    BattleStarted {
+        army: Id,
+        allies: Vec<Id>,
+    },
+    /// One round fought: each side's strength, losses and morale after it.
+    BattleRound {
+        round: u32,
+        strengths: [u64; 2],
+        losses: [u64; 2],
+        morale: [u32; 2],
+    },
+    /// The winning side, 0 or 1, cut down `losses` of a routed or retreating enemy.
+    Pursuit {
+        by: usize,
+        losses: u64,
+    },
+    /// The player's losses by line and level, split into wounded and killed;
+    /// any rewards follow a victory.
+    BattleEnded {
+        outcome: BattleOutcome,
+        wounded: Vec<(Id, usize, u64)>,
+        killed: Vec<(Id, usize, u64)>,
+    },
     /// One unit of `item` was used; `hp` and `mp` are what it restored.
     Consumed {
         item: Id,
@@ -274,6 +301,26 @@ pub enum Event {
     InventoryViewed,
     StatusViewed,
     QuestsViewed,
+}
+
+/// The player's order for one round of a battle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BattleOrder {
+    Charge,
+    /// Melee troops brace: every melee hit either side deals is weakened.
+    Hold,
+    /// Mounted troops leave the line to ride down the enemy's archers.
+    Flank,
+    /// Leave the field, giving the enemy a pursuit and the battle.
+    Retreat,
+}
+
+/// How a battle ended for the player's side.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BattleOutcome {
+    Victory,
+    Defeat,
+    Draw,
 }
 
 /// How an encounter ended; the player's death leaves it open instead.

@@ -25,6 +25,9 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     if let Some(encounter) = fighting(state) {
         return fight_actions(world, state, encounter, panels);
     }
+    if let Some(Stance::Battle(battle)) = state.combat.as_ref().map(|c| &c.stance) {
+        return battle_actions(world, battle, panels);
+    }
     let location = world.location(&state.player.location).unwrap();
     let here = placed_here(world, state);
     let mut actions: Vec<_> = here
@@ -33,10 +36,14 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         .map(|id| available(Command::Talk((*id).clone())))
         .collect();
     if state.combat.is_some() {
+        // Fighters, and armies that are not on the player's side.
+        let foe = |c: &Character| {
+            c.combat.is_some() || c.army.as_ref().is_some_and(|a| a.joins.is_none())
+        };
         actions.extend(
             here.iter()
                 .filter(|id| !defeated(state, id))
-                .filter(|id| character_here(world, state, id).is_some_and(|c| c.combat.is_some()))
+                .filter(|id| character_here(world, state, id).is_some_and(foe))
                 .map(|id| available(Command::Engage((*id).clone()))),
         );
     }
@@ -213,6 +220,33 @@ fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
             });
         }
     }
+    actions
+}
+
+/// The orders a battle takes; flanking needs riders still in the saddle.
+fn battle_actions(world: &WorldSpec, battle: &BattleState, panels: Vec<Action>) -> Vec<Action> {
+    let troops = world.troops().unwrap();
+    let mounted = battle.sides[0].stacks.iter().any(|s| {
+        let class = &troops.line(&s.line).unwrap().class;
+        s.count > 0 && troops.class(class).is_some_and(|c| c.mounted)
+    });
+    let mut orders = vec![BattleOrder::Charge, BattleOrder::Hold];
+    if mounted {
+        orders.push(BattleOrder::Flank);
+    }
+    orders.push(BattleOrder::Retreat);
+    let mut actions: Vec<_> = orders
+        .into_iter()
+        .map(|o| Action {
+            command: Command::Order(o),
+            available: true,
+        })
+        .collect();
+    actions.push(Action {
+        command: Command::Autoresolve,
+        available: true,
+    });
+    actions.extend(panels);
     actions
 }
 

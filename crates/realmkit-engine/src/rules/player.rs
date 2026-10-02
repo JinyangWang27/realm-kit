@@ -37,6 +37,7 @@ pub(crate) fn clamp_vitals(world: &WorldSpec, state: &mut GameState) {
             player.rage_remainder %= u64::from(max.hp);
             (&mut player.hp, &mut player.mp)
         }
+        Stance::Battle(battle) => (&mut battle.hp, &mut battle.mp),
     };
     *hp = (*hp).min(max.hp);
     *mp = (*mp).min(max.mp);

@@ -25,6 +25,7 @@ pub(super) fn check(
             "player vitals exceed their maximums",
         )?,
         Stance::Fighting(encounter) => encounter_state(world, state, combat, rules, encounter)?,
+        Stance::Battle(battle) => super::battle::check(world, state, combat, battle)?,
     }
     ensure(
         combat.xp >= progress.xp_floor
@@ -70,9 +71,13 @@ fn level(combat: &CombatState, rules: &Combat) -> Result<(), String> {
 fn defeats(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
     ensure(
         combat.defeated.iter().all(|id| {
-            !repeatable(world, id)
-                && world.character(id).is_some_and(|c| c.combat.is_some())
-                && world.locations.iter().any(|l| l.characters.contains(id))
+            let character = world.character(id);
+            // A fighter outside a repeatable group, or a hostile army that is not repeatable.
+            let fighter = character.is_some_and(|c| c.combat.is_some()) && !repeatable(world, id);
+            let army = character
+                .and_then(|c| c.army.as_ref())
+                .is_some_and(|a| a.joins.is_none() && !a.repeatable);
+            (fighter || army) && world.locations.iter().any(|l| l.characters.contains(id))
         }),
         "invalid defeated characters",
     )

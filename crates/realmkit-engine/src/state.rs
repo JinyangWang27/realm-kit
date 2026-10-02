@@ -35,6 +35,47 @@ pub struct CombatState {
 pub enum Stance {
     Exploring(Vitals),
     Fighting(Encounter),
+    /// Leading a mass battle; it holds the player's HP and MP until it ends.
+    Battle(BattleState),
+}
+
+/// A mass battle between the player's side (0) and an army (1), paused
+/// between rounds for the player's order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BattleState {
+    pub army: Id,
+    /// Armies that joined the player, in the order they did.
+    pub allies: Vec<Id>,
+    /// Rounds fought so far.
+    pub round: u32,
+    /// The player's HP and MP; at 0 HP the player is knocked out of the fight.
+    pub hp: u32,
+    pub mp: u32,
+    /// Side 0: the roster's healthy squads (lines as authored, levels from
+    /// the highest), then each ally's troops. Side 1: the army's troops.
+    pub sides: [BattleSide; 2],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BattleSide {
+    pub stacks: Vec<BattleStack>,
+    pub morale: u32,
+    /// Morale-loss progress below one point, in units of the starting size.
+    pub morale_remainder: u64,
+    /// Heads at the start, the player included on side 0.
+    pub start_size: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BattleStack {
+    pub line: Id,
+    pub level: usize,
+    pub count: u64,
+    /// Damage taken short of one more loss.
+    pub remainder: u64,
 }
 
 /// One piece of equipment: which item it is, and whether it is worn.

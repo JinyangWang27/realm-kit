@@ -82,6 +82,12 @@ pub enum EngineError {
     PoolEmpty(Id),
     #[error("this world has no soldiers")]
     NoRetinue,
+    #[error("{0} is on your side")]
+    NotHostile(Id),
+    #[error("you have no riders to send round the flank")]
+    NoFlank,
+    #[error("you are not leading a battle")]
+    NotInBattle,
     #[error("your retinue is full")]
     RosterFull,
     #[error("you do not have that many {0} to upgrade")]

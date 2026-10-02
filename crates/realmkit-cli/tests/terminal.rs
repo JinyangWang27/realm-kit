@@ -578,7 +578,8 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         "Greyford\nDay 1, 08:00\n",
         "Roads: Ashmere (2 h), Hollin Keep (4 h)\n",
         "2. Travel to Ashmere — 2 h",
-        "3. Travel to Vellmarket — 3 h [locked]",
+        "2. Engage The fen outlaws",
+        "4. Travel to Vellmarket — 3 h [locked]",
         "4. Wait — 1 h",
         "Ashmere\nDay 1, 10:00\n",
         "Roads: Greyford (2 h), Vellmarket (3 h, closed)",
@@ -607,7 +608,7 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
     // The market submenu prices every good, and shows what cannot be afforded.
     let menu = run(
         &["play", MARCHES, "--line", "--seed", "7"],
-        "travel ashmere\n5\n2\n",
+        "travel ashmere\n6\n2\n",
     );
     let menu = String::from_utf8(menu.stdout).unwrap();
     for passage in [
