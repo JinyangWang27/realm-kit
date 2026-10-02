@@ -337,3 +337,17 @@ fn deserters_leave_behind_xp_that_may_promote_the_rest() {
 fn squad_at(engine: &Engine<'_>, level: usize) -> Option<Squad> {
     squad(engine, "levy", level)
 }
+
+#[test]
+fn soldier_commands_are_refused_in_a_world_without_troops() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    let upgrade = Upgrade {
+        line: "levy".into(),
+        to: "bowmen".into(),
+        quantity: 1,
+    };
+    for command in [upgrade, recruit("levy", 1), Retinue] {
+        assert!(engine.execute(command).is_err());
+    }
+}

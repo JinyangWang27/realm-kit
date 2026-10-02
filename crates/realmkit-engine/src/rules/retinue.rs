@@ -152,6 +152,9 @@ pub(crate) fn upgrade(
     quantity: u64,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
+    if state.retinue.is_none() {
+        return Err(EngineError::NoRetinue);
+    }
     let from = troops(world)
         .line(&line)
         .ok_or_else(|| EngineError::NotEnoughTroops(line.clone()))?;
