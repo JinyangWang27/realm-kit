@@ -180,6 +180,7 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
                     location,
                     w.location(location).is_some(),
                 );
+                economy::workshop_town(out, w, owner, location);
             }
         }
         Condition::Proficiency { proficiency, rank } => {

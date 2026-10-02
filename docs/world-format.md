@@ -166,9 +166,11 @@ composition of others:
   has at least that much; see [Economy](#economy).
 - `workshop` (`{ "kind": "workshop", "workshop": "weavery", "location":
   "vellmarket" }`) holds while the player owns a workshop of that kind, in
-  that town if `location` is given; see [Workshops](#workshops).
+  that town if `location` is given, which must be a town market
+  (`invalid_town`); see [Workshops](#workshops).
 - `proficiency` (`{ "kind": "proficiency", "proficiency": "trading", "rank":
-  2 }`) holds once the player's rank is at least `rank` (1 to 100); see
+  2 }`) holds once the player's rank is at least `rank` (1 to the
+  proficiency's `max`); see
   [Proficiencies](#proficiencies).
 - `all` holds when every condition in `of` does, `any` when at least one
   does, and `not` when its `condition` does not. `of` must not be empty.
@@ -455,6 +457,8 @@ With stock, each market holds units of every good and a purse:
   menu marks an empty good `[sold out]`.
 - Selling is paid from the purse and refuses a sale it cannot cover.
 - A ware's price goes into the purse.
+- A purse holds at most the currency bound; what would pass it is let go,
+  so a full purse never stops the player buying.
 
 On each occurrence every market is restocked, in market order:
 
@@ -529,11 +533,14 @@ Ranks come from two places:
 - **Points.** A level entry may grant `"proficiency_points"`, the first
   level's being the starting pool. The player spends them with
   `train trading [points]`. Levels that grant points in a world with no
-  proficiency are `proficiencies_disabled`.
-- **Effects.** `raise_proficiency` teaches ranks without using points.
+  proficiency are `proficiencies_disabled`, and levels that grant more in
+  all than the proficiencies' `max` ranks add up to are `invalid_points`.
+- **Effects.** `raise_proficiency` teaches ranks without using points; its
+  `ranks` is 1 to `max`.
 
 Saves keep each rank's trained and taught parts. Unspent points are derived
-from the level.
+from the level, and a save holds taught ranks only in a world with an
+effect that teaches them.
 
 ## Characters
 

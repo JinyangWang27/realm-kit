@@ -548,6 +548,25 @@ fn workshops(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
     }
 }
 
+/// A workshop condition's town: workshops stand only in town markets.
+pub(super) fn workshop_town(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, town: &str) {
+    // Without workshops, the condition is reported on its own.
+    let Some(economy) = w.economy().filter(|e| e.workshops.is_some()) else {
+        return;
+    };
+    let in_town = economy
+        .market(town)
+        .is_some_and(|m| m.kind == MarketKind::Town);
+    if w.location(town).is_some() && !in_town {
+        issue(
+            out,
+            owner,
+            "invalid_town",
+            format!("{town} has no town market, so no workshop stands there"),
+        );
+    }
+}
+
 /// A workshop effect or condition names a kind the world authors.
 pub(super) fn workshop(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, kind: &str) {
     let Some(rules) = w.economy().and_then(|e| e.workshops.as_ref()) else {
@@ -577,20 +596,22 @@ pub(super) fn proficiency(
     proficiency: Proficiency,
     rank: u32,
 ) {
-    if w.proficiency_max(proficiency).is_none() {
+    let Some(max) = w.proficiency_max(proficiency) else {
         issue(
             out,
             owner,
             "proficiencies_disabled",
             format!("this world does not define the {proficiency:?} proficiency"),
         );
-    }
-    if !(1..=RANK_BOUND).contains(&rank) {
+        return;
+    };
+    // A rank past the top could never be held or taught.
+    if !(1..=max.min(RANK_BOUND)).contains(&rank) {
         issue(
             out,
             owner,
             "invalid_amount",
-            format!("a proficiency rank is 1 to {RANK_BOUND}"),
+            format!("a {proficiency:?} rank is 1 to {max}"),
         );
     }
 }
@@ -617,12 +638,18 @@ pub(super) fn proficiency_points(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             .map(|l| u64::from(l.proficiency_points))
             .sum()
     });
-    if total > u64::from(u32::MAX) {
+    // Every point must have a rank to go to.
+    let ranks: u64 = Proficiency::ALL
+        .iter()
+        .filter_map(|p| w.proficiency_max(*p))
+        .map(u64::from)
+        .sum();
+    if any && total > ranks {
         issue(
             out,
             &w.world.id,
             "invalid_points",
-            "levels grant too many proficiency points in all",
+            format!("levels grant {total} proficiency points, but proficiencies take only {ranks}"),
         );
     }
 }

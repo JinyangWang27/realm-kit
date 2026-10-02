@@ -122,11 +122,7 @@ pub(crate) fn trade(
             *units = units
                 .checked_sub(quantity)
                 .ok_or_else(|| EngineError::OutOfStock(good.clone()))?;
-            stock.currency = stock
-                .currency
-                .checked_add(total)
-                .filter(|c| *c <= CURRENCY_BOUND)
-                .ok_or(EngineError::NumericLimit)?;
+            stock.currency = fill(stock.currency, total);
         } else {
             *units = units
                 .checked_add(quantity)
@@ -187,11 +183,7 @@ fn buy_ware(
         .ok_or(EngineError::NotEnoughCurrency)?;
     // A ware comes from elsewhere, but its price still fills the purse.
     if let Some(stock) = wallet.stock.get_mut(here) {
-        stock.currency = stock
-            .currency
-            .checked_add(cost)
-            .filter(|c| *c <= CURRENCY_BOUND)
-            .ok_or(EngineError::NumericLimit)?;
+        stock.currency = fill(stock.currency, cost);
     }
     let stack = [realmkit_spec::ItemStack {
         item: ware.item.clone(),
@@ -210,6 +202,12 @@ fn buy_ware(
 pub(crate) fn ware_price(world: &WorldSpec, state: &GameState, item: &str) -> Option<u64> {
     let (economy, market) = market_here(world, state).ok()?;
     Some(economy.ware(market, item)?.price)
+}
+
+/// A purse after taking `amount`: it holds at most the currency bound and
+/// lets the rest go, since its size only limits what merchants can buy.
+fn fill(purse: u64, amount: u64) -> u64 {
+    purse.saturating_add(amount).min(CURRENCY_BOUND)
 }
 
 fn receive(wallet: &mut EconomyState, amount: u64) -> Result<(), EngineError> {

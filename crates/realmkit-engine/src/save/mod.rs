@@ -89,8 +89,14 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
 }
 
 /// Only authored proficiencies, each gained and within its top rank, with
-/// no more points trained than the saved level has granted.
+/// no more points trained than the saved level has granted, and ranks
+/// taught only where an authored effect that could have fired teaches them.
 fn proficiencies(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let teaches = |proficiency: Proficiency| {
+        fired(world, state).into_iter().any(
+            |e| matches!(e, Effect::RaiseProficiency { proficiency: p, .. } if *p == proficiency),
+        )
+    };
     let level = state.combat.as_ref().map_or(0, |c| c.level);
     // An unknown level is reported by the combat check.
     let reached = world.combat().is_none_or(|c| level <= c.levels.len());
@@ -111,6 +117,7 @@ fn proficiencies(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                 world
                     .proficiency_max(*proficiency)
                     .is_some_and(|max| rank > 0 && rank <= u64::from(max))
+                    && (held.taught == 0 || teaches(*proficiency))
             }),
         "proficiencies do not match the world",
     )

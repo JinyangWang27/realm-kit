@@ -22,13 +22,16 @@ fn unlimited() -> WorldSpec {
     world
 }
 
-/// The best trader the marches allow: rank 3, so the narrowest spread.
+/// The best trader the marches allow: rank 3, so the narrowest spread,
+/// trained with the three points of level 3.
 fn best_trader(state: &mut GameState) {
-    let taught = ProficiencyState {
-        trained: 0,
-        taught: 3,
+    let combat = state.combat.as_mut().unwrap();
+    (combat.level, combat.xp) = (3, 80);
+    let trained = ProficiencyState {
+        trained: 3,
+        taught: 0,
     };
-    state.proficiencies.insert(Proficiency::Trading, taught);
+    state.proficiencies.insert(Proficiency::Trading, trained);
 }
 
 fn buy(good: &str, quantity: u64) -> Command {

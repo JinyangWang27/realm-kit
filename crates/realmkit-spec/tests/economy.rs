@@ -94,9 +94,10 @@ fn economy_content_is_checked_with_stable_codes() {
             "missing_reference",
         ),
         (|w| economy(w).producers[0].name = " ".into(), "empty_name"),
-        // Vellmarket: renaming Greyford would strand Ashmere's town as well.
+        // Ashmere: renaming Greyford would strand Ashmere's town, and
+        // Vellmarket the weavery's, as well.
         (
-            |w| economy(w).markets[2].location = "nowhere".into(),
+            |w| economy(w).markets[1].location = "nowhere".into(),
             "missing_reference",
         ),
         (
@@ -339,8 +340,59 @@ fn prosperity_stock_workshops_and_trading_are_checked_with_stable_codes() {
             "invalid_amount",
         ),
         (
-            |w| economy(w).trading.as_mut().unwrap().max = 0,
+            |w| {
+                economy(w).trading.as_mut().unwrap().max = 0;
+                let combat = w.world.combat.as_mut().unwrap();
+                combat
+                    .levels
+                    .iter_mut()
+                    .for_each(|l| l.proficiency_points = 0);
+            },
             "invalid_amount",
+        ),
+        // Trading stops at rank 3, so rank 4 can never hold or be taught.
+        (
+            |w| {
+                w.characters[2].requires = Some(Condition::Proficiency {
+                    proficiency: Proficiency::Trading,
+                    rank: 4,
+                })
+            },
+            "invalid_amount",
+        ),
+        (
+            |w| {
+                let maddoc = w.dialogues.iter_mut().find(|d| d.id == "maddoc").unwrap();
+                maddoc.nodes[0].choices[2].effects = vec![Effect::RaiseProficiency {
+                    proficiency: Proficiency::Trading,
+                    ranks: 4,
+                }];
+            },
+            "invalid_amount",
+        ),
+        // Workshops stand only in town markets.
+        (
+            |w| {
+                w.characters[2].requires = Some(Condition::Workshop {
+                    workshop: "weavery".into(),
+                    location: Some("ashmere".into()),
+                })
+            },
+            "invalid_town",
+        ),
+        (
+            |w| {
+                w.characters[2].requires = Some(Condition::Workshop {
+                    workshop: "weavery".into(),
+                    location: Some("hollin_keep".into()),
+                })
+            },
+            "invalid_town",
+        ),
+        // Four points for three ranks of trading leave one that nothing takes.
+        (
+            |w| w.world.combat.as_mut().unwrap().levels[0].proficiency_points = 2,
+            "invalid_points",
         ),
         (
             |w| {

@@ -318,7 +318,8 @@ fn workshops_are_bought_in_towns_within_their_limit() {
 
 #[test]
 fn trading_is_trained_with_level_points_and_narrows_the_spread() {
-    let world = marches();
+    // Wenna can teach ranks, so a save may hold taught ones.
+    let world = teaching();
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     // Level 1 grants one point; Greyford grain at 533 with a 15% spread.
     assert_eq!(engine.unspent_proficiency_points(), 1);
@@ -368,8 +369,8 @@ fn trading_is_trained_with_level_points_and_narrows_the_spread() {
     ));
 }
 
-#[test]
-fn an_effect_teaches_trading_and_a_condition_reads_it() {
+/// The marches, where Wenna teaches two ranks of trading until rank 3.
+fn teaching() -> WorldSpec {
     let mut world = marches();
     let wenna = world
         .dialogues
@@ -393,6 +394,12 @@ fn an_effect_teaches_trading_and_a_condition_reads_it() {
             }],
         },
     );
+    world
+}
+
+#[test]
+fn an_effect_teaches_trading_and_a_condition_reads_it() {
+    let world = teaching();
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     engine.execute(Talk("wenna".into())).unwrap();
     let events = engine.execute(ChooseDialogue(1)).unwrap();
@@ -532,4 +539,47 @@ fn a_save_keeps_the_new_economy_state_and_rejects_impossible_ones() {
             "corruption {i} was accepted"
         );
     }
+}
+
+#[test]
+fn a_full_purse_still_sells_to_the_player() {
+    // A purse at the currency bound keeps what fits; buying is never refused
+    // for what the merchants would receive.
+    let world = marches();
+    let mut full = Engine::new_with_seed(&world, 7).unwrap().snapshot();
+    let stock = full
+        .state
+        .economy
+        .as_mut()
+        .unwrap()
+        .stock
+        .get_mut("greyford");
+    stock.unwrap().currency = CURRENCY_BOUND;
+    let mut engine = Engine::restore(&world, full).unwrap();
+    assert!(offered(&engine).contains(&(buy("grain", 1), true)));
+    engine.execute(buy("grain", 1)).unwrap();
+    assert_eq!(wallet(&engine).stock["greyford"].currency, CURRENCY_BOUND);
+}
+
+#[test]
+fn a_save_cannot_hold_ranks_no_effect_teaches() {
+    // The marches teach trading only through level points.
+    let world = marches();
+    let mut taught = Engine::new_with_seed(&world, 7).unwrap().snapshot();
+    let held = ProficiencyState {
+        trained: 0,
+        taught: 1,
+    };
+    taught
+        .state
+        .proficiencies
+        .insert(Proficiency::Trading, held);
+    assert!(matches!(
+        Engine::restore(&world, taught.clone()),
+        Err(EngineError::InvalidSave(_))
+    ));
+    // Where Wenna teaches, the same ranks could have been taught.
+    let world = teaching();
+    taught.package_revision = world.revision();
+    assert!(Engine::restore(&world, taught).is_ok());
 }

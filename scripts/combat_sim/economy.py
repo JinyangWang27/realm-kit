@@ -330,6 +330,10 @@ def main(argv: list[str]) -> None:
     parser.add_argument("--prices", action="store_true", help="print the final indices as authored values")
     args = parser.parse_args(argv)
     economy, start = load(args.world)
+    # Only ranks the engine could reach: none without trading, and at most its top.
+    top = int(economy.raw.get("trading", {}).get("max", 0))
+    if not 0 <= args.trading <= top:
+        parser.error(f"--trading is a rank from 0 to {top} in this package")
     market, stock = Stream(args.seed ^ DOMAIN_MARKET), Stream(args.seed ^ DOMAIN_STOCK)
     tick = economy.raw["tick"]["schedule"]
     for n in range(1, args.ticks + 1):
