@@ -597,9 +597,23 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         "Sold: Cloth ×1 for 135 silver",
         "Inventory:\n  227 silver\n",
         "5. Market ›",
+        // Levies raised at Ashmere fight the outlaws beside the keep's guard.
+        "6. Recruit ›",
+        "2. Engage The fen outlaws (14) — with Warden Cadoc",
+        "Recruited: Levy ×6 for 60 silver",
+        "Retinue: 6/30\n  Levy (L1) ×6 · XP 0/6\n  Wages due: 6 silver\n",
+        "Battle: The fen outlaws\nWarden Cadoc joins your side.",
+        "Yours: You HP 40/40 · Levy 6 · Keep guard 6 | Theirs: Outlaw 8 · Hardened outlaw 2 · Poacher 4",
+        "  2. Hold the line\n",
+        "Round 1 — yours: strength 25, lost 0, morale 100 · theirs: strength 14, lost 1, morale 90",
+        "You run down the fleeing enemy: 1 fall.\nVictory.\nWounded: Levy ×1\nKilled: Levy ×2\n",
+        "Promoted: Levy ×4 (level 2).",
+        "Wages paid: 4 silver\nRecovered: Levy ×1\n",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
+    // Flanking takes riders, so the order is not offered without them.
+    assert!(!text.contains("Flank with riders"), "{text}");
     // Travel shows the clock once, at the destination.
     assert!(!text.contains("2 h later"), "{text}");
     let help = String::from_utf8(run(&["play", MARCHES], "help\n").stdout).unwrap();
@@ -608,7 +622,7 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
     // The market submenu prices every good, and shows what cannot be afforded.
     let menu = run(
         &["play", MARCHES, "--line", "--seed", "7"],
-        "travel ashmere\n6\n2\n",
+        "travel ashmere\n7\n2\n",
     );
     let menu = String::from_utf8(menu.stdout).unwrap();
     for passage in [

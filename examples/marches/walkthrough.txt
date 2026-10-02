@@ -25,4 +25,13 @@ market
 sell cloth
 inventory
 quests
+travel ashmere
+recruit levy 6
+retinue
+engage outlaws
+hold
+autoresolve
+retinue
+wait 1d
+retinue
 quit

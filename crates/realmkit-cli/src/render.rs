@@ -374,9 +374,16 @@ pub fn events(
                 let restored = if mp { "Health and MP" } else { "Health" };
                 writeln!(output, "You rest. {restored} restored.")?
             }
-            Event::Recruited { line, quantity, .. } => {
-                writeln!(output, "Recruited: {} ×{quantity}", soldier(world, line, 1))?
-            }
+            Event::Recruited {
+                line,
+                quantity,
+                cost,
+            } => writeln!(
+                output,
+                "Recruited: {} ×{quantity} for {}",
+                soldier(world, line, 1),
+                money(world, *cost)
+            )?,
             Event::Upgraded {
                 line, to, quantity, ..
             } => {
