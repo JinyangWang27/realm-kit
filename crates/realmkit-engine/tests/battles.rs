@@ -392,3 +392,44 @@ fn a_lost_battle_promotes_a_squad_its_leftover_xp_now_lifts() {
     assert!(squad(&engine, "levy", 2).is_some());
     Engine::restore(&world, engine.snapshot()).unwrap();
 }
+
+#[test]
+fn an_army_worth_enormous_xp_shares_it_without_overflowing() {
+    let mut world = marches();
+    let outlaws = world.characters.iter_mut().find(|c| c.id == "outlaws");
+    outlaws.unwrap().army.as_mut().unwrap().xp = u64::MAX;
+    let mut engine = before_the_outlaws(
+        &world,
+        &[
+            ("levy", 3, healthy(6)),
+            ("bowmen", 1, healthy(4)),
+            ("riders", 1, healthy(3)),
+        ],
+    );
+    engine.execute(Engage("outlaws".into())).unwrap();
+    engine.execute(Order(BattleOrder::Hold)).unwrap();
+    let events = engine.execute(Order(BattleOrder::Flank)).unwrap();
+    let share = (u128::from(u64::MAX) * 30 / 100) as u64;
+    assert!(events.contains(&Event::ExperienceGranted { amount: share }));
+}
+
+#[test]
+fn a_player_who_strikes_with_lore_fights_as_the_simulator_says() {
+    // `combat.player_basic_channel` is special: the player strikes and
+    // weighs in with special attack, in the engine and the simulator alike.
+    let mut world = marches();
+    world.world.combat.as_mut().unwrap().player_basic_channel = Channel::Special;
+    let mut engine = before_the_outlaws(&world, &[("levy", 3, healthy(6))]);
+    engine.execute(Engage("outlaws".into())).unwrap();
+    let events = engine.execute(Autoresolve).unwrap();
+    let strengths: Vec<_> = events
+        .iter()
+        .filter_map(|e| match e {
+            Event::BattleRound { strengths, .. } => Some(*strengths),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(strengths, [[11, 14], [7, 12], [5, 11], [2, 9]]);
+    assert_eq!(outcome(&events), Some(BattleOutcome::Defeat));
+    assert_eq!(vitals(&engine).hp, 10);
+}

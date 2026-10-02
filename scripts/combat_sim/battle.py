@@ -293,7 +293,8 @@ def player_unit(world: dict[str, Any], level: int) -> Unit:
         cls=None,
         ranged=False,
         mounted=False,
-        channel="physical",
+        # The engine's player attacks in the authored basic channel (no gear here).
+        channel=world["combat"].get("player_basic_channel", "physical"),
         player=True,
         hp=stats["hp"],
     )

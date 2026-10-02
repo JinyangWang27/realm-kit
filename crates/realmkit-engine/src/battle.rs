@@ -574,7 +574,8 @@ fn finish(
         .as_ref()
         .unwrap();
     let share = world.battle().unwrap().player_xp_percent;
-    let mine = army.xp * u64::from(share) / 100;
+    // Army XP is unbounded content: share it in u128, where it cannot overflow.
+    let mine = (u128::from(army.xp) * u128::from(share) / 100) as u64;
     rules::grant_xp(world, state, mine, events)?;
     let rest = army.xp - mine;
     if let Some(retinue) = state.retinue.as_mut() {
