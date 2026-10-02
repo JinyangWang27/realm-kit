@@ -498,9 +498,13 @@ pub(crate) fn settle(world: &WorldSpec, state: &mut GameState, events: &mut Vec<
     }
     let clamp = |v: i128| u64::try_from(v).unwrap_or(u64::MAX);
     if net >= 0 {
-        let amount = clamp(net).min(CURRENCY_BOUND - wallet.currency);
+        let earned = clamp(net);
+        let amount = earned.min(CURRENCY_BOUND - wallet.currency);
         wallet.currency += amount;
-        events.push(Event::WorkshopsEarned { amount });
+        events.push(Event::WorkshopsEarned {
+            amount,
+            forgone: earned - amount,
+        });
     } else {
         let owed = clamp(-net);
         let amount = owed.min(wallet.currency);

@@ -253,9 +253,11 @@ pub enum Event {
         location: Id,
         earned: u64,
     },
-    /// A settlement: the player's workshops earned this much in all.
+    /// A settlement: the player's workshops earned `amount` in all, and
+    /// `forgone` more that would have passed the currency bound.
     WorkshopsEarned {
         amount: u64,
+        forgone: u64,
     },
     /// A settlement: the workshops lost money; `amount` was paid and
     /// `shortfall` could not be.

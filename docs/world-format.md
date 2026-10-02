@@ -502,7 +502,8 @@ with no spread:
 - Its net is the value of `output` units of `good`, minus the value of its
   `inputs`, minus `overhead`.
 - The value of `n` units is `price × index × n ÷ 1,000`, rounded down once.
-- All nets are summed. A gain is received; a loss is paid from what the
+- All nets are summed. A gain is received up to the currency bound, and
+  anything past it is reported as forgone; a loss is paid from what the
   player holds, and anything left over is reported as a shortfall.
 - Workshops never move prices.
 
@@ -536,11 +537,15 @@ Ranks come from two places:
   proficiency are `proficiencies_disabled`, and levels that grant more in
   all than the proficiencies' `max` ranks add up to are `invalid_points`.
 - **Effects.** `raise_proficiency` teaches ranks without using points; its
-  `ranks` is 1 to `max`.
+  `ranks` is 1 to `max`. Like a technique grant, it teaches only the ranks
+  that fit under `max` and nothing once there, so a lesson is never
+  refused.
 
-Saves keep each rank's trained and taught parts. Unspent points are derived
-from the level, and a save holds taught ranks only in a world with an
-effect that teaches them.
+Taught ranks can take the place of points: points that no proficiency has
+a rank left for can never be spent, and are not shown as unspent. Saves
+keep each rank's trained and taught parts. Unspent points are derived from
+the level, and a save holds taught ranks only in a world with an effect
+that teaches them, and workshops only of kinds an effect sells.
 
 ## Characters
 
@@ -616,8 +621,8 @@ arrives as individual pieces); `take_items` hands over counted items only.
 `grant_currency` and `pay_currency` need the economy; paying more than the
 player has refuses the choice. `buy_workshop` and `sell_workshop` act in the
 town where the player stands ([Workshops](#workshops)), and
-`raise_proficiency` teaches ranks without spending points, refusing the
-choice past the top rank ([Proficiencies](#proficiencies)). Events cannot
+`raise_proficiency` teaches ranks without spending points, up to the top
+rank ([Proficiencies](#proficiencies)). Events cannot
 use these three.
 A choice can be taken again while its condition holds, so a one-time gift
 pairs `grant_items` with `set_flag` under a `not` condition on that flag.

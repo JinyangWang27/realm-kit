@@ -349,11 +349,16 @@ pub fn events(
                 world.location(location).unwrap().name,
                 money(world, *earned)
             )?,
-            Event::WorkshopsEarned { amount } => writeln!(
-                output,
-                "{}",
-                paint.good(&format!("Your workshops earn {}.", money(world, *amount)))
-            )?,
+            Event::WorkshopsEarned { amount, forgone } => {
+                let mut line = format!("Your workshops earn {}.", money(world, *amount));
+                if *forgone > 0 {
+                    line += &format!(
+                        " {} more is beyond what you can hold.",
+                        money(world, *forgone)
+                    );
+                }
+                writeln!(output, "{}", paint.good(&line))?
+            }
             Event::WorkshopsLost { amount, shortfall } => {
                 let mut line = format!("Your workshops lose {}.", money(world, *amount));
                 if *shortfall > 0 {

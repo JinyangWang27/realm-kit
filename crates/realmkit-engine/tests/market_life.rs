@@ -230,7 +230,10 @@ fn a_weavery_bought_from_maddoc_earns_at_the_weekly_settlement() {
     // 6 cloth less 9 wool less 120 overhead at Vellmarket's prices.
     let events = engine.execute(Wait(10_080 - 480)).unwrap();
     assert!(
-        events.contains(&Event::WorkshopsEarned { amount: 115 }),
+        events.contains(&Event::WorkshopsEarned {
+            amount: 115,
+            forgone: 0
+        }),
         "{events:?}"
     );
     let earned = events
@@ -362,7 +365,8 @@ fn trading_is_trained_with_level_points_and_narrows_the_spread() {
         .unwrap();
     held.taught = 2;
     let mut taught = Engine::restore(&world, taught).unwrap();
-    assert_eq!(taught.unspent_proficiency_points(), 1);
+    // Level 2's point has no rank left to buy, so it is not shown as unspent.
+    assert_eq!(taught.unspent_proficiency_points(), 0);
     assert!(matches!(
         taught.execute(train),
         Err(EngineError::ProficiencyCap)
@@ -420,7 +424,8 @@ fn an_effect_teaches_trading_and_a_condition_reads_it() {
     }));
     engine.execute(Talk("wenna".into())).unwrap();
     assert_eq!(engine.dialogue_choices()[0], "Tell me about the fen.");
-    // A second lesson would pass the top rank, so it is refused whole.
+    // Like a technique grant, a lesson teaches only what fits under the top
+    // rank: the second teaches one rank, and a third nothing, refusing nothing.
     let mut world = world.clone();
     let wenna = world
         .dialogues
@@ -429,15 +434,73 @@ fn an_effect_teaches_trading_and_a_condition_reads_it() {
         .unwrap();
     wenna.nodes[0].choices[0].requires = None;
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
-    engine.execute(Talk("wenna".into())).unwrap();
+    let lesson = |engine: &mut Engine<'_>| {
+        engine.execute(Talk("wenna".into())).unwrap();
+        engine.execute(ChooseDialogue(1)).unwrap()
+    };
+    lesson(&mut engine);
+    let events = lesson(&mut engine);
+    assert!(events.contains(&Event::ProficiencyRaised {
+        proficiency: Proficiency::Trading,
+        rank: 3
+    }));
+    let events = lesson(&mut engine);
+    assert!(!events
+        .iter()
+        .any(|e| matches!(e, Event::ProficiencyRaised { .. })));
+    assert_eq!(engine.proficiency_rank(Proficiency::Trading), 3);
+    // The level's point has no rank left to buy, so none is shown to spend.
+    assert_eq!(engine.unspent_proficiency_points(), 0);
+    assert!(!offered(&engine)
+        .iter()
+        .any(|(c, _)| matches!(c, Train { .. })));
+}
+
+#[test]
+fn income_past_the_currency_bound_is_reported_as_forgone() {
+    let world = marches();
+    let mut engine = standing(&world, "vellmarket", 1_000);
+    engine.execute(Talk("maddoc".into())).unwrap();
     engine.execute(ChooseDialogue(1)).unwrap();
-    engine.execute(Talk("wenna".into())).unwrap();
-    let before = engine.state().clone();
+    let mut near = engine.snapshot();
+    near.state.economy.as_mut().unwrap().currency = CURRENCY_BOUND - 10;
+    let mut engine = Engine::restore(&world, near).unwrap();
+    let events = engine.execute(Wait(10_080 - 480)).unwrap();
+    assert!(
+        events.contains(&Event::WorkshopsEarned {
+            amount: 10,
+            forgone: 105
+        }),
+        "{events:?}"
+    );
+    assert_eq!(wallet(&engine).currency, CURRENCY_BOUND);
+}
+
+#[test]
+fn a_save_holds_only_workshops_some_effect_sells() {
+    // A dye works the world defines, but nobody sells.
+    let mut world = marches();
+    let workshops = world
+        .world
+        .economy
+        .as_mut()
+        .unwrap()
+        .workshops
+        .as_mut()
+        .unwrap();
+    let mut dyeworks = workshops.kinds[0].clone();
+    (dyeworks.id, dyeworks.name) = ("dyeworks".into(), "Dye works".into());
+    workshops.kinds.push(dyeworks);
+    let mut snapshot = Engine::new_with_seed(&world, 7).unwrap().snapshot();
+    let owned = &mut snapshot.state.economy.as_mut().unwrap().workshops;
+    owned.insert("greyford".into(), [("weavery".into(), 1)].into());
+    assert!(Engine::restore(&world, snapshot.clone()).is_ok());
+    let owned = &mut snapshot.state.economy.as_mut().unwrap().workshops;
+    owned.insert("greyford".into(), [("dyeworks".into(), 1)].into());
     assert!(matches!(
-        engine.execute(ChooseDialogue(1)),
-        Err(EngineError::ProficiencyCap)
+        Engine::restore(&world, snapshot),
+        Err(EngineError::InvalidSave(_))
     ));
-    assert_eq!(engine.state(), &before);
 }
 
 #[test]

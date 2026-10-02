@@ -216,7 +216,7 @@ pub(crate) fn apply(
                 economy::sell_workshop(world, state, workshop, events)?
             }
             Effect::RaiseProficiency { proficiency, ranks } => {
-                proficiency::raise(world, state, *proficiency, *ranks, events)?
+                proficiency::raise(world, state, *proficiency, *ranks, events)
             }
         }
     }

@@ -185,8 +185,16 @@ fn economy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
         },
         "merchants' stock does not match the world",
     )?;
-    // Workshops stand only in towns, within each town's limit.
+    // Workshops stand only in towns, within each town's limit, and only of
+    // kinds some authored effect that could have fired sells.
     let limit = economy.workshops.as_ref().map_or(0, |w| u64::from(w.limit));
+    let sold: Vec<&Id> = fired(world, state)
+        .into_iter()
+        .filter_map(|e| match e {
+            Effect::BuyWorkshop { workshop } => Some(workshop),
+            _ => None,
+        })
+        .collect();
     ensure(
         wallet.workshops.iter().all(|(town, kinds)| {
             let in_town = economy
@@ -196,9 +204,7 @@ fn economy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
             in_town
                 && !kinds.is_empty()
                 && total <= limit
-                && kinds
-                    .iter()
-                    .all(|(kind, n)| *n > 0 && economy.workshop(kind).is_some())
+                && kinds.iter().all(|(kind, n)| *n > 0 && sold.contains(&kind))
         }),
         "workshops do not match the world",
     )
