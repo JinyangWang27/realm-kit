@@ -111,8 +111,12 @@ pub(crate) fn recruit(
         .get_mut(&here.id)
         .and_then(|p| p.get_mut(&line))
         .unwrap();
-    if *pool < quantity {
+    if *pool == 0 {
         return Err(EngineError::PoolEmpty(line));
+    }
+    if *pool < quantity {
+        let left = *pool;
+        return Err(EngineError::TooFewRecruits { line, left });
     }
     if full {
         return Err(EngineError::RosterFull);

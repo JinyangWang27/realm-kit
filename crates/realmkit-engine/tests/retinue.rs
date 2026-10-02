@@ -88,6 +88,11 @@ fn levies_are_raised_from_the_pool_for_silver() {
     );
     assert_eq!(squad(&engine, "levy", 1), Some(healthy(3, 0)));
     assert_eq!((pool(&engine), currency(&engine)), (5, 70));
+    // Asking for more than are left says how many are.
+    assert!(matches!(
+        engine.execute(recruit("levy", 6)),
+        Err(EngineError::TooFewRecruits { left: 5, .. })
+    ));
     // Refusals change nothing.
     let before = engine.state().clone();
     for (command, refused) in [

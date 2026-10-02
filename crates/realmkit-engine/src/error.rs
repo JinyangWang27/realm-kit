@@ -80,6 +80,8 @@ pub enum EngineError {
     NotRecruitedHere(Id),
     #[error("no more {0} can be recruited here for now")]
     PoolEmpty(Id),
+    #[error("only {left} {line} can be recruited here for now")]
+    TooFewRecruits { line: Id, left: u64 },
     #[error("this world has no soldiers")]
     NoRetinue,
     #[error("{0} is on your side")]
