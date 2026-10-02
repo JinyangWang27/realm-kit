@@ -641,3 +641,16 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         .contains("Loaded save 2."));
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn a_pursuit_that_catches_nobody_goes_unremarked() {
+    // Alone against the outlaws, the player is knocked out in the first
+    // round, so the enemy's pursuit finds nobody left to cut down.
+    let output = run(
+        &["play", MARCHES, "--line", "--seed", "7"],
+        "travel ashmere\nengage outlaws\nautoresolve\n",
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.contains("Defeat."), "{text}");
+    assert!(!text.contains("cuts down 0"), "{text}");
+}

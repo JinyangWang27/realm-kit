@@ -450,6 +450,8 @@ pub fn events(
                     side(1)
                 )?
             }
+            // A pursuit that catches nobody is not worth a line.
+            Event::Pursuit { losses: 0, .. } => {}
             Event::Pursuit { by: 0, losses } => {
                 writeln!(output, "You run down the fleeing enemy: {losses} fall.")?
             }
