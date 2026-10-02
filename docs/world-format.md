@@ -1,6 +1,9 @@
-# World package format 14
+# World package format 15
 
-Format 14 adds troops, who are recruited, level up in squads and draw
+Format 15 completes the economy: markets that prosper or decline, merchants
+with limited stock and purses, villages that feed their market town,
+workshops the player owns, and the trading proficiency with proficiency
+points from the level table. Format 14 added troops, who are recruited, level up in squads and draw
 wages, and mass battles against authored armies, with allies who join.
 Format 13 added consumable items that restore HP and MP, and wares that
 markets sell at fixed prices. Format 12 composed conditions with `all`,
@@ -36,10 +39,13 @@ there is no migration. Convert them by hand:
   condition. A list of one condition becomes that condition; a longer list
   becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
   dialogue choice's `effect` becomes a one-element `effects` list.
+- **Formats 12–14** (M5a, M5b, M6a-1, consumables, troops): only raise the
+  number. Every economy part below `tick`, and `proficiency_points`, are
+  optional.
 
-Format 14 represents one fixed player-controlled character and one playable
+Format 15 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 14 does not serialize a route collection
+stable logical route ID `default`; Format 15 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -54,7 +60,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 14 also requires item and quest tables because they serve the current demo.
+Format 15 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -89,7 +95,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 14 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 15 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -158,6 +164,12 @@ composition of others:
   [World time](#world-time-roads-and-events).
 - `currency` (`{ "kind": "currency", "amount": 150 }`) holds while the player
   has at least that much; see [Economy](#economy).
+- `workshop` (`{ "kind": "workshop", "workshop": "weavery", "location":
+  "vellmarket" }`) holds while the player owns a workshop of that kind, in
+  that town if `location` is given; see [Workshops](#workshops).
+- `proficiency` (`{ "kind": "proficiency", "proficiency": "trading", "rank":
+  2 }`) holds once the player's rank is at least `rank` (1 to 100); see
+  [Proficiencies](#proficiencies).
 - `all` holds when every condition in `of` does, `any` when at least one
   does, and `not` when its `condition` does not. `of` must not be empty.
 
@@ -383,8 +395,145 @@ may be carried in any number.
 Validation keeps every authored number small enough that no tick or trade
 can overflow: at most 10,000 producers of a kind, units per producer and
 demand; at most 100,000,000 of a good made or used by one market per tick
-(counted at the base price, where producers use the most);
+(counted at the base price, where producers use the most, with a town's
+villages and the highest demand percentage);
 index bounds that contain 1,000 within 1 to 100,000.
+
+The parts below are each optional and independent: a world authors only the
+blocks it wants, and without one there is no state, menu entry or event for
+it. Prosperity, stock and workshops each need the time block and run on
+their own schedule. When several fall due at the same minute, they go in
+this order: the price tick, prosperity, restocking, then workshop
+settlement.
+
+### Villages and their town
+
+A village market may name its market town with `"town": "greyford"`. On
+the price tick the village's production and demand count towards the town's
+supply as well as its own, each at its own index and prosperity. Only a
+village names a town, and the town must be a town market (`invalid_town`).
+The two converge only through an authored link.
+
+### Prosperity
+
+```json
+"prosperity": {
+  "schedule": { "at": 1440, "every": 1440 },
+  "base": 50,
+  "scarce_above": 1200,
+  "scarcity": 10,
+  "demand_percent": [80, 120]
+}
+```
+
+Every market has a prosperity from 0 to 100, starting at its own
+`"prosperity"` value or at `base`. On each occurrence it moves one point
+towards an ideal: `base`, lowered by `scarcity` for every good the market
+needs whose index is at or above `scarce_above`, and never below 0. A market
+needs a good that its kind demands or its producers consume. Prosperity
+draws nothing.
+
+`demand_percent` scales the market kind's demand on the price tick. It is
+the percentage at prosperity 0 and at prosperity 100, linear in between:
+`demand × (lo × (100 − p) + hi × p) ÷ 10,000`, rounded down once.
+Producers' own consumption is not scaled. Left out, it is `[100, 100]`.
+
+### Stock
+
+```json
+"stock": {
+  "schedule": { "at": 1440, "every": 1440 },
+  "units": 40,
+  "currency": 600,
+  "prosperity_percent": [50, 150]
+}
+```
+
+With stock, each market holds units of every good and a purse:
+
+- Buying takes units from the stock and refuses more than it holds. The
+  menu marks an empty good `[sold out]`.
+- Selling is paid from the purse and refuses a sale it cannot cover.
+- A ware's price goes into the purse.
+
+On each occurrence every market is restocked, in market order:
+
+- The purse becomes `currency`.
+- Each good's target is a share of `units` by weight. A good's weight is
+  what the market (and its villages) makes of it × 1,000 ÷ its index,
+  rounded down, so cheap local goods fill the shelves.
+- Each good with a target `t` draws its stock below `2t + 1` from its own
+  `stock` random stream. A good with no target gets none and draws nothing.
+
+With prosperity, `units` and `currency` are scaled by `prosperity_percent`
+like demand; without it, that field is ignored with a warning
+(`unused_percent`). A new game starts every market at its targets, drawing
+nothing. The scaled units stay within 500,000 and the scaled purse within
+the currency bound. Restocking never moves prices, and the price tick's
+draws are the same with or without stock.
+
+### Workshops
+
+```json
+"workshops": {
+  "schedule": { "at": 10080, "every": 10080 },
+  "limit": 1,
+  "kinds": [
+    { "id": "weavery", "name": "Weavery", "good": "cloth", "output": 6,
+      "inputs": { "wool": 9 }, "overhead": 120, "price": 150, "resale": 75 }
+  ]
+}
+```
+
+The player buys workshops through dialogue:
+
+- `buy_workshop` pays the kind's `price` for one in the town market where the
+  player stands. It is refused in a village or elsewhere, past `limit`
+  workshops of any kinds in that town, or without the money.
+- `sell_workshop` sells one back for its `resale`.
+
+On each occurrence, every workshop settles at its town's current indices,
+with no spread:
+
+- Its net is the value of `output` units of `good`, minus the value of its
+  `inputs`, minus `overhead`.
+- The value of `n` units is `price × index × n ÷ 1,000`, rounded down once.
+- All nets are summed. A gain is received; a loss is paid from what the
+  player holds, and anything left over is reported as a shortfall.
+- Workshops never move prices.
+
+Validation:
+
+- `good` and `inputs` must be trade goods, each 1 to 10,000 units.
+- The limit is 1 to 100 (`invalid_limit`).
+- `resale` is at most `price` (`invalid_resale`), so buying and selling
+  back never pays.
+
+### Proficiencies
+
+A proficiency is a rank the player gains, used by the capability that
+defines it. The economy defines `trading`:
+
+```json
+"trading": { "name": "Trade", "max": 3, "narrow_percent": 4 }
+```
+
+- Each rank takes `narrow_percent` off every spread: `spread × (100 −
+  narrow_percent × rank) ÷ 100`, rounded down. With 15% and rank 1, that is
+  14%.
+- `max` is 1 to 100, and `narrow_percent × max` is at most 100.
+- The round-trip check above applies to the narrowest spread, at `max`.
+
+Ranks come from two places:
+
+- **Points.** A level entry may grant `"proficiency_points"`, the first
+  level's being the starting pool. The player spends them with
+  `train trading [points]`. Levels that grant points in a world with no
+  proficiency are `proficiencies_disabled`.
+- **Effects.** `raise_proficiency` teaches ranks without using points.
+
+Saves keep each rank's trained and taught parts. Unspent points are derived
+from the level.
 
 ## Characters
 
@@ -426,7 +575,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 14 has a single flat quest collection. The long-term model should retain
+Format 15 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -447,6 +596,9 @@ Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 { "kind": "take_items", "items": [{ "item": "pen", "quantity": 1 }] }
 { "kind": "grant_currency", "amount": 60 }
 { "kind": "pay_currency", "amount": 150 }
+{ "kind": "buy_workshop", "workshop": "weavery" }
+{ "kind": "sell_workshop", "workshop": "weavery" }
+{ "kind": "raise_proficiency", "proficiency": "trading", "ranks": 1 }
 ```
 
 Effects apply in authored order to the staged state, and the choice commits
@@ -455,7 +607,11 @@ does not carry or completing a quest that is not ready, nothing the earlier
 effects did is kept. `grant_items` gives items as quest rewards do (equipment
 arrives as individual pieces); `take_items` hands over counted items only.
 `grant_currency` and `pay_currency` need the economy; paying more than the
-player has refuses the choice.
+player has refuses the choice. `buy_workshop` and `sell_workshop` act in the
+town where the player stands ([Workshops](#workshops)), and
+`raise_proficiency` teaches ranks without spending points, refusing the
+choice past the top rank ([Proficiencies](#proficiencies)). Events cannot
+use these three.
 A choice can be taken again while its condition holds, so a one-time gift
 pairs `grant_items` with `set_flag` under a `not` condition on that flag.
 
@@ -888,7 +1044,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 14 currently selects combat prose variants from the current
+Format 15 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -1053,7 +1209,7 @@ the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
 skill references, usable and affordable skills, loot quantities, fighter
 placement and template placeholders. `load()` reports a package whose
-`format_version` is not 12 as `SpecError::UnsupportedFormat` before parsing it.
+`format_version` is not 15 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.

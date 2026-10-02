@@ -1551,6 +1551,14 @@ a proposed answer that still needs to be confirmed:
   and optionally capped by an authored stat; each proficiency is personal or
   party, and a party proficiency uses the best rank in the retinue; items can
   teach a rank through study over world time or grant a bonus while carried.
+  As delivered in M6a-2 (Format 15): proficiencies are a closed engine
+  set, so far `trading`, each defined by the block of the capability that
+  uses it (`economy.trading`, with a name, a top rank and its narrowing);
+  level entries grant shared `proficiency_points`; a save keeps each
+  rank's trained and taught parts, and unspent points are derived; a
+  `raise_proficiency` effect teaches ranks and a `proficiency` condition
+  reads them. Still open: party proficiencies wait for companions, and
+  study, carried bonuses and stat caps for a world that needs them.
 - **Price model (M6a) · decided.** Prices follow production, not stock. Each
   market keeps a price index per good in thousandths of the base price, within
   authored bounds. A recurring price tick moves it against net supply
@@ -1570,7 +1578,14 @@ a proposed answer that still needs to be confirmed:
   draws stay, from their own `market` stream; phase 1 clamps to the bounds so
   later phases work on valid indices; and warm-up rounds are an authoring
   choice, run by `scripts/combat_sim economy --prices`, never by the engine.
-  Prosperity, stock, workshops and proficiency wait for M6a-2.
+  M6a-2 (Format 15) added prosperity, which moves one point a day towards
+  its ideal and scales a market kind's demand linearly between authored
+  percentages at 0 and 100; merchants' stock and purse, redrawn on a
+  restock schedule from their own `stock` stream and limiting trade both
+  ways; villages that feed their market town on the tick; weekly workshop
+  settlement at local prices with no spread; and the trading proficiency.
+  Each part is its own optional block, which settles the
+  "own block or optional fields" question below for the economy.
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.

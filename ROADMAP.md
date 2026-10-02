@@ -1157,9 +1157,18 @@ slices, each bumping the package and save format as usual:
    `scripts/combat_sim/economy.py` mirrors the tick and computes warm-up
    prices for authors; `examples/marches` trades. Wares, items a market
    sells at a fixed price, arrived early with consumables (Format 13).
-   **M6a-2:** prosperity,
-   merchants' stock and currency, workshops, upkeep and the trading
-   proficiency.
+   **M6a-2 · delivered** (Format 15): prosperity that drifts daily towards
+   an ideal lowered by scarcity and scales demand and stock; merchants'
+   stock and purse, restocked from their own `stock` stream, limiting
+   trade both ways; villages that feed their market town; workshops bought
+   and sold in dialogue and settled weekly at local prices, with their
+   overhead as upkeep beside the retinue's wages; and the trading
+   proficiency, which brings the proficiency mechanism: points from the
+   level table, ranks taught by effects, and a `proficiency` condition.
+   `examples/marches` sells a weavery. Still to come, with the
+   capabilities they need: party proficiencies (companions), studying
+   items over world time, a wider spread for unneeded goods and disliked
+   merchants (M6b), and caravan and village-trade prosperity (M6f).
 2. **M6b — factions and standing.** War and peace between factions, authored
    standing tracks such as renown and relation, and the conditions and effects
    that read and change them. Authored personality traits steer dialogue and

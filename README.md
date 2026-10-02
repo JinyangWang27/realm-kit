@@ -145,7 +145,14 @@ Worlds with an economy have currency and markets: buy smoked eels where the
 fen is full of them and sell them where they are scarce (`Market ›`, or
 `buy eels 6`, `sell eels 6`, `market`). Every unit you trade nudges the local
 price, and once a day each market's prices drift with what it makes and
-needs, so a good route stops paying if you flood it.
+needs, so a good route stops paying if you flood it. Merchants hold only
+what their market makes and a purse that refills each morning, so one stall
+cannot take a whole cargo (`[sold out]`), and a town that goes without what
+it needs loses prosperity, and with it demand and stock. Trading is a
+proficiency: spend the points levels give you (`Proficiencies ›`, or
+`train trading`) to narrow the spread. You can also buy a workshop from the
+right merchant, such as Maddoc's weavery in Vellmarket. It turns wool into
+cloth and pays or costs you its margin every week.
 Some markets also sell wares at a fixed price, gear included, and some items
 can be used: the arena's quartermaster sells a healing draught that you
 drink from `Use item ›` (or `use healing_draught`), even mid-fight, where
