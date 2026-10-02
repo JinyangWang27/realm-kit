@@ -63,6 +63,12 @@ def exact(value: Amount) -> Fraction:
 
 
 # Proposed engine validation bounds (ROADMAP.md, "Engine bounds").
+def ratio_damage(a: int, d: int, power: int) -> int:
+    """The engine's formula: combined attack `a` against combined defence `d`,
+    both scaled by 100, rounded down once, never below 1."""
+    return max(1, (a * power * a) // (100 * 100 * (a + d)))
+
+
 STAT_BOUND = 9_999
 POWER_BOUNDS = (1, 1_000)
 
@@ -185,7 +191,7 @@ class Rules:
         if a <= 0:
             raise ValueError(f"{attacker.name} has no attack for {skill.name}")
         if self.formula is Formula.RATIO:
-            return max(1, (a * skill.power * a) // (100 * 100 * (a + d)))
+            return ratio_damage(a, d, skill.power)
         k = self.k_for(attacker.level)
         return max(1, (a * skill.power * k) // (100 * (100 * k + d)))
 

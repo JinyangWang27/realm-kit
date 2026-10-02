@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from .economy import MASK, splitmix64
+from .model import ratio_damage
 
 DOMAIN_BATTLE = 0x6261_7474_6C65  # "battle" in ASCII, as in the engine's rng.rs
 ORDERS = ("charge", "hold", "flank", "retreat")
@@ -79,7 +80,7 @@ def damage(rules: dict[str, Any], attacker: Unit, defender: Unit) -> int:
     else:
         a = 100 * a_stats["satk"] + share * a_stats["patk"]
         d = 100 * d_stats["sdef"] + share * d_stats["pdef"]
-    return max(1, a * 100 * a // (100 * 100 * (a + d)))
+    return ratio_damage(a, d, 100)
 
 
 def split(n: int, counts: list[int]) -> list[int]:

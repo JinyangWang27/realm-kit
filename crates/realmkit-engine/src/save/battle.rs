@@ -33,7 +33,11 @@ pub(super) fn check(
             && side.start_size == extra + start.iter().map(|s| s.count).sum::<u64>()
             && side.morale <= 100
             && side.morale_remainder < side.start_size
-            && rules.morale.is_none_or(|m| side.morale >= m.rout)
+            // Without morale rules nothing moves it from a full 100.
+            && match rules.morale {
+                Some(m) => side.morale >= m.rout,
+                None => side.morale == 100 && side.morale_remainder == 0,
+            }
             && side.stacks.iter().zip(start).all(|(now, then)| {
                 let hp = troops
                     .line(&now.line)

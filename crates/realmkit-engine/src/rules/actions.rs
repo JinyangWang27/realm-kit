@@ -112,7 +112,7 @@ fn soldiers(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     };
     let currency = state.economy.as_ref().map_or(0, |e| e.currency);
     let here = world.location(&state.player.location).unwrap();
-    let room = retinue::heads(retinue) < troops.limit;
+    let room = retinue.heads() < troops.limit;
     let mut actions: Vec<_> = here
         .recruits
         .iter()

@@ -34,4 +34,16 @@ autoresolve
 retinue
 wait 1d
 retinue
+engage outlaws
+autoresolve
+retinue
+upgrade levy riders 2
+retinue
+engage outlaws
+save
+charge
+load 3
+flank
+autoresolve
+retinue
 quit

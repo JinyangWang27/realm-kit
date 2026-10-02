@@ -28,7 +28,12 @@ fn healthy(healthy: u64) -> Squad {
 
 /// At Ashmere, facing the outlaws, with exactly `squads` in the roster.
 fn before_the_outlaws<'w>(world: &'w WorldSpec, squads: &[(&str, usize, Squad)]) -> Engine<'w> {
-    let mut engine = Engine::new_with_seed(world, 7).unwrap();
+    seeded(world, 7, squads)
+}
+
+/// [`before_the_outlaws`] with another seed.
+fn seeded<'w>(world: &'w WorldSpec, seed: u64, squads: &[(&str, usize, Squad)]) -> Engine<'w> {
+    let mut engine = Engine::new_with_seed(world, seed).unwrap();
     engine.execute(Travel("ashmere".into())).unwrap();
     let mut snapshot = engine.snapshot();
     let roster = &mut snapshot.state.retinue.as_mut().unwrap().roster;
@@ -207,6 +212,10 @@ fn the_keep_guard_joins_once_the_letter_is_read_and_the_fen_thaws() {
     assert_eq!(counts(&engine, 0), [4, 6]);
     let events = engine.execute(Autoresolve).unwrap();
     assert_eq!(outcome(&events), Some(BattleOutcome::Victory));
+    assert_eq!(
+        rounds(&events),
+        [[20, 12], [16, 9], [13, 6], [13, 4]].map(|s| s.to_vec())
+    );
     // As the simulator has it: two levies stand and five keep guards; the
     // guards' losses are theirs, not ours.
     // The levies' 42 XP (14 a head) lifts them to level 2 for 6 each.
@@ -432,4 +441,107 @@ fn a_player_who_strikes_with_lore_fights_as_the_simulator_says() {
     assert_eq!(strengths, [[11, 14], [7, 12], [5, 11], [2, 9]]);
     assert_eq!(outcome(&events), Some(BattleOutcome::Defeat));
     assert_eq!(vitals(&engine).hp, 10);
+}
+
+/// Each round's strengths, side 0 first.
+fn rounds(events: &[Event]) -> Vec<Vec<u64>> {
+    events
+        .iter()
+        .filter_map(|e| match e {
+            Event::BattleRound { strengths, .. } => Some(strengths.to_vec()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn riders_sent_round_the_flank_ride_down_the_poachers() {
+    // `battle ... --roster levy:2:6 --roster riders:1:3 --orders flank,... --seed 123`
+    let world = marches();
+    let squads = [("levy", 2, healthy(6)), ("riders", 1, healthy(3))];
+    let mut engine = seeded(&world, 123, &squads);
+    engine.execute(Engage("outlaws".into())).unwrap();
+    let mut events = Vec::new();
+    while engine.battle().is_some() {
+        events.extend(engine.execute(Order(BattleOrder::Flank)).unwrap());
+    }
+    assert_eq!(
+        rounds(&events),
+        [[17, 11], [17, 6], [14, 4]].map(|s| s.to_vec())
+    );
+    assert!(events.contains(&Event::Pursuit { by: 0, losses: 3 }));
+    assert_eq!(outcome(&events), Some(BattleOutcome::Victory));
+    assert_eq!(vitals(&engine).hp, 30);
+}
+
+#[test]
+fn both_sides_breaking_together_is_a_draw() {
+    // `battle ... --roster levy:3:6 --seed 0`
+    let world = marches();
+    let mut engine = seeded(&world, 0, &[("levy", 3, healthy(6))]);
+    engine.execute(Engage("outlaws".into())).unwrap();
+    let events = engine.execute(Autoresolve).unwrap();
+    assert_eq!(rounds(&events).len(), 6);
+    assert_eq!(rounds(&events)[5], [3, 5]);
+    assert_eq!(outcome(&events), Some(BattleOutcome::Draw));
+    // A draw has no pursuit and no spoils.
+    assert!(!events.iter().any(|e| matches!(e, Event::Pursuit { .. })));
+    assert!(!events
+        .iter()
+        .any(|e| matches!(e, Event::ExperienceGranted { .. })));
+    assert_eq!(vitals(&engine).hp, 14);
+}
+
+/// The marches with battles capped at three rounds and no morale.
+fn capped() -> WorldSpec {
+    let mut world = marches();
+    let battle = world.world.battle.as_mut().unwrap();
+    battle.rounds = 3;
+    battle.morale = None;
+    world
+}
+
+#[test]
+fn at_the_round_cap_the_weaker_side_withdraws() {
+    // The marches with `rounds: 3` and no `morale`:
+    // `battle <that world> --roster levy:3:6 --roster bowmen:1:4 --orders hold,hold,hold --seed 9`
+    let world = capped();
+    let squads = [("levy", 3, healthy(6)), ("bowmen", 1, healthy(4))];
+    let mut engine = seeded(&world, 9, &squads);
+    engine.execute(Engage("outlaws".into())).unwrap();
+    let mut events = Vec::new();
+    while engine.battle().is_some() {
+        events.extend(engine.execute(Order(BattleOrder::Hold)).unwrap());
+    }
+    assert_eq!(
+        rounds(&events),
+        [[22, 15], [20, 13], [17, 9]].map(|s| s.to_vec())
+    );
+    // Without morale nobody breaks, and the stronger side keeps the field.
+    assert!(events
+        .iter()
+        .all(|e| !matches!(e, Event::BattleRound { morale, .. } if *morale != [100, 100])));
+    assert_eq!(outcome(&events), Some(BattleOutcome::Victory));
+    assert_eq!(vitals(&engine).hp, 31);
+}
+
+#[test]
+fn without_morale_rules_a_save_keeps_full_morale() {
+    let world = capped();
+    let mut engine = before_the_outlaws(&world, &[("levy", 3, healthy(6))]);
+    engine.execute(Engage("outlaws".into())).unwrap();
+    engine.execute(Order(BattleOrder::Charge)).unwrap();
+    let good = engine.snapshot();
+    Engine::restore(&world, good.clone()).unwrap();
+    for corrupt in [
+        |b: &mut BattleState| b.sides[0].morale = 3,
+        |b: &mut BattleState| b.sides[1].morale_remainder = 1,
+    ] {
+        let mut snapshot = good.clone();
+        let Stance::Battle(battle) = &mut snapshot.state.combat.as_mut().unwrap().stance else {
+            panic!("not in a battle");
+        };
+        corrupt(battle);
+        assert!(Engine::restore(&world, snapshot).is_err());
+    }
 }

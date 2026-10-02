@@ -14,7 +14,7 @@ mod time;
 pub(super) use actions::actions;
 pub(super) use economy::{quote, ware_price};
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
-pub(super) use retinue::promote;
+pub(super) use retinue::{leave, promote, prune};
 pub(super) use story::{choices, grant_items, grant_xp, progress, set_flag};
 
 /// Evaluates a condition against the state; pure, so it may run any number of times.

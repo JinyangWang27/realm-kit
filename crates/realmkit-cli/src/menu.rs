@@ -403,12 +403,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             let state = engine.state();
             let retinue = state.retinue.as_ref()?;
             let left = retinue.pools.get(&here.id)?.get(line).copied()?;
-            let heads: u64 = retinue
-                .roster
-                .values()
-                .flat_map(|l| l.values())
-                .map(|s| s.heads())
-                .sum();
+            let heads = retinue.heads();
             let why = if action.available {
                 String::new()
             } else if left == 0 {
