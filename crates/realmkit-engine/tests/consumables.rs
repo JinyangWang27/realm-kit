@@ -76,7 +76,7 @@ fn a_draught_restores_hp_up_to_the_maximum_and_is_spent() {
 
 #[test]
 fn using_is_refused_when_it_would_restore_nothing_or_nothing_is_carried() {
-    let mut world = arena();
+    let world = arena();
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     engine.execute(buy_draughts(1)).unwrap();
     let before = engine.state().clone();
@@ -94,19 +94,8 @@ fn using_is_refused_when_it_would_restore_nothing_or_nothing_is_carried() {
         engine.execute(Use("missing".into())),
         Err(EngineError::NotConsumable(_))
     ));
-    // An MP-only draught in a world whose player has no MP restores nothing.
-    world
-        .items
-        .iter_mut()
-        .find(|i| i.id == "healing_draught")
-        .unwrap()
-        .consumable = Some(Consumable { hp: 0, mp: 10 });
-    let mut engine = hurt_with_draughts(&world, 1);
-    assert_eq!(engine.player_stats().unwrap().mp, 0);
-    assert!(matches!(
-        engine.execute(Use("healing_draught".into())),
-        Err(EngineError::NothingToRestore)
-    ));
+    // (An MP-only draught where the player can never have MP is rejected by
+    // validation, so it never reaches the engine.)
     // None carried.
     let plain = arena();
     let mut engine = hurt_with_draughts(&plain, 1);

@@ -63,6 +63,11 @@ fn consumables_are_checked_with_stable_codes() {
             },
             "invalid_consumable",
         ),
+        // The arena's fighter can never have MP: an MP restore could never apply.
+        (
+            |w| item(w, "healing_draught").consumable = Some(Consumable { hp: 5, mp: 5 }),
+            "invalid_consumable",
+        ),
         // Wearing and eating the same thing is not a thing.
         (
             |w| item(w, "buckler").consumable = Some(Consumable { hp: 5, mp: 0 }),
@@ -78,6 +83,20 @@ fn consumables_are_checked_with_stable_codes() {
             world.diagnostics()
         );
     }
+    // Where the player can have MP, restoring it is fine.
+    let mut duel = duel();
+    duel.items.push(Item {
+        id: "ether".into(),
+        name: "Ether".into(),
+        description: "It fizzes.".into(),
+        equipment: None,
+        consumable: Some(Consumable { hp: 0, mp: 5 }),
+    });
+    assert!(
+        !codes(&duel).contains(&"invalid_consumable".to_string()),
+        "{:?}",
+        duel.diagnostics()
+    );
     // Restoring HP needs HP: a world without combat has none.
     let mut archive = archive();
     archive.items[0].consumable = Some(Consumable { hp: 5, mp: 0 });

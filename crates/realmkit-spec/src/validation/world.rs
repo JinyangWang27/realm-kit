@@ -60,12 +60,23 @@ pub(super) fn header(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
         }
         let restores = consumable.hp > 0 || consumable.mp > 0;
         let bounded = consumable.hp <= STAT_BOUND && consumable.mp <= STAT_BOUND;
-        if !restores || !bounded || item.equipment.is_some() {
+        // MP that no level, point or bonus can ever give is never restored.
+        let mp_possible = w.combat().is_none_or(|c| {
+            c.levels.iter().any(|l| l.stats.mp > 0)
+                || c.stat_points
+                    .as_ref()
+                    .is_some_and(|p| p.values.get(&Stat::Mp).is_some_and(|v| *v > 0))
+                || progression::worst_bonus(w, c, Stat::Mp) > 0
+        });
+        if !restores || !bounded || item.equipment.is_some() || (consumable.mp > 0 && !mp_possible)
+        {
             issue(
                 out,
                 &item.id,
                 "invalid_consumable",
-                format!("a consumable restores 1 to {STAT_BOUND} HP or MP and is not equipment"),
+                format!(
+                    "a consumable restores 1 to {STAT_BOUND} HP or MP the player can have, and is not equipment"
+                ),
             );
         }
     }

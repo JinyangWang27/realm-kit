@@ -688,7 +688,9 @@ An item with a `consumable` part restores HP and MP when used:
 ```
 
 - `hp` and `mp` each default to 0. At least one is positive, both are at
-  most 9,999, and a consumable is not also equipment (`invalid_consumable`).
+  most 9,999, a consumable is not also equipment, and it restores MP only
+  where some level, stat point, technique or piece can give the player MP
+  (`invalid_consumable`).
   A world without combat has no HP or MP to restore (`combat_disabled`).
 - `use <item>` spends one unit and restores up to the effective maxima. A
   use that would restore nothing is refused, and nothing is spent.
