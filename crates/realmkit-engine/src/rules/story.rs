@@ -209,6 +209,15 @@ pub(crate) fn apply(
             Effect::TakeItems { items } => take_items(state, items, events)?,
             Effect::GrantCurrency { amount } => economy::grant(state, *amount, events)?,
             Effect::PayCurrency { amount } => economy::pay(state, *amount, events)?,
+            Effect::BuyWorkshop { workshop } => {
+                economy::buy_workshop(world, state, workshop, events)?
+            }
+            Effect::SellWorkshop { workshop } => {
+                economy::sell_workshop(world, state, workshop, events)?
+            }
+            Effect::RaiseProficiency { proficiency, ranks } => {
+                proficiency::raise(world, state, *proficiency, *ranks, events)?
+            }
         }
     }
     Ok(())

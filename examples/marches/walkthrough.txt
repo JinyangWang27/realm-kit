@@ -1,5 +1,7 @@
 look
 market
+train trading
+buy grain 30
 travel ashmere
 talk reeve
 choose 1
@@ -46,4 +48,11 @@ load 3
 flank
 autoresolve
 retinue
+travel vellmarket
+sell eels 12
+talk maddoc
+choose 1
+wait 7d
+status
+market
 quit

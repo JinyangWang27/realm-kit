@@ -162,17 +162,24 @@ fn everything_that_takes_time_needs_a_clock() {
     world.world.time = None;
     let codes = codes(&world);
     // Four timed roads, the thaw, two people's hours, Wenna, the price tick,
-    // the troops' upkeep and Ashmere's recruits refilling.
+    // prosperity, restocking, workshops, the troops' upkeep and Ashmere's
+    // recruits refilling.
     assert_eq!(
         codes.iter().filter(|c| *c == "time_disabled").count(),
-        11,
+        14,
         "{codes:?}"
     );
     // A road without minutes takes no time, so it needs no clock.
     let mut world = marches();
     world.world.time = None;
     world.world.events.clear();
-    world.world.economy.as_mut().unwrap().tick = None;
+    let economy = world.world.economy.as_mut().unwrap();
+    economy.tick = None;
+    economy.prosperity = None;
+    economy.stock = None;
+    economy.workshops = None;
+    economy.markets.iter_mut().for_each(|m| m.prosperity = None);
+    world.dialogues.retain(|d| d.id != "maddoc");
     let troops = world.world.troops.as_mut().unwrap();
     troops.upkeep = None;
     for line in &mut troops.lines {
@@ -185,6 +192,9 @@ fn everything_that_takes_time_needs_a_clock() {
     }
     for character in &mut world.characters {
         character.requires = None;
+        if character.id == "maddoc" {
+            character.dialogue = None;
+        }
     }
     for road in &mut world.world.roads {
         road.minutes = 0;

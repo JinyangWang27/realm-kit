@@ -386,6 +386,7 @@ fn replay(fight: SimFight) {
         xp: 0,
         stats: fight.player,
         points: 0,
+        proficiency_points: 0,
     }];
     combat.resources = Resources {
         mp_regen_percent: 3,

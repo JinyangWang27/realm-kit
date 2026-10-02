@@ -27,7 +27,7 @@ pub use troops::*;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 14;
+pub const FORMAT_VERSION: u32 = 15;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -150,7 +150,15 @@ impl WorldSpec {
     /// Whether any content draws random numbers; only then does play keep a
     /// seeded generator.
     pub fn stochastic(&self) -> bool {
-        self.random_combat() || self.random_world() || self.random_market() || self.random_battle()
+        self.random_combat()
+            || self.random_world()
+            || self.random_market()
+            || self.random_battle()
+            || self.random_stock()
+    }
+    /// Whether restocking draws random numbers: the economy keeps stock.
+    pub fn random_stock(&self) -> bool {
+        self.economy().is_some_and(|e| e.stock.is_some())
     }
     /// Whether battles draw random numbers: every round rolls.
     pub fn random_battle(&self) -> bool {
@@ -181,6 +189,18 @@ impl WorldSpec {
     }
     pub fn economy(&self) -> Option<&Economy> {
         self.world.economy.as_ref()
+    }
+    /// The highest rank of a proficiency, if the world defines it.
+    pub fn proficiency_max(&self, proficiency: Proficiency) -> Option<u32> {
+        match proficiency {
+            Proficiency::Trading => self.economy()?.trading.as_ref().map(|t| t.max),
+        }
+    }
+    /// A proficiency's name in the world's language, if the world defines it.
+    pub fn proficiency_name(&self, proficiency: Proficiency) -> Option<&str> {
+        match proficiency {
+            Proficiency::Trading => self.economy()?.trading.as_ref().map(|t| t.name.as_str()),
+        }
     }
     pub fn technique(&self, id: &str) -> Option<&Technique> {
         self.combat()?.techniques.iter().find(|v| v.id == id)

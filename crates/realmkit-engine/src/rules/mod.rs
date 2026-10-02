@@ -7,13 +7,17 @@ mod consume;
 mod crafting;
 mod economy;
 mod player;
+mod proficiency;
 mod retinue;
 mod story;
 mod time;
 
 pub(super) use actions::actions;
-pub(super) use economy::{quote, ware_price};
+pub(super) use economy::{quote, stock_up, ware_price};
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
+pub(super) use proficiency::{
+    granted_points as granted_proficiency_points, rank, unspent_proficiency_points,
+};
 pub(super) use retinue::{leave, promote, prune};
 pub(super) use story::{choices, grant_items, grant_xp, progress, set_flag};
 
@@ -40,6 +44,16 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
             .economy
             .as_ref()
             .is_some_and(|e| e.currency >= *amount),
+        Condition::Workshop { workshop, location } => state.economy.as_ref().is_some_and(|e| {
+            e.workshops
+                .iter()
+                .filter(|(at, _)| location.as_ref().is_none_or(|l| l == *at))
+                .any(|(_, kinds)| kinds.get(workshop).is_some_and(|n| *n > 0))
+        }),
+        Condition::Proficiency {
+            proficiency,
+            rank: at_least,
+        } => rank(state, *proficiency) >= *at_least,
         Condition::TimeOfDay { from, to } => state.time.is_some_and(|now| {
             let minute = now % realmkit_spec::MINUTES_PER_DAY;
             if from < to {
@@ -249,6 +263,10 @@ pub(super) fn execute(
             player::allocate(world, state, stat, points, &mut events)?
         }
         Command::Respec => player::respec(world, state, &mut events)?,
+        Command::Train {
+            proficiency,
+            points,
+        } => proficiency::train(world, state, proficiency, points, &mut events)?,
         Command::Equip(piece) => gear::equip(world, state, piece, &mut events)?,
         Command::Unequip(piece) => gear::unequip(world, state, piece, &mut events)?,
         Command::Forge(recipe) => crafting::forge(world, state, &recipe, &mut events)?,

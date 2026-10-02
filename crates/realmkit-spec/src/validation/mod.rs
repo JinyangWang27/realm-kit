@@ -62,6 +62,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
         combat::rules(&mut out, w, combat);
     }
     troops::rules(&mut out, w);
+    economy::proficiency_points(&mut out, w);
     out
 }
 
@@ -169,6 +170,21 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
             time::needed(out, w, owner);
         }
         Condition::Currency { amount } => economy::amount(out, w, owner, *amount),
+        Condition::Workshop { workshop, location } => {
+            economy::workshop(out, w, owner, workshop);
+            if let Some(location) = location {
+                reference(
+                    out,
+                    owner,
+                    "location",
+                    location,
+                    w.location(location).is_some(),
+                );
+            }
+        }
+        Condition::Proficiency { proficiency, rank } => {
+            economy::proficiency(out, w, owner, *proficiency, *rank)
+        }
     }
 }
 

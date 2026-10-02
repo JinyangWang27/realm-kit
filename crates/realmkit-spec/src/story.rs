@@ -80,6 +80,17 @@ pub enum Condition {
     Currency {
         amount: u64,
     },
+    /// The player owns a workshop of this kind, at `location` if given.
+    Workshop {
+        workshop: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        location: Option<Id>,
+    },
+    /// The player's rank in a proficiency is at least `rank`.
+    Proficiency {
+        proficiency: Proficiency,
+        rank: u32,
+    },
 }
 
 impl Condition {
@@ -163,5 +174,18 @@ pub enum Effect {
     /// The player pays; without enough, nothing happens.
     PayCurrency {
         amount: u64,
+    },
+    /// The player buys a workshop of this kind in the town where they stand.
+    BuyWorkshop {
+        workshop: Id,
+    },
+    /// The player sells back a workshop of this kind where they stand.
+    SellWorkshop {
+        workshop: Id,
+    },
+    /// A teacher or a book raises a proficiency without spending points.
+    RaiseProficiency {
+        proficiency: Proficiency,
+        ranks: u32,
     },
 }

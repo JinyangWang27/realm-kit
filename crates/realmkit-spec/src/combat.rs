@@ -162,6 +162,10 @@ pub struct Level {
     /// starting pool.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub points: u32,
+    /// Proficiency points granted on reaching this level; the first level's
+    /// are the starting pool.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub proficiency_points: u32,
 }
 
 /// Player-allocated stat points: what one point adds to each stat that

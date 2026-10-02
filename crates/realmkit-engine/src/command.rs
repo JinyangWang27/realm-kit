@@ -62,6 +62,11 @@ pub enum Command {
     },
     /// Refunds every spent stat point, where the world allows it.
     Respec,
+    /// Spends unspent proficiency points on one proficiency.
+    Train {
+        proficiency: Proficiency,
+        points: u32,
+    },
     /// Wears a piece of equipment, returning whatever held its slots to the pack.
     Equip(u64),
     Unequip(u64),
@@ -228,6 +233,36 @@ pub enum Event {
         points: u32,
     },
     PointsRefunded,
+    /// The player trained a proficiency up to `rank`.
+    ProficiencyTrained {
+        proficiency: Proficiency,
+        rank: u32,
+    },
+    /// An effect taught a proficiency up to `rank`.
+    ProficiencyRaised {
+        proficiency: Proficiency,
+        rank: u32,
+    },
+    WorkshopBought {
+        workshop: Id,
+        location: Id,
+        cost: u64,
+    },
+    WorkshopSold {
+        workshop: Id,
+        location: Id,
+        earned: u64,
+    },
+    /// A settlement: the player's workshops earned this much in all.
+    WorkshopsEarned {
+        amount: u64,
+    },
+    /// A settlement: the workshops lost money; `amount` was paid and
+    /// `shortfall` could not be.
+    WorkshopsLost {
+        amount: u64,
+        shortfall: u64,
+    },
     TechniqueLearned {
         technique: Id,
     },

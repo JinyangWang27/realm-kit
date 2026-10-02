@@ -22,7 +22,8 @@
   {
     "id": "maddoc",
     "name": "Maddoc the wool factor",
-    "description": "He weighs every bale twice and trusts neither weighing."
+    "description": "He weighs every bale twice and trusts neither weighing.",
+    "dialogue": "maddoc"
   },
   {
     "id": "wenna",

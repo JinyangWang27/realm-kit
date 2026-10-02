@@ -588,15 +588,20 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         "16 h later: Day 2, 14:00",
         "Vellmarket\nDay 2, 17:00\n",
         "The Reeve's Letter [carry_letter]: Completed",
-        // Trading: eels from the fen sell dearer in Vellmarket, cloth in Greyford.
-        "Market at Greyford:\n  Grain — buy 17 silver · sell 13 silver · carried 0\n",
-        "Bought: Smoked eels ×6 for 63 silver",
+        // Trading: eels from the fen sell dearer in Vellmarket, cloth in
+        // Greyford. Merchants hold only so much, and trading narrows the spread.
+        "6. Proficiencies — 1 point ›",
+        "Market at Greyford:\n  Prosperity 48\n  Grain — buy 12 silver · sell 9 silver · stock 20 · carried 0\n",
+        "  You: 100 silver · Merchants: 588 silver\n",
+        "Trade is now rank 1.",
+        "there is no grain left to buy here",
+        "Bought: Smoked eels ×6 for 48 silver",
         "Received: 60 silver",
-        "Sold: Smoked eels ×6 for 93 silver",
-        "Bought: Cloth ×1 for 98 silver",
-        "Sold: Cloth ×1 for 135 silver",
-        "Inventory:\n  227 silver\n",
-        "5. Market ›",
+        "Sold: Smoked eels ×6 for 85 silver",
+        "Bought: Cloth ×1 for 100 silver",
+        "Sold: Cloth ×1 for 126 silver",
+        "Inventory:\n  223 silver\n",
+        "6. Market ›",
         // Levies raised at Ashmere fight the outlaws beside the keep's guard.
         "6. Recruit ›",
         "2. Engage The fen outlaws (14) — with Warden Cadoc",
@@ -617,6 +622,11 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         "Loaded save 3.",
         "  3. Flank with riders\n",
         "Round 1 — yours: strength 27, lost 0, morale 100 · theirs: strength 11, lost 3, morale 68",
+        // A weavery bought from Maddoc pays out at the week's settlement.
+        "You buy the Weavery in Vellmarket for 150 silver.",
+        "Your workshops earn 122 silver.",
+        "  Trade 1/3 · 1 proficiency point to spend\n  Workshops: Weavery in Vellmarket\n",
+        "Market at Vellmarket:\n  Prosperity 40\n",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
@@ -625,17 +635,19 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
     let help = String::from_utf8(run(&["play", MARCHES], "help\n").stdout).unwrap();
     assert!(help.contains("travel <location-id>"));
     assert!(help.contains("buy <item> [units]"));
-    // The market submenu prices every good, and shows what cannot be afforded.
+    assert!(help.contains("train trading [points]"));
+    // The market submenu prices every good, and shows what is sold out or
+    // cannot be afforded.
     let menu = run(
         &["play", MARCHES, "--line", "--seed", "7"],
-        "travel ashmere\n7\n2\n",
+        "travel ashmere\n8\n2\ntravel greyford\n7\n",
     );
     let menu = String::from_utf8(menu.stdout).unwrap();
     for passage in [
-        "Market\n  1. Prices\n  2. Buy Grain — 14 silver (next 15 silver)\n",
-        "4. Buy Cloth — 184 silver [cannot afford]",
-        "Bought: Grain ×1 for 14 silver",
-        "Sell Grain (1) — 9 silver (next 9 silver)",
+        "Market\n  1. Prices\n  2. Buy Grain — 12 silver (next 13 silver)\n",
+        "4. Buy Cloth — 168 silver [sold out]",
+        "Bought: Grain ×1 for 12 silver",
+        "Sell Grain (1) — 8 silver (next 8 silver)",
     ] {
         assert!(menu.contains(passage), "missing {passage:?} in {menu}");
     }

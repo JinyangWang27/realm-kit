@@ -317,7 +317,18 @@ fn time_never_passes_beyond_its_bound() {
     let mut world = marches();
     world.world.time.as_mut().unwrap().start = WORLD_TIME_BOUND - 60;
     world.world.events.clear();
-    world.world.economy.as_mut().unwrap().tick = None;
+    let economy = world.world.economy.as_mut().unwrap();
+    economy.tick = None;
+    economy.prosperity = None;
+    economy.stock = None;
+    economy.workshops = None;
+    economy.markets.iter_mut().for_each(|m| m.prosperity = None);
+    world.dialogues.retain(|d| d.id != "maddoc");
+    world.characters.iter_mut().for_each(|c| {
+        if c.id == "maddoc" {
+            c.dialogue = None;
+        }
+    });
     world.world.troops.as_mut().unwrap().upkeep = None;
     for location in &mut world.locations {
         location.recruits.iter_mut().for_each(|r| r.refill = None);

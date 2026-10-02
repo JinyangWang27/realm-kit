@@ -1,7 +1,7 @@
 //! Synchronous gameplay; no generation or presentation dependencies.
 
 use realmkit_spec::{
-    Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack,
+    Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack, Proficiency,
     QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat, Stats, WorldSpec,
     BASIC_POWER,
 };
@@ -115,9 +115,22 @@ impl<'w> Engine<'w> {
                             (m.location.clone(), prices.collect())
                         })
                         .collect(),
+                    prosperity: match &economy.prosperity {
+                        Some(rules) => economy
+                            .markets
+                            .iter()
+                            .map(|m| (m.location.clone(), m.prosperity.unwrap_or(rules.base)))
+                            .collect(),
+                        None => BTreeMap::new(),
+                    },
+                    stock: BTreeMap::new(),
+                    workshops: BTreeMap::new(),
                 }),
+                proficiencies: BTreeMap::new(),
             },
         };
+        // Merchants open with their stock at its targets, drawing nothing.
+        rules::stock_up(world, &mut engine.state);
         // Starting techniques, then vitals at the maxima their passives give.
         if let Some(rules) = world.combat() {
             let mut ignored = Vec::new();
@@ -151,6 +164,14 @@ impl<'w> Engine<'w> {
     pub fn unspent_points(&self) -> Option<u32> {
         let combat = self.state.combat.as_ref()?;
         Some(rules::unspent_points(self.world, combat))
+    }
+    /// The player's rank in a proficiency; 0 if never gained.
+    pub fn proficiency_rank(&self, proficiency: Proficiency) -> u32 {
+        rules::rank(&self.state, proficiency)
+    }
+    /// Proficiency points granted so far and not yet trained.
+    pub fn unspent_proficiency_points(&self) -> u32 {
+        rules::unspent_proficiency_points(self.world, &self.state)
     }
     /// The player's current HP and MP, wherever they live; `None` without combat.
     pub fn player_vitals(&self) -> Option<Vitals> {

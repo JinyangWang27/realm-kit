@@ -80,6 +80,29 @@ pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy)
     markets(out, w, economy);
     links(out, w, economy);
     no_round_trip(out, w, economy);
+    prosperity(out, w, economy);
+    stock(out, w, economy);
+    workshops(out, w, economy);
+    if let Some(trading) = &economy.trading {
+        if trading.name.trim().is_empty() {
+            issue(
+                out,
+                owner,
+                "empty_name",
+                "the trading proficiency needs a name",
+            );
+        }
+        if !(1..=RANK_BOUND).contains(&trading.max)
+            || u64::from(trading.narrow_percent) * u64::from(trading.max) > 100
+        {
+            issue(
+                out,
+                owner,
+                "invalid_amount",
+                format!("trading ranks 1 to {RANK_BOUND} narrow the spread by at most 100% in all"),
+            );
+        }
+    }
     if let Some(tick) = &economy.tick {
         time::needed(out, w, owner);
         time::schedule(out, w, owner, &tick.schedule);
@@ -123,19 +146,29 @@ fn no_round_trip(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
     if low == 0 {
         return;
     }
+    // The best trader pays the narrowest spread.
+    let best = economy.trading.as_ref().map_or(0, |t| t.max);
     let spreads = std::iter::once(economy.spread_percent)
         .chain(economy.markets.iter().filter_map(|m| m.spread_percent));
-    for spread in spreads {
+    for authored in spreads {
+        let spread = narrowed(economy, authored, best);
         let margin = (100 + u64::from(spread)).pow(2) * low;
         if margin < 10_000 * (low + u64::from(economy.trade_step)) {
             issue(
                 out,
                 owner,
                 "invalid_spread",
-                format!("a spread of {spread}% lets trading a unit back and forth turn a profit"),
+                format!("a spread of {authored}% (narrowed to {spread}%) lets trading a unit back and forth turn a profit"),
             );
         }
     }
+}
+
+/// A spread narrowed by `rank` in trading, as the engine computes it.
+fn narrowed(economy: &Economy, spread: u32, rank: u32) -> u32 {
+    let narrow = economy.trading.as_ref().map_or(0, |t| t.narrow_percent);
+    let kept = 100_u64.saturating_sub(u64::from(narrow) * u64::from(rank));
+    (u64::from(spread) * kept / 100) as u32
 }
 
 /// Goods are counted items, each traded once, with a positive price.
@@ -282,8 +315,56 @@ fn markets(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
                 );
             }
         }
+        if let Some(start) = market.prosperity {
+            if economy.prosperity.is_none() {
+                issue(
+                    out,
+                    owner,
+                    "invalid_amount",
+                    "a starting prosperity needs the economy's prosperity block",
+                );
+            }
+            bounded(
+                out,
+                owner,
+                start.into(),
+                PROSPERITY_BOUND.into(),
+                "prosperity",
+            );
+        }
+        if let Some(town) = &market.town {
+            let valid = market.kind == MarketKind::Village
+                && economy
+                    .market(town)
+                    .is_some_and(|t| t.kind == MarketKind::Town);
+            if !valid {
+                issue(
+                    out,
+                    owner,
+                    "invalid_town",
+                    format!(
+                        "only a village names its market town, and {town} must be a town market"
+                    ),
+                );
+            }
+        }
+        // Demand peaks at whichever end of the prosperity range scales it most.
+        let peak = economy.prosperity.map_or(0, |p| {
+            if p.demand_percent[0] >= p.demand_percent[1] {
+                0
+            } else {
+                PROSPERITY_BOUND
+            }
+        });
         for good in &economy.goods {
-            let (made, used) = economy.supply(market, good, BASE_INDEX);
+            let (mut made, mut used) = economy.supply(market, good, BASE_INDEX, peak);
+            if market.kind == MarketKind::Town {
+                for village in economy.villages(&market.location) {
+                    let (m, u) = economy.supply(village, good, BASE_INDEX, peak);
+                    made = made.saturating_add(m);
+                    used = used.saturating_add(u);
+                }
+            }
             if made > SUPPLY_BOUND || used > SUPPLY_BOUND {
                 issue(
                     out,
@@ -343,5 +424,205 @@ fn links(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
                 "a market's links share at most 100 percent in total",
             );
         }
+    }
+}
+
+fn prosperity(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
+    let Some(rules) = &economy.prosperity else {
+        return;
+    };
+    let owner = &w.world.id;
+    time::needed(out, w, owner);
+    time::schedule(out, w, owner, &rules.schedule);
+    let bound = u64::from(PROSPERITY_BOUND);
+    bounded(out, owner, rules.base.into(), bound, "prosperity");
+    bounded(out, owner, rules.scarcity.into(), bound, "a scarcity");
+    let [low, high] = economy.index_bounds;
+    if !(low..=high).contains(&rules.scarce_above) {
+        issue(
+            out,
+            owner,
+            "invalid_amount",
+            "the scarcity level is within the index bounds",
+        );
+    }
+    for percent in rules.demand_percent {
+        bounded(out, owner, percent.into(), 1_000, "a demand percentage");
+    }
+}
+
+/// Restocks stay within the stock and currency bounds at any prosperity.
+fn stock(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
+    let Some(rules) = &economy.stock else {
+        return;
+    };
+    let owner = &w.world.id;
+    time::needed(out, w, owner);
+    time::schedule(out, w, owner, &rules.schedule);
+    for percent in rules.prosperity_percent {
+        bounded(out, owner, percent.into(), 1_000, "a stock percentage");
+    }
+    let top = match economy.prosperity {
+        Some(_) => *rules.prosperity_percent.iter().max().unwrap(),
+        None => 100,
+    };
+    if economy.prosperity.is_none() && rules.prosperity_percent != [100, 100] {
+        warn(
+            out,
+            owner,
+            "unused_percent",
+            "stock scales with prosperity, but the economy has no prosperity block",
+        );
+    }
+    let most = |value: u64| u128::from(value) * u128::from(top) / 100;
+    if most(rules.units) > u128::from(STOCK_BOUND / 2) {
+        issue(
+            out,
+            owner,
+            "invalid_amount",
+            format!(
+                "a restock spreads at most {} units at any prosperity",
+                STOCK_BOUND / 2
+            ),
+        );
+    }
+    if most(rules.currency) > u128::from(CURRENCY_BOUND) {
+        issue(
+            out,
+            owner,
+            "invalid_amount",
+            format!("a purse holds at most {CURRENCY_BOUND} at any prosperity"),
+        );
+    }
+}
+
+/// Workshops make a trade good from trade goods, and never pay for
+/// themselves by being bought and sold back.
+fn workshops(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
+    let Some(rules) = &economy.workshops else {
+        return;
+    };
+    let owner = &w.world.id;
+    time::needed(out, w, owner);
+    time::schedule(out, w, owner, &rules.schedule);
+    if !(1..=WORKSHOP_BOUND).contains(&rules.limit) {
+        issue(
+            out,
+            owner,
+            "invalid_limit",
+            format!("a town holds 1 to {WORKSHOP_BOUND} workshops"),
+        );
+    }
+    ids(out, "workshop", rules.kinds.iter().map(|k| k.id.as_str()));
+    for kind in &rules.kinds {
+        let owner = &kind.id;
+        if kind.name.trim().is_empty() {
+            issue(out, owner, "empty_name", "a workshop needs a name");
+        }
+        for (good, units) in std::iter::once((&kind.good, &kind.output)).chain(&kind.inputs) {
+            reference(out, owner, "good", good, economy.good(good).is_some());
+            if *units == 0 || *units > QUANTITY_BOUND {
+                issue(
+                    out,
+                    owner,
+                    "invalid_amount",
+                    format!("a workshop makes or uses 1 to {QUANTITY_BOUND} units of a good"),
+                );
+            }
+        }
+        for (value, what) in [
+            (kind.price, "a workshop's price"),
+            (kind.resale, "a workshop's resale"),
+            (kind.overhead, "a workshop's overhead"),
+        ] {
+            bounded(out, owner, value, CURRENCY_BOUND, what);
+        }
+        if kind.resale > kind.price {
+            issue(
+                out,
+                owner,
+                "invalid_resale",
+                "selling a workshop back pays at most its price",
+            );
+        }
+    }
+}
+
+/// A workshop effect or condition names a kind the world authors.
+pub(super) fn workshop(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, kind: &str) {
+    let Some(rules) = w.economy().and_then(|e| e.workshops.as_ref()) else {
+        issue(
+            out,
+            owner,
+            "workshops_disabled",
+            "this world's economy has no workshops",
+        );
+        return;
+    };
+    reference(
+        out,
+        owner,
+        "workshop",
+        kind,
+        rules.kinds.iter().any(|k| k.id == kind),
+    );
+}
+
+/// A proficiency an effect or condition names is authored, and a rank is
+/// within its bound.
+pub(super) fn proficiency(
+    out: &mut Vec<Diagnostic>,
+    w: &WorldSpec,
+    owner: &str,
+    proficiency: Proficiency,
+    rank: u32,
+) {
+    if w.proficiency_max(proficiency).is_none() {
+        issue(
+            out,
+            owner,
+            "proficiencies_disabled",
+            format!("this world does not define the {proficiency:?} proficiency"),
+        );
+    }
+    if !(1..=RANK_BOUND).contains(&rank) {
+        issue(
+            out,
+            owner,
+            "invalid_amount",
+            format!("a proficiency rank is 1 to {RANK_BOUND}"),
+        );
+    }
+}
+
+/// Levels grant proficiency points only where a proficiency can take them.
+pub(super) fn proficiency_points(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    let granted = w
+        .combat()
+        .is_some_and(|c| c.levels.iter().any(|l| l.proficiency_points > 0));
+    let any = Proficiency::ALL
+        .iter()
+        .any(|p| w.proficiency_max(*p).is_some());
+    if granted && !any {
+        issue(
+            out,
+            &w.world.id,
+            "proficiencies_disabled",
+            "levels grant proficiency points, but the world defines no proficiency",
+        );
+    }
+    let total: u64 = w.combat().map_or(0, |c| {
+        c.levels
+            .iter()
+            .map(|l| u64::from(l.proficiency_points))
+            .sum()
+    });
+    if total > u64::from(u32::MAX) {
+        issue(
+            out,
+            &w.world.id,
+            "invalid_points",
+            "levels grant too many proficiency points in all",
+        );
     }
 }

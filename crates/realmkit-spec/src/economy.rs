@@ -18,6 +18,14 @@ pub const BASE_INDEX: u32 = 1_000;
 /// The most a market makes or uses up of one good on a tick, so a tick's
 /// draws stay far inside 64 bits.
 pub const SUPPLY_BOUND: u64 = 100_000_000;
+/// The highest prosperity a market reaches.
+pub const PROSPERITY_BOUND: u32 = 100;
+/// The most units of one good a market keeps in stock.
+pub const STOCK_BOUND: u64 = 1_000_000;
+/// The highest rank of any proficiency.
+pub const RANK_BOUND: u32 = 100;
+/// The most workshops one town holds.
+pub const WORKSHOP_BOUND: u32 = 100;
 
 /// Optional economy: currency and markets. Every price comes from production.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -43,6 +51,121 @@ pub struct Economy {
     /// Prices move on this schedule; without one, only trade moves them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tick: Option<PriceTick>,
+    /// Markets prosper or decline with what they lack.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prosperity: Option<Prosperity>,
+    /// Markets hold limited stock and a purse, restocked on a schedule.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stock: Option<Stock>,
+    /// Workshops the player may own in towns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workshops: Option<Workshops>,
+    /// The trading proficiency, which narrows the spread.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trading: Option<Trading>,
+}
+
+/// Each market's prosperity, from 0 to [`PROSPERITY_BOUND`], drifting one
+/// point a time towards an ideal its scarcities lower.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Prosperity {
+    pub schedule: Schedule,
+    /// The ideal prosperity while nothing the market needs is scarce.
+    pub base: u32,
+    /// A needed good at or above this index is scarce.
+    pub scarce_above: u32,
+    /// Each scarce good lowers the ideal by this much.
+    pub scarcity: u32,
+    /// A market kind's demand, as a percentage, at prosperity 0 and 100.
+    #[serde(default = "unscaled", skip_serializing_if = "is_unscaled")]
+    pub demand_percent: [u32; 2],
+}
+
+/// Merchants' stock of goods and their purse, redrawn on a schedule.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Stock {
+    pub schedule: Schedule,
+    /// Units a restock spreads over the goods the market makes.
+    pub units: u64,
+    /// The purse after a restock.
+    pub currency: u64,
+    /// Units and purse, as a percentage, at prosperity 0 and 100.
+    #[serde(default = "unscaled", skip_serializing_if = "is_unscaled")]
+    pub prosperity_percent: [u32; 2],
+}
+
+/// Workshops the player buys in towns, settled on a schedule.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Workshops {
+    pub schedule: Schedule,
+    /// The most workshops of any kinds the player owns in one town.
+    pub limit: u32,
+    pub kinds: Vec<WorkshopKind>,
+}
+
+/// A kind of workshop: what it makes from what on each settlement.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkshopKind {
+    pub id: Id,
+    pub name: String,
+    /// The good it makes.
+    pub good: Id,
+    /// Units made on each settlement.
+    pub output: u64,
+    /// Units of each good used up on each settlement.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub inputs: BTreeMap<Id, u64>,
+    /// Paid on each settlement besides the inputs.
+    #[serde(default)]
+    pub overhead: u64,
+    /// What buying one costs.
+    pub price: u64,
+    /// What selling one back pays; never more than the price.
+    #[serde(default)]
+    pub resale: u64,
+}
+
+/// The trading proficiency: each rank narrows the spread.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Trading {
+    pub name: String,
+    /// The highest rank.
+    pub max: u32,
+    /// Each rank takes this share off the spread.
+    pub narrow_percent: u32,
+}
+
+/// A proficiency the engine knows how to use; its capability defines it.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum Proficiency {
+    /// Narrows the spread; defined by `economy.trading`.
+    Trading,
+}
+
+impl Proficiency {
+    pub const ALL: [Proficiency; 1] = [Proficiency::Trading];
+}
+
+fn unscaled() -> [u32; 2] {
+    [100, 100]
+}
+
+fn is_unscaled(value: &[u32; 2]) -> bool {
+    *value == unscaled()
+}
+
+/// `value` scaled by a percentage that runs linearly from `lo` at
+/// prosperity 0 to `hi` at prosperity 100, rounded down once.
+pub fn scaled(value: u64, [lo, hi]: [u32; 2], prosperity: u32) -> u64 {
+    let p = u128::from(prosperity.min(PROSPERITY_BOUND));
+    let percent = u128::from(lo) * (100 - p) + u128::from(hi) * p;
+    u64::try_from(u128::from(value) * percent / 10_000).unwrap_or(u64::MAX)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -112,6 +235,12 @@ pub struct Market {
     /// Items sold here at a fixed price, buy-only and never running out.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub wares: Vec<Ware>,
+    /// Starting prosperity; the economy's base if left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prosperity: Option<u32>,
+    /// A village's market town, whose trade counts the village's too.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub town: Option<Id>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -161,17 +290,43 @@ impl Economy {
     pub fn producer(&self, id: &str) -> Option<&Producer> {
         self.producers.iter().find(|p| p.id == id)
     }
-    /// The spread at a market.
-    pub fn spread(&self, market: &Market) -> u32 {
-        market.spread_percent.unwrap_or(self.spread_percent)
+    pub fn workshop(&self, id: &str) -> Option<&WorkshopKind> {
+        self.workshops.as_ref()?.kinds.iter().find(|k| k.id == id)
+    }
+    /// The spread at a market, narrowed by `rank` in trading.
+    pub fn spread(&self, market: &Market, rank: u32) -> u32 {
+        let spread = market.spread_percent.unwrap_or(self.spread_percent);
+        let narrow = self.trading.as_ref().map_or(0, |t| t.narrow_percent);
+        let kept = 100_u64.saturating_sub(u64::from(narrow) * u64::from(rank));
+        (u64::from(spread) * kept / 100) as u32
+    }
+    /// The villages whose trade counts towards `town`'s, in market order.
+    pub fn villages<'e>(&'e self, town: &'e str) -> impl Iterator<Item = &'e Market> {
+        self.markets
+            .iter()
+            .filter(move |m| m.town.as_deref() == Some(town))
+    }
+    /// Whether a market needs a good: its kind demands it or its producers
+    /// use it up.
+    pub fn needs(&self, market: &Market, good: &Good) -> bool {
+        good.demand.get(&market.kind).is_some_and(|d| *d > 0)
+            || market.producers.iter().any(|(id, count)| {
+                *count > 0
+                    && self
+                        .producer(id)
+                        .is_some_and(|p| p.consumes.get(&good.item).is_some_and(|u| *u > 0))
+            })
     }
     /// What a market makes and uses up of a good on one tick, at price
     /// `index`: its producers' yields, and its kind's demand plus what its
     /// producers consume. Producers make do with less of a dear good: while
     /// the index is above 1,000, their consumption is scaled by 1,000 ÷
-    /// index, rounded down once. Saturating; validation keeps both within
-    /// [`SUPPLY_BOUND`] at the base price, where consumption is greatest.
-    pub fn supply(&self, market: &Market, good: &Good, index: u32) -> (u64, u64) {
+    /// index, rounded down once. With prosperity, the kind's demand is
+    /// scaled by the demand percentage at `prosperity`. Saturating;
+    /// validation keeps both within [`SUPPLY_BOUND`] at the base price,
+    /// where consumption is greatest. A town's villages are not counted
+    /// here; see the price tick.
+    pub fn supply(&self, market: &Market, good: &Good, index: u32, prosperity: u32) -> (u64, u64) {
         let (mut made, mut industry) = (0_u64, 0_u64);
         for (id, count) in &market.producers {
             let Some(producer) = self.producer(id) else {
@@ -186,7 +341,10 @@ impl Economy {
         if index > BASE_INDEX {
             industry = industry.saturating_mul(u64::from(BASE_INDEX)) / u64::from(index);
         }
-        let demand = good.demand.get(&market.kind).copied().unwrap_or(0);
+        let mut demand = good.demand.get(&market.kind).copied().unwrap_or(0);
+        if let Some(rules) = &self.prosperity {
+            demand = scaled(demand, rules.demand_percent, prosperity);
+        }
         (made, demand.saturating_add(industry))
     }
 }

@@ -1,8 +1,10 @@
 //! Panels: views of the current state that spend no time.
 
-use crate::render::{clock, direction_name, duration, money, piece_name, stat_name, Paint};
+use crate::render::{
+    clock, direction_name, duration, money, piece_name, stat_name, workshop_name, Paint,
+};
 use realmkit_engine::Engine;
-use realmkit_spec::Stat;
+use realmkit_spec::{Proficiency, Stat};
 use std::io::{self, Write};
 
 /// The location: its name, description, exits (locked or not) and who is here.
@@ -105,14 +107,20 @@ pub fn market(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
     };
     let name = &world.location(&market.location).unwrap().name;
     writeln!(output, "{}", paint.title(&format!("Market at {name}:")))?;
+    if let Some(prosperity) = wallet.prosperity.get(&market.location) {
+        writeln!(output, "  Prosperity {prosperity}")?;
+    }
     for good in &economy.goods {
         let Some(quote) = engine.quote(&good.item) else {
             continue;
         };
         let held = state.player.inventory.get(&good.item).copied().unwrap_or(0);
+        let stock = quote
+            .stock
+            .map_or(String::new(), |n| format!(" · stock {n}"));
         writeln!(
             output,
-            "  {} — buy {} · sell {} · carried {held}",
+            "  {} — buy {} · sell {}{stock} · carried {held}",
             world.item(&good.item).unwrap().name,
             money(world, quote.buy),
             money(world, quote.sell),
@@ -133,7 +141,15 @@ pub fn market(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
             )?;
         }
     }
-    writeln!(output, "  {}", money(world, wallet.currency))
+    match wallet.stock.get(&market.location) {
+        Some(stock) => writeln!(
+            output,
+            "  You: {} · Merchants: {}",
+            money(world, wallet.currency),
+            money(world, stock.currency)
+        ),
+        None => writeln!(output, "  {}", money(world, wallet.currency)),
+    }
 }
 
 /// " (Defence +6, Speed -10)": what wearing a piece at its base tier does.
@@ -243,7 +259,8 @@ pub fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
         engine.player_vitals(),
         world.combat(),
     ) else {
-        return writeln!(output, "{}", paint.title(player));
+        writeln!(output, "{}", paint.title(player))?;
+        return holdings(output, engine);
     };
     // Who and where: the level, and the core internal art's rank as the realm.
     let mut heading = format!("{player} — Level {}", combat.level);
@@ -273,10 +290,50 @@ pub fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
         None => write!(output, " (highest level)")?,
     }
     match engine.unspent_points() {
-        Some(1) => writeln!(output, " · 1 point to spend"),
-        Some(points) if points > 0 => writeln!(output, " · {points} points to spend"),
-        _ => writeln!(output),
+        Some(1) => writeln!(output, " · 1 point to spend")?,
+        Some(points) if points > 0 => writeln!(output, " · {points} points to spend")?,
+        _ => writeln!(output)?,
     }
+    holdings(output, engine)
+}
+
+/// Proficiency ranks with points waiting, then the player's workshops.
+fn holdings(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
+    let world = engine.world();
+    let ranks: Vec<String> = Proficiency::ALL
+        .into_iter()
+        .filter_map(|p| {
+            let name = world.proficiency_name(p)?;
+            let max = world.proficiency_max(p)?;
+            Some(format!("{name} {}/{max}", engine.proficiency_rank(p)))
+        })
+        .collect();
+    if !ranks.is_empty() {
+        write!(output, "  {}", ranks.join(" · "))?;
+        match engine.unspent_proficiency_points() {
+            0 => writeln!(output)?,
+            1 => writeln!(output, " · 1 proficiency point to spend")?,
+            n => writeln!(output, " · {n} proficiency points to spend")?,
+        }
+    }
+    let Some(wallet) = &engine.state().economy else {
+        return Ok(());
+    };
+    let owned: Vec<String> = wallet
+        .workshops
+        .iter()
+        .flat_map(|(town, kinds)| {
+            let town = &world.location(town).unwrap().name;
+            kinds.iter().map(move |(kind, count)| match count {
+                1 => format!("{} in {town}", workshop_name(world, kind)),
+                n => format!("{} ×{n} in {town}", workshop_name(world, kind)),
+            })
+        })
+        .collect();
+    if !owned.is_empty() {
+        writeln!(output, "  Workshops: {}", owned.join(", "))?;
+    }
+    Ok(())
 }
 
 /// Every quest and its status.
