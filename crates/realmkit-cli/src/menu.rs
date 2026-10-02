@@ -24,6 +24,8 @@ const FLEE: &str = "Flee";
 const TRAIN: &str = "Train";
 const RESPEC: &str = "Refund stat points";
 const TRAIN_GROUP: &str = "Train stats";
+const PROFICIENCY_GROUP: &str = "Proficiencies";
+const SOLD_OUT: &str = "[sold out]";
 const EQUIPMENT_GROUP: &str = "Equipment";
 const SMITHING_GROUP: &str = "Smithing";
 const MARKET_GROUP: &str = "Market";
@@ -94,6 +96,7 @@ pub enum Outcome {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Group {
     Train,
+    Proficiencies,
     Equipment,
     Smithing,
     Enchanting,
@@ -107,6 +110,7 @@ impl Group {
     fn of(command: &Command) -> Option<Self> {
         match command {
             Command::Allocate { .. } | Command::Respec => Some(Self::Train),
+            Command::Train { .. } => Some(Self::Proficiencies),
             Command::Equip(_) => Some(Self::Equipment),
             Command::Forge(_) | Command::Improve(_) => Some(Self::Smithing),
             Command::Enchant { .. } => Some(Self::Enchanting),
@@ -262,6 +266,10 @@ fn group_label(engine: &Engine<'_>, group: Group) -> String {
             0 => format!("{TRAIN_GROUP} {OPENS}"),
             1 => format!("{TRAIN_GROUP} — 1 point {OPENS}"),
             n => format!("{TRAIN_GROUP} — {n} points {OPENS}"),
+        },
+        Group::Proficiencies => match engine.unspent_proficiency_points() {
+            1 => format!("{PROFICIENCY_GROUP} — 1 point {OPENS}"),
+            n => format!("{PROFICIENCY_GROUP} — {n} points {OPENS}"),
         },
         Group::Equipment => format!("{EQUIPMENT_GROUP} {OPENS}"),
         Group::Smithing => format!("{SMITHING_GROUP} {OPENS}"),
@@ -488,7 +496,13 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             let quote = engine.quote(good)?;
             if !action.available {
                 let currency = engine.state().economy.as_ref()?.currency;
-                let why = if currency < quote.buy { AFFORD } else { LOCKED };
+                let why = if quote.stock == Some(0) {
+                    SOLD_OUT
+                } else if currency < quote.buy {
+                    AFFORD
+                } else {
+                    LOCKED
+                };
                 return Some(format!("{BUY} {name} — {} {why}", money(world, quote.buy)));
             }
             format!(
@@ -530,6 +544,15 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             )
         }
         Command::Respec => RESPEC.into(),
+        // "Train Trade: 0 → 1"
+        Command::Train { proficiency, .. } => {
+            let rank = engine.proficiency_rank(*proficiency);
+            format!(
+                "{TRAIN} {}: {rank} → {}",
+                world.proficiency_name(*proficiency)?,
+                rank + 1
+            )
+        }
         // "Equip #5 Greatsword: Attack 13 → 21, Defence 11 → 9", from
         // the engine's own calculation on a copy.
         Command::Equip(piece) => {
@@ -916,6 +939,30 @@ mod tests {
             Menu::new(&engine, true, None).entries()[0].label,
             "Talk to Elder Mara"
         );
+    }
+
+    #[test]
+    fn proficiencies_wait_behind_their_own_submenu() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/marches"
+        ))
+        .unwrap();
+        let mut engine = Engine::new(&world).unwrap();
+        let mut menu = Menu::new(&engine, false, None);
+        let labels = |menu: &Menu| -> Vec<String> {
+            menu.entries().iter().map(|e| e.label.clone()).collect()
+        };
+        assert_eq!(labels(&menu)[5], "Proficiencies — 1 point ›");
+        menu.choose(6);
+        assert_eq!(labels(&menu), ["Train Trade: 0 → 1", "Back"]);
+        let Outcome::Run(train) = menu.handle(Key::Enter) else {
+            panic!("the first entry trains trading");
+        };
+        engine.execute(train).unwrap();
+        // With no points left, the group is gone.
+        let menu = Menu::new(&engine, false, None);
+        assert!(!labels(&menu).iter().any(|l| l.starts_with("Proficiencies")));
     }
 
     #[test]

@@ -117,6 +117,16 @@ proves the complete single-player loop with authored content.
   `scripts/combat_sim/battle.py`, whose numbers engine tests pin. Saves hold
   squads and pools, and a battle between rounds. `examples/marches`
   exercises it. Package and save format 14.
+- [x] Economy completion (M6a-2): markets prosper or decline one point a
+  day towards an ideal their scarcities lower, and prosperity scales
+  demand and merchants' stock; merchants hold stock and a purse, restocked
+  on a schedule from their own `stock` stream, so trade is limited both
+  ways; villages feed their market town; workshops bought and sold through
+  dialogue settle weekly at local prices; and the trading proficiency,
+  trained with points from the level table or taught by effects, narrows
+  the spread. `scripts/combat_sim/economy.py` mirrors all of it, and a
+  world without these parts keeps its Format 14 numbers.
+  `examples/marches` exercises them. Package and save format 15.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

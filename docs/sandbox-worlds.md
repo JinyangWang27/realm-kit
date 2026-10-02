@@ -277,11 +277,17 @@ the world authors it, and it arrives with a fixture that proves it.
 
 ### Economy
 
-M6a-1 delivers goods, producers, markets, the price tick, links, buying and
+M6a-1 delivered goods, producers, markets, the price tick, links, buying and
 selling, merchants who must be present and currency conditions and effects
-([Economy](world-format.md#economy)). Prosperity, merchants' stock,
-workshops and the trading proficiency follow in M6a-2. A village does not
-yet count towards its market town's trade; link the two instead.
+([Economy](world-format.md#economy)). M6a-2 delivered prosperity,
+merchants' stock, villages that feed their town, workshops and the trading
+proficiency. As delivered, each part is its own optional block; restocking
+draws from its own `stock` stream rather than `market`, so authoring stock
+never shifts price draws; and a restock weighs goods by what the market
+makes (more while cheap), not by net supply, so a town that eats more
+grain than it grows still sells some. Still to come: the wider spreads for
+goods a market neither makes nor needs and for disliked merchants,
+prosperity from caravans and village trade, and party proficiencies.
 
 Prices come from what each place makes and needs. A town surrounded by
 vineyards sells wine cheaply; a town with looms but no flocks pays well for

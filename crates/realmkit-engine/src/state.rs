@@ -182,6 +182,24 @@ pub struct GameState {
     /// Soldiers and recruiting pools; present only in worlds with troops.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retinue: Option<RetinueState>,
+    /// Ranks in the proficiencies the world defines, once any is gained.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub proficiencies: BTreeMap<Proficiency, ProficiencyState>,
+}
+
+/// A proficiency's rank, split by where it came from: points the player
+/// trained, and ranks effects taught. Unspent points are derived from the level.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProficiencyState {
+    pub trained: u32,
+    pub taught: u32,
+}
+
+impl ProficiencyState {
+    pub fn rank(&self) -> u32 {
+        self.trained.saturating_add(self.taught)
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -230,9 +248,26 @@ pub struct EconomyState {
     /// Each market's price index for every good, by location then item, in
     /// thousandths of the base price.
     pub prices: BTreeMap<Id, BTreeMap<Id, u32>>,
+    /// Each market's prosperity; present only in worlds that author it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub prosperity: BTreeMap<Id, u32>,
+    /// Each market's stock and purse; present only in worlds that author it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub stock: BTreeMap<Id, MarketStock>,
+    /// The player's workshops, by town then kind.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub workshops: BTreeMap<Id, BTreeMap<Id, u32>>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 14;
+/// What a market's merchants hold: units of every good, and a purse.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MarketStock {
+    pub currency: u64,
+    pub goods: BTreeMap<Id, u64>,
+}
+
+pub const SAVE_FORMAT_VERSION: u32 = 15;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 

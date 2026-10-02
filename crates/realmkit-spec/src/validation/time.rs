@@ -167,7 +167,10 @@ fn event_effect(
         Effect::AcceptQuest { .. }
         | Effect::CompleteQuest { .. }
         | Effect::TakeItems { .. }
-        | Effect::PayCurrency { .. } => issue(
+        | Effect::PayCurrency { .. }
+        | Effect::BuyWorkshop { .. }
+        | Effect::SellWorkshop { .. }
+        | Effect::RaiseProficiency { .. } => issue(
             out,
             owner,
             "invalid_effect",

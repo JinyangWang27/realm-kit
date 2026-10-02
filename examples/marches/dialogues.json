@@ -75,5 +75,38 @@
       },
       { "id": "fen", "text": "'Every spring the fen swallows the causeway, and every spring it gives it back a little shorter.'" }
     ]
+  },
+  {
+    "id": "maddoc",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "'Wool, cloth, or a word in private?'",
+        "choices": [
+          {
+            "text": "I will buy the weavery by the gate. (150 silver)",
+            "next": "sold",
+            "requires": {
+              "kind": "all",
+              "of": [
+                { "kind": "not", "condition": { "kind": "workshop", "workshop": "weavery", "location": "vellmarket" } },
+                { "kind": "currency", "amount": 150 }
+              ]
+            },
+            "effects": [{ "kind": "buy_workshop", "workshop": "weavery" }]
+          },
+          {
+            "text": "Take the weavery back. (75 silver)",
+            "next": "bought_back",
+            "requires": { "kind": "workshop", "workshop": "weavery", "location": "vellmarket" },
+            "effects": [{ "kind": "sell_workshop", "workshop": "weavery" }]
+          },
+          { "text": "Just trading." }
+        ]
+      },
+      { "id": "sold", "text": "He counts the coins twice. 'Six bolts a week, if the wool holds. The looms are yours.'" },
+      { "id": "bought_back", "text": "'Half what you paid. Looms do not get younger.'" }
+    ]
   }
 ]

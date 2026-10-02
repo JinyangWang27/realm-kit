@@ -99,4 +99,8 @@ pub struct Quote {
     pub sell: u64,
     pub next_buy: u64,
     pub next_sell: u64,
+    /// Units the merchants hold, where the world keeps stock.
+    pub stock: Option<u64>,
+    /// What the merchants can pay out, where the world keeps stock.
+    pub purse: Option<u64>,
 }

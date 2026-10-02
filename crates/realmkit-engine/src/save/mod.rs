@@ -78,12 +78,49 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                     && r.world.is_some() == world.random_world()
                     && r.market.is_some() == world.random_market()
                     && r.battle.is_some() == world.random_battle()
+                    && r.stock.is_some() == world.random_stock()
             }
         },
         "random state does not match the world",
     )?;
     time(world, state)?;
-    economy(world, state)
+    economy(world, state)?;
+    proficiencies(world, state)
+}
+
+/// Only authored proficiencies, each gained and within its top rank, with
+/// no more points trained than the saved level has granted, and ranks
+/// taught only where an authored effect that could have fired teaches them.
+fn proficiencies(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let teaches = |proficiency: Proficiency| {
+        fired(world, state).into_iter().any(
+            |e| matches!(e, Effect::RaiseProficiency { proficiency: p, .. } if *p == proficiency),
+        )
+    };
+    let level = state.combat.as_ref().map_or(0, |c| c.level);
+    // An unknown level is reported by the combat check.
+    let reached = world.combat().is_none_or(|c| level <= c.levels.len());
+    let granted = if reached {
+        rules::granted_proficiency_points(world, level)
+    } else {
+        0
+    };
+    let trained: u64 = state
+        .proficiencies
+        .values()
+        .map(|p| u64::from(p.trained))
+        .sum();
+    ensure(
+        trained <= granted
+            && state.proficiencies.iter().all(|(proficiency, held)| {
+                let rank = u64::from(held.trained) + u64::from(held.taught);
+                world
+                    .proficiency_max(*proficiency)
+                    .is_some_and(|max| rank > 0 && rank <= u64::from(max))
+                    && (held.taught == 0 || teaches(*proficiency))
+            }),
+        "proficiencies do not match the world",
+    )
 }
 
 /// Currency within its bound, and an index for every good at every market
@@ -108,7 +145,69 @@ fn economy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
         }
         _ => false,
     };
-    ensure(valid, "currency or prices do not match the world")
+    ensure(valid, "currency or prices do not match the world")?;
+    let (Some(economy), Some(wallet)) = (world.economy(), &state.economy) else {
+        return Ok(());
+    };
+    let every_market = |keys: Vec<&Id>| {
+        keys.len() == economy.markets.len()
+            && economy.markets.iter().all(|m| keys.contains(&&m.location))
+    };
+    ensure(
+        match economy.prosperity {
+            Some(_) => {
+                every_market(wallet.prosperity.keys().collect())
+                    && wallet
+                        .prosperity
+                        .values()
+                        .all(|p| *p <= realmkit_spec::PROSPERITY_BOUND)
+            }
+            None => wallet.prosperity.is_empty(),
+        },
+        "prosperity does not match the world",
+    )?;
+    ensure(
+        match economy.stock {
+            Some(_) => {
+                every_market(wallet.stock.keys().collect())
+                    && wallet.stock.values().all(|stock| {
+                        stock.currency <= realmkit_spec::CURRENCY_BOUND
+                            && stock.goods.len() == economy.goods.len()
+                            && economy.goods.iter().all(|g| {
+                                stock
+                                    .goods
+                                    .get(&g.item)
+                                    .is_some_and(|n| *n <= realmkit_spec::STOCK_BOUND)
+                            })
+                    })
+            }
+            None => wallet.stock.is_empty(),
+        },
+        "merchants' stock does not match the world",
+    )?;
+    // Workshops stand only in towns, within each town's limit, and only of
+    // kinds some authored effect that could have fired sells.
+    let limit = economy.workshops.as_ref().map_or(0, |w| u64::from(w.limit));
+    let sold: Vec<&Id> = fired(world, state)
+        .into_iter()
+        .filter_map(|e| match e {
+            Effect::BuyWorkshop { workshop } => Some(workshop),
+            _ => None,
+        })
+        .collect();
+    ensure(
+        wallet.workshops.iter().all(|(town, kinds)| {
+            let in_town = economy
+                .market(town)
+                .is_some_and(|m| m.kind == realmkit_spec::MarketKind::Town);
+            let total: u64 = kinds.values().map(|n| u64::from(*n)).sum();
+            in_town
+                && !kinds.is_empty()
+                && total <= limit
+                && kinds.iter().all(|(kind, n)| *n > 0 && sold.contains(&kind))
+        }),
+        "workshops do not match the world",
+    )
 }
 
 /// The clock is within its bounds, and every mover is somewhere it may be.
@@ -184,7 +283,9 @@ fn could_have_been(
         Condition::Any { of } if value => of.iter().any(|c| could(c, true)),
         Condition::Any { of } => of.iter().all(|c| could(c, false)),
         Condition::Not { condition } => could(condition, !value),
-        Condition::Flag { .. } | Condition::Technique { .. } if value => {
+        Condition::Flag { .. } | Condition::Technique { .. } | Condition::Proficiency { .. }
+            if value =>
+        {
             rules::holds(state, condition)
         }
         // A starting technique was known at that rank from the first moment.

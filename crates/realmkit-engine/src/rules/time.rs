@@ -5,12 +5,16 @@ use super::*;
 use realmkit_spec::{Schedule, DURATION_BOUND, WORLD_TIME_BOUND};
 
 /// Something that happens on a schedule. Occurrences at the same minute go
-/// in this order: authored events, characters who move, the price tick, the
-/// retinue's upkeep, then recruiting pools refilling in location order.
+/// in this order: authored events, characters who move, the price tick,
+/// prosperity, restocking, workshop settlement, the retinue's upkeep, then
+/// recruiting pools refilling in location order.
 enum Due<'w> {
     Event(&'w realmkit_spec::WorldEvent),
     Mover(&'w Character),
     PriceTick,
+    Prosperity,
+    Restock,
+    Workshops,
     Upkeep,
     Refill(&'w realmkit_spec::Location),
 }
@@ -29,6 +33,16 @@ fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
         .economy()
         .and_then(|e| e.tick)
         .map(|t| (t.schedule, Due::PriceTick));
+    let economy = world.economy();
+    let prosperity = economy
+        .and_then(|e| e.prosperity)
+        .map(|p| (p.schedule, Due::Prosperity));
+    let restock = economy
+        .and_then(|e| e.stock)
+        .map(|s| (s.schedule, Due::Restock));
+    let workshops = economy
+        .and_then(|e| e.workshops.as_ref())
+        .map(|w| (w.schedule, Due::Workshops));
     let upkeep = world
         .troops()
         .and_then(|t| t.upkeep)
@@ -40,6 +54,9 @@ fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
     events
         .chain(movers)
         .chain(prices)
+        .chain(prosperity)
+        .chain(restock)
+        .chain(workshops)
         .chain(upkeep)
         .chain(refills)
         .collect()
@@ -100,6 +117,9 @@ fn pass(
             }
             Due::Mover(character) => relocate(state, character, events, present),
             Due::PriceTick => economy::tick(world, state),
+            Due::Prosperity => economy::prosper(world, state),
+            Due::Restock => economy::restock(world, state),
+            Due::Workshops => economy::settle(world, state, events),
             Due::Upkeep => retinue::upkeep(world, state, events),
             Due::Refill(location) => retinue::refill(world, state, &location.id),
         }

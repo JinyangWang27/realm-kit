@@ -1,5 +1,13 @@
 use realmkit_engine::{BattleOrder, Command};
-use realmkit_spec::{Direction, Stat, WorldSpec};
+use realmkit_spec::{Direction, Proficiency, Stat, WorldSpec};
+
+/// A proficiency's typed token.
+fn proficiency(value: &str) -> Option<Proficiency> {
+    match value {
+        "trading" => Some(Proficiency::Trading),
+        _ => None,
+    }
+}
 
 /// Commands a player can type; fighting and resting only where the world has combat.
 pub fn help(world: &WorldSpec) -> String {
@@ -25,6 +33,9 @@ pub fn help(world: &WorldSpec) -> String {
     }
     if combat.is_some_and(|c| c.stat_points.is_some()) {
         attack += "allocate hp|mp|patk|pdef|satk|sdef|speed [points]\nrespec — refund stat points, where allowed\n";
+    }
+    if world.economy().is_some_and(|e| e.trading.is_some()) {
+        attack += "train trading [points] — spend proficiency points\n";
     }
     if !world.world.roads.is_empty() {
         attack += "travel <location-id> — take the road there (or go <location-id>)\n";
@@ -222,6 +233,13 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
                 _ => 1,
             },
         },
+        ("train", [name, rest @ ..]) if rest.len() <= 1 => Command::Train {
+            proficiency: proficiency(&name.to_ascii_lowercase()).ok_or("unknown proficiency")?,
+            points: match rest {
+                [n] => n.parse().map_err(|_| "expected a number of points")?,
+                _ => 1,
+            },
+        },
         ("talk", [id]) => Command::Talk((*id).into()),
         ("accept", [id]) => Command::AcceptQuest((*id).into()),
         ("complete", [id]) => Command::CompleteQuest((*id).into()),
@@ -271,6 +289,26 @@ mod tests {
         );
         assert_eq!(parse("retinue"), Ok(Input::Command(Command::Retinue)));
         assert!(parse("recruit").is_err());
+    }
+
+    #[test]
+    fn train_names_a_proficiency_and_optional_points() {
+        assert_eq!(
+            parse("train Trading"),
+            Ok(Input::Command(Command::Train {
+                proficiency: Proficiency::Trading,
+                points: 1
+            }))
+        );
+        assert_eq!(
+            parse("train trading 2"),
+            Ok(Input::Command(Command::Train {
+                proficiency: Proficiency::Trading,
+                points: 2
+            }))
+        );
+        assert!(parse("train haggling").is_err());
+        assert!(parse("train trading two").is_err());
     }
 
     #[test]

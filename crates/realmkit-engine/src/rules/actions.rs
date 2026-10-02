@@ -84,6 +84,20 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
             actions.push(available(Command::Respec));
         }
     }
+    // One point at a time into each proficiency below its top rank.
+    if proficiency::unspent_proficiency_points(world, state) > 0 {
+        for proficiency in Proficiency::ALL {
+            let Some(max) = world.proficiency_max(proficiency) else {
+                continue;
+            };
+            if proficiency::rank(state, proficiency) < max {
+                actions.push(available(Command::Train {
+                    proficiency,
+                    points: 1,
+                }));
+            }
+        }
+    }
     // Pieces in the pack can be worn; removing is a typed command, since
     // wearing another piece already swaps.
     if let Some(combat) = &state.combat {
@@ -188,9 +202,11 @@ fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 good: good.item.clone(),
                 quantity: 1,
             },
-            // Carrying one more must fit the count too.
+            // Carrying one more must fit the count too, and merchants who
+            // keep stock must have one left.
             available: wallet.currency >= quote.buy
-                && held(&good.item).is_none_or(|n| n.checked_add(1).is_some()),
+                && held(&good.item).is_none_or(|n| n.checked_add(1).is_some())
+                && quote.stock.is_none_or(|n| n > 0),
         });
     }
     for ware in &market.wares {
@@ -212,11 +228,14 @@ fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                     good: good.item.clone(),
                     quantity: 1,
                 },
-                // Proceeds that would pass the currency bound cannot be taken.
+                // Proceeds that would pass the currency bound cannot be
+                // taken, nor more than the merchants' purse and shelves hold.
                 available: wallet
                     .currency
                     .checked_add(quote.sell)
-                    .is_some_and(|total| total <= realmkit_spec::CURRENCY_BOUND),
+                    .is_some_and(|total| total <= realmkit_spec::CURRENCY_BOUND)
+                    && quote.purse.is_none_or(|p| p >= quote.sell)
+                    && quote.stock.is_none_or(|n| n < realmkit_spec::STOCK_BOUND),
             });
         }
     }

@@ -1,5 +1,5 @@
 {
-  "format_version": 14,
+  "format_version": 15,
   "id": "marches",
   "name": "The Marches",
   "language": "en",
@@ -10,9 +10,9 @@
     "special_name": "Lore",
     "timeline": { "action_cost": 100000, "speed_cap": 200 },
     "levels": [
-      { "xp": 0, "stats": { "hp": 40, "patk": 8, "pdef": 5, "satk": 2, "sdef": 4, "speed": 100 } },
-      { "xp": 30, "stats": { "hp": 46, "patk": 9, "pdef": 6, "satk": 2, "sdef": 5, "speed": 100 } },
-      { "xp": 80, "stats": { "hp": 52, "patk": 10, "pdef": 7, "satk": 3, "sdef": 6, "speed": 100 } }
+      { "xp": 0, "stats": { "hp": 40, "patk": 8, "pdef": 5, "satk": 2, "sdef": 4, "speed": 100 }, "proficiency_points": 1 },
+      { "xp": 30, "stats": { "hp": 46, "patk": 9, "pdef": 6, "satk": 2, "sdef": 5, "speed": 100 }, "proficiency_points": 1 },
+      { "xp": 80, "stats": { "hp": 52, "patk": 10, "pdef": 7, "satk": 3, "sdef": 6, "speed": 100 }, "proficiency_points": 1 }
     ],
     "narrative": {
       "attack": ["{attacker} strike {target} for {damage} damage."],
@@ -66,21 +66,25 @@
         "kind": "town",
         "merchant": "hild",
         "producers": { "fields": 1 },
-        "prices": { "grain": 760, "wool": 1086, "cloth": 1309, "eels": 728 }
+        "prices": { "grain": 533, "wool": 1055, "cloth": 1218, "eels": 484 },
+        "prosperity": 48
       },
       {
         "location": "ashmere",
         "kind": "village",
         "producers": { "fields": 3, "traps": 4 },
-        "prices": { "grain": 586, "wool": 1052, "cloth": 1232, "eels": 517 },
-        "spread_percent": 25
+        "prices": { "grain": 508, "wool": 1025, "cloth": 1124, "eels": 388 },
+        "spread_percent": 25,
+        "prosperity": 50,
+        "town": "greyford"
       },
       {
         "location": "vellmarket",
         "kind": "town",
         "merchant": "maddoc",
         "producers": { "flocks": 6, "looms": 6 },
-        "prices": { "grain": 1601, "wool": 745, "cloth": 712, "eels": 1301 }
+        "prices": { "grain": 1292, "wool": 787, "cloth": 732, "eels": 1186 },
+        "prosperity": 42
       }
     ],
     "links": [{ "between": ["greyford", "ashmere"], "percent": 10 }],
@@ -93,7 +97,37 @@
       "damp_below": 900,
       "revert_percent": 3,
       "input_pull_percent": 10
-    }
+    },
+    "prosperity": {
+      "schedule": { "at": 1440, "every": 1440 },
+      "base": 50,
+      "scarce_above": 1200,
+      "scarcity": 10,
+      "demand_percent": [80, 120]
+    },
+    "stock": {
+      "schedule": { "at": 1440, "every": 1440 },
+      "units": 40,
+      "currency": 600,
+      "prosperity_percent": [50, 150]
+    },
+    "workshops": {
+      "schedule": { "at": 10080, "every": 10080 },
+      "limit": 1,
+      "kinds": [
+        {
+          "id": "weavery",
+          "name": "Weavery",
+          "good": "cloth",
+          "output": 6,
+          "inputs": { "wool": 9 },
+          "overhead": 120,
+          "price": 150,
+          "resale": 75
+        }
+      ]
+    },
+    "trading": { "name": "Trade", "max": 3, "narrow_percent": 4 }
   },
   "troops": {
     "classes": [

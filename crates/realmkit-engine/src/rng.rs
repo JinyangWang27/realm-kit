@@ -14,6 +14,8 @@ const DOMAIN_WORLD: u64 = 0x77_6f72_6c64;
 const DOMAIN_MARKET: u64 = 0x6d61_726b_6574;
 /// "battle" in ASCII: mass-battle rolls.
 const DOMAIN_BATTLE: u64 = 0x6261_7474_6c65;
+/// "stock" in ASCII: merchants restocking.
+const DOMAIN_STOCK: u64 = 0x73_746f_636b;
 
 /// Saved generator state, one stream per random domain. A domain exists
 /// only in worlds whose content draws from it.
@@ -33,6 +35,9 @@ pub struct RngState {
     /// Mass-battle rolls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub battle: Option<u64>,
+    /// Merchants restocking.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stock: Option<u64>,
 }
 
 impl RngState {
@@ -44,6 +49,7 @@ impl RngState {
             world: world.random_world().then_some(seed ^ DOMAIN_WORLD),
             market: world.random_market().then_some(seed ^ DOMAIN_MARKET),
             battle: world.random_battle().then_some(seed ^ DOMAIN_BATTLE),
+            stock: world.random_stock().then_some(seed ^ DOMAIN_STOCK),
         };
         world.stochastic().then_some(state)
     }

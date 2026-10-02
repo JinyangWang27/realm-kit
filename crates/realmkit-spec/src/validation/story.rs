@@ -145,6 +145,12 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
         Effect::GrantCurrency { amount } | Effect::PayCurrency { amount } => {
             economy::amount(out, w, owner, *amount)
         }
+        Effect::BuyWorkshop { workshop } | Effect::SellWorkshop { workshop } => {
+            economy::workshop(out, w, owner, workshop)
+        }
+        Effect::RaiseProficiency { proficiency, ranks } => {
+            economy::proficiency(out, w, owner, *proficiency, *ranks)
+        }
         Effect::GrantTechnique(grant) => {
             progression::technique_grant(out, w, owner, grant);
             // A choice can be taken again; teaching a rank is idempotent,

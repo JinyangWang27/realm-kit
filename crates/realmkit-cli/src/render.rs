@@ -47,6 +47,14 @@ fn hit(
     writeln!(output, "{}", interpolate(text, &values)?)
 }
 
+/// A workshop kind's authored name.
+pub fn workshop_name<'w>(world: &'w realmkit_spec::WorldSpec, kind: &str) -> &'w str {
+    world
+        .economy()
+        .and_then(|e| e.workshop(kind))
+        .map_or("?", |k| k.name.as_str())
+}
+
 /// A piece's name at its tier and with its enchantment: "Iron sword", or
 /// "Fine Iron sword of Keenness" from the authored templates.
 pub fn piece_name(world: &realmkit_spec::WorldSpec, gear: &realmkit_engine::Gear) -> String {
@@ -310,6 +318,54 @@ pub fn events(
                 )?
             }
             Event::PointsRefunded => writeln!(output, "Your stat points are refunded.")?,
+            Event::ProficiencyTrained { proficiency, rank }
+            | Event::ProficiencyRaised { proficiency, rank } => writeln!(
+                output,
+                "{}",
+                paint.good(&format!(
+                    "{} is now rank {rank}.",
+                    world.proficiency_name(*proficiency).unwrap_or("?")
+                ))
+            )?,
+            Event::WorkshopBought {
+                workshop,
+                location,
+                cost,
+            } => writeln!(
+                output,
+                "You buy the {} in {} for {}.",
+                workshop_name(world, workshop),
+                world.location(location).unwrap().name,
+                money(world, *cost)
+            )?,
+            Event::WorkshopSold {
+                workshop,
+                location,
+                earned,
+            } => writeln!(
+                output,
+                "You sell the {} in {} for {}.",
+                workshop_name(world, workshop),
+                world.location(location).unwrap().name,
+                money(world, *earned)
+            )?,
+            Event::WorkshopsEarned { amount, forgone } => {
+                let mut line = format!("Your workshops earn {}.", money(world, *amount));
+                if *forgone > 0 {
+                    line += &format!(
+                        " {} more is beyond what you can hold.",
+                        money(world, *forgone)
+                    );
+                }
+                writeln!(output, "{}", paint.good(&line))?
+            }
+            Event::WorkshopsLost { amount, shortfall } => {
+                let mut line = format!("Your workshops lose {}.", money(world, *amount));
+                if *shortfall > 0 {
+                    line += &format!(" You could not cover {}.", money(world, *shortfall));
+                }
+                writeln!(output, "{}", paint.bad(&line))?
+            }
             Event::Equipped { gear } => {
                 writeln!(output, "You equip {}.", gear_name(engine, *gear))?
             }

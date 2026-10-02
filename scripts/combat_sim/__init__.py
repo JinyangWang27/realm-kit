@@ -19,9 +19,9 @@ Run from the repository root:
 
 Modules: model (rules, formulas, skills, characters), content (tuned values to
 swap when prototyping), encounter (the timeline), simulator (experiments),
-targets (balance assertions), report, tune, and economy (the M6a price tick and
-trade prices, run over a package's economy block:
-`python3 -m scripts.combat_sim economy <world>`).
+targets (balance assertions), report, tune, and economy (the M6a price tick,
+prosperity, restocking, workshop settlement and trade prices, run over a
+package's economy block: `python3 -m scripts.combat_sim economy <world>`).
 
 Every number here is a tuning candidate, not an agreed balance constant.
 """

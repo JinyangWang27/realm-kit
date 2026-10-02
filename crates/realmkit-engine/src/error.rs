@@ -26,6 +26,20 @@ pub enum EngineError {
     InvalidQuantity,
     #[error("you cannot afford that")]
     NotEnoughCurrency,
+    #[error("there is no {0} left to buy here")]
+    OutOfStock(Id),
+    #[error("the merchants cannot pay that much")]
+    MerchantCannotPay,
+    #[error("workshops are bought in a town with a market")]
+    NoWorkshopHere,
+    #[error("you own as many workshops here as a town allows")]
+    WorkshopLimit,
+    #[error("you have no such workshop here")]
+    NoWorkshop,
+    #[error("this world has no such proficiency")]
+    NoSuchProficiency,
+    #[error("that proficiency cannot rise further")]
+    ProficiencyCap,
     #[error("{0} is not available here")]
     NotHere(Id),
     #[error("{0} has already been defeated")]

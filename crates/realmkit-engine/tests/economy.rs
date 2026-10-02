@@ -15,6 +15,25 @@ fn currency(engine: &Engine<'_>) -> u64 {
     engine.state().economy.as_ref().unwrap().currency
 }
 
+/// The marches without merchants' stock, so only currency limits trade.
+fn unlimited() -> WorldSpec {
+    let mut world = marches();
+    world.world.economy.as_mut().unwrap().stock = None;
+    world
+}
+
+/// The best trader the marches allow: rank 3, so the narrowest spread,
+/// trained with the three points of level 3.
+fn best_trader(state: &mut GameState) {
+    let combat = state.combat.as_mut().unwrap();
+    (combat.level, combat.xp) = (3, 80);
+    let trained = ProficiencyState {
+        trained: 3,
+        taught: 0,
+    };
+    state.proficiencies.insert(Proficiency::Trading, trained);
+}
+
 fn buy(good: &str, quantity: u64) -> Command {
     Buy {
         good: good.into(),
@@ -45,17 +64,17 @@ fn the_price_tick_matches_the_simulator() {
     assert_eq!(
         after_ticks(&world, 7, 1),
         [
-            [748, 1092, 1305, 721],
-            [557, 1054, 1234, 551],
-            [1606, 743, 715, 1300]
+            [530, 1056, 1215, 479],
+            [473, 1027, 1132, 414],
+            [1303, 781, 735, 1187]
         ]
     );
     assert_eq!(
         after_ticks(&world, 7, 3),
         [
-            [739, 1102, 1300, 741],
-            [576, 1060, 1242, 557],
-            [1646, 738, 698, 1310]
+            [491, 1060, 1214, 409],
+            [470, 1031, 1148, 402],
+            [1353, 767, 712, 1195]
         ]
     );
 }
@@ -67,7 +86,7 @@ fn producers_use_less_of_a_dear_input_as_the_simulator_does() {
     let mut world = marches();
     let economy = world.world.economy.as_mut().unwrap();
     economy.markets[2].prices.insert("wool".into(), 2_000);
-    assert_eq!(after_ticks(&world, 7, 1)[2], [1606, 1929, 833, 1300]);
+    assert_eq!(after_ticks(&world, 7, 1)[2], [1303, 1926, 849, 1187]);
 }
 
 #[test]
@@ -85,7 +104,7 @@ fn prices_hold_still_until_a_tick_and_the_tick_draws_its_own_stream() {
     let world = marches();
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     engine.execute(Wait(1_440 - 480 - 1)).unwrap();
-    assert_eq!(index(&engine, "vellmarket", "cloth"), 712);
+    assert_eq!(index(&engine, "vellmarket", "cloth"), 732);
     // Without the economy, Wenna wanders exactly as she does with it.
     let mut plain = marches();
     plain.world.economy = None;
@@ -106,6 +125,18 @@ fn prices_hold_still_until_a_tick_and_the_tick_draws_its_own_stream() {
                 .retain(|e| !matches!(e, Effect::GrantCurrency { .. }));
         }
     }
+    // Maddoc sells a workshop, and levels grant trading points.
+    plain.dialogues.retain(|d| d.id != "maddoc");
+    plain.characters.iter_mut().for_each(|c| {
+        if c.id == "maddoc" {
+            c.dialogue = None;
+        }
+    });
+    let combat = plain.world.combat.as_mut().unwrap();
+    combat
+        .levels
+        .iter_mut()
+        .for_each(|l| l.proficiency_points = 0);
     let wander = |world: &WorldSpec| {
         let mut engine = Engine::new_with_seed(world, 7).unwrap();
         engine.execute(Wait(10 * 1_440)).unwrap();
@@ -120,22 +151,22 @@ fn buying_and_selling_move_currency_goods_and_the_index() {
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     engine.execute(Travel("ashmere".into())).unwrap();
     assert_eq!(currency(&engine), 100);
-    // Eels at 517 with a 25% spread: 9, then 9 at 543 and 10 at 569.
+    // Eels at 388 with a 25% spread: 7, then 7 at 414 and 8 at 440.
     let events = engine.execute(buy("eels", 3)).unwrap();
     assert_eq!(
         events,
         [Event::Bought {
             good: "eels".into(),
             quantity: 3,
-            cost: buy_price(15, 517, 25) + buy_price(15, 543, 25) + buy_price(15, 569, 25)
+            cost: buy_price(15, 388, 25) + buy_price(15, 414, 25) + buy_price(15, 440, 25)
         }]
     );
-    assert_eq!(index(&engine, "ashmere", "eels"), 517 + 3 * 26);
+    assert_eq!(index(&engine, "ashmere", "eels"), 388 + 3 * 26);
     assert_eq!(engine.state().player.inventory["eels"], 3);
     let spent = 100 - currency(&engine);
     // Selling one back lowers the index by the same step.
     let events = engine.execute(sell("eels", 1)).unwrap();
-    let earned = sell_price(15, 595, 25);
+    let earned = sell_price(15, 466, 25);
     assert_eq!(
         events,
         [Event::Sold {
@@ -144,7 +175,7 @@ fn buying_and_selling_move_currency_goods_and_the_index() {
             earned
         }]
     );
-    assert_eq!(index(&engine, "ashmere", "eels"), 595 - 26);
+    assert_eq!(index(&engine, "ashmere", "eels"), 466 - 26);
     assert_eq!(currency(&engine), 100 - spent + earned);
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }
@@ -155,8 +186,11 @@ fn refused_trades_change_nothing() {
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     engine.execute(Travel("ashmere".into())).unwrap();
     let before = engine.state().clone();
+    // Ashmere's merchants hold 16 grain and no cloth.
     let refusals = [
-        (buy("cloth", 1), "afford"),
+        (buy("grain", 16), "afford"),
+        (buy("grain", 17), "left"),
+        (buy("cloth", 1), "left"),
         (buy("eels", 0), "units"),
         (buy("eels", TRADE_BOUND + 1), "units"),
         (sell("grain", 1), "enough"),
@@ -209,7 +243,8 @@ fn the_menu_offers_what_can_be_bought_and_what_is_carried() {
         [
             (Market, true),
             (buy("grain", 1), true),
-            (buy("wool", 1), true),
+            // Ashmere makes neither wool nor cloth, so its merchants hold none.
+            (buy("wool", 1), false),
             (buy("cloth", 1), false),
             (buy("eels", 1), true),
         ]
@@ -342,7 +377,7 @@ fn a_save_keeps_currency_and_prices_and_rejects_impossible_ones() {
 
 #[test]
 fn indices_stay_within_their_bounds_under_heavy_trade() {
-    let world = marches();
+    let world = unlimited();
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     let mut rich = engine.snapshot();
     rich.state.economy.as_mut().unwrap().currency = 1_000_000;
@@ -443,10 +478,12 @@ fn buying_is_not_offered_when_the_count_cannot_hold_another_unit() {
 
 #[test]
 fn trading_back_and_forth_never_makes_money() {
-    let world = marches();
+    // Even for the best trader, whose spread is narrowest.
+    let world = unlimited();
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     let mut rich = engine.snapshot();
     rich.state.economy.as_mut().unwrap().currency = 100_000_000;
+    best_trader(&mut rich.state);
     engine = Engine::restore(&world, rich).unwrap();
     for place in ["greyford", "ashmere", "greyford"] {
         if engine.state().player.location != place {
@@ -467,15 +504,16 @@ fn trading_back_and_forth_never_makes_money() {
 #[test]
 fn selling_first_and_buying_back_never_makes_money_either() {
     // A dear good, so rounding cannot hide a profit of a few units.
-    let mut world = marches();
+    let mut world = unlimited();
     world.world.economy.as_mut().unwrap().goods[3].price = PRICE_BOUND;
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     let mut stocked = engine.snapshot();
+    best_trader(&mut stocked.state);
     stocked.state.economy.as_mut().unwrap().currency = CURRENCY_BOUND / 2;
     stocked.state.player.inventory.insert("eels".into(), 2_000);
-    // Greyford's 15% spread, near the bottom of the index, is the tightest
-    // margin: with a gentler buy than sell step, selling one unit at 150 and
-    // buying it straight back would pay.
+    // Greyford's 15% spread, narrowed to 13% by the best trader, near the
+    // bottom of the index, is the tightest margin: with a gentler buy than
+    // sell step, selling one unit at 150 and buying it straight back would pay.
     let greyford = stocked
         .state
         .economy
