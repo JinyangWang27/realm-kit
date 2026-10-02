@@ -35,6 +35,9 @@ pub enum Command {
     Flee,
     /// Restores HP and MP at a safe location.
     Rest,
+    /// Uses one carried consumable: restores HP and MP; in an encounter, it
+    /// is the player's turn.
+    Use(Id),
     /// Spends unspent stat points on one stat.
     Allocate {
         stat: Stat,
@@ -141,6 +144,12 @@ pub enum Event {
         outcome: Outcome,
     },
     Rested,
+    /// One unit of `item` was used; `hp` and `mp` are what it restored.
+    Consumed {
+        item: Id,
+        hp: u32,
+        mp: u32,
+    },
     PointsAllocated {
         stat: Stat,
         points: u32,

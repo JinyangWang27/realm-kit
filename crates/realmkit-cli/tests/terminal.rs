@@ -347,6 +347,48 @@ fn the_arena_plays_packs_flight_sparring_and_a_no_flee_boss() {
 }
 
 #[test]
+fn the_arena_quartermaster_sells_a_draught_that_heals_mid_fight() {
+    // The wolves bite before the first turn; the draught is drunk in the
+    // second bout, as a turn, with the fight menu offering it.
+    let input = [
+        "market",
+        "buy healing_draught",
+        "north",
+        "engage grey_wolf",
+        "flee",
+        "engage grey_wolf",
+        "use healing_draught",
+        "flee",
+        "south",
+        "east",
+        "engage rat",
+        "attack rat",
+        "west",
+        "sell rat_tail",
+        "use healing_draught",
+    ]
+    .join("\n");
+    let output = run(&["play", ARENA, "--seed", "7"], &format!("{input}\n"));
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "Market at The Arena Gate:",
+        "Wares:",
+        "Healing draught — 8 marks",
+        // Gear shows what it would do before it is bought.
+        "Iron mail — 60 marks (Defence +6, Speed -10)",
+        "Bought: Healing draught ×1 for 8 marks",
+        "Use item ›",
+        "You use Healing draught: +",
+        "Sold: Rat tail ×1 for",
+        // Nothing left to drink.
+        "you do not have enough healing_draught",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+}
+
+#[test]
 fn a_seed_reproduces_a_run_with_random_content() {
     // Spar to open the pit, then trade heavy blows with the ogre: both can crit.
     let mut script = "west\nengage holt\n".to_string() + &"attack holt\n".repeat(5);

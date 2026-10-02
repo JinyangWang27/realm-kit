@@ -517,3 +517,131 @@ fn a_trade_that_empties_the_conversation_ends_it() {
     assert_eq!(engine.state().dialogue, None);
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }
+
+#[test]
+fn wares_sell_at_a_fixed_price_and_gear_arrives_as_pieces() {
+    let world = arena();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    assert_eq!(engine.ware_price("healing_draught"), Some(8));
+    assert_eq!(engine.ware_price("rat_tail"), None);
+    let events = engine.execute(buy("healing_draught", 1)).unwrap();
+    assert!(events.contains(&Event::Bought {
+        good: "healing_draught".into(),
+        quantity: 1,
+        cost: 8
+    }));
+    assert_eq!(currency(&engine), 2);
+    // A fixed price: the next one costs the same, and none can be sold back.
+    assert_eq!(engine.ware_price("healing_draught"), Some(8));
+    assert!(matches!(
+        engine.execute(sell("healing_draught", 1)),
+        Err(EngineError::NotTraded(_))
+    ));
+    assert!(matches!(
+        engine.execute(buy("healing_draught", 1)),
+        Err(EngineError::NotEnoughCurrency)
+    ));
+    // Two pieces of mail are two pieces, and the money leaves once.
+    let mut rich = arena();
+    rich.world.economy.as_mut().unwrap().currency.start = 200;
+    let mut engine = Engine::new_with_seed(&rich, 7).unwrap();
+    let before: Vec<u64> = combat(&engine).gear.keys().copied().collect();
+    engine.execute(buy("iron_mail", 2)).unwrap();
+    assert_eq!(currency(&engine), 80);
+    let new: Vec<_> = combat(&engine)
+        .gear
+        .iter()
+        .filter(|(id, _)| !before.contains(id))
+        .collect();
+    assert_eq!(new.len(), 2);
+    assert!(new
+        .iter()
+        .all(|(_, g)| g.item == "iron_mail" && !g.equipped));
+    assert_eq!(*new[1].0, *new[0].0 + 1);
+    Engine::restore(&rich, engine.snapshot()).unwrap();
+}
+
+#[test]
+fn wares_are_offered_only_at_an_open_market() {
+    let world = arena();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    assert!(offered(&engine).contains(&(buy("healing_draught", 1), true)));
+    assert!(offered(&engine).contains(&(buy("iron_mail", 1), false)));
+    engine.execute(Move(Direction::East)).unwrap();
+    assert!(!offered(&engine)
+        .iter()
+        .any(|(c, _)| *c == buy("healing_draught", 1)));
+    assert!(matches!(
+        engine.execute(buy("healing_draught", 1)),
+        Err(EngineError::NoMarket)
+    ));
+    // A market whose merchant is away sells no wares either.
+    let mut world = marches();
+    let greyford = world
+        .world
+        .economy
+        .as_mut()
+        .unwrap()
+        .markets
+        .iter_mut()
+        .find(|m| m.location == "greyford")
+        .unwrap();
+    greyford.wares.push(Ware {
+        item: "keep_token".into(),
+        price: 5,
+    });
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    assert_eq!(engine.ware_price("keep_token"), Some(5));
+    engine.execute(Wait(15 * 60)).unwrap(); // 23:00: Hild has gone home
+    assert_eq!(engine.ware_price("keep_token"), None);
+    assert!(matches!(
+        engine.execute(buy("keep_token", 1)),
+        Err(EngineError::NotHere(_))
+    ));
+}
+
+#[test]
+fn a_ware_won_as_loot_cannot_vanish_from_a_save() {
+    // Wares can only be bought, so a piece a defeat granted is still owed:
+    // the ogre's reward stays in the save even though the gate sells mail.
+    let mut world = arena();
+    let combat = world.world.combat.as_mut().unwrap();
+    combat
+        .groups
+        .iter_mut()
+        .find(|g| g.id == "warren")
+        .unwrap()
+        .repeatable = false;
+    combatant(&mut world, "rat").loot = vec![ItemStack {
+        item: "iron_mail".into(),
+        quantity: 1,
+    }];
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    engine.execute(Move(Direction::East)).unwrap();
+    engine.execute(Engage("rat".into())).unwrap();
+    fight_out(&mut engine);
+    let mut snapshot = engine.snapshot();
+    Engine::restore(&world, snapshot.clone()).unwrap();
+    let gear = &mut snapshot.state.combat.as_mut().unwrap().gear;
+    let mail = *gear.iter().find(|(_, g)| g.item == "iron_mail").unwrap().0;
+    gear.remove(&mail);
+    assert!(Engine::restore(&world, snapshot).is_err());
+}
+
+#[test]
+fn gear_wares_are_bought_at_most_a_grant_at_a_time() {
+    // Validation caps any grant of equipment at GEAR_STACK_BOUND pieces;
+    // buying is a grant too, so a mistyped count cannot flood the pack.
+    let mut rich = arena();
+    rich.world.economy.as_mut().unwrap().currency.start = CURRENCY_BOUND;
+    let mut engine = Engine::new_with_seed(&rich, 7).unwrap();
+    let before = engine.state().clone();
+    assert!(matches!(
+        engine.execute(buy("iron_mail", GEAR_STACK_BOUND + 1)),
+        Err(EngineError::InvalidQuantity)
+    ));
+    assert_eq!(engine.state(), &before);
+    engine.execute(buy("iron_mail", GEAR_STACK_BOUND)).unwrap();
+    // Counted wares are bounded by trading's own limit only.
+    engine.execute(buy("healing_draught", 1_000)).unwrap();
+}

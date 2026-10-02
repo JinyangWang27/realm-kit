@@ -109,6 +109,9 @@ pub struct Market {
     /// Replaces the economy's spread here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spread_percent: Option<u32>,
+    /// Items sold here at a fixed price, buy-only and never running out.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wares: Vec<Ware>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -117,6 +120,14 @@ pub struct TradeLink {
     pub between: [Id; 2],
     /// Each side moves this share of the gap towards the other on a tick.
     pub percent: u32,
+}
+
+/// An item a market sells at a fixed price per unit.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Ware {
+    pub item: Id,
+    pub price: u64,
 }
 
 /// The recurring price update, in four phases over every market.
@@ -142,6 +153,10 @@ impl Economy {
     }
     pub fn market(&self, location: &str) -> Option<&Market> {
         self.markets.iter().find(|m| m.location == location)
+    }
+    /// The ware a market sells as `item`, if any.
+    pub fn ware<'m>(&self, market: &'m Market, item: &str) -> Option<&'m Ware> {
+        market.wares.iter().find(|w| w.item == item)
     }
     pub fn producer(&self, id: &str) -> Option<&Producer> {
         self.producers.iter().find(|p| p.id == id)

@@ -27,6 +27,8 @@ const TRAIN_GROUP: &str = "Train stats";
 const EQUIPMENT_GROUP: &str = "Equipment";
 const SMITHING_GROUP: &str = "Smithing";
 const MARKET_GROUP: &str = "Market";
+const CONSUME_GROUP: &str = "Use item";
+const NOTHING_TO_RESTORE: &str = "[nothing to restore]";
 const PRICES: &str = "Prices";
 const BUY: &str = "Buy";
 const SELL: &str = "Sell";
@@ -80,6 +82,7 @@ pub enum Group {
     Smithing,
     Enchanting,
     Market,
+    Consume,
 }
 
 impl Group {
@@ -90,6 +93,7 @@ impl Group {
             Command::Forge(_) | Command::Improve(_) => Some(Self::Smithing),
             Command::Enchant { .. } => Some(Self::Enchanting),
             Command::Market | Command::Buy { .. } | Command::Sell { .. } => Some(Self::Market),
+            Command::Use(_) => Some(Self::Consume),
             _ => None,
         }
     }
@@ -213,6 +217,7 @@ fn group_label(engine: &Engine<'_>, group: Group) -> String {
         Group::Smithing => format!("{SMITHING_GROUP} {OPENS}"),
         Group::Enchanting => format!("{ENCHANTING_GROUP} {OPENS}"),
         Group::Market => format!("{MARKET_GROUP} {OPENS}"),
+        Group::Consume => format!("{CONSUME_GROUP} {OPENS}"),
     }
 }
 
@@ -335,11 +340,48 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 bonuses.join(", ")
             )
         }
+        // "Healing draught ×2 — +30 HP", or why it would do nothing now.
+        Command::Use(item) => {
+            let consumable = world.item(item)?.consumable?;
+            let held = engine
+                .state()
+                .player
+                .inventory
+                .get(item)
+                .copied()
+                .unwrap_or(0);
+            let mut gains = Vec::new();
+            if consumable.hp > 0 {
+                gains.push(format!("+{} HP", consumable.hp));
+            }
+            if consumable.mp > 0 {
+                gains.push(format!("+{} {MP}", consumable.mp));
+            }
+            let why = if action.available {
+                String::new()
+            } else {
+                format!(" {NOTHING_TO_RESTORE}")
+            };
+            format!(
+                "{} ×{held} — {}{why}",
+                world.item(item)?.name,
+                gains.join(", ")
+            )
+        }
         // "Buy Cloth — 129 silver (next 133)": this unit's price and the
         // next one's after the index moves; unaffordable goods stay listed.
         Command::Buy { good, .. } => {
-            let quote = engine.quote(good)?;
             let name = &world.item(good)?.name;
+            // A ware: one fixed price, so no "next".
+            if let Some(price) = engine.ware_price(good) {
+                let why = if action.available {
+                    String::new()
+                } else {
+                    format!(" {AFFORD}")
+                };
+                return Some(format!("{BUY} {name} — {}{why}", money(world, price)));
+            }
+            let quote = engine.quote(good)?;
             if !action.available {
                 let currency = engine.state().economy.as_ref()?.currency;
                 let why = if currency < quote.buy { AFFORD } else { LOCKED };
@@ -761,6 +803,7 @@ mod tests {
             [
                 "Rest",
                 "Train stats — 3 points ›",
+                "Market ›",
                 "Inventory",
                 "Character",
                 "Quests"
@@ -833,6 +876,44 @@ mod tests {
         assert!(labels.contains(
             &"Improve #1 Iron sword → Fine Iron sword (Attack +4 → +6) — 1 Iron ingot [needs Journeyman Smithing]"
         ), "{labels:?}");
+    }
+
+    #[test]
+    fn consumables_and_wares_are_labelled_with_what_they_do_and_cost() {
+        let world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena")).unwrap();
+        let mut engine = Engine::new(&world).unwrap();
+        let open = |engine: &Engine<'_>, group: &str| -> Vec<String> {
+            let mut menu = Menu::new(engine, false, None);
+            let at = menu
+                .entries()
+                .iter()
+                .position(|e| e.label == group)
+                .unwrap_or_else(|| panic!("no {group}"));
+            menu.choose(at + 1);
+            menu.entries().iter().map(|e| e.label.clone()).collect()
+        };
+        let market = open(&engine, "Market ›");
+        assert!(
+            market.contains(&"Buy Healing draught — 8 marks".into()),
+            "{market:?}"
+        );
+        assert!(
+            market.contains(&"Buy Iron mail — 60 marks [cannot afford]".into()),
+            "{market:?}"
+        );
+        engine
+            .execute(Command::Buy {
+                good: "healing_draught".into(),
+                quantity: 1,
+            })
+            .unwrap();
+        // At full health a draught would do nothing, and says so.
+        let usable = open(&engine, "Use item ›");
+        assert_eq!(
+            usable,
+            ["Healing draught ×1 — +30 HP [nothing to restore]", "Back"]
+        );
     }
 
     #[test]

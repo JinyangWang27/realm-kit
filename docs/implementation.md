@@ -101,6 +101,13 @@ proves the complete single-player loop with authored content.
   currency conditions and effects. `scripts/combat_sim/economy.py` mirrors
   the tick and the trade prices, and engine tests pin its numbers. Package
   and save format 12.
+- [x] Consumables and wares (M4, part of M6a-2): items may restore HP and
+  MP when used, capped at the maxima and refused when they would restore
+  nothing; in an encounter a use is the player's turn, one basic action
+  long. Markets may sell wares at a fixed price, buy-only and unlimited,
+  equipment arriving as pieces. No new saved state; saves accept used-up
+  consumables and freely bought wares. `examples/arena` exercises both.
+  Package and save format 13.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

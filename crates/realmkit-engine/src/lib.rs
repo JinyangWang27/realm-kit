@@ -219,6 +219,12 @@ impl<'w> Engine<'w> {
         rules::quote(self.world, &self.state, good)
     }
 
+    /// One unit's fixed price of a ware at the open market here; `None` away
+    /// from an open market or for an item not sold here.
+    pub fn ware_price(&self, item: &str) -> Option<u64> {
+        rules::ware_price(self.world, &self.state, item)
+    }
+
     /// Who is here now: present under their conditions and not defeated.
     pub fn present_here(&self) -> Vec<&'w Character> {
         rules::present_here(self.world, &self.state)

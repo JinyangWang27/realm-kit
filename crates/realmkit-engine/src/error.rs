@@ -76,6 +76,10 @@ pub enum EngineError {
     NotFighting,
     #[error("this is not a safe place to rest")]
     NotSafe,
+    #[error("{0} cannot be used")]
+    NotConsumable(Id),
+    #[error("that would restore nothing")]
+    NothingToRestore,
     #[error("there is no active conversation")]
     NoDialogue,
     #[error("choose one of the displayed options")]

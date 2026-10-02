@@ -46,6 +46,40 @@ pub(super) fn header(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             );
         }
     }
+    for item in &w.items {
+        let Some(consumable) = item.consumable else {
+            continue;
+        };
+        if w.combat().is_none() {
+            issue(
+                out,
+                &item.id,
+                "combat_disabled",
+                "this world has no combat block, so there are no HP or MP to restore",
+            );
+        }
+        let restores = consumable.hp > 0 || consumable.mp > 0;
+        let bounded = consumable.hp <= STAT_BOUND && consumable.mp <= STAT_BOUND;
+        // MP that no level, point or bonus can ever give is never restored.
+        let mp_possible = w.combat().is_none_or(|c| {
+            c.levels.iter().any(|l| l.stats.mp > 0)
+                || c.stat_points
+                    .as_ref()
+                    .is_some_and(|p| p.values.get(&Stat::Mp).is_some_and(|v| *v > 0))
+                || progression::worst_bonus(w, c, Stat::Mp) > 0
+        });
+        if !restores || !bounded || item.equipment.is_some() || (consumable.mp > 0 && !mp_possible)
+        {
+            issue(
+                out,
+                &item.id,
+                "invalid_consumable",
+                format!(
+                    "a consumable restores 1 to {STAT_BOUND} HP or MP the player can have, and is not equipment"
+                ),
+            );
+        }
+    }
     ids(out, "quest", w.quests.iter().map(|v| v.id.as_str()));
     ids(out, "dialogue", w.dialogues.iter().map(|v| v.id.as_str()));
     ids(out, "flag", w.world.flags.iter().map(String::as_str));

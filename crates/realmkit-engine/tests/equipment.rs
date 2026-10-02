@@ -233,13 +233,14 @@ fn saves_reject_equipment_the_rules_could_not_produce() {
                 .unwrap()
                 .equipped = true
         },
-        // A piece nothing granted.
+        // A piece nothing granted: a second starting buckler (iron mail
+        // would not do, since the gate sells it).
         |s| {
             let c = s.state.combat.as_mut().unwrap();
             c.gear.insert(
                 6,
                 Gear {
-                    item: "iron_mail".into(),
+                    item: "buckler".into(),
                     equipped: false,
                     tier: 0,
                     enchantment: None,
@@ -330,6 +331,7 @@ fn many_worn_modifiers_combine_exactly() {
                     modifiers,
                     tiers: Vec::new(),
                 }),
+                consumable: None,
             });
         }
         world

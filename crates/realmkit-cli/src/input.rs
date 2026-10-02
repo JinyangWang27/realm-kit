@@ -8,6 +8,9 @@ pub fn help(world: &WorldSpec) -> String {
     if combat.is_some() {
         attack += "engage <character-id>\nattack <character-id>\nuse <skill-id> <character-id>\nflee\nrest — at a safe place\n";
     }
+    if world.items.iter().any(|i| i.consumable.is_some()) {
+        attack += "use <item> — use something you carry, such as a draught\n";
+    }
     if combat.is_some_and(|c| !c.slots.is_empty()) {
         attack += "equip <#> — wear a piece from your pack\nunequip <#>\n";
     }
@@ -175,6 +178,7 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
         ("wait", [value]) => Command::Wait(minutes(&value.to_ascii_lowercase())?),
         ("engage", [id]) => Command::Engage((*id).into()),
         ("attack", [id]) => Command::Attack((*id).into()),
+        ("use", [item]) => Command::Use((*item).into()),
         ("use", [skill, target]) => Command::UseSkill {
             skill: (*skill).into(),
             target: (*target).into(),
@@ -220,6 +224,21 @@ mod tests {
     }
 
     #[test]
+    fn use_takes_an_item_alone_or_a_skill_and_a_target() {
+        assert_eq!(
+            parse("use healing_draught"),
+            Ok(Input::Command(Command::Use("healing_draught".into())))
+        );
+        assert_eq!(
+            parse("use heavy_blow ogre"),
+            Ok(Input::Command(Command::UseSkill {
+                skill: "heavy_blow".into(),
+                target: "ogre".into()
+            }))
+        );
+    }
+
+    #[test]
     fn maps_all_directions_and_preserves_entity_ids() {
         for (text, expected) in [
             ("k", Direction::North),
@@ -253,7 +272,12 @@ mod tests {
             }))
         );
         assert_eq!(parse("rest"), Ok(Input::Command(Command::Rest)));
-        assert!(parse("use bolt").is_err());
+        // One argument names a carried item to use.
+        assert_eq!(
+            parse("use bolt"),
+            Ok(Input::Command(Command::Use("bolt".into())))
+        );
+        assert!(parse("use").is_err());
         assert_eq!(
             parse("allocate HP 2"),
             Ok(Input::Command(Command::Allocate {

@@ -146,6 +146,10 @@ fen is full of them and sell them where they are scarce (`Market ›`, or
 `buy eels 6`, `sell eels 6`, `market`). Every unit you trade nudges the local
 price, and once a day each market's prices drift with what it makes and
 needs, so a good route stops paying if you flood it.
+Some markets also sell wares at a fixed price, gear included, and some items
+can be used: the arena's quartermaster sells a healing draught that you
+drink from `Use item ›` (or `use healing_draught`), even mid-fight, where
+drinking takes your turn.
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting

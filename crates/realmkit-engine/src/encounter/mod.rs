@@ -178,6 +178,28 @@ pub(super) fn flee(
     advance(world, state, events, true)
 }
 
+/// Spends the player's turn on a consumable: `hp`/`mp` (already capped) are
+/// restored now, the turn takes one basic action's time, and opponents act
+/// until the player's next turn. No rage or technique XP is earned.
+pub(super) fn consume_turn(
+    world: &WorldSpec,
+    state: &mut GameState,
+    hp: u32,
+    mp: u32,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let (encounter, me) = fighting(world, &mut state.combat)?;
+    let step = delay(&world.combat().unwrap().timeline, me.stats.speed, 100)?;
+    let player = &mut encounter.participants[0];
+    player.hp += hp;
+    player.mp += mp;
+    player.next_time = player
+        .next_time
+        .checked_add(step)
+        .ok_or(EngineError::NumericLimit)?;
+    advance(world, state, events, false)
+}
+
 fn fighting<'s>(
     world: &WorldSpec,
     combat: &'s mut Option<CombatState>,

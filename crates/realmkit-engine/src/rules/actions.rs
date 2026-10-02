@@ -85,16 +85,39 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 .map(|(id, _)| available(Command::Equip(*id))),
         );
     }
+    actions.extend(consumables(world, state));
     actions.extend(crafting::offered(world, state));
     actions.extend(trade(world, state));
     actions.extend(panels);
     actions
 }
 
+/// One entry per carried consumable, in inventory order; unavailable when
+/// it would restore nothing.
+fn consumables(world: &WorldSpec, state: &GameState) -> Vec<Action> {
+    let (Some(combat), Some(now)) = (&state.combat, player_vitals(state)) else {
+        return Vec::new();
+    };
+    let max = player_stats(world, combat);
+    state
+        .player
+        .inventory
+        .keys()
+        .filter_map(|id| {
+            let restores = consume::consumable(world, id).ok()?;
+            let (hp, mp) = consume::gain(now.hp, now.mp, max, restores);
+            Some(Action {
+                command: Command::Use(id.clone()),
+                available: hp > 0 || mp > 0,
+            })
+        })
+        .collect()
+}
+
 /// At an open market: its prices, then buying one unit of each good, where
 /// affordable, and selling one of each good the player carries.
 fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
-    let Ok((economy, _)) = economy::market_here(world, state) else {
+    let Ok((economy, market)) = economy::market_here(world, state) else {
         return Vec::new();
     };
     let wallet = state.economy.as_ref().unwrap();
@@ -113,6 +136,17 @@ fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
             // Carrying one more must fit the count too.
             available: wallet.currency >= quote.buy
                 && held(&good.item).is_none_or(|n| n.checked_add(1).is_some()),
+        });
+    }
+    for ware in &market.wares {
+        // A counted ware must fit the carried count too.
+        let fits = held(&ware.item).is_none_or(|n| n.checked_add(1).is_some());
+        actions.push(Action {
+            command: Command::Buy {
+                good: ware.item.clone(),
+                quantity: 1,
+            },
+            available: wallet.currency >= ware.price && fits,
         });
     }
     for good in &economy.goods {
@@ -168,6 +202,7 @@ fn fight_actions(
             available: encounter::check_skill(player, level, s).is_ok(),
         }));
     }
+    actions.extend(consumables(world, state));
     if !encounter::group(world, encounter).is_some_and(|g| g.no_flee) {
         actions.push(available(Command::Flee));
     }

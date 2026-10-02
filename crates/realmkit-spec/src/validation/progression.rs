@@ -100,7 +100,7 @@ pub(super) fn stat_points(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str,
 
 /// The most passive technique bonuses and the best gear for every slot could
 /// add to `stat` at once.
-fn worst_bonus(w: &WorldSpec, combat: &Combat, stat: Stat) -> u64 {
+pub(super) fn worst_bonus(w: &WorldSpec, combat: &Combat, stat: Stat) -> u64 {
     let gear: u64 = combat
         .slots
         .iter()

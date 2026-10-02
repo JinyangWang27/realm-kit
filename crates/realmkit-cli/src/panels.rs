@@ -118,7 +118,42 @@ pub fn market(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
             money(world, quote.sell),
         )?;
     }
+    if !market.wares.is_empty() {
+        writeln!(output, "  {}", paint.title("Wares:"))?;
+        for ware in &market.wares {
+            let item = world.item(&ware.item).unwrap();
+            writeln!(
+                output,
+                "  {} — {}{}",
+                item.name,
+                money(world, ware.price),
+                item.equipment
+                    .as_ref()
+                    .map_or(String::new(), |e| { bonuses(world, e) })
+            )?;
+        }
+    }
     writeln!(output, "  {}", money(world, wallet.currency))
+}
+
+/// " (Defence +6, Speed -10)": what wearing a piece at its base tier does.
+fn bonuses(world: &realmkit_spec::WorldSpec, equipment: &realmkit_spec::Equipment) -> String {
+    let mut parts: Vec<String> = Stat::ALL
+        .into_iter()
+        .filter_map(|stat| {
+            let bonus = equipment.bonuses.get(&stat).filter(|b| **b > 0)?;
+            Some(format!("{} +{bonus}", stat_name(world, stat)))
+        })
+        .collect();
+    if equipment.speed_penalty > 0 {
+        let speed = stat_name(world, Stat::Speed);
+        parts.push(format!("{speed} -{}", equipment.speed_penalty));
+    }
+    if parts.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", parts.join(", "))
+    }
 }
 
 /// Pieces of equipment by number, then counted items.

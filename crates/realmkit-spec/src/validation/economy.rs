@@ -259,6 +259,29 @@ fn markets(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
                 );
             }
         }
+        let mut sold = BTreeSet::new();
+        for ware in &market.wares {
+            reference(out, owner, "item", &ware.item, w.item(&ware.item).is_some());
+            if !(1..=PRICE_BOUND).contains(&ware.price) {
+                issue(
+                    out,
+                    owner,
+                    "invalid_price",
+                    format!("{} costs 1 to {PRICE_BOUND}", ware.item),
+                );
+            }
+            if economy.good(&ware.item).is_some() || !sold.insert(&ware.item) {
+                issue(
+                    out,
+                    owner,
+                    "invalid_ware",
+                    format!(
+                        "{} is sold here once, and is not also a trade good",
+                        ware.item
+                    ),
+                );
+            }
+        }
         for good in &economy.goods {
             let (made, used) = economy.supply(market, good, BASE_INDEX);
             if made > SUPPLY_BOUND || used > SUPPLY_BOUND {

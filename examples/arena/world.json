@@ -1,5 +1,5 @@
 {
-  "format_version": 12,
+  "format_version": 13,
   "id": "training_arena",
   "name": "The Training Arena",
   "language": "en",
@@ -71,5 +71,22 @@
       "victory": "{target} goes down.",
       "death": "The sand comes up to meet you.\nYour training is over. Start a new game to try again."
     }
+  },
+  "economy": {
+    "currency": { "format": "{amount} marks", "start": 10 },
+    "goods": [{ "item": "rat_tail", "price": 6 }],
+    "markets": [
+      {
+        "location": "gate",
+        "kind": "town",
+        "wares": [
+          { "item": "healing_draught", "price": 8 },
+          { "item": "iron_mail", "price": 60 }
+        ]
+      }
+    ],
+    "index_bounds": [100, 10000],
+    "spread_percent": 15,
+    "trade_step": 26
   }
 }

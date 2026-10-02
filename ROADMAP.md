@@ -885,7 +885,7 @@ The combination rule for several pieces of gear/status effects is still open.
 Do not sum or multiply modifiers by accident. Specify immunity precedence and
 vulnerability/resistance stacking before allowing multiple sources in a build.
 
-## M4 — Equipment, skills and character builds
+## M4 — Equipment, skills and character builds · complete
 
 Scope includes both defining equipment during world authoring and letting players
 forge, improve and enchant it. See the [equipment and crafting proposal](docs/equipment.md)
@@ -912,7 +912,9 @@ every package.
   immunity wins (zero damage); the combined multiplier is kept within 1/10 to
   10. Each armour piece authors a flat speed penalty; penalties add up and
   apply before the speed cap, and effective speed never drops below 1.
-  Consumables get their own later slice.
+  **Consumables** (Format 13): an item restores HP and MP when used,
+  exploring or as a fight turn. Cooldowns and status effects wait for a
+  skill that needs them.
 - Define durations in terms of the chosen combat clock; do not casually mix
   wall-clock seconds, actor turns and timeline units.
 - Show why stats changed and what an action costs before confirming it.
@@ -1153,7 +1155,9 @@ slices, each bumping the package and save format as usual:
    present, buying and selling with a spread, per-unit index steps and an
    engine-computed preview, and currency conditions and effects;
    `scripts/combat_sim/economy.py` mirrors the tick and computes warm-up
-   prices for authors; `examples/marches` trades. **M6a-2:** prosperity,
+   prices for authors; `examples/marches` trades. Wares, items a market
+   sells at a fixed price, arrived early with consumables (Format 13).
+   **M6a-2:** prosperity,
    merchants' stock and currency, workshops, upkeep and the trading
    proficiency.
 2. **M6b — factions and standing.** War and peace between factions, authored
