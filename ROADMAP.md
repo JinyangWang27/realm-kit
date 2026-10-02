@@ -1187,6 +1187,19 @@ slices, each bumping the package and save format as usual:
    captivity as a setback rather than an ending. Holding prisons arrive with
    M6e. Victories grant XP, standing and a loot pool drawn from authored loot
    tables; defeats may inflict authored lasting injuries.
+   **M6c-1 and M6d-1 · delivered** (Format 14): troop classes and lines
+   whose soldiers level up in squads, renamed where authored, with branch
+   upgrades from a line's last level; recruiting from pools that refill;
+   an upkeep schedule for wages, desertion when unpaid and recovery of the
+   wounded; mass battles against authored armies, autoresolved or commanded
+   with charge, hold, flank and retreat under the round rule
+   `scripts/combat_sim/battle.py` mirrors; allies who join while a
+   condition holds, ahead of factions; wounded and killed losses, the
+   player knocked out rather than killed, and victory XP shared with the
+   squads that fought. `examples/marches` raises levies and beats the fen
+   outlaws. Still to come: companions, provisions, persistent morale,
+   travel speed, leaders and companions as individuals, ground, prisoners,
+   injuries and loot tables.
 5. **M6e — holdings and sieges.** Ownership that changes during play, income,
    garrisons, authored buildings, sieges as mass battles after a preparation
    time, and raiding enemy villages for loot at the cost of their income.

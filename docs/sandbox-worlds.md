@@ -447,6 +447,10 @@ they do, without scripting each character.
 - **Roster.** The player's roster holds, per troop definition, a count of
   healthy troops, a count of wounded troops and an XP pool: troops are
   fungible, not instances. All three are saved.
+- **Allies before factions** (delivered, Format 14). Until factions exist,
+  an army with a `joins` condition is an ally: never engaged, it fights on
+  the player's side in any battle where it is present while the condition
+  holds. Faction membership and war will derive that condition.
 - **Wounded troops.** Wounded troops do not fight, still draw wages and count
   towards the size limit. On each upkeep tick an authored share recovers, more
   at a location that authors rest or healing, and the retinue's surgery
@@ -474,16 +478,20 @@ they do, without scripting each character.
   for example after lost renown, nobody leaves; recruiting is refused until the
   roster is back under it. Agent party templates author their own fixed limits,
   and a validation bound caps every roster.
-- **Upgrades.** Battles add XP to the pool of each surviving troop type, and
-  recruits join with no XP. Every troop that leaves a type, whether by upgrade,
-  death, capture or desertion, takes its share of that type's pool: the pool
-  divided by the type's healthy and wounded count, rounded down. A troop can
-  upgrade once its share reaches the next step's authored XP. It pays that XP
-  from its share and carries the rest into its new type's pool. Any other
-  leaver's share is lost, and a type whose last troop leaves also drops any
-  rounding remainder. XP is only moved or spent, never created outside battle,
-  so a pool never outlives its troops and upgrades available after a save are
-  the same as before it.
+- **Levels and upgrades** (delivered, Format 14). A troop definition is a
+  line of levels, each with its own stats, and optionally a new name and
+  wage, so a soldier grows stronger every level and is renamed only where
+  the world says. The roster keeps one squad per line and level with a
+  shared XP pool, rather than one instance per soldier, so state grows with
+  the number of ranks, not of soldiers. Battles add XP and recruits add
+  none. A squad whose share (its pool divided by its healthy and wounded
+  count, rounded down) covers the next level rises together, paying that
+  XP and carrying the rest. At a line's last level soldiers wait until the
+  player upgrades them into an authored branch line, each carrying its
+  share, for an authored cost. Every soldier who leaves, by upgrade, death,
+  capture or desertion, takes their share; a squad whose last soldier
+  leaves drops the rest. XP is only moved or spent, never created outside
+  battle.
 - **Provisions.** Trade goods may author a provisions value. On each upkeep
   tick the retinue eats provisions per head, prisoners included, from its
   carried goods in authored goods order. A hungry retinue

@@ -1,6 +1,8 @@
-# World package format 13
+# World package format 14
 
-Format 13 adds consumable items that restore HP and MP, and wares that
+Format 14 adds troops, who are recruited, level up in squads and draw
+wages, and mass battles against authored armies, with allies who join.
+Format 13 added consumable items that restore HP and MP, and wares that
 markets sell at fixed prices. Format 12 composed conditions with `all`,
 `any` and `not`, gave dialogue choices ordered effect lists, and added
 optional world time with roads, scheduled events and characters who move,
@@ -35,9 +37,9 @@ there is no migration. Convert them by hand:
   becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
   dialogue choice's `effect` becomes a one-element `effects` list.
 
-Format 13 represents one fixed player-controlled character and one playable
+Format 14 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 13 does not serialize a route collection
+stable logical route ID `default`; Format 14 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -52,7 +54,7 @@ because control differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 13 also requires item and quest tables because they serve the current demo.
+Format 14 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -87,7 +89,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 13 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 14 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -424,7 +426,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 13 has a single flat quest collection. The long-term model should retain
+Format 14 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -886,7 +888,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 13 currently selects combat prose variants from the current
+Format 14 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -897,6 +899,144 @@ This remains a current implementation detail, not a content contract authors
 should depend on. A later combat implementation may keep deterministic selection
 while keying variants to a more local gameplay/narrative sequence (for example an
 encounter-local attack sequence) if stronger semantic independence is useful.
+
+## Troops and battles
+
+The optional `troops` block in `world.json` (it needs `combat`) gives the
+player soldiers; the optional `battle` block (it needs `troops`) lets them
+fight authored armies.
+
+```json
+"troops": {
+  "classes": [
+    { "id": "foot", "name": "Foot" },
+    { "id": "archers", "name": "Archers", "ranged": true },
+    { "id": "riders", "name": "Riders", "mounted": true }
+  ],
+  "lines": [
+    {
+      "id": "levy",
+      "class": "foot",
+      "levels": [
+        { "xp": 0, "name": "Levy", "wage": 1, "stats": { "hp": 20, "patk": 6, "pdef": 4, "satk": 0, "sdef": 2, "speed": 100 } },
+        { "xp": 6, "stats": { "hp": 22, "patk": 7, "pdef": 5, "satk": 0, "sdef": 2, "speed": 100 } },
+        { "xp": 10, "name": "Spearman", "wage": 2, "stats": { "hp": 26, "patk": 9, "pdef": 6, "satk": 0, "sdef": 2, "speed": 100 } }
+      ],
+      "upgrades": [{ "to": "bowmen", "cost": 20 }, { "to": "riders", "cost": 40 }]
+    }
+  ],
+  "limit": 30,
+  "wounded_percent": 50,
+  "upkeep": { "schedule": { "at": 1440, "every": 1440 }, "recover_percent": 50, "desert_percent": 20 }
+}
+```
+
+- **Classes** are the world's own: ranged troops shoot from behind the
+  line, mounted ones can flank; a class is one, the other or neither
+  (`invalid_class`).
+- **Lines** are ladders of levels. Each level sets stats and the XP each
+  soldier needs to rise into it; only the first needs none, and it must be
+  named (`invalid_line`). A level may rename the soldier or change the wage,
+  and otherwise keeps the previous level's. `channel` (physical by default)
+  is the line's attack channel. `upgrades` are branches a last-level soldier
+  can take into another line's first level, for a `cost` in currency each.
+- **Squads.** The roster keeps one squad per line and level, whose soldiers
+  share an XP pool. A squad whose share (the pool divided by its healthy and
+  wounded soldiers) covers the next level rises together, paying for it and
+  carrying the rest. A soldier who leaves (upgraded, killed, deserting) takes
+  their share. `upgrade <line> <to> [n]` turns last-level soldiers into a
+  branch, each carrying its share.
+- **The roster limit** counts healthy and wounded soldiers, not the player
+  (1 to 10,000, `invalid_limit`).
+- **Upkeep** (needs world time) pays every soldier's wage at once on its
+  schedule, or, when the currency does not cover it, pays nothing and loses
+  `desert_percent` of each squad (at least one, the healthy first). Then
+  `recover_percent` of each squad's wounded mend, rounded up. Resting at a
+  safe place mends them all. Wages without upkeep draw a warning
+  (`unused_wages`).
+
+A location may offer recruits, each line from a pool that starts full and
+refills on a schedule (needs world time):
+
+```json
+"recruits": {
+  "troops": [{ "line": "levy", "price": 10, "size": 8 }],
+  "refill": { "schedule": { "at": 1440, "every": 1440 }, "amount": 2 }
+}
+```
+
+`recruit <line> [n]` takes level-1 soldiers from the pool for their price,
+within the roster limit.
+
+```json
+"battle": {
+  "frontage": 12,
+  "rounds": 8,
+  "roll": [90, 110],
+  "matchups": { "riders": { "archers": 150 }, "foot": { "riders": 120 } },
+  "morale": { "factor": 150, "floor": 50, "rout": 30 },
+  "hold_percent": 60,
+  "flank_percent": 130,
+  "pursuit_class": "riders",
+  "player_xp_percent": 30
+}
+```
+
+A character may lead an army instead of fighting alone (`invalid_army`):
+
+```json
+"army": {
+  "troops": [{ "line": "outlaws", "count": 8 }, { "line": "outlaws", "level": 2, "count": 2 }],
+  "xp": 60,
+  "loot": [{ "item": "eels", "quantity": 4 }],
+  "repeatable": true
+}
+```
+
+An army with a `joins` condition is an ally instead: it is never engaged,
+and it joins the player's side in any battle fought where it is present
+while the condition holds. Its XP, loot and repeatability do nothing
+(`unused_reward`).
+
+`engage <army>` starts a battle, which holds the player's HP and MP until it
+ends. Side 0 is the player (one head, with effective stats), the roster's
+healthy squads (lines as authored, levels from the highest) and any allies;
+side 1 is the army. Each round the player orders `charge`, `hold`, `flank`
+(with riders) or `retreat`, or `autoresolve` charges to the end; the enemy
+always charges. A round, computed from the counts at its start for both
+sides at once:
+
+1. **Who fights.** `frontage` melee heads per side, filled in order; every
+   ranged head shoots. On `flank`, mounted troops leave the line to attack
+   the enemy's archers, if any stand.
+2. **Targets.** The enemy's melee units, or its archers once no melee stands
+   (or its archers, for flankers). A unit's fighting count is split across
+   them by their counts, floors first, then one each to the largest
+   remainders.
+3. **Damage.** Count × the personal damage formula at power 100 in the
+   attacker's channel, × the matchup (100 when absent) × the side's morale
+   modifier (`floor` + (100 − `floor`) × morale ÷ 100) × the side's roll
+   (one draw per round from the `battle` random stream) × `hold_percent` on
+   melee hits while either side holds × `flank_percent` for flankers × 200%
+   for the pursuit class in a pursuit, all ÷ 100⁶, rounded down once.
+4. **Losses.** Damage carries over within a stack until it makes up a
+   soldier's HP. The player loses HP and at 0 is knocked out, never killed.
+5. **Morale** (from 100) falls by losses × `factor` ÷ the side's starting
+   size, the remainder carried; a side below `rout` breaks.
+6. **End.** A side that broke or has nobody standing loses, and the winner
+   takes a pursuit round in which the loser deals nothing; both at once is a
+   draw. After `rounds` rounds the weaker side (count × HP × attack, scaled
+   by morale) withdraws, the player's side on a tie. A retreat gives the
+   enemy a pursuit and the battle.
+
+Afterwards `wounded_percent` of the player side's losses are wounded, the
+rest killed, and the player is back to exploring on at least 1 HP. A victory
+gives the player `player_xp_percent` of the army's XP and shares the rest
+among the squads still standing by their healthy count, promotes them,
+grants the loot, and records a non-repeatable army as defeated.
+`python3 -m scripts.combat_sim battle <world> --army ID [--roster
+line:level:count] [--ally ID] [--orders ...] --seed N` runs the same rule
+offline.
 
 ## Validation feedback
 
