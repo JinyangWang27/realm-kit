@@ -609,11 +609,17 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         "You run down the fleeing enemy: 1 fall.\nVictory.\nWounded: Levy ×1\nKilled: Levy ×2\n",
         "Promoted: Levy ×4 (level 2).",
         "Wages paid: 4 silver\nRecovered: Levy ×1\n",
+        // A second victory makes Spearmen of them; two become riders, who
+        // flank in a battle saved, fought a round, and loaded back.
+        "Promoted: Spearman ×3 (level 3).",
+        "Spearman ×2 become Rider.",
+        "Yours: You HP 46/46 · Spearman 1 · Rider 2 · Keep guard 6",
+        "Loaded save 3.",
+        "  3. Flank with riders\n",
+        "Round 1 — yours: strength 27, lost 0, morale 100 · theirs: strength 11, lost 3, morale 68",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
-    // Flanking takes riders, so the order is not offered without them.
-    assert!(!text.contains("Flank with riders"), "{text}");
     // Travel shows the clock once, at the destination.
     assert!(!text.contains("2 h later"), "{text}");
     let help = String::from_utf8(run(&["play", MARCHES], "help\n").stdout).unwrap();
@@ -634,11 +640,16 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         assert!(menu.contains(passage), "missing {passage:?} in {menu}");
     }
     assert!(help.contains("wait [minutes]"));
-    // A save made on the road resumes at the same minute.
-    let resumed = run(&["play", MARCHES, "--line", "--saves", &dir], "load\n");
-    assert!(String::from_utf8(resumed.stdout)
-        .unwrap()
-        .contains("Loaded save 2."));
+    // The newest save, made mid-battle, resumes the battle; the older one
+    // made on the road still loads.
+    let resumed = run(&["play", MARCHES, "--line", "--saves", &dir], "load 2\n");
+    let resumed = String::from_utf8(resumed.stdout).unwrap();
+    assert!(resumed.contains("Loaded save 3."), "{resumed}");
+    assert!(
+        resumed.contains("Yours: You HP 46/46 · Spearman 1 · Rider 2 · Keep guard 6"),
+        "{resumed}"
+    );
+    assert!(resumed.contains("Loaded save 2."), "{resumed}");
     std::fs::remove_dir_all(dir).unwrap();
 }
 
