@@ -37,6 +37,7 @@ pub(crate) fn clamp_vitals(world: &WorldSpec, state: &mut GameState) {
             player.rage_remainder %= u64::from(max.hp);
             (&mut player.hp, &mut player.mp)
         }
+        Stance::Battle(battle) => (&mut battle.hp, &mut battle.mp),
     };
     *hp = (*hp).min(max.hp);
     *mp = (*mp).min(max.mp);
@@ -130,6 +131,9 @@ pub(crate) fn rest(
     });
     state.dialogue = None;
     events.push(Event::Rested);
+    if let Some(retinue) = state.retinue.as_mut() {
+        retinue::mend(retinue, None, events);
+    }
     // Resting takes the world's authored time, if it keeps one.
     let minutes = world.world.time.as_ref().and_then(|t| t.rest).unwrap_or(0);
     time::advance(world, state, minutes, events)

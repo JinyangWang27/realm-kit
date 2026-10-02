@@ -216,7 +216,7 @@ fn fighting<'s>(
     };
     match &mut combat.stance {
         Stance::Fighting(encounter) => Ok((encounter, me)),
-        Stance::Exploring(_) => Err(EngineError::NotFighting),
+        Stance::Exploring(_) | Stance::Battle(_) => Err(EngineError::NotFighting),
     }
 }
 

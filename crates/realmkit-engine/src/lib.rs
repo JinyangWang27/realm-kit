@@ -8,6 +8,7 @@ use realmkit_spec::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod battle;
 mod command;
 mod encounter;
 mod error;
@@ -88,6 +89,19 @@ impl<'w> Engine<'w> {
                         Some((c.id.clone(), start.id.clone()))
                     })
                     .collect(),
+                // Every recruiting pool starts full.
+                retinue: world.troops().map(|_| RetinueState {
+                    roster: BTreeMap::new(),
+                    pools: world
+                        .locations
+                        .iter()
+                        .filter_map(|l| {
+                            let recruits = l.recruits.as_ref()?;
+                            let pools = recruits.troops.iter().map(|o| (o.line.clone(), o.size));
+                            Some((l.id.clone(), pools.collect()))
+                        })
+                        .collect(),
+                }),
                 economy: world.economy().map(|economy| EconomyState {
                     currency: economy.currency.start,
                     prices: economy
@@ -146,7 +160,14 @@ impl<'w> Engine<'w> {
     pub fn encounter(&self) -> Option<&Encounter> {
         match &self.state.combat.as_ref()?.stance {
             Stance::Fighting(encounter) => Some(encounter),
-            Stance::Exploring(_) => None,
+            Stance::Exploring(_) | Stance::Battle(_) => None,
+        }
+    }
+    /// The battle the player is leading, if any.
+    pub fn battle(&self) -> Option<&BattleState> {
+        match &self.state.combat.as_ref()?.stance {
+            Stance::Battle(battle) => Some(battle),
+            Stance::Exploring(_) | Stance::Fighting(_) => None,
         }
     }
     /// The next `n` actors, projected as if every action took a basic

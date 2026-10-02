@@ -1,6 +1,6 @@
 use crate::panels;
 use crossterm::style::Stylize;
-use realmkit_engine::{Engine, Event, Outcome};
+use realmkit_engine::{BattleOutcome, Engine, Event, Outcome};
 use realmkit_spec::{Direction, Id, Stat, TextTemplate};
 use std::io::{self, Write};
 
@@ -93,6 +93,14 @@ pub fn stat_name(world: &realmkit_spec::WorldSpec, stat: Stat) -> String {
         Stat::Sdef => format!("{special} defence"),
         Stat::Speed => "Speed".into(),
     }
+}
+
+/// A soldier's name at a line's 1-based level, as the line authors it.
+pub fn soldier(world: &realmkit_spec::WorldSpec, line: &str, level: usize) -> String {
+    world
+        .troops()
+        .and_then(|t| t.line(line))
+        .map_or_else(|| line.to_string(), |l| l.name_at(level).to_string())
 }
 
 /// An amount in the world's currency, such as "120 silver".
@@ -365,6 +373,115 @@ pub fn events(
                 let mp = engine.player_stats().is_some_and(|s| s.mp > 0);
                 let restored = if mp { "Health and MP" } else { "Health" };
                 writeln!(output, "You rest. {restored} restored.")?
+            }
+            Event::Recruited {
+                line,
+                quantity,
+                cost,
+            } => writeln!(
+                output,
+                "Recruited: {} ×{quantity} for {}",
+                soldier(world, line, 1),
+                money(world, *cost)
+            )?,
+            Event::Upgraded {
+                line, to, quantity, ..
+            } => {
+                let from = world.troops().unwrap().line(line).unwrap().levels.len();
+                writeln!(
+                    output,
+                    "{} ×{quantity} become {}.",
+                    soldier(world, line, from),
+                    soldier(world, to, 1)
+                )?
+            }
+            Event::Promoted { line, level, count } => writeln!(
+                output,
+                "{}",
+                paint.good(&format!(
+                    "Promoted: {} ×{count} (level {level}).",
+                    soldier(world, line, *level)
+                ))
+            )?,
+            Event::WagesPaid { amount } => {
+                writeln!(output, "Wages paid: {}", money(world, *amount))?
+            }
+            Event::Deserted { line, level, count } => writeln!(
+                output,
+                "{}",
+                paint.bad(&format!(
+                    "Unpaid, {} ×{count} desert.",
+                    soldier(world, line, *level)
+                ))
+            )?,
+            Event::Recovered { line, level, count } => writeln!(
+                output,
+                "Recovered: {} ×{count}",
+                soldier(world, line, *level)
+            )?,
+            Event::RetinueViewed => panels::retinue(output, engine, paint)?,
+            Event::BattleStarted { army, allies } => {
+                writeln!(
+                    output,
+                    "{}",
+                    paint.title(&format!("Battle: {}", name(army)))
+                )?;
+                for ally in allies {
+                    writeln!(output, "{} joins your side.", name(ally))?;
+                }
+            }
+            Event::BattleRound {
+                round,
+                strengths,
+                losses,
+                morale,
+            } => {
+                let side = |s: usize| {
+                    let mut line = format!("strength {}, lost {}", strengths[s], losses[s]);
+                    if world.battle().is_some_and(|b| b.morale.is_some()) {
+                        line += &format!(", morale {}", morale[s]);
+                    }
+                    line
+                };
+                writeln!(
+                    output,
+                    "Round {round} — yours: {} · theirs: {}",
+                    side(0),
+                    side(1)
+                )?
+            }
+            Event::Pursuit { by: 0, losses } => {
+                writeln!(output, "You run down the fleeing enemy: {losses} fall.")?
+            }
+            Event::Pursuit { losses, .. } => writeln!(
+                output,
+                "{}",
+                paint.bad(&format!("The enemy cuts down {losses} as you fall back."))
+            )?,
+            Event::BattleEnded {
+                outcome,
+                wounded,
+                killed,
+            } => {
+                let verdict = match outcome {
+                    BattleOutcome::Victory => paint.good("Victory."),
+                    BattleOutcome::Defeat => paint.bad("Defeat."),
+                    BattleOutcome::Draw => "Both sides fall back: a draw.".into(),
+                };
+                writeln!(output, "{verdict}")?;
+                let list = |stacks: &[(String, usize, u64)]| -> String {
+                    stacks
+                        .iter()
+                        .map(|(line, level, n)| format!("{} ×{n}", soldier(world, line, *level)))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                if !wounded.is_empty() {
+                    writeln!(output, "Wounded: {}", list(wounded))?;
+                }
+                if !killed.is_empty() {
+                    writeln!(output, "Killed: {}", list(killed))?;
+                }
             }
             Event::Consumed { item, hp, mp } => {
                 let mut gains = Vec::new();

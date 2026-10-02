@@ -187,8 +187,17 @@ fn economy_content_is_checked_with_stable_codes() {
 fn currency_needs_an_economy_and_a_price_tick_needs_a_clock() {
     let mut world = marches();
     world.world.economy = None;
-    // The reeve's reward.
-    assert_eq!(codes(&world), ["economy_disabled"]);
+    // The reeve's reward, and the troops' wages, upgrade costs and recruit prices.
+    let found: std::collections::BTreeSet<_> = codes(&world).into_iter().collect();
+    assert_eq!(found, ["economy_disabled".to_string()].into());
+    let owners: std::collections::BTreeSet<_> = world
+        .diagnostics()
+        .into_iter()
+        .filter_map(|d| d.entity_id)
+        .collect();
+    for owner in ["levy", "bowmen", "riders", "ashmere"] {
+        assert!(owners.contains(owner), "{owner}: {owners:?}");
+    }
     let mut world = marches();
     world.world.time = None;
     let codes = codes(&world);

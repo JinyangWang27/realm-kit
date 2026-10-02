@@ -150,6 +150,14 @@ Some markets also sell wares at a fixed price, gear included, and some items
 can be used: the arena's quartermaster sells a healing draught that you
 drink from `Use item ›` (or `use healing_draught`), even mid-fight, where
 drinking takes your turn.
+Worlds with troops let you raise soldiers where they are recruited
+(`Recruit ›`, or `recruit levy 6`), pay their wages, and lead them against
+armies (`engage outlaws`). Each round you charge, hold the line, flank with
+riders or retreat, or autoresolve the rest; nearby allies may join you.
+Soldiers who survive share the victory's XP and rise in level together,
+renamed as the world decides, and at the end of a line you choose their
+branch (`Upgrade ›`). In the marches, levies raised at Ashmere beat the fen
+outlaws beside the keep's men.
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting

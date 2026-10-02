@@ -35,6 +35,47 @@ pub struct CombatState {
 pub enum Stance {
     Exploring(Vitals),
     Fighting(Encounter),
+    /// Leading a mass battle; it holds the player's HP and MP until it ends.
+    Battle(BattleState),
+}
+
+/// A mass battle between the player's side (0) and an army (1), paused
+/// between rounds for the player's order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BattleState {
+    pub army: Id,
+    /// Armies that joined the player, in the order they did.
+    pub allies: Vec<Id>,
+    /// Rounds fought so far.
+    pub round: u32,
+    /// The player's HP and MP; at 0 HP the player is knocked out of the fight.
+    pub hp: u32,
+    pub mp: u32,
+    /// Side 0: the roster's healthy squads (lines as authored, levels from
+    /// the highest), then each ally's troops. Side 1: the army's troops.
+    pub sides: [BattleSide; 2],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BattleSide {
+    pub stacks: Vec<BattleStack>,
+    pub morale: u32,
+    /// Morale-loss progress below one point, in units of the starting size.
+    pub morale_remainder: u64,
+    /// Heads at the start, the player included on side 0.
+    pub start_size: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BattleStack {
+    pub line: Id,
+    pub level: usize,
+    pub count: u64,
+    /// Damage taken short of one more loss.
+    pub remainder: u64,
 }
 
 /// One piece of equipment: which item it is, and whether it is worn.
@@ -138,6 +179,37 @@ pub struct GameState {
     /// Currency and prices; present only in worlds with an economy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub economy: Option<EconomyState>,
+    /// Soldiers and recruiting pools; present only in worlds with troops.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retinue: Option<RetinueState>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RetinueState {
+    /// Soldiers by line, then 1-based level. A squad is never empty.
+    pub roster: BTreeMap<Id, BTreeMap<usize, Squad>>,
+    /// Recruits left at each recruiting place, by line.
+    pub pools: BTreeMap<Id, BTreeMap<Id, u64>>,
+}
+
+/// The soldiers of one line at one level, who share their XP.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Squad {
+    pub healthy: u64,
+    pub wounded: u64,
+    pub xp: u64,
+}
+
+impl Squad {
+    pub fn heads(&self) -> u64 {
+        self.healthy + self.wounded
+    }
+    /// Each soldier's part of the XP, rounded down.
+    pub fn share(&self) -> u64 {
+        self.xp.checked_div(self.heads()).unwrap_or(0)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -149,7 +221,7 @@ pub struct EconomyState {
     pub prices: BTreeMap<Id, BTreeMap<Id, u32>>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 13;
+pub const SAVE_FORMAT_VERSION: u32 = 14;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 

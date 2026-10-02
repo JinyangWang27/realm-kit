@@ -10,6 +10,7 @@ mod equipment;
 mod progression;
 mod story;
 mod time;
+mod troops;
 mod world;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -60,6 +61,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     if let Some(combat) = w.combat() {
         combat::rules(&mut out, w, combat);
     }
+    troops::rules(&mut out, w);
     out
 }
 

@@ -15,12 +15,18 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     if world.combat().is_some_and(|c| !c.techniques.is_empty()) {
         panels.push(available(Command::Techniques));
     }
+    if state.retinue.is_some() {
+        panels.push(available(Command::Retinue));
+    }
     // Death is not a locked door: offer only what can still be done.
     if dead(state) {
         return panels;
     }
     if let Some(encounter) = fighting(state) {
         return fight_actions(world, state, encounter, panels);
+    }
+    if let Some(Stance::Battle(battle)) = state.combat.as_ref().map(|c| &c.stance) {
+        return battle_actions(world, battle, panels);
     }
     let location = world.location(&state.player.location).unwrap();
     let here = placed_here(world, state);
@@ -30,10 +36,14 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         .map(|id| available(Command::Talk((*id).clone())))
         .collect();
     if state.combat.is_some() {
+        // Fighters, and armies that are not on the player's side.
+        let foe = |c: &Character| {
+            c.combat.is_some() || c.army.as_ref().is_some_and(|a| a.joins.is_none())
+        };
         actions.extend(
             here.iter()
                 .filter(|id| !defeated(state, id))
-                .filter(|id| character_here(world, state, id).is_some_and(|c| c.combat.is_some()))
+                .filter(|id| character_here(world, state, id).is_some_and(foe))
                 .map(|id| available(Command::Engage((*id).clone()))),
         );
     }
@@ -86,9 +96,54 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         );
     }
     actions.extend(consumables(world, state));
+    actions.extend(soldiers(world, state));
     actions.extend(crafting::offered(world, state));
     actions.extend(trade(world, state));
     actions.extend(panels);
+    actions
+}
+
+/// Recruiting one of each line offered here, then upgrading one soldier of
+/// each last-level squad into each branch; unaffordable or impossible ones
+/// stay listed to explain themselves.
+fn soldiers(world: &WorldSpec, state: &GameState) -> Vec<Action> {
+    let (Some(troops), Some(retinue)) = (world.troops(), &state.retinue) else {
+        return Vec::new();
+    };
+    let currency = state.economy.as_ref().map_or(0, |e| e.currency);
+    let here = world.location(&state.player.location).unwrap();
+    let room = retinue::heads(retinue) < troops.limit;
+    let mut actions: Vec<_> = here
+        .recruits
+        .iter()
+        .flat_map(|r| &r.troops)
+        .map(|offer| Action {
+            command: Command::Recruit {
+                line: offer.line.clone(),
+                quantity: 1,
+            },
+            available: room && retinue.pools[&here.id][&offer.line] > 0 && currency >= offer.price,
+        })
+        .collect();
+    for line in &troops.lines {
+        let last = line.levels.len();
+        let ready = retinue
+            .roster
+            .get(&line.id)
+            .and_then(|l| l.get(&last))
+            .is_some_and(|s| s.healthy > 0);
+        if !ready {
+            continue;
+        }
+        actions.extend(line.upgrades.iter().map(|upgrade| Action {
+            command: Command::Upgrade {
+                line: line.id.clone(),
+                to: upgrade.to.clone(),
+                quantity: 1,
+            },
+            available: currency >= upgrade.cost,
+        }));
+    }
     actions
 }
 
@@ -165,6 +220,33 @@ fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
             });
         }
     }
+    actions
+}
+
+/// The orders a battle takes; flanking needs riders still in the saddle.
+fn battle_actions(world: &WorldSpec, battle: &BattleState, panels: Vec<Action>) -> Vec<Action> {
+    let troops = world.troops().unwrap();
+    let mounted = battle.sides[0].stacks.iter().any(|s| {
+        let class = &troops.line(&s.line).unwrap().class;
+        s.count > 0 && troops.class(class).is_some_and(|c| c.mounted)
+    });
+    let mut orders = vec![BattleOrder::Charge, BattleOrder::Hold];
+    if mounted {
+        orders.push(BattleOrder::Flank);
+    }
+    orders.push(BattleOrder::Retreat);
+    let mut actions: Vec<_> = orders
+        .into_iter()
+        .map(|o| Action {
+            command: Command::Order(o),
+            available: true,
+        })
+        .collect();
+    actions.push(Action {
+        command: Command::Autoresolve,
+        available: true,
+    });
+    actions.extend(panels);
     actions
 }
 

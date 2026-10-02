@@ -108,6 +108,15 @@ proves the complete single-player loop with authored content.
   equipment arriving as pieces. No new saved state; saves accept used-up
   consumables and freely bought wares. `examples/arena` exercises both.
   Package and save format 13.
+- [x] Troops and mass battles (M6c-1, M6d-1): troop lines whose soldiers
+  level up in squads sharing XP, renamed where authored, with branch
+  upgrades; recruiting from refilling pools; wages, desertion and recovery
+  on an upkeep schedule; mass battles against armies, autoresolved or
+  commanded round by round, with allies who join while a condition holds.
+  The round rule draws from its own `battle` stream and mirrors
+  `scripts/combat_sim/battle.py`, whose numbers engine tests pin. Saves hold
+  squads and pools, and a battle between rounds. `examples/marches`
+  exercises it. Package and save format 14.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 

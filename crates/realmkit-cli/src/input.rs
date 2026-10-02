@@ -1,4 +1,4 @@
-use realmkit_engine::Command;
+use realmkit_engine::{BattleOrder, Command};
 use realmkit_spec::{Direction, Stat, WorldSpec};
 
 /// Commands a player can type; fighting and resting only where the world has combat.
@@ -31,6 +31,12 @@ pub fn help(world: &WorldSpec) -> String {
     }
     if world.economy().is_some() {
         attack += "market — prices here\nbuy <item> [units]\nsell <item> [units]\n";
+    }
+    if world.troops().is_some() {
+        attack += "retinue — your soldiers\nrecruit <line> [count] — where soldiers are raised\nupgrade <line> <to-line> [count]\n";
+    }
+    if world.battle().is_some() {
+        attack += "engage <army-id> — start a battle\ncharge | hold | flank | retreat — order a round\nautoresolve — charge to the end\n";
     }
     if world.world.time.as_ref().is_some_and(|t| t.wait.is_some()) {
         attack += "wait [minutes] — let time pass (90, 2h or 1d)\n";
@@ -184,6 +190,21 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
             target: (*target).into(),
         },
         ("rest", []) => Command::Rest,
+        ("retinue", []) => Command::Retinue,
+        ("recruit", [line, rest @ ..]) if rest.len() <= 1 => Command::Recruit {
+            line: (*line).into(),
+            quantity: quantity(rest)?,
+        },
+        ("upgrade", [line, to, rest @ ..]) if rest.len() <= 1 => Command::Upgrade {
+            line: (*line).into(),
+            to: (*to).into(),
+            quantity: quantity(rest)?,
+        },
+        ("charge", []) => Command::Order(BattleOrder::Charge),
+        ("hold", []) => Command::Order(BattleOrder::Hold),
+        ("flank", []) => Command::Order(BattleOrder::Flank),
+        ("retreat", []) => Command::Order(BattleOrder::Retreat),
+        ("autoresolve", []) => Command::Autoresolve,
         ("flee", []) => Command::Flee,
         ("respec", []) => Command::Respec,
         ("equip", [piece]) => Command::Equip(gear(piece)?),
@@ -221,6 +242,35 @@ mod tests {
     /// A world without a clock, roads or markets, as the demo is.
     fn parse(line: &str) -> Result<Input, &'static str> {
         parse_with(line, Context::default())
+    }
+
+    #[test]
+    fn soldiers_are_raised_upgraded_and_ordered_by_typed_commands() {
+        assert_eq!(
+            parse("recruit levy 6"),
+            Ok(Input::Command(Command::Recruit {
+                line: "levy".into(),
+                quantity: 6
+            }))
+        );
+        assert_eq!(
+            parse("upgrade levy bowmen"),
+            Ok(Input::Command(Command::Upgrade {
+                line: "levy".into(),
+                to: "bowmen".into(),
+                quantity: 1
+            }))
+        );
+        assert_eq!(
+            parse("flank"),
+            Ok(Input::Command(Command::Order(BattleOrder::Flank)))
+        );
+        assert_eq!(
+            parse("autoresolve"),
+            Ok(Input::Command(Command::Autoresolve))
+        );
+        assert_eq!(parse("retinue"), Ok(Input::Command(Command::Retinue)));
+        assert!(parse("recruit").is_err());
     }
 
     #[test]

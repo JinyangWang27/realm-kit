@@ -1574,7 +1574,9 @@ a proposed answer that still needs to be confirmed:
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.
-- **Mass-battle formula (M6d).** Proposed: troops fight as stacks of counts,
+- **Mass-battle formula (M6d).** Decided as delivered in Format 14, without
+  ground, leadership, individuals other than the player, or a champion duel:
+  troops fight as stacks of counts,
   and the player, companions and leaders as stacks of one with their own HP,
   over at most an authored number of rounds
   ([Mass battle](sandbox-worlds.md#mass-battle)). Each round both sides deal
@@ -1599,7 +1601,8 @@ a proposed answer that still needs to be confirmed:
   (proposed) or a fixed engine set; defaults for frontage, the morale factor,
   the rout threshold and the hold percentage; and whether a champion duel can
   end a battle outright.
-- **Battle modes (M6d).** Proposed: when the player's party joins a battle, the
+- **Battle modes (M6d).** Decided as delivered in Format 14 (a round
+  summary shows strength, losses and morale per side): when the player's party joins a battle, the
   player chooses autoresolve or command. A commanded battle is a third stance
   beside exploring and fighting that holds every individual's HP and MP, and a
   champion duel's encounter while it runs, so each keeps exactly one home.
@@ -1653,12 +1656,16 @@ a proposed answer that still needs to be confirmed:
   ordinary main-questline quests; only the top rung is the route's completed,
   non-terminal outcome, because a playthrough records at most one outcome
   ([Section 3](#3-outcomes-failure-and-replay)).
-- **Retinue XP (M6c).** Proposed: the roster saves an XP pool per troop type.
-  Battles add to it and recruits add none. Every troop leaving a type (upgrade,
-  casualty, desertion) takes its share, the pool divided by the count rounded
-  down; an upgrading troop pays the next step's authored XP from that share
-  and carries the rest into its new type's pool. A type with no troops left has
-  an empty pool, so XP is only moved or spent, never farmed.
+- **Retinue XP (M6c).** Decided as delivered in Format 14: the roster saves
+  an XP pool per line and level, and soldiers level up within their line by
+  that pool, renamed where the world authors a new name, instead of paying
+  for each upgrade step. Battles add to it and recruits add none. Every
+  soldier leaving a squad (upgrade, casualty, desertion) takes its share, the
+  pool divided by the head count rounded down; a squad whose share covers the
+  next level rises whole, paying that XP and carrying the rest. Upgrades are
+  branch choices from a line's last level, carrying each soldier's share. A
+  squad with nobody left drops its pool, so XP is only moved or spent, never
+  farmed. Soldiers are never instances: a full world may hold a million.
 - **Roster limit (M6c).** Proposed: an integer the engine computes from an
   authored base plus authored contributions from standing tracks and the
   leadership proficiency. Companions count; prisoners have a separate limit. A

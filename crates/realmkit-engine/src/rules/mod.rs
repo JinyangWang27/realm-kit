@@ -7,12 +7,14 @@ mod consume;
 mod crafting;
 mod economy;
 mod player;
+mod retinue;
 mod story;
 mod time;
 
 pub(super) use actions::actions;
 pub(super) use economy::{quote, ware_price};
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
+pub(super) use retinue::promote;
 pub(super) use story::{choices, grant_items, grant_xp, progress, set_flag};
 
 /// Evaluates a condition against the state; pure, so it may run any number of times.
@@ -64,14 +66,23 @@ pub(super) fn player_vitals(state: &GameState) -> Option<Vitals> {
                 mp: player.mp,
             }
         }
+        Stance::Battle(battle) => Vitals {
+            hp: battle.hp,
+            mp: battle.mp,
+        },
     })
 }
 
+/// Only a personal fight kills: a battle knocks the player out instead.
 pub(super) fn dead(state: &GameState) -> bool {
-    player_vitals(state).is_some_and(|v| v.hp == 0)
+    let battle = state
+        .combat
+        .as_ref()
+        .is_some_and(|c| matches!(c.stance, Stance::Battle(_)));
+    !battle && player_vitals(state).is_some_and(|v| v.hp == 0)
 }
 
-fn defeated(state: &GameState, id: &str) -> bool {
+pub(super) fn defeated(state: &GameState, id: &str) -> bool {
     state
         .combat
         .as_ref()
@@ -81,8 +92,15 @@ fn defeated(state: &GameState, id: &str) -> bool {
 fn fighting(state: &GameState) -> Option<&Encounter> {
     match &state.combat.as_ref()?.stance {
         Stance::Fighting(encounter) => Some(encounter),
-        Stance::Exploring(_) => None,
+        Stance::Exploring(_) | Stance::Battle(_) => None,
     }
+}
+
+fn leading(state: &GameState) -> bool {
+    state
+        .combat
+        .as_ref()
+        .is_some_and(|c| matches!(c.stance, Stance::Battle(_)))
 }
 
 /// Characters at the player's location, whatever their conditions: those
@@ -148,6 +166,7 @@ pub(super) fn is_panel(command: &Command) -> bool {
             | Command::Quests
             | Command::Techniques
             | Command::Market
+            | Command::Retinue
     )
 }
 
@@ -168,6 +187,11 @@ pub(super) fn execute(
     if fighting(state).is_some() && !panel && !combat_action {
         return Err(EngineError::InEncounter);
     }
+    // In a battle only orders and panels are possible.
+    let order = matches!(command, Command::Order(_) | Command::Autoresolve);
+    if leading(state) && !panel && !order {
+        return Err(EngineError::InEncounter);
+    }
     let mut events = Vec::new();
     match command {
         Command::Look => events.push(Event::LocationViewed {
@@ -177,6 +201,18 @@ pub(super) fn execute(
         Command::Status => events.push(Event::StatusViewed),
         Command::Quests => events.push(Event::QuestsViewed),
         Command::Techniques => events.push(Event::TechniquesViewed),
+        Command::Retinue => {
+            if state.retinue.is_none() {
+                return Err(EngineError::NoRetinue);
+            }
+            events.push(Event::RetinueViewed)
+        }
+        Command::Recruit { line, quantity } => {
+            retinue::recruit(world, state, line, quantity, &mut events)?
+        }
+        Command::Upgrade { line, to, quantity } => {
+            retinue::upgrade(world, state, line, to, quantity, &mut events)?
+        }
         Command::Market => {
             economy::market_here(world, state)?;
             events.push(Event::MarketViewed)
@@ -200,7 +236,12 @@ pub(super) fn execute(
             story::quest(world, state, &id, true, &mut events)?;
             state.dialogue = None;
         }
+        Command::Engage(id) if world.character(&id).is_some_and(|c| c.army.is_some()) => {
+            battle::engage(world, state, id, &mut events)?
+        }
         Command::Engage(id) => encounter::engage(world, state, id, &mut events)?,
+        Command::Order(order) => battle::command(world, state, order, &mut events)?,
+        Command::Autoresolve => battle::autoresolve(world, state, &mut events)?,
         Command::Flee => encounter::flee(world, state, &mut events)?,
         Command::Attack(id) => encounter::player_action(world, state, id, None, &mut events)?,
         Command::UseSkill { skill, target } => use_skill(world, state, skill, target, &mut events)?,

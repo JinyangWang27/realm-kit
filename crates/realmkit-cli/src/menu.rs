@@ -1,9 +1,9 @@
 use crate::{
     input,
     render::Paint,
-    render::{direction_name, duration, gear_name, money, piece_name, stat_name},
+    render::{direction_name, duration, gear_name, money, piece_name, soldier, stat_name},
 };
-use realmkit_engine::{Command, Engine};
+use realmkit_engine::{BattleOrder, Command, Engine};
 use realmkit_spec::{Resource, Stat};
 use std::io::{self, Write};
 
@@ -28,6 +28,22 @@ const EQUIPMENT_GROUP: &str = "Equipment";
 const SMITHING_GROUP: &str = "Smithing";
 const MARKET_GROUP: &str = "Market";
 const CONSUME_GROUP: &str = "Use item";
+const RECRUIT_GROUP: &str = "Recruit";
+const UPGRADE_GROUP: &str = "Upgrade";
+const RECRUIT: &str = "Recruit";
+const LEFT: &str = "left";
+const NONE_LEFT: &str = "[none left]";
+const FULL: &str = "[retinue full]";
+const WITH: &str = "with";
+const RETINUE: &str = "Retinue";
+const CHARGE: &str = "Charge";
+const HOLD: &str = "Hold the line";
+const FLANK: &str = "Flank with riders";
+const RETREAT: &str = "Retreat";
+const AUTORESOLVE: &str = "Autoresolve the rest";
+const YOURS: &str = "Yours";
+const THEIRS: &str = "Theirs";
+const KNOCKED_OUT: &str = "knocked out";
 const NOTHING_TO_RESTORE: &str = "[nothing to restore]";
 const PRICES: &str = "Prices";
 const BUY: &str = "Buy";
@@ -83,6 +99,8 @@ pub enum Group {
     Enchanting,
     Market,
     Consume,
+    Recruit,
+    Upgrade,
 }
 
 impl Group {
@@ -94,6 +112,8 @@ impl Group {
             Command::Enchant { .. } => Some(Self::Enchanting),
             Command::Market | Command::Buy { .. } | Command::Sell { .. } => Some(Self::Market),
             Command::Use(_) => Some(Self::Consume),
+            Command::Recruit { .. } => Some(Self::Recruit),
+            Command::Upgrade { .. } => Some(Self::Upgrade),
             _ => None,
         }
     }
@@ -168,6 +188,36 @@ fn encounter_lines(engine: &Engine<'_>) -> Vec<String> {
     vec![vitals.join(" | "), format!("{NEXT}: {}", order.join(", "))]
 }
 
+/// "Yours: You HP 40/40 · Levy 6 | Theirs: Outlaw 8 · Poacher 4": who still
+/// stands on each side of a battle.
+fn battle_lines(engine: &Engine<'_>) -> Vec<String> {
+    let Some(battle) = engine.battle() else {
+        return Vec::new();
+    };
+    let world = engine.world();
+    let player = &world.character(&world.world.player).unwrap().name;
+    let max = engine.player_stats().unwrap().hp;
+    let you = if battle.hp > 0 {
+        format!("{player} HP {}/{max}", battle.hp)
+    } else {
+        format!("{player} {KNOCKED_OUT}")
+    };
+    let stacks = |side: usize| -> Vec<String> {
+        battle.sides[side]
+            .stacks
+            .iter()
+            .filter(|s| s.count > 0)
+            .map(|s| format!("{} {}", soldier(world, &s.line, s.level), s.count))
+            .collect()
+    };
+    let ours = std::iter::once(you).chain(stacks(0)).collect::<Vec<_>>();
+    vec![format!(
+        "{YOURS}: {} | {THEIRS}: {}",
+        ours.join(" · "),
+        stacks(1).join(" · ")
+    )]
+}
+
 /// The location's or fight's actions: grouped ones go into submenus, each
 /// entered where its first action would have been.
 fn actions(engine: &Engine<'_>) -> (Vec<Entry>, Vec<(Group, Vec<Entry>)>) {
@@ -218,6 +268,8 @@ fn group_label(engine: &Engine<'_>, group: Group) -> String {
         Group::Enchanting => format!("{ENCHANTING_GROUP} {OPENS}"),
         Group::Market => format!("{MARKET_GROUP} {OPENS}"),
         Group::Consume => format!("{CONSUME_GROUP} {OPENS}"),
+        Group::Recruit => format!("{RECRUIT_GROUP} {OPENS}"),
+        Group::Upgrade => format!("{UPGRADE_GROUP} {OPENS}"),
     }
 }
 
@@ -340,6 +392,63 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 bonuses.join(", ")
             )
         }
+        // "Recruit Levy — 10 silver (8 left)", or why not now.
+        Command::Recruit { line, .. } => {
+            let offer = here
+                .recruits
+                .as_ref()?
+                .troops
+                .iter()
+                .find(|o| &o.line == line)?;
+            let state = engine.state();
+            let retinue = state.retinue.as_ref()?;
+            let left = retinue.pools.get(&here.id)?.get(line).copied()?;
+            let heads: u64 = retinue
+                .roster
+                .values()
+                .flat_map(|l| l.values())
+                .map(|s| s.heads())
+                .sum();
+            let why = if action.available {
+                String::new()
+            } else if left == 0 {
+                format!(" {NONE_LEFT}")
+            } else if heads >= world.troops()?.limit {
+                format!(" {FULL}")
+            } else {
+                format!(" {AFFORD}")
+            };
+            format!(
+                "{RECRUIT} {} — {} ({left} {LEFT}){why}",
+                soldier(world, line, 1),
+                money(world, offer.price)
+            )
+        }
+        // "Spearman → Bowman — 20 silver".
+        Command::Upgrade { line, to, .. } => {
+            let from = world.troops()?.line(line)?;
+            let cost = from.upgrades.iter().find(|u| &u.to == to)?.cost;
+            let why = if action.available {
+                String::new()
+            } else {
+                format!(" {AFFORD}")
+            };
+            format!(
+                "{} → {} — {}{why}",
+                soldier(world, line, from.levels.len()),
+                soldier(world, to, 1),
+                money(world, cost)
+            )
+        }
+        Command::Retinue => RETINUE.into(),
+        Command::Order(order) => match order {
+            BattleOrder::Charge => CHARGE,
+            BattleOrder::Hold => HOLD,
+            BattleOrder::Flank => FLANK,
+            BattleOrder::Retreat => RETREAT,
+        }
+        .into(),
+        Command::Autoresolve => AUTORESOLVE.into(),
         // "Healing draught ×2 — +30 HP", or why it would do nothing now.
         Command::Use(item) => {
             let consumable = world.item(item)?.consumable?;
@@ -434,8 +543,29 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             let changes = stat_changes(engine, &probe);
             format!("{EQUIP} {}{changes}", gear_name(engine, *piece))
         }
+        // An army names its size and who will stand with the player.
         Command::Engage(id) => {
-            format!("{ENGAGE} {}", world.character(id).unwrap().name)
+            let character = world.character(id).unwrap();
+            let Some(army) = &character.army else {
+                return Some(format!("{ENGAGE} {}", character.name));
+            };
+            let size: u64 = army.troops.iter().map(|s| s.count).sum();
+            let mut label = format!("{ENGAGE} {} ({size})", character.name);
+            let allies: Vec<_> = engine
+                .present_here()
+                .into_iter()
+                .filter(|c| {
+                    c.army
+                        .as_ref()
+                        .and_then(|a| a.joins.as_ref())
+                        .is_some_and(|j| engine.holds(j))
+                })
+                .map(|c| c.name.as_str())
+                .collect();
+            if !allies.is_empty() {
+                label += &format!(" — {WITH} {}", allies.join(", "));
+            }
+            label
         }
         Command::Talk(id) => {
             format!("{TALK} {}", world.character(id).unwrap().name)
@@ -593,7 +723,11 @@ impl Menu {
             open,
             cursor: 0,
             dialogue,
-            header: encounter_lines(engine),
+            header: if engine.battle().is_some() {
+                battle_lines(engine)
+            } else {
+                encounter_lines(engine)
+            },
             context: input::Context::of(engine.world()),
         }
     }
@@ -913,6 +1047,55 @@ mod tests {
         assert_eq!(
             usable,
             ["Healing draught ×1 — +30 HP [nothing to restore]", "Back"]
+        );
+    }
+
+    #[test]
+    fn soldiers_are_recruited_and_upgraded_from_submenus() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/marches"
+        ))
+        .unwrap();
+        let mut engine = Engine::new(&world).unwrap();
+        engine.execute(Command::Travel("ashmere".into())).unwrap();
+        let open = |engine: &Engine<'_>, group: &str| -> Vec<String> {
+            let mut menu = Menu::new(engine, false, None);
+            let at = menu
+                .entries()
+                .iter()
+                .position(|e| e.label == group)
+                .unwrap_or_else(|| panic!("no {group}"));
+            menu.choose(at + 1);
+            menu.entries().iter().map(|e| e.label.clone()).collect()
+        };
+        assert_eq!(
+            open(&engine, "Recruit ›"),
+            ["Recruit Levy — 10 silver (8 left)", "Back"]
+        );
+        engine
+            .execute(Command::Recruit {
+                line: "levy".into(),
+                quantity: 8,
+            })
+            .unwrap();
+        assert_eq!(
+            open(&engine, "Recruit ›"),
+            ["Recruit Levy — 10 silver (0 left) [none left]", "Back"]
+        );
+        // Spearmen can turn bowmen or, for more than is left, riders.
+        let mut snapshot = engine.snapshot();
+        let roster = &mut snapshot.state.retinue.as_mut().unwrap().roster;
+        let levies = roster.remove("levy").unwrap()[&1];
+        roster.entry("levy".into()).or_default().insert(3, levies);
+        let engine = Engine::restore(&world, snapshot).unwrap();
+        assert_eq!(
+            open(&engine, "Upgrade ›"),
+            [
+                "Spearman → Bowman — 20 silver",
+                "Spearman → Rider — 40 silver [cannot afford]",
+                "Back"
+            ]
         );
     }
 

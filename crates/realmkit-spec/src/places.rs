@@ -29,6 +29,9 @@ pub struct Location {
     /// Crafting stations here, such as an anvil. Requires combat.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stations: Vec<Id>,
+    /// Soldiers for hire here. Requires troops and an economy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recruits: Option<Recruits>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -57,6 +60,9 @@ pub struct Character {
     /// Moves among locations on a schedule instead of staying where placed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub moves: Option<Moves>,
+    /// Leads an army: an enemy to engage in a mass battle, or an ally.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub army: Option<Army>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

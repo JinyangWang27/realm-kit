@@ -30,5 +30,30 @@
     "description": "A storyteller who sleeps wherever the last tale ran out.",
     "dialogue": "wenna",
     "moves": { "among": ["greyford", "ashmere", "vellmarket"], "schedule": { "at": 1800, "every": 1440 } }
+  },
+  {
+    "id": "outlaws",
+    "name": "The fen outlaws",
+    "description": "Reed-cutters turned robbers, camped where the causeway meets the dry ground.",
+    "army": {
+      "troops": [
+        { "line": "outlaws", "count": 8 },
+        { "line": "outlaws", "level": 2, "count": 2 },
+        { "line": "poachers", "count": 4 }
+      ],
+      "xp": 60,
+      "loot": [{ "item": "eels", "quantity": 4 }],
+      "repeatable": true
+    }
+  },
+  {
+    "id": "warden",
+    "name": "Warden Cadoc",
+    "description": "The keep's men in green, sent down the fen road as the steward promised.",
+    "requires": { "kind": "flag", "flag": "letter_delivered" },
+    "army": {
+      "troops": [{ "line": "keep_guard", "count": 6 }],
+      "joins": { "kind": "flag", "flag": "thaw" }
+    }
   }
 ]

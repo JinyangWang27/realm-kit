@@ -3,7 +3,9 @@
 
 use super::*;
 
+mod battle;
 mod combat;
+mod retinue;
 
 fn ensure(ok: bool, problem: &str) -> Result<(), String> {
     if ok {
@@ -25,6 +27,8 @@ pub(super) fn check(
     basics(world, state)?;
     quests(world, fresh, state)?;
     let progress = Progress::of(world, state)?;
+    // The roster first: a battle's check sums its bounded squads.
+    retinue::check(world, state)?;
     if let (Some(combat), Some(rules)) = (&state.combat, world.combat()) {
         combat::check(world, state, combat, rules, &progress)?;
     }
@@ -73,6 +77,7 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                     && r.combat.is_some() == world.random_combat()
                     && r.world.is_some() == world.random_world()
                     && r.market.is_some() == world.random_market()
+                    && r.battle.is_some() == world.random_battle()
             }
         },
         "random state does not match the world",
@@ -216,9 +221,14 @@ fn defeated(state: &GameState, id: &str) -> bool {
         .is_some_and(|c| c.defeated.contains(id))
 }
 
-/// A repeatable group's members are never recorded and reward every victory.
+/// A repeatable group's members and repeatable hostile armies are never
+/// recorded and reward every victory.
 fn repeatable(world: &WorldSpec, id: &str) -> bool {
-    world
+    let army = world
+        .character(id)
+        .and_then(|c| c.army.as_ref())
+        .is_some_and(|a| a.repeatable && a.joins.is_none());
+    army || world
         .character(id)
         .and_then(|c| c.combat.as_ref()?.group.as_deref())
         .and_then(|g| world.group(g))
@@ -292,10 +302,16 @@ impl<'w> Progress<'w> {
             .iter()
             .filter(|c| defeated(state, &c.id))
             .filter_map(|c| c.combat.as_ref());
+        let armies = world
+            .characters
+            .iter()
+            .filter(|c| defeated(state, &c.id))
+            .filter_map(|c| c.army.as_ref());
         let stacks = completed
             .clone()
             .flat_map(|q| &q.reward_items)
-            .chain(recorded.clone().flat_map(|m| &m.loot));
+            .chain(recorded.clone().flat_map(|m| &m.loot))
+            .chain(armies.clone().flat_map(|a| &a.loot));
         // Starting gear counts as held from the start.
         let starting = world
             .combat()
@@ -315,6 +331,12 @@ impl<'w> Progress<'w> {
         for fighter in recorded {
             let most = xp_for_defeat(fighter.xp, 1, usize::MAX);
             ceiling = ceiling.checked_add(most).ok_or("impossible experience")?;
+        }
+        // A won battle gives the player at most the army's whole XP.
+        for army in armies {
+            ceiling = ceiling
+                .checked_add(army.xp)
+                .ok_or("impossible experience")?;
         }
         let ceiling = floor.checked_add(ceiling).ok_or("impossible experience")?;
         let repeaters = world.characters.iter().filter(|c| repeatable(world, &c.id));
@@ -377,8 +399,10 @@ impl<'w> Progress<'w> {
             xp_ceiling: ceiling,
             any_repeatable: repeaters.clone().next().is_some(),
             renewable: repeaters
-                .filter_map(|c| c.combat.as_ref())
-                .flat_map(|m| &m.loot)
+                .flat_map(|c| {
+                    let fighter = c.combat.iter().flat_map(|m| &m.loot);
+                    fighter.chain(c.army.iter().flat_map(|a| &a.loot))
+                })
                 .map(|s| &s.item)
                 .chain(wares.map(|w| &w.item))
                 .collect(),

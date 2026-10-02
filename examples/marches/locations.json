@@ -3,13 +3,18 @@
     "id": "greyford",
     "name": "Greyford",
     "description": "A market town where three roads meet at a stone bridge. Barges wait below for the river to rise.",
-    "characters": ["hild", "wenna"]
+    "characters": ["hild", "wenna"],
+    "safe": true
   },
   {
     "id": "ashmere",
     "name": "Ashmere",
     "description": "Reed roofs and smoking chimneys on the edge of the fen. Eel traps dry on every fence.",
-    "characters": ["reeve"]
+    "characters": ["reeve", "outlaws", "warden"],
+    "recruits": {
+      "troops": [{ "line": "levy", "price": 10, "size": 8 }],
+      "refill": { "schedule": { "at": 1440, "every": 1440 }, "amount": 2 }
+    }
   },
   {
     "id": "hollin_keep",
