@@ -67,6 +67,15 @@ fn troop_content_is_checked_with_stable_codes() {
         (|w| line(w, "levy").levels[0].xp = 5, "invalid_line"),
         (|w| line(w, "levy").levels[1].xp = 0, "invalid_line"),
         (|w| line(w, "levy").levels[0].stats.hp = 0, "invalid_stats"),
+        // A soldier with nothing to strike with in the line's channel.
+        (
+            |w| {
+                let stats = &mut line(w, "levy").levels[0].stats;
+                stats.patk = 0;
+                stats.satk = 0;
+            },
+            "no_attack",
+        ),
         (
             |w| line(w, "levy").upgrades[0].to = "missing".into(),
             "missing_reference",

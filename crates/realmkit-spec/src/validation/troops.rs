@@ -98,8 +98,17 @@ fn lines(out: &mut Vec<Diagnostic>, w: &WorldSpec, troops: &Troops) {
                 "a line's first level is named and alone needs no XP; every later level needs some",
             );
         }
+        let share = w.combat().map_or(0, |c| c.cross_share);
         for level in &line.levels {
             combat::stats(out, &line.id, &level.stats);
+            if level.stats.combined(line.channel, share, false) == 0 {
+                issue(
+                    out,
+                    &line.id,
+                    "no_attack",
+                    "every level of a line has some attack in the line's channel",
+                );
+            }
             if level.wage.is_some_and(|wage| wage > CURRENCY_BOUND) {
                 issue(
                     out,
