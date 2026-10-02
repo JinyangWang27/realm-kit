@@ -12,6 +12,7 @@ mod stats;
 mod story;
 mod techniques;
 mod time;
+mod troops;
 mod validation;
 pub use combat::*;
 pub use crafting::*;
@@ -22,10 +23,11 @@ pub use stats::*;
 pub use story::*;
 pub use techniques::*;
 pub use time::*;
+pub use troops::*;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 13;
+pub const FORMAT_VERSION: u32 = 14;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -65,6 +67,12 @@ pub struct World {
     /// Absent in a world without currency or trade.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub economy: Option<Economy>,
+    /// Absent in a world without soldiers; needs combat.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub troops: Option<Troops>,
+    /// Absent in a world without mass battles; needs troops.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub battle: Option<Battle>,
 }
 
 // Serde defaults shared by several content types.
@@ -142,7 +150,17 @@ impl WorldSpec {
     /// Whether any content draws random numbers; only then does play keep a
     /// seeded generator.
     pub fn stochastic(&self) -> bool {
-        self.random_combat() || self.random_world() || self.random_market()
+        self.random_combat() || self.random_world() || self.random_market() || self.random_battle()
+    }
+    /// Whether battles draw random numbers: every round rolls.
+    pub fn random_battle(&self) -> bool {
+        self.battle().is_some()
+    }
+    pub fn troops(&self) -> Option<&Troops> {
+        self.world.troops.as_ref()
+    }
+    pub fn battle(&self) -> Option<&Battle> {
+        self.world.battle.as_ref()
     }
     /// Whether fights draw random numbers: some hit can be critical.
     pub fn random_combat(&self) -> bool {

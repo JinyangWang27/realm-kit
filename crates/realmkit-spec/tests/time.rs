@@ -61,10 +61,6 @@ fn time_content_is_checked_with_stable_codes() {
             "invalid_duration",
         ),
         (
-            |w| w.world.time.as_mut().unwrap().rest = Some(60),
-            "combat_disabled",
-        ),
-        (
             |w| road(w, "greyford-ashmere").minutes = DURATION_BOUND + 1,
             "invalid_duration",
         ),
@@ -145,6 +141,15 @@ fn time_content_is_checked_with_stable_codes() {
         change(&mut world);
         assert_eq!(codes(&world), [code], "case {index}");
     }
+    // Resting restores HP, so a world without combat has nothing to rest.
+    let mut archive = archive();
+    archive.world.time = Some(WorldTime {
+        start: 0,
+        clock: TextTemplate("Day {day}".into()),
+        wait: None,
+        rest: Some(60),
+    });
+    assert!(codes(&archive).contains(&"combat_disabled".to_string()));
     // A start past the bound also leaves every schedule before it.
     let mut world = marches();
     world.world.time.as_mut().unwrap().start = WORLD_TIME_BOUND + 1;
@@ -156,10 +161,11 @@ fn everything_that_takes_time_needs_a_clock() {
     let mut world = marches();
     world.world.time = None;
     let codes = codes(&world);
-    // Four timed roads, the thaw, two people's hours, Wenna and the price tick.
+    // Four timed roads, the thaw, two people's hours, Wenna, the price tick,
+    // the troops' upkeep and Ashmere's recruits refilling.
     assert_eq!(
         codes.iter().filter(|c| *c == "time_disabled").count(),
-        9,
+        11,
         "{codes:?}"
     );
     // A road without minutes takes no time, so it needs no clock.
@@ -167,8 +173,16 @@ fn everything_that_takes_time_needs_a_clock() {
     world.world.time = None;
     world.world.events.clear();
     world.world.economy.as_mut().unwrap().tick = None;
+    let troops = world.world.troops.as_mut().unwrap();
+    troops.upkeep = None;
+    for line in &mut troops.lines {
+        line.levels.iter_mut().for_each(|l| l.wage = None);
+    }
     world.characters.retain(|c| c.moves.is_none());
     world.locations[0].characters.retain(|c| c != "wenna");
+    for location in &mut world.locations {
+        location.recruits.iter_mut().for_each(|r| r.refill = None);
+    }
     for character in &mut world.characters {
         character.requires = None;
     }

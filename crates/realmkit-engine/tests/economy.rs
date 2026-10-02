@@ -89,6 +89,16 @@ fn prices_hold_still_until_a_tick_and_the_tick_draws_its_own_stream() {
     // Without the economy, Wenna wanders exactly as she does with it.
     let mut plain = marches();
     plain.world.economy = None;
+    // Wages, upgrades and recruits are free without currency.
+    for line in &mut plain.world.troops.as_mut().unwrap().lines {
+        line.levels.iter_mut().for_each(|l| l.wage = None);
+        line.upgrades.iter_mut().for_each(|u| u.cost = 0);
+    }
+    for location in &mut plain.locations {
+        for offer in location.recruits.iter_mut().flat_map(|r| &mut r.troops) {
+            offer.price = 0;
+        }
+    }
     for dialogue in &mut plain.dialogues {
         for choice in dialogue.nodes.iter_mut().flat_map(|n| &mut n.choices) {
             choice

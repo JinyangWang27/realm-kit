@@ -149,7 +149,7 @@ pub struct EconomyState {
     pub prices: BTreeMap<Id, BTreeMap<Id, u32>>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 13;
+pub const SAVE_FORMAT_VERSION: u32 = 14;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 

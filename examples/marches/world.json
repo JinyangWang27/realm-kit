@@ -1,15 +1,31 @@
 {
-  "format_version": 13,
+  "format_version": 14,
   "id": "marches",
   "name": "The Marches",
   "language": "en",
   "start": "greyford",
   "player": "traveller",
   "flags": ["letter_delivered", "thaw"],
+  "combat": {
+    "special_name": "Lore",
+    "timeline": { "action_cost": 100000, "speed_cap": 200 },
+    "levels": [
+      { "xp": 0, "stats": { "hp": 40, "patk": 8, "pdef": 5, "satk": 2, "sdef": 4, "speed": 100 } },
+      { "xp": 30, "stats": { "hp": 46, "patk": 9, "pdef": 6, "satk": 2, "sdef": 5, "speed": 100 } },
+      { "xp": 80, "stats": { "hp": 52, "patk": 10, "pdef": 7, "satk": 3, "sdef": 6, "speed": 100 } }
+    ],
+    "narrative": {
+      "attack": ["{attacker} strike {target} for {damage} damage."],
+      "hurt": ["{attacker} hits {target}: {damage} damage."],
+      "victory": "{target} goes down.",
+      "death": "The fen takes you.\nStart a new game to try again."
+    }
+  },
   "time": {
     "start": 480,
     "clock": "Day {day}, {hour}:{minute}",
-    "wait": 60
+    "wait": 60,
+    "rest": 480
   },
   "roads": [
     { "id": "greyford-ashmere", "between": ["greyford", "ashmere"], "minutes": 120 },
@@ -78,5 +94,75 @@
       "revert_percent": 3,
       "input_pull_percent": 10
     }
+  },
+  "troops": {
+    "classes": [
+      { "id": "foot", "name": "Foot" },
+      { "id": "archers", "name": "Archers", "ranged": true },
+      { "id": "riders", "name": "Riders", "mounted": true }
+    ],
+    "lines": [
+      {
+        "id": "levy",
+        "class": "foot",
+        "levels": [
+          { "xp": 0, "name": "Levy", "wage": 1, "stats": { "hp": 20, "patk": 6, "pdef": 4, "satk": 0, "sdef": 2, "speed": 100 } },
+          { "xp": 6, "stats": { "hp": 22, "patk": 7, "pdef": 5, "satk": 0, "sdef": 2, "speed": 100 } },
+          { "xp": 10, "name": "Spearman", "wage": 2, "stats": { "hp": 26, "patk": 9, "pdef": 6, "satk": 0, "sdef": 2, "speed": 100 } }
+        ],
+        "upgrades": [{ "to": "bowmen", "cost": 20 }, { "to": "riders", "cost": 40 }]
+      },
+      {
+        "id": "bowmen",
+        "class": "archers",
+        "levels": [
+          { "xp": 0, "name": "Bowman", "wage": 2, "stats": { "hp": 18, "patk": 8, "pdef": 3, "satk": 0, "sdef": 2, "speed": 100 } },
+          { "xp": 15, "name": "Marksman", "wage": 3, "stats": { "hp": 20, "patk": 11, "pdef": 4, "satk": 0, "sdef": 2, "speed": 100 } }
+        ]
+      },
+      {
+        "id": "riders",
+        "class": "riders",
+        "levels": [
+          { "xp": 0, "name": "Rider", "wage": 4, "stats": { "hp": 30, "patk": 10, "pdef": 6, "satk": 0, "sdef": 2, "speed": 100 } }
+        ]
+      },
+      {
+        "id": "outlaws",
+        "class": "foot",
+        "levels": [
+          { "xp": 0, "name": "Outlaw", "stats": { "hp": 18, "patk": 6, "pdef": 3, "satk": 0, "sdef": 2, "speed": 100 } },
+          { "xp": 10, "name": "Hardened outlaw", "stats": { "hp": 22, "patk": 8, "pdef": 4, "satk": 0, "sdef": 2, "speed": 100 } }
+        ]
+      },
+      {
+        "id": "poachers",
+        "class": "archers",
+        "levels": [
+          { "xp": 0, "name": "Poacher", "stats": { "hp": 15, "patk": 7, "pdef": 2, "satk": 0, "sdef": 2, "speed": 100 } }
+        ]
+      },
+      {
+        "id": "keep_guard",
+        "class": "foot",
+        "levels": [
+          { "xp": 0, "name": "Keep guard", "stats": { "hp": 28, "patk": 9, "pdef": 7, "satk": 0, "sdef": 2, "speed": 100 } }
+        ]
+      }
+    ],
+    "limit": 30,
+    "wounded_percent": 50,
+    "upkeep": { "schedule": { "at": 1440, "every": 1440 }, "recover_percent": 50, "desert_percent": 20 }
+  },
+  "battle": {
+    "frontage": 12,
+    "rounds": 8,
+    "roll": [90, 110],
+    "matchups": { "riders": { "archers": 150 }, "foot": { "riders": 120 }, "archers": { "foot": 110 } },
+    "morale": { "factor": 150, "floor": 50, "rout": 30 },
+    "hold_percent": 60,
+    "flank_percent": 130,
+    "pursuit_class": "riders",
+    "player_xp_percent": 30
   }
 }
