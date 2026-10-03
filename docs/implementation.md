@@ -130,6 +130,25 @@ proves the complete single-player loop with authored content.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
+## Next implementation priorities
+
+These items are **not delivered** and do not change Format 15 by themselves. They
+mirror the Astraea-driven roadmap priority while keeping every capability
+optional:
+
+- [ ] Overland-map authored placement + player-knowledge-aware engine query.
+- [ ] Embeddable graphical-client seam, including a browser/WASM hosting proof
+  without terminal or native-filesystem assumptions.
+- [ ] Start choices and first-class authored
+  story-phase/main-side-questline/outcome progression.
+- [ ] Factions, war/peace and typed standing/relation tracks.
+- [ ] Remaining retinue needs used by the representative Erdain world:
+  companions, roster limit, provisions/morale and travel speed.
+- [ ] Holdings/sieges, then world agents and faction strategy; add only the
+  politics/order pieces demonstrated by the fixture.
+- [ ] Shared-authority handoff and server adapters only after the complete
+  offline game path is viable.
+
 ## Concrete boundaries
 
 `realmkit-spec` owns serializable content and package validation; engine and

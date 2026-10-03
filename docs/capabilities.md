@@ -145,10 +145,23 @@ than adding capabilities of their own. Each of these is optional on its own, so
 smaller worlds take only the pieces they need; see
 [modularity](sandbox-worlds.md#modularity) for the dependencies between them.
 
+An Astraea-style original game currently pressure-tests a particular composition:
+
+```text
+authored quests/story phases + travel + time + combat + techniques + equipment
++ economy + factions/standing + retinue/companions + mass battle + holdings
++ world agents + faction strategy
+```
+
+Its text-first graphical client and optional Shared Astraea deployment are not
+world capabilities: presentation and authority are adapters around the same
+validated command/state model. Solo play must remain valid with no networking.
+This composition sets implementation priority without making any listed
+capability universal.
+
 Crafting belongs only if the source supports characters making or improving
 things. Combat belongs only if physical or magical conflict is an important
 playable part of the source.
-
 Capabilities compose through explicit shared concepts such as entity IDs,
 locations, conditions, flags, commands and events, plus typed cross-capability
 references when needed. Optional inventory state can reference the same physical
@@ -290,15 +303,32 @@ not which source characters exist.
 
 ## Suggested implementation order
 
-The current combat demo proves the command/event and static-content seams. The
-next non-combat fixture should exercise a main investigation questline while
-omitting combat and inventory. A second slice can add a physical evidence object
-to prove that inventory and evidence compose through typed references rather than
-inheritance or tags. That fixture should also demonstrate that a side questline
-can be unlocked by main-story phase and feed explicit state back into a later
-main quest. Relationships/reputation and time are then broadly useful. Skill
-checks should be introduced only with clear semantics for certainty, difficulty
-and any deterministic randomness.
+The implementation is already beyond the original investigation-first planning
+note: Format 15 includes world time, economy, troop recruitment and a first mass
+battle slice. The next priorities are driven by Astraea as RealmKit's first full
+original-game pressure test, while every capability remains optional.
 
-Every new capability should ship with one small playable fixture proving why it
-exists. A capability without a representative world is speculative scaffolding.
+1. Deliver the **presentation seam** needed by the game: authored overland-map
+   placement plus a player-knowledge-aware map query, and prove that the core can
+   be embedded by a browser/native graphical host without terminal/filesystem
+   assumptions.
+2. Deliver **authored start/progression** needed by the opening: start choices,
+   first-class story phases/main and side questlines/outcomes, then
+   dialogue-by-role/text variants when real Vaelgate content would otherwise
+   duplicate prose.
+3. Deliver **factions and standing** so political states, schools and orders can
+   affect gameplay through typed conditions/effects rather than flags alone.
+4. Complete only the **retinue** pieces needed by the first representative Erdain
+   party: companions, roster limit, provisions/morale and travel speed.
+5. Add **holdings/sieges, world agents and faction strategy** in that order,
+   followed by the minimum politics/order composition the world demonstrates.
+   Optional detail such as prisoners, marriage or champion duels waits for a
+   concrete authored need.
+6. Keep **Shared Astraea** behind the offline game: authoritative networking and
+   local-to-server import are adapters and a later milestone, not reasons to add
+   generic multiplayer state to current capabilities.
+
+The investigation fixture remains useful as a modularity test for a future world
+that actually needs investigation. It is no longer the immediate next capability
+merely to prove abstraction. Every newly implemented capability should still ship
+with a small playable fixture proving why it exists.

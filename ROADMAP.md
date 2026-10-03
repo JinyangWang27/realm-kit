@@ -1,8 +1,10 @@
 # RealmKit roadmap
 
 Status: discussion draft. Milestones describe playable outcomes, not release
-dates. M0, M1 and M2 are implemented; later milestones are proposed. Combat pacing and
-balance formulas remain design decisions, not promises about current behavior.
+dates. M0 through M4 are complete; M5 and M6 are partially delivered; M7 through
+M9 remain proposed. Individual slices below are the source of truth for delivered
+scope. Combat pacing and balance formulas remain design decisions where their
+sections still say so, not promises about current behavior.
 The [open-decisions register](docs/open-decisions.md) records unresolved choices
 and when they must be settled.
 
@@ -41,6 +43,42 @@ and when they must be settled.
   mandatory feature list.
 - Add a system when a milestone needs it. No empty future crates or generic ECS.
 
+## Astraea priority path
+
+Astraea is the first intended full original game to pressure-test RealmKit. Its
+requirements set the near-term implementation priority, but they do **not** become
+mandatory engine features for unrelated worlds. When choosing between speculative
+generality and a feature needed by Astraea's next playable slice, build the
+Astraea requirement with the smallest reusable typed boundary.
+
+The current priority is:
+
+1. **P0 — player-facing presentation seam.** Deliver the overland-map data/query
+   needed for a continent-scale world and prove that the spec/engine can be hosted
+   by a graphical client without terminal or filesystem assumptions. The target
+   product client is text-first and graphical; React/Tauri/web details stay
+   outside the engine. Keep `realmkit-cli` as the reference/debug client.
+2. **P0 — authored opening and progression.** Pull forward route start choices
+   for an ordinary-background opening, first-class main/side questline and story
+   phase progression, authored outcomes, dialogue-by-role and conditional text
+   where the Vaelgate slice needs them.
+3. **P0 — political identity.** Factions and typed standing/relation tracks are
+   required before Erdain's states, martial schools and orders can be represented
+   as gameplay rather than lore-only labels.
+4. **P1 — living Erdain sandbox.** Finish the retinue pieces Astraea needs
+   (especially companions, provisions/morale and travel speed), then holdings and
+   sieges, world agents, faction strategy, and the minimum politics/order
+   composition needed for fealty and organizations. The already delivered
+   economy and mass-battle slices are foundations. Prisoner detail, courtship,
+   champion duels and similar subfeatures wait for authored Astraea content that
+   actually needs them.
+5. **P2 — Shared Astraea.** Preserve a complete offline Solo Astraea. Shared
+   Astraea is a later optional authoritative mode over the same deterministic
+   rules, with an explicit local-to-server authority handoff and no attempt to
+   merge divergent offline and shared histories.
+
+This priority path changes sequencing, not modularity: a world that needs no
+factions, army simulation, map, multiplayer or combat still authors none of them.
 ## M0 — Playable foundation · complete
 
 Delivered: four-crate Rust workspace, static JSON world packages, structured
@@ -1016,12 +1054,20 @@ milestones. They change how play reads, never the engine or its rules.
    last six lines of the fight (the latest turn marked) and the menu. When
    it ends, scrollback keeps only the opening line and the final turn. Line
    mode and pipes keep the full log.
-6. **Overland map** · proposed. A map of places and roads drawn from authored
-   display positions, with zoom, panning and labels that make room for each
-   other, and a fixed view in line mode
+6. **Overland map** · proposed, **Astraea P0**. A map of places and roads
+   drawn from authored display positions, with zoom, panning and labels that
+   make room for each other, and a fixed view in line mode
    ([Overland map](docs/sandbox-worlds.md#overland-map)). Unlike the items
    above, it needs a package field for positions and an engine query, so it
    bumps the format.
+7. **Embeddable client surface** · proposed, **Astraea P0**. Keep the engine
+   presentation-agnostic, but prove a non-terminal host can load a package from
+   memory, inspect player-permitted views/actions, execute typed commands and
+   import/export snapshots without depending on terminal I/O or native
+   filesystem access. Add a browser/WASM compatibility check for the core crates
+   (or the thinnest adapter needed to expose them); the React/Tauri application
+   itself belongs outside RealmKit. Do not add a generic UI framework to the
+   engine.
 
 ## M5 — Longer authored adventures and source-specific mechanics
 
@@ -1076,6 +1122,11 @@ M5 also lays the general foundations that
 these slices. The investigation fixture, optional Inventory and authored endings
 above are delivered alongside them, in whichever order a fixture needs them.
 
+For Astraea, the identifiers below describe scope rather than a strict execution
+order: **M5f start choices** and the authored-progression part of **M5c** are P0,
+and M5e is pulled forward as soon as repeated social roles or state-sensitive
+dialogue in Vaelgate would otherwise duplicate content.
+
 1. **M5a — condition tree and effect lists · delivered.** `requires` becomes
    one condition composed with `All / Any / Not` over typed leaf predicates,
    and a dialogue choice carries an ordered list of `effects` in place of one
@@ -1101,10 +1152,15 @@ above are delivered alongside them, in whichever order a fixture needs them.
    clock entered or left its `time_of_day` hours, and a market that opens
    or closes with its merchant, change silently; report them as movers'
    arrivals are reported.
-3. **M5c — quest lifecycle.** Quests that fail, carry world-time deadlines or
-   are abandoned, plus repeatable offers: job templates whose parameters the
-   saved RNG draws from authored candidate lists at an explicit gameplay
-   transition, such as a recurring refresh, never when a menu opens.
+3. **M5c — authored progression and quest lifecycle.** Generalize the current
+   quest table into explicit story phases, one route-owned main questline and
+   optional side questlines with typed prerequisites/chains; side outcomes may
+   feed explicit state back into later main progression. Add first-class authored
+   route outcomes/completion state. Quests may fail, carry world-time deadlines
+   or be abandoned. Repeatable offers remain activities rather than side
+   questlines: their parameters are drawn by the saved RNG from authored
+   candidate lists at an explicit gameplay transition, such as a recurring
+   refresh, never when a menu opens.
 4. **M5d — runtime instances** for spawned copies and parties whose state
    outlives one encounter, as in the first bullet above. Unique authored
    characters keep their authored IDs and carry state such as wounds or
@@ -1139,7 +1195,15 @@ world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
 Each slice depends on the M5 foundations it uses, following the hard
 requirements in [Modularity](docs/sandbox-worlds.md#modularity): the economy
 needs only M5a's effects and M5b's schedules, so it came first. Deliver in
-slices, each bumping the package and save format as usual:
+slices, each bumping the package and save format as usual.
+
+Astraea now supplies the concrete ordering pressure. After the already delivered
+economy and first troop/battle slices, prioritize **M6b factions/standing**, the
+remaining **M6c** retinue/companion/travel needs, then **M6e holdings/sieges**,
+**M6f world agents**, **M6g faction strategy**, and only the minimal **M6h**
+politics/order composition that authored Erdain content requires. M6d additions
+such as prisoners, injuries and champion duels are not blockers unless the
+Astraea fixture actually uses them.
 
 1. **M6a — economy.** Currency; markets whose per-good price index follows
    authored production and demand on a recurring price tick; linked markets
@@ -1315,11 +1379,16 @@ successful real-engine simulation to a completion outcome. For a two-route
 fixture, both routes are selectable from New Game, share the intended world/canon
 data, and validate and simulate independently from their own starts.
 
-## M9 — Additional clients and shared play · optional later
+## M9 — Shared play and authority handoff · optional later
 
-Add a richer TUI or web/mobile client over the same command model when useful.
-Introduce an authoritative server and party play as a separate milestone once
-the single-player rules are stable. The server owns canonical state, RNG
+Richer player-facing clients are no longer parked in this milestone: the
+[presentation track](#presentation-track--in-progress) owns the embeddable
+client/map work needed by offline Astraea.
+
+M9 is specifically the later **Shared Astraea** path. Solo Erdain and Solo
+Astraea remain fully local and playable without a server. When shared play becomes
+active work, introduce an authoritative server as an adapter around the same
+deterministic command/event rules. The server owns canonical shared state, RNG
 resolution, authoritative command ordering and durable persistence; clients submit
 commands rather than outcomes.
 
@@ -1330,46 +1399,48 @@ Timeouts/disconnect handling may submit predefined fallback commands but wall-cl
 waiting does not itself advance gameplay time. Reconnect from current server
 state; never rewind a persistent shared world from a client snapshot.
 
-Single-player checkpoint rewind does not imply rewinding a persistent shared
-world—multiplayer recovery remains scoped to state exclusively owned by the
-relevant player/session/instance. Add storage/networking crates only when this
-milestone becomes active work.
+The local-to-shared transition is an explicit trust boundary. The first prototype
+should prefer a versioned deterministic replay/import artifact (package revision,
+initial seed/state and committed local commands, or an equivalently reproducible
+record) that lets the server validate the state accepted at Ascension instead of
+trusting a mutable client save. This proves mechanical reachability, not that a
+human personally played every command; stronger anti-cheat is only justified if
+competitive stakes later require it.
 
-**Done when:** clients cannot bypass engine rules, and the chosen multiplayer
-scheduling and persistence policies have reproducible tests. No runtime AI.
+Choosing Shared Astraea forks the local history. Offline Solo Astraea and the
+server-owned shared history may both continue from their common ancestor, but
+they are never automatically merged. Returning from Shared Astraea uses state
+owned by that server-side history and its recovery scope.
 
+Add storage, authentication, networking and server crates only when this
+milestone becomes active work. Steam/itch/web identity and hosting policy are
+product concerns, not RealmKit core abstractions.
+
+**Done when:** an offline playthrough can cross a tested authority-handoff
+boundary into a server-owned shared character/world state; clients cannot bypass
+engine rules; concurrent authoritative scopes have reproducible ordering tests;
+reconnect restores current server state; and no multiplayer feature requires
+runtime AI.
 ## Decisions to discuss next
 
-This is the immediate combat-oriented subset. The complete cross-project list is
-maintained in the [open-decisions register](docs/open-decisions.md).
+Resolve decisions immediately before the Astraea slice that consumes them. The
+complete cross-project register remains in
+[docs/open-decisions.md](docs/open-decisions.md).
 
-1. The [encounter model](#combatants-and-encounters--proposed) is decided:
-   `Engage` on any character with a combat profile, authored groups, sides,
-   player or policy control, tie order and vitals ownership. Very fast actors
-   can take several consecutive turns, as in the timeline example.
-2. Speed cap 200 at baseline 100 and action cost 100,000 are decided. Armour
-   speed penalties move to M4 with equipment.
-3. Confirm the [stat ranges](#stat-ranges-and-caps--proposed): the 9,999 engine
-   bound and no other stat caps in M3. Confirm the
-   [balance targets](#balance-simulation--proposed), the K-free damage formula
-   in place of level-scaled K (then retune the simulator), and XP that falls off
-   with level difference. Confirm the
-   [optional parts](#optional-parts-of-combat--proposed) and that power comes from
-   stats, never level. Confirm repeatable groups and `Flee` in M3c for
-   grinding.
-4. The [skill resources](#skill-resources) are decided: MP regenerating over
-   encounter time and by resting, rage built from actions and damage taken,
-   and flat MP costs exactly as authored. The regeneration and rage constants
-   are authored per world, so they stay easy to retune.
-5. Confirm the two channels, physical and special, and a 25% cross share. The
-   world names the special channel with a required `special_name` (decided).
-   Immunity, vulnerability and modifier stacking are deferred to M4.
-6. The M3 combat menu shows exact damage after each action and the projected turn
-   order. Qualitative previews wait for a client that needs them.
-7. [Technique ranks](#technique-ranks--decided) are decided for M4, in place of
-   realm tiers, with an authored name for every rank; player-allocated stat
-   points are decided as a core, per-world-optional part of M4. Extend the
-   balance simulation to ranks and stat points when balancing resumes.
-
-M3a and M3b are delivered; M3b implemented decisions 3 and 5 as proposed.
-Decisions 1, 2 and 4 are settled for M3c.
+1. **Presentation P0:** settle overland-map placement/kinds/knowledge disclosure
+   and the minimum engine query/host boundary needed by a browser/Tauri client;
+   prove the core can be hosted without terminal or filesystem assumptions.
+2. **Authored progression P0:** settle the concrete story-phase/main-side
+   questline/outcome representation and M5f start-choice branching needed by the
+   Road to Vaelgate opening.
+3. **Politics P0:** settle M6b faction membership/war-peace representation and
+   standing-track scopes/thresholds before authoring Erdain's political entities,
+   schools and orders.
+4. **Party P1:** settle companion progression/gear, roster limit, provisions,
+   morale and travel-speed rules required by the first full Erdain party.
+5. **Living world P1:** settle only the holding, world-agent and faction-strategy
+   details needed by the representative Erdain sandbox; defer ornamental systems
+   such as courtship or champion duels until authored content demands them.
+6. **Shared Astraea P2:** only when the server milestone starts, settle the
+   replay/import artifact, account binding, persistence schema and session/party
+   ownership rules for the local-to-authoritative handoff.
