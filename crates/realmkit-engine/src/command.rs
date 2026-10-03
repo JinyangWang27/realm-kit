@@ -2,7 +2,8 @@
 
 use super::*;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Command {
     Look,
     Move(Direction),
@@ -91,7 +92,8 @@ pub enum Command {
     Techniques,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Event {
     LocationViewed {
         location: Id,
@@ -341,7 +343,8 @@ pub enum Event {
 }
 
 /// The player's order for one round of a battle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BattleOrder {
     Charge,
     /// Melee troops brace: every melee hit either side deals is weakened.
@@ -353,7 +356,8 @@ pub enum BattleOrder {
 }
 
 /// How a battle ended for the player's side.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BattleOutcome {
     Victory,
     Defeat,
@@ -361,7 +365,8 @@ pub enum BattleOutcome {
 }
 
 /// How an encounter ended; the player's death leaves it open instead.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Outcome {
     /// Every opponent died or yielded.
     Victory,
@@ -372,7 +377,8 @@ pub enum Outcome {
 
 /// A command a client may offer in the current scene. Unavailable actions are
 /// shown for explanation; the engine still rechecks legality on execution.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Action {
     pub command: Command,
     pub available: bool,

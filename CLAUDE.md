@@ -10,6 +10,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo test -p realmkit-engine --test techniques <name_substring>   # one test file, filtered
 cargo test -p realmkit-cli menu::tests                            # unit tests in one module
+cargo build -p realmkit-engine --target wasm32-unknown-unknown --locked   # browser hosting check (rustup target add wasm32-unknown-unknown)
 
 cargo run -p realmkit-cli -- play examples/arena --seed 1 --line < examples/arena/walkthrough.txt
 cargo run -p realmkit-cli -- validate examples/sect

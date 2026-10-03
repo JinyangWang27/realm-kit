@@ -2,7 +2,7 @@
 //! recovery chain, oldest first. Loading an older save forks the chain; saves
 //! from the abandoned future stay on disk but are no longer offered.
 
-use realmkit_engine::{SaveSnapshot, SAVE_FORMAT_VERSION};
+use realmkit_engine::{EngineError, SaveSnapshot};
 use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
@@ -113,7 +113,7 @@ impl Saves {
             &self.dir.join(LINEAGE),
             &serde_json::to_vec_pretty(&lineage)?,
         )?;
-        write_atomic(&self.file(id), &serde_json::to_vec_pretty(snapshot)?)?;
+        write_atomic(&self.file(id), &snapshot.to_json())?;
         lineage.entries.push(Entry { id, kind });
         write_atomic(
             &self.dir.join(LINEAGE),
@@ -125,15 +125,10 @@ impl Saves {
     pub fn read(&self, id: u64) -> Result<SaveSnapshot, Box<dyn Error>> {
         let path = self.file(id);
         let bytes = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let invalid = |e: serde_json::Error| format!("{}: {e}", path.display());
-        // Check the version first: an older save's state fails typed parsing obscurely.
-        let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(invalid)?;
-        match value["save_format_version"].as_u64() {
-            Some(version) if version != u64::from(SAVE_FORMAT_VERSION) => {
-                Err(format!("unsupported save format version {version}").into())
-            }
-            _ => Ok(serde_json::from_value(value).map_err(invalid)?),
-        }
+        SaveSnapshot::from_json(&bytes).map_err(|error| match error {
+            EngineError::InvalidSave(reason) => format!("{}: {reason}", path.display()).into(),
+            other => other.into(),
+        })
     }
 
     /// Loads the save at one-based-minus-one `index` (the newest when `None`)

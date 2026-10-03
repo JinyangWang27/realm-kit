@@ -282,3 +282,22 @@ pub struct SaveSnapshot {
     pub player_route_id: Id,
     pub state: GameState,
 }
+
+impl SaveSnapshot {
+    /// Reads a snapshot from JSON, rejecting another save format by its
+    /// version before the typed parse, which would fail obscurely.
+    pub fn from_json(bytes: &[u8]) -> Result<Self, EngineError> {
+        let invalid = |e: serde_json::Error| EngineError::InvalidSave(e.to_string());
+        let value: serde_json::Value = serde_json::from_slice(bytes).map_err(invalid)?;
+        match value["save_format_version"].as_u64() {
+            Some(version) if version != u64::from(SAVE_FORMAT_VERSION) => Err(
+                EngineError::InvalidSave(format!("unsupported save format version {version}")),
+            ),
+            _ => serde_json::from_value(value).map_err(invalid),
+        }
+    }
+
+    pub fn to_json(&self) -> Vec<u8> {
+        serde_json::to_vec_pretty(self).expect("snapshots always serialize")
+    }
+}
