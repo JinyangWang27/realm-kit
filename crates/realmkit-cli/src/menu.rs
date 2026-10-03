@@ -72,16 +72,22 @@ pub const LINE_HINT: &str = "Enter a number, or type help for commands.";
 pub const NOT_LISTED: &str = "Choose one of the listed numbers.";
 pub const CHOOSE_ANSWER: &str = "Choose one of the listed answers.";
 pub const NOT_ON_MAP: &str = "That place is not on the map.";
+pub const MAP_AFTER_FIGHT: &str = "The map can wait until the fight is over.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Up,
     Down,
+    Left,
+    Right,
+    Tab,
     Enter,
     Esc,
     Backspace,
     Char(char),
     Quit,
+    /// The terminal is now this many columns and rows.
+    Resize(u16, u16),
 }
 
 #[derive(Debug, PartialEq, Eq)]

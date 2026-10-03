@@ -24,8 +24,15 @@ impl Drop for RawGuard {
 }
 
 /// Raw mode is held only while waiting for a key, so rendering keeps plain `\n`.
+/// The terminal's size comes first, and again whenever it changes.
 pub(crate) fn terminal_keys() -> impl Iterator<Item = io::Result<Key>> {
-    std::iter::from_fn(|| {
+    let mut sized = false;
+    std::iter::from_fn(move || {
+        if !std::mem::replace(&mut sized, true) {
+            if let Ok((cols, rows)) = terminal::size() {
+                return Some(Ok(Key::Resize(cols, rows)));
+            }
+        }
         let _raw = match RawGuard::new() {
             Ok(guard) => guard,
             Err(error) => return Some(Err(error)),
@@ -35,7 +42,11 @@ pub(crate) fn terminal_keys() -> impl Iterator<Item = io::Result<Key>> {
                 Ok(event) => event,
                 Err(error) => return Some(Err(error)),
             };
-            let Event::Key(key) = event else { continue };
+            let key = match event {
+                Event::Key(key) => key,
+                Event::Resize(cols, rows) => return Some(Ok(Key::Resize(cols, rows))),
+                _ => continue,
+            };
             if key.kind != KeyEventKind::Press {
                 continue;
             }
@@ -44,6 +55,9 @@ pub(crate) fn terminal_keys() -> impl Iterator<Item = io::Result<Key>> {
                 KeyCode::Char('c' | 'd') if ctrl => Key::Quit,
                 KeyCode::Up => Key::Up,
                 KeyCode::Down => Key::Down,
+                KeyCode::Left => Key::Left,
+                KeyCode::Right => Key::Right,
+                KeyCode::Tab => Key::Tab,
                 KeyCode::Enter => Key::Enter,
                 KeyCode::Esc => Key::Esc,
                 KeyCode::Backspace => Key::Backspace,

@@ -1,9 +1,18 @@
 //! The overland map as text: a window onto the world's places and roads.
 //! The engine decides what the player may know; this only draws it.
 
-use crate::render::duration;
-use realmkit_engine::{MapPlace, MapView};
+use crate::{
+    menu::Key,
+    render::{duration, Paint},
+};
+use crossterm::{
+    cursor::MoveTo,
+    queue,
+    terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use realmkit_engine::{Engine, MapPlace, MapView};
 use realmkit_spec::{PlaceKind, WorldSpec};
+use std::io::{self, Write};
 
 /// Line mode's fixed frame: no terminal size is known there.
 pub const LINE_COLS: usize = 80;
@@ -15,6 +24,9 @@ pub const MAX_ZOOM: u32 = 6;
 const PAD_COLS: usize = 12;
 const PAD_ROWS: usize = 1;
 
+// Below the map: where the player is or what Tab picked, the legend, keys.
+const SCREEN_LINES: u16 = 3;
+const KEYS_HINT: &str = "+/- zoom · arrows pan · 0 fit · c centre · Tab next place · Esc back";
 const YOU: char = '@';
 const ROAD: char = '·';
 const LEGEND_YOU: &str = "you";
@@ -81,6 +93,13 @@ impl Viewport {
         let fit = across.max(down);
         let fit = if fit > 0.0 { fit } else { 1.0 };
         fit / f64::from(1u32 << self.zoom.min(MAX_ZOOM))
+    }
+
+    /// Pans by a quarter of the window: `dx` and `dy` are -1, 0 or 1.
+    pub fn pan(&mut self, view: &MapView, dx: i32, dy: i32) {
+        let scale = self.scale(view);
+        self.centre.0 += f64::from(dx) * scale * (self.cols / 4) as f64;
+        self.centre.1 += f64::from(dy) * scale * 2.0 * (self.rows / 4) as f64;
     }
 
     /// The cell a world point falls in, which may lie outside the window.
@@ -300,6 +319,123 @@ pub fn frame(world: &WorldSpec, view: &MapView, zoom: Option<(u32, &str)>) -> Op
     let mut lines = render(world, view, &viewport);
     lines.push(legend(view));
     Some(lines)
+}
+
+/// The places one road or exit from here, in authored order, with the
+/// road's time where there is one.
+fn neighbours(view: &MapView) -> Vec<(&str, Option<u64>)> {
+    let here = view.here.as_str();
+    let roads = view.roads.iter().filter_map(|r| {
+        let [a, b] = &r.between;
+        let other = if a == here {
+            b
+        } else if b == here {
+            a
+        } else {
+            return None;
+        };
+        Some((other.as_str(), Some(r.minutes)))
+    });
+    let exits = view
+        .exits
+        .iter()
+        .filter(|e| e.from == here)
+        .map(|e| (e.to.as_str(), None));
+    roads.chain(exits).collect()
+}
+
+/// The map on the alternate screen until Esc: zoom, pan, fit, centre and
+/// step through the places one road from here. It opens centred on the
+/// player at `zoom`, the level last used, or on a place `at` a level; on
+/// leaving, `zoom` keeps the level. `size` is the terminal's columns and
+/// rows, as last reported. Returns whether play goes on (false on quit).
+pub fn explore(
+    engine: &Engine<'_>,
+    keys: &mut impl Iterator<Item = io::Result<Key>>,
+    output: &mut impl Write,
+    paint: Paint,
+    size: &std::cell::Cell<(u16, u16)>,
+    zoom: &mut u32,
+    at: Option<(u32, &str)>,
+) -> io::Result<bool> {
+    let world = engine.world();
+    let Some(view) = engine.map_view() else {
+        return Ok(true);
+    };
+    let window = |(cols, rows): (u16, u16)| {
+        (
+            usize::from(cols.max(1)),
+            usize::from(rows.saturating_sub(SCREEN_LINES).max(1)),
+        )
+    };
+    let (cols, rows) = window(size.get());
+    let (start, place) = at.unwrap_or((*zoom, &view.here));
+    let Some(mut viewport) = Viewport::on(&view, place, start, cols, rows) else {
+        return Ok(true);
+    };
+    let neighbours = neighbours(&view);
+    let mut picked: Option<usize> = None;
+    queue!(output, EnterAlternateScreen)?;
+    let going_on = loop {
+        queue!(output, MoveTo(0, 0), Clear(ClearType::All))?;
+        for line in render(world, &view, &viewport) {
+            writeln!(output, "{line}")?;
+        }
+        let name = |id: &str| world.location(id).unwrap().name.as_str();
+        let status = match picked.map(|i| neighbours[i]) {
+            Some((id, Some(minutes))) => format!("{} — {}", name(id), duration(minutes)),
+            Some((id, None)) => name(id).to_string(),
+            None => name(&view.here).to_string(),
+        };
+        writeln!(output, "{}", paint.title(&status))?;
+        writeln!(output, "{}", legend(&view))?;
+        write!(output, "{}", paint.dim(KEYS_HINT))?;
+        output.flush()?;
+        let key = match keys.next().transpose()? {
+            None | Some(Key::Quit) => break false,
+            Some(key) => key,
+        };
+        match key {
+            Key::Esc => break true,
+            Key::Char('+' | '=') => viewport.zoom = (viewport.zoom + 1).min(MAX_ZOOM),
+            Key::Char('-') => viewport.zoom = viewport.zoom.saturating_sub(1),
+            Key::Left => viewport.pan(&view, -1, 0),
+            Key::Right => viewport.pan(&view, 1, 0),
+            Key::Up => viewport.pan(&view, 0, -1),
+            Key::Down => viewport.pan(&view, 0, 1),
+            Key::Char('0') => {
+                viewport = Viewport::fit(&view, viewport.cols, viewport.rows);
+            }
+            Key::Char('c') => {
+                viewport = Viewport::on(
+                    &view,
+                    &view.here,
+                    viewport.zoom,
+                    viewport.cols,
+                    viewport.rows,
+                )
+                .unwrap();
+                picked = None;
+            }
+            Key::Tab if !neighbours.is_empty() => {
+                let next = picked.map_or(0, |i| (i + 1) % neighbours.len());
+                picked = Some(next);
+                viewport = Viewport::on(
+                    &view,
+                    neighbours[next].0,
+                    viewport.zoom,
+                    viewport.cols,
+                    viewport.rows,
+                )
+                .unwrap();
+            }
+            Key::Resize(cols, rows) => (viewport.cols, viewport.rows) = window((cols, rows)),
+            _ => {}
+        }
+    };
+    *zoom = viewport.zoom;
+    queue!(output, LeaveAlternateScreen)?;
+    Ok(going_on)
 }
 
 #[cfg(test)]
