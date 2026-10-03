@@ -32,6 +32,13 @@ the borders. A later visit finds a new banner over a town the player once knew.
 No part of this needs a concrete source game. The scenario only pushes
 RealmKit's abstractions and tests.
 
+Astraea's Erdain is now the first intended full-game consumer close to this
+reference scenario. That makes the core political sandbox a prioritization tool,
+not a mandate to implement every feature listed below. For the representative
+world, factions/standing, companions/party travel, holdings, world agents and
+faction strategy matter before optional detail such as marriage, elaborate
+prisoner rules or tournament set pieces.
+
 ## Architecture test
 
 A mature RealmKit should play this scenario with the guarantees every world

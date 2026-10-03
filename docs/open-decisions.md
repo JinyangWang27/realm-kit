@@ -464,10 +464,11 @@ Decisions:
 - `PlayerState` remains mutable state intrinsic to the controlled character;
   run-wide story/world state belongs to `GameState` or typed state beneath it.
 
-The current Format 1 `Npc` type is an implementation limitation. When the format
-needs canonical characters that may be player-controlled in one route and
-non-player-controlled in another, evolve toward a shared `Character` entity
-rather than duplicating the same person as separate NPC/player definitions.
+Shared `Character` definitions are already delivered. Format 15's remaining
+limitation is the single fixed `world.player` binding for the implicit `default`
+route. When a concrete multi-route package arrives, add a small route-level
+`PlayerSpec` binding to the same shared Character rather than duplicating a
+canonical person as separate player and NPC definitions.
 
 ## 6. Conditions and effects
 
@@ -1265,6 +1266,31 @@ For overland worlds, the [overland map](sandbox-worlds.md#overland-map) proposal
 applies this: authored display positions, an engine map-view query, and a
 client-owned viewport with zoom and panning.
 
+**Astraea priority.** The overland map is now a concrete P0 consumer rather than
+a distant presentation idea. Settle only the placement/kind/discovery data needed
+for its first continent slice; do not turn coordinates into movement semantics or
+invent a generic scene graph.
+
+### Client integration surface
+
+**Open; Astraea P0.**
+
+The graphical Astraea client is a concrete consumer of RealmKit, but its framework
+must not leak into the engine. The next presentation slice should define/prove the
+smallest host boundary needed to:
+
+- load a validated package from in-memory bytes/data rather than requiring a
+  filesystem path;
+- obtain player-permitted location/map/character/quest/actions views;
+- submit the same typed commands used by the CLI;
+- import/export storage-neutral save snapshots;
+- keep presentation queries pure and deterministic.
+
+The core should have a tested browser/WASM-compatible hosting path, whether that
+is direct compilation of the relevant crates or a deliberately thin adapter.
+React, Tauri, DOM state and platform storage remain outside RealmKit. Do not
+stabilize a broad public SDK before the real client shows which queries it needs.
+
 ### Preview/detail policy
 
 RealmKit does not globally require exact or qualitative previews. The
@@ -1383,6 +1409,23 @@ Authoritative server
    └── emit permitted events/views
 ```
 
+The first concrete consumer is Shared Astraea. Its product assumptions are:
+Solo Erdain and Solo Astraea remain local/offline; choosing the shared mode crosses
+an explicit authority boundary; local and shared histories fork and are not later
+merged.
+
+For the first handoff prototype, prefer a reproducible replay/import artifact over
+trusting a mutable client save. It can bind the package revision and initial
+seed/state to the ordered committed commands required to reproduce the accepted
+Ascension state. The server replays/revalidates before taking authority. This
+establishes mechanical reachability but is not proof of human play, so stronger
+anti-cheat remains deferred unless competitive stakes justify it.
+
+Still open for that milestone: the exact replay artifact and compaction strategy,
+account/character binding, persistence/database shape, party/session ownership,
+and what parts of an offline history (if any) a public server is willing to
+accept. None of these are current package-format requirements.
+
 Decisions:
 
 - The server owns canonical mutable state, rule execution, RNG resolution and
@@ -1486,8 +1529,12 @@ summary:
 The [sandbox design direction](sandbox-worlds.md) proposes the capabilities,
 and the roadmap schedules them as
 [M5 slices](../ROADMAP.md#delivery-slices--proposed-1) and
-[M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). Each question below has
-a proposed answer that still needs to be confirmed:
+[M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). Astraea's Erdain is now
+the concrete full-game pressure test: after the delivered economy and first
+troop/battle slices, factions/standing and the remaining party needs come before
+holdings, world agents and faction strategy. Optional detail stays deferred until
+authored content needs it. Each question below has a proposed answer that still
+needs to be confirmed:
 
 - **Recurring schedules (M5b) · decided.** A schedule authors a first minute
   strictly after the route's initial world time and an optional period of at
@@ -1781,13 +1828,22 @@ a proposed answer that still needs to be confirmed:
 
 ## Discussion order
 
-Discuss decisions immediately before their first consumer:
+Discuss decisions immediately before their first concrete consumer. With Astraea
+as the current full-game pressure test:
 
-1. M1: presentation and information disclosure.
-2. M2: outcomes, definitions/instances, and save compatibility.
-3. First non-combat fixture: universal core, conditions/effects, skills/checks.
-4. M3/M4: time, combat values, equipment and crafting details.
-5. M5/M6: sandbox foundations and capabilities ([Section 18](#18-living-sandbox-worlds)).
-6. M8: canon divergence, original characters, capability provenance and generation
-   completion criteria.
-7. Multiplayer only when an authoritative server becomes active work.
+1. Presentation: overland-map data/disclosure and the minimal embeddable/WASM host
+   boundary.
+2. M5: start choices plus explicit story-phase/main-side
+   questline/outcome progression; dialogue roles/text variants when the opening
+   content needs them.
+3. M6b: factions, war/peace and standing tracks.
+4. Remaining M6c: companions, roster limit, provisions/morale and travel speed.
+5. M6e-M6h: holdings, world agents, faction strategy and only the politics/order
+   pieces used by the representative Erdain world.
+6. M7/M8: authoring diagnostics, simulation, source adaptation and provenance as
+   their consumers become active.
+7. M9: replay/import, persistence, identity and session rules only when Shared
+   Astraea becomes active server work.
+
+Open decisions for unrelated future capabilities should stay open rather than
+being settled speculatively.

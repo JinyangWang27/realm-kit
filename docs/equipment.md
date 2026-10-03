@@ -1,7 +1,8 @@
-# Equipment and crafting proposal
+# Equipment and crafting
 
-Status: architecture foundation agreed for M4; concrete APIs and balance values
-remain implementation work. The design builds on selective runtime instances,
+Status: M4 equipment, forging/improvement and enchanting are delivered; this
+document records the architectural boundaries behind the implementation. Balance
+values remain world-authored. The design builds on selective runtime instances,
 typed capability-owned modifiers, gradual defence, separate damage-type
 modifiers, the armour/speed trade-off, and capped effective speed.
 
@@ -52,9 +53,9 @@ Crafting-specific interchangeable materials may be stored as Crafting-owned
 definition + quantity state when Inventory is absent. When Inventory is present,
 recipes may instead consume Inventory-owned ordinary carried items through
 explicit typed references; the same resource quantity is never owned by both
-capabilities. Keep modified equipment individually addressable. The existing
-Format 1 item-count inventory will need a deliberate migration when equipment
-instances arrive.
+capabilities. Keep modified equipment individually addressable. Equipment
+instances have since arrived as their own saved state while counted inventory
+remains separate; neither capability owns the other's mutable state.
 
 ## Authoring equipment
 

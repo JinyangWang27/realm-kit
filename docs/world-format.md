@@ -52,10 +52,11 @@ timeline. When both are
 present, New Game selects between them directly; one route does not unlock the
 other. Each route has its own player binding, start state, main questline, outcomes and
 mutable save while reusing shared locations, NPCs, factions and other world
-definitions where appropriate. Future formats should evolve toward shared `Character` definitions plus a small
-`PlayerSpec` route binding that identifies which character the human controls.
-Do not duplicate a canonical person as separate player and NPC entities merely
-because control differs by route.
+definitions where appropriate. Shared `Character` definitions already exist;
+a future multi-route format only needs the small `PlayerSpec` route binding that
+identifies which shared character the human controls. Do not duplicate a
+canonical person as separate player and NPC entities merely because control
+differs by route.
 
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
@@ -82,7 +83,7 @@ A package is a directory containing these required UTF-8 JSON files:
 Empty content tables are `[]`; files must still exist. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
-Version 2 describes this schema; incompatible changes require an explicit
+Format 15 describes the current schema; incompatible changes require an explicit
 version/migration decision.
 
 IDs use ASCII letters, digits, `_` and `-`, with uniqueness within each entity
