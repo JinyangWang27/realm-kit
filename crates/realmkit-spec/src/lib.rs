@@ -1,7 +1,11 @@
 //! Versioned, static world content. No game state or gameplay rules execute here.
 
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::BTreeMap,
+    io,
+    path::{Path, PathBuf},
+};
 
 mod combat;
 mod crafting;
@@ -28,6 +32,15 @@ pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
 pub const FORMAT_VERSION: u32 = 15;
+/// The files every package holds, by name.
+pub const PACKAGE_FILES: [&str; 6] = [
+    "world.json",
+    "locations.json",
+    "characters.json",
+    "items.json",
+    "quests.json",
+    "dialogues.json",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -87,9 +100,35 @@ fn is_zero(value: &u32) -> bool {
 impl WorldSpec {
     pub fn load(directory: impl AsRef<Path>) -> Result<Self, SpecError> {
         let directory = directory.as_ref();
+        Self::parse(directory, |file| std::fs::read(directory.join(file)))
+    }
+
+    /// Loads a package from wherever `read` finds each of [`PACKAGE_FILES`],
+    /// such as memory or a browser fetch, so a host needs no filesystem.
+    pub fn from_files(read: impl FnMut(&str) -> io::Result<Vec<u8>>) -> Result<Self, SpecError> {
+        Self::parse(Path::new(""), read)
+    }
+
+    fn parse(
+        base: &Path,
+        mut read: impl FnMut(&str) -> io::Result<Vec<u8>>,
+    ) -> Result<Self, SpecError> {
+        let mut file = |name: &str| -> Result<(Vec<u8>, PathBuf), SpecError> {
+            let path = base.join(name);
+            match read(name) {
+                Ok(bytes) => Ok((bytes, path)),
+                Err(source) => Err(SpecError::Io { path, source }),
+            }
+        };
+        fn typed<T: serde::de::DeserializeOwned>(
+            (bytes, path): (Vec<u8>, PathBuf),
+        ) -> Result<T, SpecError> {
+            serde_json::from_slice(&bytes).map_err(|source| SpecError::Json { path, source })
+        }
         // Check the version before the typed parse, which would fail on older
         // packages' fields with an obscure JSON error.
-        let header: serde_json::Value = read_json(directory, "world.json")?;
+        let (bytes, path) = file("world.json")?;
+        let header: serde_json::Value = typed((bytes, path.clone()))?;
         let found = header
             .get("format_version")
             .and_then(serde_json::Value::as_u64);
@@ -97,15 +136,13 @@ impl WorldSpec {
             return Err(SpecError::UnsupportedFormat { found });
         }
         let world = Self {
-            world: serde_json::from_value(header).map_err(|source| SpecError::Json {
-                path: directory.join("world.json"),
-                source,
-            })?,
-            locations: read_json(directory, "locations.json")?,
-            characters: read_json(directory, "characters.json")?,
-            items: read_json(directory, "items.json")?,
-            quests: read_json(directory, "quests.json")?,
-            dialogues: read_json(directory, "dialogues.json")?,
+            world: serde_json::from_value(header)
+                .map_err(|source| SpecError::Json { path, source })?,
+            locations: typed(file("locations.json")?)?,
+            characters: typed(file("characters.json")?)?,
+            items: typed(file("items.json")?)?,
+            quests: typed(file("quests.json")?)?,
+            dialogues: typed(file("dialogues.json")?)?,
         };
         world.validate()?;
         Ok(world)
@@ -242,13 +279,4 @@ impl WorldSpec {
             .iter()
             .find(|r| r.leads(from).is_some_and(|other| other == to))
     }
-}
-
-fn read_json<T: serde::de::DeserializeOwned>(directory: &Path, file: &str) -> Result<T, SpecError> {
-    let path = directory.join(file);
-    let bytes = std::fs::read(&path).map_err(|source| SpecError::Io {
-        path: path.clone(),
-        source,
-    })?;
-    serde_json::from_slice(&bytes).map_err(|source| SpecError::Json { path, source })
 }
