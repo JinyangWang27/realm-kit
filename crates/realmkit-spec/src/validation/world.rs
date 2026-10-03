@@ -142,7 +142,45 @@ pub(super) fn locations<'w>(out: &mut Vec<Diagnostic>, w: &'w WorldSpec) -> BTre
             }
         }
     }
+    map(out, w);
     placed
+}
+
+/// Either every place has a position or none does, each within the bound
+/// and none on top of another.
+fn map(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    let positioned = w.locations.iter().filter(|l| l.map.is_some()).count();
+    if positioned == 0 {
+        return;
+    }
+    let mut seen = BTreeSet::new();
+    for l in &w.locations {
+        let Some(point) = l.map else {
+            issue(
+                out,
+                &l.id,
+                "map_partial",
+                "other places have a map position, so this one needs one too",
+            );
+            continue;
+        };
+        if point.x > MAP_BOUND || point.y > MAP_BOUND {
+            issue(
+                out,
+                &l.id,
+                "map_bounds",
+                format!("map coordinates are at most {MAP_BOUND}"),
+            );
+        }
+        if !seen.insert((point.x, point.y)) {
+            issue(
+                out,
+                &l.id,
+                "map_duplicate",
+                format!("another place is already at ({}, {})", point.x, point.y),
+            );
+        }
+    }
 }
 
 /// The player's numbers come from the level table, not from a profile.

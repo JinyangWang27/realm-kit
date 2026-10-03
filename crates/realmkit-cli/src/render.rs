@@ -606,6 +606,8 @@ pub fn events(
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,
             Event::QuestsViewed => panels::quests(output, engine, paint)?,
+            // The map view arrives with the map renderer.
+            Event::MapViewed => {}
             Event::TimePassed {
                 eventful: false, ..
             } if travelled => {}

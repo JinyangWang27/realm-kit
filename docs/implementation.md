@@ -132,7 +132,7 @@ proves the complete single-player loop with authored content.
 
 ## Next implementation priorities
 
-These items are **not delivered** and do not change Format 15 by themselves. They
+These items are **not delivered** and do not change Format 16 by themselves. They
 mirror the Astraea-driven roadmap priority while keeping every capability
 optional:
 

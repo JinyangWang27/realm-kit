@@ -13,6 +13,30 @@ pub enum Direction {
     Down,
 }
 
+/// The largest coordinate a map position may have.
+pub const MAP_BOUND: u32 = 10_000;
+
+/// What a place is, for drawing it on a map. Earlier kinds matter more when
+/// labels compete for room.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum PlaceKind {
+    Town,
+    Castle,
+    Village,
+    Waypoint,
+}
+
+/// Where a place is drawn: `x` grows east and `y` south. Positions never
+/// create, block or time a road.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MapPoint {
+    pub x: u32,
+    pub y: u32,
+    pub kind: PlaceKind,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Location {
@@ -32,6 +56,9 @@ pub struct Location {
     /// Soldiers for hire here. Requires troops and an economy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recruits: Option<Recruits>,
+    /// Where the place is drawn; either every location has one or none does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub map: Option<MapPoint>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -201,3 +201,27 @@ fn everything_that_takes_time_needs_a_clock() {
     }
     assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
 }
+
+#[test]
+fn map_positions_are_checked_with_stable_codes() {
+    type Change = fn(&mut WorldSpec);
+    let cases: Vec<(Change, &str)> = vec![
+        (|w| w.locations[1].map = None, "map_partial"),
+        (
+            |w| w.locations[1].map.as_mut().unwrap().x = MAP_BOUND + 1,
+            "map_bounds",
+        ),
+        (|w| w.locations[1].map = w.locations[0].map, "map_duplicate"),
+    ];
+    for (index, (change, code)) in cases.into_iter().enumerate() {
+        let mut world = marches();
+        change(&mut world);
+        assert_eq!(codes(&world), [code], "case {index}");
+    }
+    // A world may leave every place off the map.
+    let mut unmapped = marches();
+    for l in &mut unmapped.locations {
+        l.map = None;
+    }
+    assert!(codes(&unmapped).is_empty());
+}

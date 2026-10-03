@@ -464,7 +464,7 @@ Decisions:
 - `PlayerState` remains mutable state intrinsic to the controlled character;
   run-wide story/world state belongs to `GameState` or typed state beneath it.
 
-Shared `Character` definitions are already delivered. Format 15's remaining
+Shared `Character` definitions are already delivered. Format 16's remaining
 limitation is the single fixed `world.player` binding for the implicit `default`
 route. When a concrete multi-route package arrives, add a small route-level
 `PlayerSpec` binding to the same shared Character rather than duplicating a

@@ -18,6 +18,9 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     if state.retinue.is_some() {
         panels.push(available(Command::Retinue));
     }
+    if world.locations.iter().any(|l| l.map.is_some()) {
+        panels.push(available(Command::Map));
+    }
     // Death is not a locked door: offer only what can still be done.
     if dead(state) {
         return panels;

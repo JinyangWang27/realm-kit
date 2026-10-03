@@ -1,9 +1,9 @@
 //! Synchronous gameplay; no generation or presentation dependencies.
 
 use realmkit_spec::{
-    Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack, Proficiency,
-    QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat, Stats, WorldSpec,
-    BASIC_POWER,
+    Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack, MapPoint,
+    Proficiency, QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat, Stats,
+    WorldSpec, BASIC_POWER,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -265,6 +265,12 @@ impl<'w> Engine<'w> {
     /// from an open market or for an item not sold here.
     pub fn ware_price(&self, item: &str) -> Option<u64> {
         rules::ware_price(self.world, &self.state, item)
+    }
+
+    /// The overland map as the player may know it; `None` in a world whose
+    /// places have no positions.
+    pub fn map_view(&self) -> Option<MapView> {
+        rules::map_view(self.world, &self.state)
     }
 
     /// Who is here now: present under their conditions and not defeated.

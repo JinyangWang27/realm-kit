@@ -267,7 +267,7 @@ pub struct MarketStock {
     pub goods: BTreeMap<Id, u64>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 15;
+pub const SAVE_FORMAT_VERSION: u32 = 16;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 

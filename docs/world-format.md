@@ -1,6 +1,8 @@
-# World package format 15
+# World package format 16
 
-Format 15 completes the economy: markets that prosper or decline, merchants
+Format 16 adds optional map positions, so a client can draw the places and
+roads, and start questions the player answers at New Game. Format 15
+completed the economy: markets that prosper or decline, merchants
 with limited stock and purses, villages that feed their market town,
 workshops the player owns, and the trading proficiency with proficiency
 points from the level table. Format 14 added troops, who are recruited, level up in squads and draw
@@ -43,9 +45,9 @@ there is no migration. Convert them by hand:
   number. Every economy part below `tick`, and `proficiency_points`, are
   optional.
 
-Format 15 represents one fixed player-controlled character and one playable
+Format 16 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 15 does not serialize a route collection
+stable logical route ID `default`; Format 16 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -61,7 +63,7 @@ differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 15 also requires item and quest tables because they serve the current demo.
+Format 16 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -83,7 +85,7 @@ A package is a directory containing these required UTF-8 JSON files:
 Empty content tables are `[]`; files must still exist. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
-Format 15 describes the current schema; incompatible changes require an explicit
+Format 16 describes the current schema; incompatible changes require an explicit
 version/migration decision.
 
 IDs use ASCII letters, digits, `_` and `-`, with uniqueness within each entity
@@ -96,7 +98,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 15 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 16 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -588,7 +590,7 @@ characters may appear at several locations. Combat profiles require the world's
 
 ## Dialogue and quests
 
-Format 15 has a single flat quest collection. The long-term model should retain
+Format 16 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -1057,7 +1059,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 15 currently selects combat prose variants from the current
+Format 16 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful

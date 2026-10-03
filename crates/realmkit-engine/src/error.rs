@@ -98,6 +98,8 @@ pub enum EngineError {
     TooFewRecruits { line: Id, left: u64 },
     #[error("this world has no soldiers")]
     NoRetinue,
+    #[error("this world has no map")]
+    NoMap,
     #[error("{0} is on your side")]
     NotHostile(Id),
     #[error("you have no riders to send round the flank")]
