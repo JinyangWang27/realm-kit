@@ -3,7 +3,7 @@
 
 use crate::{
     fight::{self, FightScreen},
-    input,
+    input, map,
     menu::{self, Key, Menu, Outcome, Pick},
     render::{self, Paint},
     saves::Saves,
@@ -55,6 +55,10 @@ pub(crate) fn play(
                 writeln!(output, "{}", input::help(world))?;
                 continue;
             }
+            Ok(input::Input::MapZoom { zoom, place }) => {
+                zoomed_map(&engine, zoom, &place, output)?;
+                continue;
+            }
             Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
                 persist(&mut engine, saves, &mut log, request, output)?;
                 menu = Menu::new(&engine, false, None);
@@ -87,6 +91,22 @@ pub(crate) fn play(
         menu.write(output, false, Paint::default())?;
     }
     Ok(())
+}
+
+/// Prints a closer view of the map centred on a place.
+fn zoomed_map(
+    engine: &Engine<'_>,
+    zoom: u32,
+    place: &str,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    let frame = engine
+        .map_view()
+        .and_then(|view| map::frame(engine.world(), &view, Some((zoom, place))));
+    match frame {
+        Some(lines) => lines.iter().try_for_each(|line| writeln!(output, "{line}")),
+        None => writeln!(output, "{}", menu::NOT_ON_MAP),
+    }
 }
 
 /// Asks a start question by numbered lines until one of its options is
@@ -286,6 +306,10 @@ pub(crate) fn play_keys(
                             continue 'scene;
                         }
                         Ok(input::Input::Blank) => continue 'scene,
+                        Ok(input::Input::MapZoom { zoom, place }) => {
+                            zoomed_map(&engine, zoom, &place, &mut notice)?;
+                            continue 'scene;
+                        }
                         Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
                             persist(&mut engine, saves, &mut log, request, &mut notice)?;
                             leave_dialogue = false;

@@ -567,6 +567,35 @@ fn the_smithy_forges_improves_and_keeps_copies_apart() {
 
 const MARCHES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/marches");
 
+/// The marches at zoom 0 in line mode's fixed 80 × 24 frame: the first row
+/// is empty margin, so it follows the prompt.
+const MARCHES_MAP: &str = r#"
+> 
+                                           ·# Hollin Keep
+                                         ··  ·
+                                       ··     ·
+                                     ··        ·
+                                   ··           ·
+                                 ··              ·
+                              ···                 ·
+                            ··                     ·
+                          ··                        ·
+                        ··                           ·
+                      ··                              ·
+                    ··                                 ·
+                  @ Greyford                            ·
+                   ··                                    ·
+                     ·                                    ·
+                      ··                                   ·
+                        ·                                   ·
+                         ··                                  ·
+                           ·                           ·······O Vellmarket
+                            ··         ················
+                              o········
+
+@ you   O town   # castle   o village
+"#;
+
 #[test]
 fn the_marches_pass_time_on_roads_and_by_waiting() {
     let dir = saves_dir("marches");
@@ -577,6 +606,7 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
     );
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.contains(MARCHES_MAP), "{text}");
     for passage in [
         "Greyford\nDay 1, 08:00\n",
         "Roads: Ashmere (2 h), Hollin Keep (4 h)\n",

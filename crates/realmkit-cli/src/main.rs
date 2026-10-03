@@ -9,6 +9,7 @@ use std::{
 mod fight;
 mod input;
 mod keys;
+mod map;
 mod menu;
 mod panels;
 mod play;

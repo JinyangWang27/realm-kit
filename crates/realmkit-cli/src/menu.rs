@@ -65,11 +65,13 @@ const INVENTORY: &str = "Inventory";
 const CHARACTER: &str = "Character";
 const QUESTS: &str = "Quests";
 const TECHNIQUES: &str = "Techniques";
+const MAP: &str = "Map";
 const KEYS_HINT: &str = "↑/↓ select · Enter confirm · number choose · : command";
 const ESC_HINT: &str = " · Esc back";
 pub const LINE_HINT: &str = "Enter a number, or type help for commands.";
 pub const NOT_LISTED: &str = "Choose one of the listed numbers.";
 pub const CHOOSE_ANSWER: &str = "Choose one of the listed answers.";
+pub const NOT_ON_MAP: &str = "That place is not on the map.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -596,6 +598,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Status => CHARACTER.into(),
         Command::Quests => QUESTS.into(),
         Command::Techniques => TECHNIQUES.into(),
+        Command::Map => MAP.into(),
         _ => return None,
     })
 }
