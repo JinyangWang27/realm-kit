@@ -20,6 +20,11 @@ pub fn archive() -> WorldSpec {
     .unwrap()
 }
 
+/// The archive's visitor, come only to read: the start answer with no effects.
+pub fn reader(world: &WorldSpec) -> Engine<'_> {
+    Engine::start(world, 0, &["reader".into()]).unwrap()
+}
+
 pub fn combat<'e>(engine: &'e Engine<'_>) -> &'e CombatState {
     engine.state().combat.as_ref().unwrap()
 }

@@ -15,7 +15,7 @@ use crossterm::{
     terminal::{Clear, ClearType},
 };
 use realmkit_engine::{Command, Engine};
-use realmkit_spec::WorldSpec;
+use realmkit_spec::{StartQuestion, WorldSpec};
 use std::{
     error::Error,
     io::{self, BufRead, Write},
@@ -30,7 +30,12 @@ pub(crate) fn play(
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
     let mut log = render::Log::default();
-    let mut engine = start(world, saves, seed, &mut log, output)?;
+    let answer =
+        |question: &StartQuestion, output: &mut _| ask(world, question, &mut input, output);
+    let Some(mut engine) = start(world, saves, seed, &mut log, output, answer)? else {
+        writeln!(output)?;
+        return Ok(());
+    };
     let mut menu = Menu::new(&engine, false, None);
     menu.write(output, false, Paint::default())?;
     writeln!(output, "{}", menu::LINE_HINT)?;
@@ -84,6 +89,69 @@ pub(crate) fn play(
     Ok(())
 }
 
+/// Asks a start question by numbered lines until one of its options is
+/// chosen; `None` when the player quits or input ends.
+fn ask(
+    world: &WorldSpec,
+    question: &StartQuestion,
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+) -> io::Result<Option<usize>> {
+    let mut menu = Menu::question(question);
+    menu.write(output, false, Paint::default())?;
+    let mut line = String::new();
+    loop {
+        write!(output, "\n> ")?;
+        output.flush()?;
+        line.clear();
+        if input.read_line(&mut line)? == 0 {
+            return Ok(None);
+        }
+        match input::parse(world, &line) {
+            Ok(input::Input::Quit) => return Ok(None),
+            Ok(input::Input::Select(number)) => {
+                if let Outcome::Run(Command::ChooseDialogue(n)) = menu.choose(number) {
+                    return Ok(Some(n - 1));
+                }
+            }
+            _ => {}
+        }
+        writeln!(output, "{}", menu::CHOOSE_ANSWER)?;
+    }
+}
+
+/// Asks a start question by keys, leaving the question and the answer on
+/// screen; `None` when the player quits.
+fn ask_keys(
+    question: &StartQuestion,
+    keys: &mut impl Iterator<Item = io::Result<Key>>,
+    output: &mut impl Write,
+    paint: Paint,
+) -> io::Result<Option<usize>> {
+    let mut menu = Menu::question(question);
+    let mut lines = menu.write(output, true, paint)?;
+    loop {
+        output.flush()?;
+        let key = match keys.next().transpose()? {
+            None | Some(Key::Quit) => return Ok(None),
+            Some(key) => key,
+        };
+        match menu.handle(key) {
+            Outcome::Run(Command::ChooseDialogue(n)) => {
+                erase(output, lines)?;
+                let answer = &question.options[n - 1].text;
+                writeln!(output, "\n{}\n> {answer}\n", question.text)?;
+                return Ok(Some(n - 1));
+            }
+            Outcome::Redraw => {
+                erase(output, lines)?;
+                lines = menu.write(output, true, paint)?;
+            }
+            _ => {}
+        }
+    }
+}
+
 fn erase(output: &mut impl Write, lines: u16) -> io::Result<()> {
     queue!(
         output,
@@ -132,7 +200,12 @@ pub(crate) fn play_keys(
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
     let mut log = render::Log::new(paint);
-    let mut engine = start(world, saves, seed, &mut log, output)?;
+    let answer =
+        |question: &StartQuestion, output: &mut _| ask_keys(question, &mut keys, output, paint);
+    let Some(mut engine) = start(world, saves, seed, &mut log, output, answer)? else {
+        writeln!(output)?;
+        return Ok(());
+    };
     let (mut leave_dialogue, mut open) = (false, None);
     // What the last command printed, shown on whichever screen play is on,
     // and messages that are no command (help, typos, saving), shown apart.
@@ -345,6 +418,47 @@ mod tests {
         assert!(after.starts_with("You face The Ash Wolf.\n"), "{after}");
         assert!(after.contains("Level 2"), "{after}");
         assert_eq!(after.matches("damage").count(), 1, "{after}");
+    }
+
+    #[test]
+    fn start_questions_are_answered_by_keys_before_play() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/quiet-archive"
+        ))
+        .unwrap();
+        let mut output = Vec::new();
+        // Letters do nothing here; the arrows move to the second answer.
+        let keys = [Char('i'), Down, Enter, Char('c'), Quit];
+        play_keys(
+            &world,
+            None,
+            None,
+            Paint::default(),
+            keys.into_iter().map(Ok),
+            &mut output,
+        )
+        .unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains(
+            "What brings you to the archive?\n> I was a copyist's apprentice, and I keep my own pen.\n"
+        ));
+        assert!(text.contains("  Errand: I was a copyist's apprentice"));
+        // Quitting at the question ends play without starting it.
+        let mut output = Vec::new();
+        let keys = [Quit];
+        play_keys(
+            &world,
+            None,
+            None,
+            Paint::default(),
+            keys.into_iter().map(Ok),
+            &mut output,
+        )
+        .unwrap();
+        assert!(!String::from_utf8(output)
+            .unwrap()
+            .contains("The Reading Room"));
     }
 
     #[test]

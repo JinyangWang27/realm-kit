@@ -83,6 +83,15 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
         },
         "random state does not match the world",
     )?;
+    let questions = &world.world.start_questions;
+    ensure(
+        state.start_choices.len() == questions.len()
+            && questions
+                .iter()
+                .zip(&state.start_choices)
+                .all(|(q, choice)| q.options.iter().any(|o| &o.id == choice)),
+        "start choices do not answer the start questions",
+    )?;
     time(world, state)?;
     economy(world, state)?;
     proficiencies(world, state)
@@ -240,8 +249,9 @@ fn time(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     )
 }
 
-/// Effects that could have happened by the saved minute: every dialogue
-/// choice's, and every event's whose first occurrence has come.
+/// Effects that could have happened by the saved minute: the chosen start
+/// options', every dialogue choice's, and every event's whose first
+/// occurrence has come.
 pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effect> {
     let now = state.time.unwrap_or(0);
     let choices = world
@@ -256,7 +266,14 @@ pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effe
         .iter()
         .filter(|e| e.schedule.at <= now)
         .flat_map(|e| &e.effects);
-    choices.chain(events).collect()
+    let start = world
+        .world
+        .start_questions
+        .iter()
+        .zip(&state.start_choices)
+        .filter_map(|(q, choice)| q.options.iter().find(|o| &o.id == choice))
+        .flat_map(|o| &o.effects);
+    start.chain(choices).chain(events).collect()
 }
 
 /// Whether an optional requirement could have held at some earlier moment.

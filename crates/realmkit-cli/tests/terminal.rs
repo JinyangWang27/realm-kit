@@ -205,14 +205,17 @@ const ARCHIVE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/quiet
 #[test]
 fn a_world_without_combat_plays_by_menus_with_no_fighting() {
     let dir = saves_dir("archive");
-    // Accept, learn where the map is, report back, and enter the vault.
-    let input = "help\nstatus\n1\n1\n1\n2\n1\n1\n2\n1\n1\n3\n";
+    // Come only to read; accept, learn where the map is, report back, and
+    // enter the vault.
+    let input = "help\n9\n3\nhelp\nstatus\n1\n1\n1\n2\n1\n1\n2\n1\n1\n3\n";
     let output = run(&["play", ARCHIVE, "--line", "--saves", &dir], input);
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
     for passage in [
+        "What brings you to the archive?\n  1. I study the old river and its maps.\n",
+        "\n> Choose one of the listed answers.\n\n> Choose one of the listed answers.\n\n> The Reading Room",
         "talk <character-id>",
-        "\n> You\n",
+        "\n> You\n  Errand: Only to read.\n",
         "1. Talk to Old Copyist",
         "You know where the map is.",
         "Received: Vault key ×1",

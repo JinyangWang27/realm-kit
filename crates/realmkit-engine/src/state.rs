@@ -185,6 +185,9 @@ pub struct GameState {
     /// Ranks in the proficiencies the world defines, once any is gained.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub proficiencies: BTreeMap<Proficiency, ProficiencyState>,
+    /// The option chosen for each start question, in order, for display.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub start_choices: Vec<Id>,
 }
 
 /// A proficiency's rank, split by where it came from: points the player

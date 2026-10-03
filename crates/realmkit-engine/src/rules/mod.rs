@@ -21,7 +21,9 @@ pub(super) use proficiency::{
     granted_points as granted_proficiency_points, rank, unspent_proficiency_points,
 };
 pub(super) use retinue::{leave, promote, prune};
-pub(super) use story::{choices, grant_items, grant_xp, progress, set_flag};
+pub(super) use story::{
+    apply as apply_effects, choices, grant_items, grant_xp, progress, set_flag,
+};
 
 /// Evaluates a condition against the state; pure, so it may run any number of times.
 pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {

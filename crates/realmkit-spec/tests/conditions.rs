@@ -148,3 +148,60 @@ fn a_list_where_one_condition_is_expected_is_refused() {
         r#"{ "text": "Hello", "next": null, "effect": { "kind": "set_flag", "flag": "a" } }"#;
     assert!(serde_json::from_str::<DialogueChoice>(json).is_err());
 }
+
+#[test]
+fn start_questions_are_checked_with_stable_codes() {
+    type Change = fn(&mut WorldSpec);
+    let cases: Vec<(Change, &str)> = vec![
+        (
+            |w| w.world.start_questions[0].options.clear(),
+            "empty_start_question",
+        ),
+        (
+            |w| {
+                let copy = w.world.start_questions[0].options[0].clone();
+                w.world.start_questions[0].options.push(copy);
+            },
+            "duplicate_id",
+        ),
+        (
+            |w| {
+                let copy = w.world.start_questions[0].clone();
+                w.world.start_questions.push(copy);
+            },
+            "duplicate_id",
+        ),
+        (
+            |w| {
+                w.world.start_questions[0].options[0].effects = vec![Effect::SetFlag {
+                    flag: "unknown".into(),
+                }]
+            },
+            "missing_reference",
+        ),
+        (
+            |w| {
+                w.world.start_questions[0].options[0].effects = vec![Effect::TakeItems {
+                    items: vec![ItemStack {
+                        item: "pen".into(),
+                        quantity: 1,
+                    }],
+                }]
+            },
+            "invalid_effect",
+        ),
+        (
+            |w| {
+                w.world.start_questions[0].options[0].effects = vec![Effect::AcceptQuest {
+                    quest: "lost_map".into(),
+                }]
+            },
+            "invalid_effect",
+        ),
+    ];
+    for (index, (change, code)) in cases.into_iter().enumerate() {
+        let mut world = archive();
+        change(&mut world);
+        assert_eq!(codes(&world), [code], "case {index}");
+    }
+}

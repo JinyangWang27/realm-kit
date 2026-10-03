@@ -86,6 +86,9 @@ pub struct World {
     /// Absent in a world without mass battles; needs troops.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub battle: Option<Battle>,
+    /// Questions answered at New Game, each option shaping the start.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub start_questions: Vec<StartQuestion>,
 }
 
 // Serde defaults shared by several content types.
@@ -271,6 +274,11 @@ impl WorldSpec {
             .flat_map(|n| &n.choices)
             .flat_map(|c| &c.effects)
             .chain(self.world.events.iter().flat_map(|e| &e.effects))
+            .chain(self.start_options().flat_map(|o| &o.effects))
+    }
+    /// Every option of every start question.
+    pub fn start_options(&self) -> impl Iterator<Item = &StartOption> {
+        self.world.start_questions.iter().flat_map(|q| &q.options)
     }
     /// The road from `from` to `to`, if one joins them.
     pub fn road(&self, from: &str, to: &str) -> Option<&Road> {

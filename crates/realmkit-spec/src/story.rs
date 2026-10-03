@@ -189,3 +189,25 @@ pub enum Effect {
         ranks: u32,
     },
 }
+
+/// A question the route asks at New Game, before the first turn, such as the
+/// player's background. Every question is asked, in order.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct StartQuestion {
+    pub id: Id,
+    /// A short label for the answer once given, such as "Background".
+    pub name: String,
+    pub text: String,
+    pub options: Vec<StartOption>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct StartOption {
+    pub id: Id,
+    pub text: String,
+    /// Applied in order to the starting state; nothing re-runs them.
+    #[serde(default)]
+    pub effects: Vec<Effect>,
+}

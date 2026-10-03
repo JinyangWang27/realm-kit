@@ -4,7 +4,7 @@ use crate::{
     render::{direction_name, duration, gear_name, money, piece_name, soldier, stat_name},
 };
 use realmkit_engine::{BattleOrder, Command, Engine};
-use realmkit_spec::{Resource, Stat};
+use realmkit_spec::{Resource, StartQuestion, Stat};
 use std::io::{self, Write};
 
 // Fixed interface words live here, apart from authored world text, so a locale
@@ -69,6 +69,7 @@ const KEYS_HINT: &str = "↑/↓ select · Enter confirm · number choose · : c
 const ESC_HINT: &str = " · Esc back";
 pub const LINE_HINT: &str = "Enter a number, or type help for commands.";
 pub const NOT_LISTED: &str = "Choose one of the listed numbers.";
+pub const CHOOSE_ANSWER: &str = "Choose one of the listed answers.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -747,6 +748,29 @@ impl Menu {
                 encounter_lines(engine)
             },
             context: input::Context::of(engine.world()),
+        }
+    }
+
+    /// A start question at New Game, its options numbered in order. Choosing
+    /// one runs `ChooseDialogue(n)`; the caller takes it as the answer.
+    pub fn question(question: &StartQuestion) -> Self {
+        let top = question
+            .options
+            .iter()
+            .enumerate()
+            .map(|(i, option)| Entry {
+                pick: Pick::Run(Command::ChooseDialogue(i + 1)),
+                label: option.text.clone(),
+            })
+            .collect();
+        Self {
+            top,
+            groups: Vec::new(),
+            open: None,
+            cursor: 0,
+            dialogue: false,
+            header: vec![question.text.clone()],
+            context: input::Context::default(),
         }
     }
 

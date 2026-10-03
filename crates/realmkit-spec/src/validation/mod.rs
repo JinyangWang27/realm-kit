@@ -54,6 +54,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     world::characters(&mut out, w);
     story::quests(&mut out, w, &placed);
     story::dialogues(&mut out, w);
+    story::start_questions(&mut out, w);
     time::rules(&mut out, w);
     if let Some(economy) = w.economy() {
         economy::rules(&mut out, w, economy);

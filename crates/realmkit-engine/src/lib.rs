@@ -38,9 +38,45 @@ impl<'w> Engine<'w> {
         Self::new_with_seed(world, 0)
     }
 
-    /// A new playthrough whose random draws follow `seed`. The same seed and
-    /// commands always give the same events and state.
+    /// A new playthrough whose random draws follow `seed`, in a world that
+    /// asks no start questions; see [`Engine::start`].
     pub fn new_with_seed(world: &'w WorldSpec, seed: u64) -> Result<Self, EngineError> {
+        Self::start(world, seed, &[])
+    }
+
+    /// A new playthrough whose random draws follow `seed`, with `choices`
+    /// answering each start question in order by an option ID. The same
+    /// seed, choices and commands always give the same events and state.
+    pub fn start(world: &'w WorldSpec, seed: u64, choices: &[Id]) -> Result<Self, EngineError> {
+        let mut engine = Self::initial(world, seed)?;
+        let questions = &world.world.start_questions;
+        if choices.len() != questions.len() {
+            return Err(EngineError::StartChoices);
+        }
+        // What the answers grant shows in the panels, not as events.
+        let mut ignored = Vec::new();
+        for (question, choice) in questions.iter().zip(choices) {
+            let option = question
+                .options
+                .iter()
+                .find(|o| &o.id == choice)
+                .ok_or(EngineError::StartChoices)?;
+            rules::apply_effects(world, &mut engine.state, &option.effects, &mut ignored)?;
+        }
+        engine.state.start_choices = choices.to_vec();
+        // Vitals start at the maxima that techniques' passives give.
+        if let Some(combat) = engine.state.combat.as_mut() {
+            let max = rules::player_stats(world, combat);
+            combat.stance = Stance::Exploring(Vitals {
+                hp: max.hp,
+                mp: max.mp,
+            });
+        }
+        Ok(engine)
+    }
+
+    /// The route's state before any start question is answered.
+    fn initial(world: &'w WorldSpec, seed: u64) -> Result<Self, EngineError> {
         world.validate()?;
         let combat = world.combat().map(|combat| {
             let stats = combat.levels[0].stats;
@@ -127,23 +163,18 @@ impl<'w> Engine<'w> {
                     workshops: BTreeMap::new(),
                 }),
                 proficiencies: BTreeMap::new(),
+                start_choices: Vec::new(),
             },
         };
         // Merchants open with their stock at its targets, drawing nothing.
         rules::stock_up(world, &mut engine.state);
-        // Starting techniques, then vitals at the maxima their passives give.
+        // Starting techniques and gear.
         if let Some(rules) = world.combat() {
             let mut ignored = Vec::new();
             for grant in &rules.player_techniques {
                 techniques::grant(world, &mut engine.state, grant, &mut ignored)?;
             }
-            let combat = engine.state.combat.as_mut().unwrap();
-            gear::receive_starting(world, combat)?;
-            let max = rules::player_stats(world, combat);
-            combat.stance = Stance::Exploring(Vitals {
-                hp: max.hp,
-                mp: max.mp,
-            });
+            gear::receive_starting(world, engine.state.combat.as_mut().unwrap())?;
         }
         Ok(engine)
     }
@@ -216,7 +247,7 @@ impl<'w> Engine<'w> {
     /// Resumes a snapshot, or rejects it whole: a save for another package,
     /// revision or route, or with state this world could not produce, never loads.
     pub fn restore(world: &'w WorldSpec, snapshot: SaveSnapshot) -> Result<Self, EngineError> {
-        let mut engine = Self::new(world)?;
+        let mut engine = Self::initial(world, 0)?;
         save::check(world, &engine.state, &snapshot).map_err(EngineError::InvalidSave)?;
         engine.state = snapshot.state;
         Ok(engine)

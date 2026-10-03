@@ -128,6 +128,8 @@ pub enum EngineError {
     PlayerDead,
     #[error("numeric limit exceeded; command was not applied")]
     NumericLimit,
+    #[error("answer each start question, in order, with one of its options")]
+    StartChoices,
     #[error("save cannot be loaded: {0}")]
     InvalidSave(String),
 }
