@@ -41,9 +41,9 @@ there is no migration. Convert them by hand:
   condition. A list of one condition becomes that condition; a longer list
   becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
   dialogue choice's `effect` becomes a one-element `effects` list.
-- **Formats 12–14** (M5a, M5b, M6a-1, consumables, troops): only raise the
-  number. Every economy part below `tick`, and `proficiency_points`, are
-  optional.
+- **Formats 12–15** (M5a, M5b, M6a-1, consumables, troops, M6a-2): only
+  raise the number. Every economy part below `tick`, `proficiency_points`,
+  map positions and `start_questions` are optional.
 
 Format 16 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
@@ -75,14 +75,16 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads` and `events` |
-| `locations.json` | Array of locations with descriptions, directional exits and placed character IDs |
+| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events` and `start_questions` |
+| `locations.json` | Array of locations with descriptions, directional exits, placed character IDs and optional map positions |
 | `characters.json` | Array of characters with descriptions, availability conditions, and optional dialogue and combat profile |
 | `items.json` | Array of items with names and descriptions |
 | `quests.json` | Array of quests with giver, defeat or flag objective, prose, rewards and completion flags |
 | `dialogues.json` | Array of dialogue trees with nodes, choices, conditions and effects |
 
-Empty content tables are `[]`; files must still exist. Extra files such as
+Empty content tables are `[]`; files must still exist. A host without a
+filesystem, such as a browser, hands the same six files to
+`WorldSpec::from_files` from memory; `PACKAGE_FILES` lists them. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
 Format 16 describes the current schema; incompatible changes require an explicit
@@ -107,14 +109,36 @@ for English worlds.
 Exits are directed. To return along a path, author a separate reverse exit.
 Directions are `north`, `south`, `east`, `west`, `up`, `down`.
 
-The long-term presentation model distinguishes **spatial placement** from
-**traversal connectivity**. The explicit exit graph is authoritative movement
-state. Future formats may optionally group locations into Areas (for example a
-city, one building floor or a wilderness region) and give locations area-local
-integer `(x, y)` positions for map presentation.
+The presentation model distinguishes **spatial placement** from **traversal
+connectivity**. The explicit exit and road graph is authoritative movement
+state. A location may give a `map` position for drawing an overland map:
 
-Coordinates never create exits: adjacent cells need not be traversable, and an
-explicit exit may connect locations that are not adjacent in the layout. For an
+```json
+"map": { "x": 1180, "y": 840, "kind": "castle" }
+```
+
+- `x` grows east and `y` south, as on a screen, each from 0 to `MAP_BOUND`
+  (10 000; `map_bounds`). Only relative positions matter: a client scales
+  them to fit.
+- `kind` is `town`, `castle`, `village` or `waypoint`. It chooses the glyph
+  and how soon a label appears as the map zooms in; in that order, earlier
+  kinds win when labels compete for room.
+- Either every location has a position or none does (`map_partial`), and no
+  two share one (`map_duplicate`).
+- Positions never create, block or time a road or exit: adjacent places need
+  not be connected, and a road or exit may join places far apart. A road is
+  drawn as a line between its ends, and an exit as a line with an arrow
+  towards its destination.
+
+With positions, the engine offers a `Map` panel and answers a map query with
+every place, the roads with their travel minutes, the exits and the player's
+place. Until the world tracks what the player has learned, every place is
+known, and characters who move are not shown, since the map would reveal
+where they are now. Long roads can be split at waypoints (bridges, fords,
+camps) whose legs' minutes add up to the whole.
+
+Future formats may also group locations into Areas (for example a city, one
+building floor or a wilderness region) with area-local positions; for an
 initial grid layout, one coordinate should identify at most one location.
 
 Clients decide how much of an area to show. A compact 5×5 city or building may be
@@ -587,6 +611,46 @@ at most once, and its defeat is permanent (no respawns) unless its group is
 repeatable. Other
 characters may appear at several locations. Combat profiles require the world's
 `combat` block.
+
+## Start questions
+
+`start_questions` in `world.json` are asked at New Game, before the first
+turn, such as the player's background. Every question is asked, in order, and
+an answer never skips or adds a question.
+
+```json
+"start_questions": [
+  {
+    "id": "errand",
+    "name": "Errand",
+    "text": "What brings you to the archive?",
+    "options": [
+      {
+        "id": "scholar",
+        "text": "I study the old river and its maps.",
+        "effects": [{ "kind": "set_flag", "flag": "river_scholar" }]
+      },
+      { "id": "reader", "text": "Only to read." }
+    ]
+  }
+]
+```
+
+- `name` is a short label for the answer once given; the status panel shows
+  `Errand: Only to read.`
+- Each question needs at least one option (`empty_start_question`); question
+  IDs, and option IDs within a question, are unique.
+- An option's `effects` apply in order to the starting state: `set_flag`,
+  `grant_items`, `grant_currency`, `grant_technique` (with XP, since an answer
+  is given once) and `raise_proficiency`. Quests, `take_items`,
+  `pay_currency` and workshops are refused (`invalid_effect`): no giver or
+  market is at hand before play begins.
+- Later conditions and text read what an answer produced like any other
+  state. Saves keep the chosen option IDs, and a save must answer every
+  question with one of its options.
+
+Start questions shape the initial state; they are not identity editing, and
+nothing re-runs them once play begins.
 
 ## Dialogue and quests
 

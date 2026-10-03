@@ -970,8 +970,10 @@ overland travel.
   know, the roads and exits between them, each road's travel time for the
   player's party (after [travel speed](#retinue) where it exists), the
   player's location and moving characters where they were last seen. Until [knowledge and news](#knowledge-and-news)
-  exists, the player knows every place. The client never decides what is
-  hidden.
+  exists, the player knows every place and moving characters are left out,
+  since the map would show where they are now. The client never decides what
+  is hidden. Delivered in Format 16 with every part of this section except
+  travel to a place.
 - **Viewport.** The terminal client draws a window onto the world, not the
   whole world squeezed into the terminal width. The view has a centre and a
   scale in world units per cell. The first zoom level fits every place; each

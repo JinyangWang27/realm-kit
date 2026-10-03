@@ -1,8 +1,8 @@
 # RealmKit roadmap
 
 Status: discussion draft. Milestones describe playable outcomes, not release
-dates. M0 through M4 are complete; M5 and M6 are partially delivered; M7 through
-M9 remain proposed. Individual slices below are the source of truth for delivered
+dates. M0 through M4 are complete; M5, M6 and the presentation track are
+partially delivered; M7 through M9 remain proposed. Individual slices below are the source of truth for delivered
 scope. Combat pacing and balance formulas remain design decisions where their
 sections still say so, not promises about current behavior.
 The [open-decisions register](docs/open-decisions.md) records unresolved choices
@@ -53,15 +53,17 @@ Astraea requirement with the smallest reusable typed boundary.
 
 The current priority is:
 
-1. **P0 — player-facing presentation seam.** Deliver the overland-map data/query
-   needed for a continent-scale world and prove that the spec/engine can be hosted
-   by a graphical client without terminal or filesystem assumptions. The target
-   product client is text-first and graphical; React/Tauri/web details stay
-   outside the engine. Keep `realmkit-cli` as the reference/debug client.
-2. **P0 — authored opening and progression.** Pull forward route start choices
-   for an ordinary-background opening, first-class main/side questline and story
-   phase progression, authored outcomes, dialogue-by-role and conditional text
-   where the Vaelgate slice needs them.
+1. **P0 — player-facing presentation seam · delivered** (Format 16). The
+   overland-map data/query for a continent-scale world, and proof that the
+   spec/engine can be hosted by a graphical client without terminal or
+   filesystem assumptions. The target product client is text-first and
+   graphical; React/Tauri/web details stay outside the engine. Keep
+   `realmkit-cli` as the reference/debug client.
+2. **P0 — authored opening and progression.** Route start choices for an
+   ordinary-background opening are delivered (Format 16). Still to come:
+   first-class main/side questline and story phase progression, authored
+   outcomes, dialogue-by-role and conditional text where the Vaelgate slice
+   needs them.
 3. **P0 — political identity.** Factions and typed standing/relation tracks are
    required before Erdain's states, martial schools and orders can be represented
    as gameplay rather than lore-only labels.
@@ -1054,20 +1056,22 @@ milestones. They change how play reads, never the engine or its rules.
    last six lines of the fight (the latest turn marked) and the menu. When
    it ends, scrollback keeps only the opening line and the final turn. Line
    mode and pipes keep the full log.
-6. **Overland map** · proposed, **Astraea P0**. A map of places and roads
-   drawn from authored display positions, with zoom, panning and labels that
-   make room for each other, and a fixed view in line mode
-   ([Overland map](docs/sandbox-worlds.md#overland-map)). Unlike the items
-   above, it needs a package field for positions and an engine query, so it
-   bumps the format.
-7. **Embeddable client surface** · proposed, **Astraea P0**. Keep the engine
-   presentation-agnostic, but prove a non-terminal host can load a package from
-   memory, inspect player-permitted views/actions, execute typed commands and
-   import/export snapshots without depending on terminal I/O or native
-   filesystem access. Add a browser/WASM compatibility check for the core crates
-   (or the thinnest adapter needed to expose them); the React/Tauri application
-   itself belongs outside RealmKit. Do not add a generic UI framework to the
-   engine.
+6. **Overland map** · delivered, **Astraea P0** (Format 16). A map of
+   places and roads drawn from authored display positions, with zoom,
+   panning and labels that make room for each other, and a fixed view in
+   line mode ([Overland map](docs/sandbox-worlds.md#overland-map)). Unlike
+   the items above, it needs a package field for positions and an engine
+   query, so it bumps the format. As delivered: every place is known and
+   characters who move are left out until knowledge and news exists; travel
+   to a chosen place waits for travel speed and world agents.
+7. **Embeddable client surface** · delivered, **Astraea P0** (Format 16).
+   The engine stays presentation-agnostic; a non-terminal host loads a
+   package from memory (`WorldSpec::from_files`), inspects views and actions,
+   executes typed commands and imports/exports snapshots as JSON bytes, with
+   commands, events, actions and the map view serializable, and
+   `realmkit-engine` builds for `wasm32-unknown-unknown`. No adapter crate:
+   the React/Tauri application and its wasm-bindgen or IPC glue belong
+   outside RealmKit. No generic UI framework is added to the engine.
 
 ## M5 — Longer authored adventures and source-specific mechanics
 
@@ -1123,7 +1127,7 @@ these slices. The investigation fixture, optional Inventory and authored endings
 above are delivered alongside them, in whichever order a fixture needs them.
 
 For Astraea, the identifiers below describe scope rather than a strict execution
-order: **M5f start choices** and the authored-progression part of **M5c** are P0,
+order: **M5f start choices** (delivered) and the authored-progression part of **M5c** are P0,
 and M5e is pulled forward as soon as repeated social roles or state-sensitive
 dialogue in Vaelgate would otherwise duplicate content.
 
@@ -1169,9 +1173,11 @@ dialogue in Vaelgate would otherwise duplicate content.
    dialogues and topics every member shares, `Speaker` references in
    conditions, effects and templates, line slots that each member fills, role
    offer givers, and text fields with conditional variants.
-6. **M5f — start choices.** A route's authored start questions at New Game,
-   each option an ordered effect list applied to the initial state, with the
-   chosen option IDs saved for display.
+6. **M5f — start choices · delivered** (Format 16). A route's authored start
+   questions at New Game, each option an ordered effect list applied to the
+   initial state, with the chosen option IDs saved for display. Every
+   question is asked, in order; an answer never skips or adds one.
+   `examples/quiet-archive` asks why the player came.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and tested paths to completion, can be saved/resumed, and include at least one
@@ -1427,12 +1433,13 @@ Resolve decisions immediately before the Astraea slice that consumes them. The
 complete cross-project register remains in
 [docs/open-decisions.md](docs/open-decisions.md).
 
-1. **Presentation P0:** settle overland-map placement/kinds/knowledge disclosure
-   and the minimum engine query/host boundary needed by a browser/Tauri client;
-   prove the core can be hosted without terminal or filesystem assumptions.
+1. **Presentation P0 · settled** (Format 16): placement and kinds as
+   authored positions, every place known until knowledge exists, and the host
+   boundary as in-memory loading, serializable commands/events and JSON
+   snapshots. Revisit only when the real client shows which queries it needs.
 2. **Authored progression P0:** settle the concrete story-phase/main-side
-   questline/outcome representation and M5f start-choice branching needed by the
-   Road to Vaelgate opening.
+   questline/outcome representation needed by the Road to Vaelgate opening.
+   M5f start choices are settled and delivered without branching.
 3. **Politics P0:** settle M6b faction membership/war-peace representation and
    standing-track scopes/thresholds before authoring Erdain's political entities,
    schools and orders.
