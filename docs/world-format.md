@@ -750,8 +750,10 @@ is no failure for a lead not taken.
 
 After each command, if no outcome has been recorded, the outcome whose `when`
 now holds is recorded for good and reported as `OutcomeReached`; play goes on.
-Two holding at once refuse the command (`AmbiguousOutcome`), and a start whose
-answers already meet one is refused (`OutcomeAtStart`). Terminal and failure
+Two holding at once refuse the command (`AmbiguousOutcome`). No outcome may
+hold at the start: each `when` must require, on every branch, something no
+start provides, such as a quest taken up, evidence, a workshop, a phase after
+the first or a flag no start answer sets (`outcome_at_start`). Terminal and failure
 endings are not yet modelled.
 
 The journal (`Engine::journal`, the CLI's Quests panel) shows the current

@@ -139,9 +139,55 @@ fn outcomes_are_checked() {
     assert!(codes(&world).contains(&"duplicate_id".to_string()));
     world.world.outcomes = vec![RouteOutcome {
         when: done("missing"),
-        ..ending
+        ..ending.clone()
     }];
     assert!(codes(&world).contains(&"missing_reference".to_string()));
+    // Each of these could hold before the first turn: a flag a start answer
+    // sets, the first phase, an available quest, or nothing in particular.
+    let flag = |f: &str| Condition::Flag { flag: f.into() };
+    for when in [
+        flag("river_scholar"),
+        Condition::Phase {
+            phase: "visit".into(),
+        },
+        Condition::Quest {
+            quest: "lost_map".into(),
+            status: QuestStatus::Available,
+        },
+        Condition::Not {
+            condition: Box::new(flag("map_found")),
+        },
+        Condition::Any {
+            of: vec![done("lost_map"), flag("apprentice")],
+        },
+    ] {
+        let mut world = chained();
+        world.world.outcomes = vec![RouteOutcome {
+            when: when.clone(),
+            ..ending.clone()
+        }];
+        assert!(
+            codes(&world).contains(&"outcome_at_start".to_string()),
+            "{when:?}"
+        );
+    }
+    // A flag no answer sets, a later phase or evidence cannot hold yet.
+    for when in [
+        flag("map_found"),
+        Condition::Phase {
+            phase: "vault".into(),
+        },
+        Condition::All {
+            of: vec![flag("river_scholar"), done("lost_map")],
+        },
+    ] {
+        let mut world = chained();
+        world.world.outcomes = vec![RouteOutcome {
+            when,
+            ..ending.clone()
+        }];
+        assert!(world.diagnostics().is_empty(), "{:?}", codes(&world));
+    }
 }
 
 /// The caravan slice, broken in the ways an author could break it.

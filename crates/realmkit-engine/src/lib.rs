@@ -66,10 +66,6 @@ impl<'w> Engine<'w> {
         // A flag an answer set may open a breakthrough gate, as after any command.
         techniques::promote(world, &mut engine.state, &mut ignored);
         engine.state.start_choices = choices.to_vec();
-        // The route cannot be over before its first turn.
-        if !rules::outcomes(world, &engine.state).is_empty() {
-            return Err(EngineError::OutcomeAtStart);
-        }
         // Vitals start at the maxima that techniques' passives give.
         if let Some(combat) = engine.state.combat.as_mut() {
             let max = rules::player_stats(world, combat);

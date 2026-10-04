@@ -356,14 +356,40 @@ pub(super) fn phases(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     }
 }
 
-/// Outcomes have unique IDs and valid conditions.
+/// Outcomes have unique IDs and valid conditions, and none can hold at the
+/// start: each requires, on every branch, something no start provides. That
+/// is a quest taken up, evidence, a workshop, a phase after the first, or a
+/// flag no start answer sets.
 pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     ids(
         out,
         "outcome",
         w.world.outcomes.iter().map(|o| o.id.as_str()),
     );
+    let answered: BTreeSet<&Id> = w
+        .start_options()
+        .flat_map(|o| &o.effects)
+        .filter_map(|e| match e {
+            Effect::SetFlag { flag } => Some(flag),
+            _ => None,
+        })
+        .collect();
+    let never_at_start = |leaf: &Condition| match leaf {
+        Condition::Quest { status, .. } => *status != QuestStatus::Available,
+        Condition::Evidence { .. } | Condition::Workshop { .. } => true,
+        Condition::Phase { phase } => w.phase_index(phase).is_some_and(|i| i > 0),
+        Condition::Flag { flag } => !answered.contains(flag),
+        _ => false,
+    };
     for outcome in &w.world.outcomes {
         condition(out, w, &outcome.id, Some(&outcome.when));
+        if !outcome.when.requires(&never_at_start) {
+            issue(
+                out,
+                &outcome.id,
+                "outcome_at_start",
+                "an outcome must require something no start provides: a quest taken up, evidence, a workshop, a later phase or a flag no start answer sets",
+            );
+        }
     }
 }

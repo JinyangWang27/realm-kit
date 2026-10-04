@@ -287,7 +287,9 @@ overlaps that static/bounded analysis does not prove.
 **Delivered subset (Format 17).** `outcomes` with a `when` condition, checked
 after every non-panel command against the staged state; one match is recorded
 with `OutcomeReached` in the same transition, several refuse the command
-(`AmbiguousOutcome`), and a start that already meets one is refused. Only
+(`AmbiguousOutcome`), and validation rejects an outcome that could hold at
+the start (`outcome_at_start`) by requiring, on every branch, something no
+start provides. Only
 completed, non-terminal outcomes exist so far: the original game's MVP ends by
 choosing a lead while the others stay open. `terminal` and failure outcomes
 wait for content that needs them, and validation does not yet prove overlaps.

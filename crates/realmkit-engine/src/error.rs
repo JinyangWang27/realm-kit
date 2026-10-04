@@ -42,8 +42,6 @@ pub enum EngineError {
     ProficiencyCap,
     #[error("more than one outcome would be reached at once: {0:?}")]
     AmbiguousOutcome(Vec<Id>),
-    #[error("an outcome holds before the first turn")]
-    OutcomeAtStart,
     #[error("you cannot take up {0} yet")]
     QuestLocked(Id),
     #[error("{0} is not available here")]

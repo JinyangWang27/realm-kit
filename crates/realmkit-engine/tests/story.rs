@@ -218,22 +218,6 @@ fn solve_last_refused(engine: &mut Engine<'_>) -> EngineError {
 }
 
 #[test]
-fn no_outcome_may_hold_at_the_start() {
-    let mut world = chained();
-    world.world.outcomes = vec![outcome(
-        "scholarly",
-        Condition::Flag {
-            flag: "river_scholar".into(),
-        },
-    )];
-    assert!(matches!(
-        Engine::start(&world, 0, &["scholar".into()]),
-        Err(EngineError::OutcomeAtStart)
-    ));
-    assert!(Engine::start(&world, 0, &["reader".into()]).is_ok());
-}
-
-#[test]
 fn saves_record_an_outcome_exactly_when_one_was_reached() {
     let mut world = chained();
     world.world.outcomes = vec![outcome("map_home", map_home())];
