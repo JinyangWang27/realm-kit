@@ -15,7 +15,7 @@ mod time;
 
 pub(super) use actions::actions;
 pub(super) use economy::{quote, stock_up, ware_price};
-pub(super) use map::map_view;
+pub(super) use map::{known, map_view};
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
 pub(super) use proficiency::{
     granted_points as granted_proficiency_points, rank, unspent_proficiency_points,

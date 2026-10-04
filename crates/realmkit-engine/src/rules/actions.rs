@@ -55,9 +55,13 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         available: allowed(state, exit.requires.as_ref()),
     }));
     // Roads in authored order; a closed one is listed to explain itself.
+    // A road to a place the player does not know of is not offered at all.
     actions.extend(world.world.roads.iter().filter_map(|road| {
+        let to = road
+            .leads(&location.id)
+            .filter(|to| known(world, state, to))?;
         Some(Action {
-            command: Command::Travel(road.leads(&location.id)?.clone()),
+            command: Command::Travel(to.clone()),
             available: allowed(state, road.requires.as_ref()),
         })
     }));

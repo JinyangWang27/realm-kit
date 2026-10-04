@@ -153,6 +153,7 @@ fn groups_and_profile_levels_are_validated() {
         |w| {
             w.characters.push(Character {
                 id: "sarge".into(),
+                kind: CharacterKind::Person,
                 name: "Sarge".into(),
                 description: "Gives orders.".into(),
                 requires: None,

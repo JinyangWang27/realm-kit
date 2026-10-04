@@ -202,6 +202,7 @@ pub(crate) fn travel(
 ) -> Result<(), EngineError> {
     let road = world
         .road(&state.player.location, &to)
+        .filter(|_| known(world, state, &to))
         .ok_or_else(|| EngineError::NoRoad(to.clone()))?;
     if !allowed(state, road.requires.as_ref()) {
         return Err(EngineError::RoadBlocked {

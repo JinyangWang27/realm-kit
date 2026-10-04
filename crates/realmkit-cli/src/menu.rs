@@ -4,12 +4,13 @@ use crate::{
     render::{direction_name, duration, gear_name, money, piece_name, soldier, stat_name},
 };
 use realmkit_engine::{BattleOrder, Command, Engine};
-use realmkit_spec::{Resource, StartQuestion, Stat};
+use realmkit_spec::{CharacterKind, Resource, StartQuestion, Stat};
 use std::io::{self, Write};
 
 // Fixed interface words live here, apart from authored world text, so a locale
 // table can replace them later without touching menu logic.
 const TALK: &str = "Talk to";
+const EXAMINE: &str = "Examine";
 const ATTACK: &str = "Attack";
 const TRAVEL: &str = "Travel";
 const TRAVEL_TO: &str = "Travel to";
@@ -595,7 +596,12 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             label
         }
         Command::Talk(id) => {
-            format!("{TALK} {}", world.character(id).unwrap().name)
+            let character = world.character(id).unwrap();
+            let verb = match character.kind {
+                CharacterKind::Person => TALK,
+                CharacterKind::Feature => EXAMINE,
+            };
+            format!("{verb} {}", character.name)
         }
         Command::Attack(id) => {
             format!("{ATTACK} {}", world.character(id).unwrap().name)

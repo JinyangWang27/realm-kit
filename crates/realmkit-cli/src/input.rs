@@ -263,7 +263,7 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
                 _ => 1,
             },
         },
-        ("talk", [id]) => Command::Talk((*id).into()),
+        ("talk" | "examine", [id]) => Command::Talk((*id).into()),
         ("accept", [id]) => Command::AcceptQuest((*id).into()),
         ("complete", [id]) => Command::CompleteQuest((*id).into()),
         ("choose", [number]) => {

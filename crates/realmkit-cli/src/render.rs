@@ -1,7 +1,7 @@
 use crate::panels;
 use crossterm::style::Stylize;
 use realmkit_engine::{BattleOutcome, Engine, Event, Outcome};
-use realmkit_spec::{Direction, Id, Stat, TextTemplate};
+use realmkit_spec::{CharacterKind, Direction, Id, Stat, TextTemplate};
 use std::io::{self, Write};
 
 const CRITICAL: &str = "Critical hit!";
@@ -593,7 +593,11 @@ pub fn events(
                 let npc = world.character(npc).unwrap();
                 let dialogue = world.dialogue(npc.dialogue.as_ref().unwrap()).unwrap();
                 let node = dialogue.nodes.iter().find(|n| &n.id == node).unwrap();
-                writeln!(output, "{}: {}", npc.name, node.text)?;
+                // A feature does not speak: its lines describe what is seen.
+                match npc.kind {
+                    CharacterKind::Person => writeln!(output, "{}: {}", npc.name, node.text)?,
+                    CharacterKind::Feature => writeln!(output, "{}", node.text)?,
+                }
             }
             Event::QuestAccepted { quest } => {
                 writeln!(output, "{}", world.quest(quest).unwrap().introduction)?

@@ -150,6 +150,17 @@ pub(super) fn locations<'w>(out: &mut Vec<Diagnostic>, w: &'w WorldSpec) -> BTre
 /// and none on top of another.
 fn map(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     let positioned = w.locations.iter().filter(|l| l.map.is_some()).count();
+    for l in &w.locations {
+        condition(out, w, &l.id, l.known_when.as_ref());
+        if l.known_when.is_some() && positioned == 0 {
+            issue(
+                out,
+                &l.id,
+                "map_disabled",
+                "places have no map positions, so there is no map to know this place on",
+            );
+        }
+    }
     if positioned == 0 {
         return;
     }
@@ -215,6 +226,18 @@ pub(super) fn characters(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             );
         }
         condition(out, w, &character.id, character.requires.as_ref());
+        let fixed = character.combat.is_none()
+            && character.army.is_none()
+            && character.moves.is_none()
+            && character.dialogue.is_some();
+        if character.kind == CharacterKind::Feature && !fixed {
+            issue(
+                out,
+                &character.id,
+                "invalid_feature",
+                "a feature is examined through its dialogue; it cannot fight, lead an army or move",
+            );
+        }
         if let Some(profile) = &character.combat {
             combat_profile(out, w, &character.id, profile);
         }

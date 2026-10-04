@@ -398,10 +398,10 @@ pub struct Action {
     pub available: bool,
 }
 
-/// What the player may know of the map: places, the roads and exits between
-/// them, and where the player is. Until the world tracks knowledge, every
-/// place is known; characters who move are left out, since a map would show
-/// where they are now, not where they were last seen.
+/// What the player may know of the map: the places they know of (where they
+/// are, and each place whose `known_when` holds), the roads and exits between
+/// those, and where the player is. Characters who move are left out, since a
+/// map would show where they are now, not where they were last seen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MapView {
     pub here: Id,
