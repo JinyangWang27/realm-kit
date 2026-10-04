@@ -275,3 +275,27 @@ fn the_journal_shows_only_what_the_player_knows() {
         }
     );
 }
+
+#[test]
+fn a_phase_behind_a_choice_this_playthrough_never_had_is_refused() {
+    let mut world = chained();
+    // Only a scholar's question to Pell moves the story to the search.
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    pell.nodes[1].choices[0].effects.pop();
+    let scholar = pell.nodes[0]
+        .choices
+        .iter_mut()
+        .find(|c| c.text.starts_with("I study"))
+        .unwrap();
+    scholar.effects.push(Effect::EnterPhase {
+        phase: "search".into(),
+    });
+    let mut reader = reader(&world).snapshot();
+    reader.state.phases.push("search".into());
+    assert!(Engine::restore(&world, reader).is_err());
+    let mut scholar = Engine::start(&world, 0, &["scholar".into()])
+        .unwrap()
+        .snapshot();
+    scholar.state.phases.push("search".into());
+    assert!(Engine::restore(&world, scholar).is_ok());
+}

@@ -34,8 +34,8 @@ pub(super) fn check(
     }
     inventory(world, state, &progress)?;
     flags(world, state, &progress)?;
-    evidence(state, &progress)?;
-    phases(world, state, &progress)?;
+    evidence(world, state)?;
+    phases(world, state)?;
     outcome(world, state)?;
     dialogue(world, state)
 }
@@ -793,23 +793,36 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
     )
 }
 
-/// Known evidence was discovered by an effect that could have fired; evidence
-/// is never forgotten, so nothing else could have made it known.
-fn evidence(state: &GameState, progress: &Progress) -> Result<(), String> {
+/// Whether a dialogue choice with an effect `matches` could have been taken:
+/// its condition once held. Only dialogue discovers evidence or enters a phase.
+fn could_choose(world: &WorldSpec, state: &GameState, matches: impl Fn(&Effect) -> bool) -> bool {
+    world
+        .dialogues
+        .iter()
+        .flat_map(|d| &d.nodes)
+        .flat_map(|n| &n.choices)
+        .filter(|c| c.effects.iter().any(&matches))
+        .any(|c| lasting(world, state, c.requires.as_ref()))
+}
+
+/// Known evidence was discovered by a choice that could have been taken;
+/// evidence is never forgotten, so nothing else could have made it known.
+fn evidence(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     ensure(
         state.evidence.iter().all(|id| {
-            progress
-                .fired
-                .iter()
-                .any(|e| matches!(e, Effect::DiscoverEvidence { evidence } if evidence == id))
+            could_choose(
+                world,
+                state,
+                |e| matches!(e, Effect::DiscoverEvidence { evidence } if evidence == id),
+            )
         }),
         "known evidence could not have been discovered",
     )
 }
 
 /// The phases reached are the authored ones up to the current, which is the
-/// first or one some effect that could have fired enters.
-fn phases(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<(), String> {
+/// first or one a choice that could have been taken enters.
+fn phases(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     let authored = &world.world.phases;
     let current = state.phases.last();
     ensure(
@@ -818,10 +831,11 @@ fn phases(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<(
             && state.phases.is_empty() == authored.is_empty()
             && current.is_none_or(|current| {
                 state.phases.len() == 1
-                    || progress
-                        .fired
-                        .iter()
-                        .any(|e| matches!(e, Effect::EnterPhase { phase } if phase == current))
+                    || could_choose(
+                        world,
+                        state,
+                        |e| matches!(e, Effect::EnterPhase { phase } if phase == current),
+                    )
             }),
         "invalid story phase",
     )

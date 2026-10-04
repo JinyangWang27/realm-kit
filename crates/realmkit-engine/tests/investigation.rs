@@ -68,3 +68,38 @@ fn carrying_an_item_does_not_make_its_evidence_known() {
     assert_eq!(engine.state().player.inventory.get("pen"), Some(&1));
     assert!(engine.state().evidence.is_empty());
 }
+
+#[test]
+fn evidence_behind_a_choice_this_playthrough_never_had_is_refused() {
+    // Only a scholar can ask Pell about the river's maps, and only that
+    // question reveals the vault's catalogue.
+    let mut world = archive();
+    world
+        .world
+        .evidence
+        .push(realmkit_spec::EvidenceDefinition {
+            id: "catalogue".into(),
+            name: "The vault's catalogue".into(),
+            description: "Every river map, listed.".into(),
+            item: None,
+        });
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    let scholar = pell.nodes[0]
+        .choices
+        .iter_mut()
+        .find(|c| c.text.starts_with("I study"))
+        .unwrap();
+    scholar
+        .effects
+        .push(realmkit_spec::Effect::DiscoverEvidence {
+            evidence: "catalogue".into(),
+        });
+    let mut reader = reader(&world).snapshot();
+    reader.state.evidence.insert("catalogue".into());
+    assert!(Engine::restore(&world, reader).is_err());
+    let mut scholar = Engine::start(&world, 0, &["scholar".into()])
+        .unwrap()
+        .snapshot();
+    scholar.state.evidence.insert("catalogue".into());
+    assert!(Engine::restore(&world, scholar).is_ok());
+}
