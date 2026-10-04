@@ -36,6 +36,7 @@ pub(super) fn check(
     flags(world, state, &progress)?;
     evidence(state, &progress)?;
     phases(world, state, &progress)?;
+    outcome(world, state)?;
     dialogue(world, state)
 }
 
@@ -823,6 +824,23 @@ fn phases(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<(
                         .any(|e| matches!(e, Effect::EnterPhase { phase } if phase == current))
             }),
         "invalid story phase",
+    )
+}
+
+/// A recorded outcome is authored and its condition once held; without one,
+/// none holds, since the first command it held after would have recorded it.
+fn outcome(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    ensure(
+        match &state.outcome {
+            Some(id) => world
+                .world
+                .outcomes
+                .iter()
+                .find(|o| &o.id == id)
+                .is_some_and(|o| lasting(world, state, Some(&o.when))),
+            None => rules::outcomes(world, state).is_empty(),
+        },
+        "invalid route outcome",
     )
 }
 

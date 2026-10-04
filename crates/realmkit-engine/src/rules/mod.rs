@@ -303,8 +303,31 @@ pub(super) fn execute(
                 events.push(Event::DialogueEnded);
             }
         }
+        if state.outcome.is_none() {
+            match outcomes(world, state).as_slice() {
+                [] => {}
+                [one] => {
+                    state.outcome = Some(one.clone());
+                    events.push(Event::OutcomeReached {
+                        outcome: one.clone(),
+                    });
+                }
+                many => return Err(EngineError::AmbiguousOutcome(many.to_vec())),
+            }
+        }
     }
     Ok(events)
+}
+
+/// The authored outcomes whose conditions hold now, in authored order.
+pub(super) fn outcomes(world: &WorldSpec, state: &GameState) -> Vec<Id> {
+    world
+        .world
+        .outcomes
+        .iter()
+        .filter(|o| holds(state, &o.when))
+        .map(|o| o.id.clone())
+        .collect()
 }
 
 fn move_to(

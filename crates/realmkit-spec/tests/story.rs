@@ -123,3 +123,23 @@ fn phases_and_prerequisites_are_checked() {
     });
     assert!(world.diagnostics().is_empty());
 }
+
+#[test]
+fn outcomes_are_checked() {
+    let ending = RouteOutcome {
+        id: "map_home".into(),
+        name: "The map is home".into(),
+        text: "The end.".into(),
+        when: done("lost_map"),
+    };
+    let mut world = chained();
+    world.world.outcomes = vec![ending.clone()];
+    assert!(world.diagnostics().is_empty());
+    world.world.outcomes.push(ending.clone());
+    assert!(codes(&world).contains(&"duplicate_id".to_string()));
+    world.world.outcomes = vec![RouteOutcome {
+        when: done("missing"),
+        ..ending
+    }];
+    assert!(codes(&world).contains(&"missing_reference".to_string()));
+}

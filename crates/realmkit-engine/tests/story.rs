@@ -145,3 +145,109 @@ fn saves_keep_to_phases_and_prerequisites() {
     }
     assert!(Engine::restore(&world, solved).is_ok());
 }
+
+fn outcome(id: &str, when: Condition) -> RouteOutcome {
+    RouteOutcome {
+        id: id.into(),
+        name: id.into(),
+        text: "The end.".into(),
+        when,
+    }
+}
+
+fn map_home() -> Condition {
+    Condition::Quest {
+        quest: "lost_map".into(),
+        status: QuestStatus::Completed,
+    }
+}
+
+#[test]
+fn an_outcome_is_reached_once_and_play_goes_on() {
+    let mut world = chained();
+    world.world.outcomes = vec![outcome("map_home", map_home())];
+    let mut engine = reader(&world);
+    let events = solve(&mut engine);
+    let reached = Event::OutcomeReached {
+        outcome: "map_home".into(),
+    };
+    assert_eq!(events.last(), Some(&reached));
+    assert_eq!(engine.state().outcome.as_deref(), Some("map_home"));
+    // Play continues, and the outcome is never reached again.
+    let more = engine.execute(Move(East)).unwrap();
+    assert!(!more.contains(&reached));
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn two_outcomes_at_once_refuse_the_command() {
+    let mut world = chained();
+    world.world.outcomes = vec![
+        outcome("map_home", map_home()),
+        outcome(
+            "vault_open",
+            Condition::Flag {
+                flag: "vault_open".into(),
+            },
+        ),
+    ];
+    let mut engine = reader(&world);
+    let error = solve_last_refused(&mut engine);
+    assert!(
+        matches!(error, EngineError::AmbiguousOutcome(ids) if ids == ["map_home", "vault_open"])
+    );
+    assert_eq!(engine.state().outcome, None);
+    assert_eq!(engine.state().quests["lost_map"], QuestStatus::Ready);
+}
+
+/// Plays up to Pell's thanks, which must be refused.
+fn solve_last_refused(engine: &mut Engine<'_>) -> EngineError {
+    for command in [
+        Talk("archivist".into()),
+        ChooseDialogue(1),
+        ChooseDialogue(1),
+        Move(North),
+        Talk("copyist".into()),
+        ChooseDialogue(1),
+        Move(South),
+        Talk("archivist".into()),
+    ] {
+        engine.execute(command).unwrap();
+    }
+    engine.execute(ChooseDialogue(1)).unwrap_err()
+}
+
+#[test]
+fn no_outcome_may_hold_at_the_start() {
+    let mut world = chained();
+    world.world.outcomes = vec![outcome(
+        "scholarly",
+        Condition::Flag {
+            flag: "river_scholar".into(),
+        },
+    )];
+    assert!(matches!(
+        Engine::start(&world, 0, &["scholar".into()]),
+        Err(EngineError::OutcomeAtStart)
+    ));
+    assert!(Engine::start(&world, 0, &["reader".into()]).is_ok());
+}
+
+#[test]
+fn saves_record_an_outcome_exactly_when_one_was_reached() {
+    let mut world = chained();
+    world.world.outcomes = vec![outcome("map_home", map_home())];
+    let mut solved = reader(&world);
+    solve(&mut solved);
+    let solved = solved.snapshot();
+    let fresh = reader(&world).snapshot();
+    let mut unrecorded = solved.clone();
+    unrecorded.state.outcome = None;
+    let mut unknown = solved.clone();
+    unknown.state.outcome = Some("missing".into());
+    let mut early = fresh.clone();
+    early.state.outcome = Some("map_home".into());
+    for snapshot in [unrecorded, unknown, early] {
+        assert!(Engine::restore(&world, snapshot).is_err());
+    }
+}

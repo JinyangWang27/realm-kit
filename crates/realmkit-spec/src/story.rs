@@ -260,3 +260,14 @@ pub struct StartOption {
     #[serde(default)]
     pub effects: Vec<Effect>,
 }
+
+/// An authored ending of the route, reached the moment its condition first
+/// holds. A playthrough records at most one, and play may go on after it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RouteOutcome {
+    pub id: Id,
+    pub name: String,
+    pub text: String,
+    pub when: Condition,
+}

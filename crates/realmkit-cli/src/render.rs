@@ -610,6 +610,11 @@ pub fn events(
                 paint.good(EVIDENCE),
                 world.evidence(evidence).unwrap().name
             )?,
+            Event::OutcomeReached { outcome } => {
+                let outcome = world.world.outcomes.iter().find(|o| &o.id == outcome);
+                let outcome = outcome.unwrap();
+                writeln!(output, "{}\n{}", paint.title(&outcome.name), outcome.text)?
+            }
             Event::PhaseEntered { phase } => {
                 let phase = &world.world.phases[world.phase_index(phase).unwrap()];
                 writeln!(output, "{}", paint.title(&format!("— {} —", phase.name)))?

@@ -342,6 +342,10 @@ pub enum Event {
     EvidenceDiscovered {
         evidence: Id,
     },
+    /// The route reached this authored outcome; play may go on.
+    OutcomeReached {
+        outcome: Id,
+    },
     /// The story moved on to this phase.
     PhaseEntered {
         phase: Id,

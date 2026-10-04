@@ -57,6 +57,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     story::start_questions(&mut out, w);
     story::evidence(&mut out, w);
     story::phases(&mut out, w);
+    story::outcomes(&mut out, w);
     time::rules(&mut out, w);
     if let Some(economy) = w.economy() {
         economy::rules(&mut out, w, economy);

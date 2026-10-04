@@ -195,6 +195,9 @@ pub struct GameState {
     /// current one, which is last. Empty in a world without phases.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub phases: Vec<Id>,
+    /// The route outcome reached, for good; at most one per playthrough.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<Id>,
 }
 
 /// A proficiency's rank, split by where it came from: points the player

@@ -355,3 +355,15 @@ pub(super) fn phases(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
         }
     }
 }
+
+/// Outcomes have unique IDs and valid conditions.
+pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    ids(
+        out,
+        "outcome",
+        w.world.outcomes.iter().map(|o| o.id.as_str()),
+    );
+    for outcome in &w.world.outcomes {
+        condition(out, w, &outcome.id, Some(&outcome.when));
+    }
+}

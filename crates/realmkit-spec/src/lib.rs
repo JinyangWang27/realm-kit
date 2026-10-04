@@ -95,6 +95,9 @@ pub struct World {
     /// The story's phases in order; absent in a world without them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub phases: Vec<Phase>,
+    /// The route's authored endings; absent in a world without them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub outcomes: Vec<RouteOutcome>,
 }
 
 // Serde defaults shared by several content types.
