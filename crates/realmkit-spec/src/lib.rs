@@ -31,7 +31,7 @@ pub use troops::*;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 17;
+pub const FORMAT_VERSION: u32 = 18;
 /// The files every package holds, by name.
 pub const PACKAGE_FILES: [&str; 6] = [
     "world.json",

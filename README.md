@@ -187,7 +187,9 @@ and talking to people reveals evidence (`New evidence: Wheel ruts`), which
 stays known for good and is not the same as carrying an item; places such
 as a hidden fork appear on the map, and their roads open, only once you
 have learned of them. The Quests panel is the journal: the chapter, your
-quests, main ones marked, the evidence you hold and the ending reached.
+quests, main ones marked, the evidence you hold with how you read it now,
+and the ending reached. When something you learn changes how you read
+evidence you already hold, play says so (`Understanding changed — …`).
 `examples/caravan-trail` is an investigation slice: a caravan reaches
 Thornwick, another caravan goes missing, and its trail can be followed by
 fighting, paying or facing down bandits, or by finding a survivor, until

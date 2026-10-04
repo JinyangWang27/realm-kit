@@ -1195,7 +1195,10 @@ dialogue in the opening town would otherwise duplicate content.
    Authored conditions decide what evidence supports; there are no
    deductions, contradictions or accusations yet. `examples/caravan-trail`
    reaches its conclusion by several evidence paths, and the quiet archive
-   gates Pell's thanks on the stitched map.
+   gates Pell's thanks on the stitched map. Format 18 adds each evidence's
+   source, fixed facts and interpretations that later evidence, flags or
+   phases unlock, reported as `EvidenceReinterpreted`: the evidence stays the
+   same while the player's understanding of it changes.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and tested paths to completion, can be saved/resumed, and include at least one

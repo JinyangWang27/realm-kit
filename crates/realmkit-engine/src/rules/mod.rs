@@ -22,7 +22,8 @@ pub(super) use proficiency::{
 };
 pub(super) use retinue::{leave, promote, prune};
 pub(super) use story::{
-    apply as apply_effects, choices, grant_items, grant_xp, journal, progress, set_flag,
+    apply as apply_effects, choices, grant_items, grant_xp, journal, progress, reading, readings,
+    set_flag,
 };
 
 /// Evaluates a condition against the state; pure, so it may run any number of times.
@@ -213,6 +214,8 @@ pub(super) fn execute(
     if leading(state) && !panel && !order {
         return Err(EngineError::InEncounter);
     }
+    // Readings are derived, so a change shows only by comparing.
+    let readings_before = (!panel).then(|| readings(world, state));
     let mut events = Vec::new();
     match command {
         Command::Look => events.push(Event::LocationViewed {
@@ -301,6 +304,19 @@ pub(super) fn execute(
             {
                 state.dialogue = None;
                 events.push(Event::DialogueEnded);
+            }
+        }
+        // Evidence found by this command reports itself as discovered.
+        let before = readings_before.unwrap_or_default();
+        for (evidence, reading) in readings(world, state) {
+            let known_before = before.iter().find(|(id, _)| *id == evidence);
+            if let (Some((_, was)), Some(now)) = (known_before, reading) {
+                if *was != Some(now) {
+                    events.push(Event::EvidenceReinterpreted {
+                        evidence: evidence.clone(),
+                        reading: now,
+                    });
+                }
             }
         }
         // Validation proves outcomes exclude each other, so at most one holds.

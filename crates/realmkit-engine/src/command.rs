@@ -342,6 +342,13 @@ pub enum Event {
     EvidenceDiscovered {
         evidence: Id,
     },
+    /// Something learned since changed how known evidence reads: its
+    /// current interpretation is now `reading` (0-based). The facts are as
+    /// they were.
+    EvidenceReinterpreted {
+        evidence: Id,
+        reading: usize,
+    },
     /// The route reached this authored outcome; play may go on.
     OutcomeReached {
         outcome: Id,
