@@ -214,4 +214,30 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             }
         }
     }
+    // The richest answers on top of the starting purse must stay in bounds,
+    // or choosing them could not start a game. Amounts already out of
+    // bounds on their own are reported as such.
+    if let Some(economy) = w.economy().filter(|e| e.currency.start <= CURRENCY_BOUND) {
+        let granted = |o: &StartOption| {
+            o.effects
+                .iter()
+                .filter_map(|e| match e {
+                    Effect::GrantCurrency { amount } if *amount <= CURRENCY_BOUND => Some(*amount),
+                    _ => None,
+                })
+                .fold(0, u64::saturating_add)
+        };
+        let most = questions
+            .iter()
+            .map(|q| q.options.iter().map(granted).max().unwrap_or(0))
+            .fold(economy.currency.start, u64::saturating_add);
+        if most > CURRENCY_BOUND {
+            issue(
+                out,
+                &w.world.id,
+                "start_overflow",
+                format!("the starting currency and the most the start answers grant come to {most}, past {CURRENCY_BOUND}"),
+            );
+        }
+    }
 }

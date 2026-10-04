@@ -644,7 +644,9 @@ an answer never skips or adds a question.
   `grant_items`, `grant_currency`, `grant_technique` (with XP, since an answer
   is given once) and `raise_proficiency`. Quests, `take_items`,
   `pay_currency` and workshops are refused (`invalid_effect`): no giver or
-  market is at hand before play begins.
+  market is at hand before play begins. The starting currency plus the
+  largest currency grant of each question must stay within `CURRENCY_BOUND`
+  (`start_overflow`).
 - Later conditions and text read what an answer produced like any other
   state. Saves keep the chosen option IDs, and a save must answer every
   question with one of its options.

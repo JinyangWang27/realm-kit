@@ -205,3 +205,30 @@ fn start_questions_are_checked_with_stable_codes() {
         assert_eq!(codes(&world), [code], "case {index}");
     }
 }
+
+#[test]
+fn the_richest_start_answers_must_fit_the_currency_bound() {
+    let grant = |amount| StartOption {
+        id: format!("grant_{amount}"),
+        text: "Coin.".into(),
+        effects: vec![Effect::GrantCurrency { amount }],
+    };
+    let question = |id: &str, options| StartQuestion {
+        id: id.into(),
+        name: "Purse".into(),
+        text: "How much do you carry?".into(),
+        options,
+    };
+    let mut world = marches();
+    let start = world.economy().unwrap().currency.start;
+    // Alternatives in one question do not add up.
+    let most = CURRENCY_BOUND - start;
+    world.world.start_questions = vec![question("purse", vec![grant(most), grant(most - 1)])];
+    assert!(codes(&world).is_empty(), "{:?}", codes(&world));
+    // Answers to separate questions do.
+    world
+        .world
+        .start_questions
+        .push(question("legacy", vec![grant(1)]));
+    assert_eq!(codes(&world), ["start_overflow"]);
+}
