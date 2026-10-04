@@ -1,0 +1,131 @@
+[
+  { "id": "traveller", "name": "You", "description": "A traveller with the caravan, dust to the knees." },
+  {
+    "id": "iselt",
+    "name": "Caravan-master Iselt",
+    "description": "She rides with the reins in one hand and a ledger in the other.",
+    "dialogue": "iselt"
+  },
+  {
+    "id": "city_gate",
+    "kind": "feature",
+    "name": "the south gate",
+    "description": "Iron-bound doors, open by day.",
+    "dialogue": "city_gate"
+  },
+  {
+    "id": "dravin",
+    "name": "Factor Dravin",
+    "description": "The Hadda house's factor, in a good coat gone creased.",
+    "dialogue": "dravin"
+  },
+  {
+    "id": "moss",
+    "name": "Ostler Moss",
+    "description": "Broad, patient, smelling of hay.",
+    "dialogue": "moss"
+  },
+  {
+    "id": "caravan_bales",
+    "kind": "feature",
+    "name": "the caravan's bales",
+    "description": "Cotton bales stacked beside the wagons.",
+    "requires": { "kind": "quest", "quest": "bales", "status": "active" },
+    "dialogue": "caravan_bales"
+  },
+  {
+    "id": "ama",
+    "name": "Sister Ama",
+    "description": "A priest of the Dawn Hall, her sleeves smudged with lamp-black.",
+    "dialogue": "ama"
+  },
+  {
+    "id": "tenko",
+    "name": "Archivist Tenko",
+    "description": "Keeper of the guild archive, who trusts paper over people.",
+    "dialogue": "tenko"
+  },
+  {
+    "id": "garrow",
+    "name": "Old Garrow",
+    "description": "A retired gate guard who grew up among the hill folk.",
+    "dialogue": "garrow"
+  },
+  {
+    "id": "cold_camp",
+    "kind": "feature",
+    "name": "the cold camp",
+    "description": "Firepits, a dropped cup, and tracks.",
+    "dialogue": "cold_camp"
+  },
+  {
+    "id": "rask",
+    "name": "Rask",
+    "description": "A lean bandit with a studded club.",
+    "requires": {
+      "kind": "not",
+      "condition": {
+        "kind": "any",
+        "of": [
+          { "kind": "flag", "flag": "bandits_paid" },
+          { "kind": "flag", "flag": "bandits_cowed" }
+        ]
+      }
+    },
+    "dialogue": "rask",
+    "combat": {
+      "stats": { "hp": 30, "patk": 10, "pdef": 5, "satk": 0, "sdef": 4, "speed": 95 },
+      "xp": 12,
+      "group": "ridge_bandits"
+    }
+  },
+  {
+    "id": "lookout",
+    "name": "Rask's lookout",
+    "description": "A boy with a sling, trying to look dangerous.",
+    "requires": {
+      "kind": "not",
+      "condition": {
+        "kind": "any",
+        "of": [
+          { "kind": "flag", "flag": "bandits_paid" },
+          { "kind": "flag", "flag": "bandits_cowed" }
+        ]
+      }
+    },
+    "combat": {
+      "stats": { "hp": 18, "patk": 8, "pdef": 3, "satk": 0, "sdef": 3, "speed": 100 },
+      "xp": 6,
+      "group": "ridge_bandits"
+    }
+  },
+  {
+    "id": "bandit_spoils",
+    "kind": "feature",
+    "name": "the bandits' haul",
+    "description": "Crates under a tarp.",
+    "requires": { "kind": "flag", "flag": "bandits_beaten" },
+    "dialogue": "bandit_spoils"
+  },
+  {
+    "id": "fork_stones",
+    "kind": "feature",
+    "name": "the paved branch",
+    "description": "Fitted stones running east into the hills.",
+    "dialogue": "fork_stones"
+  },
+  {
+    "id": "ennick",
+    "name": "Ennick",
+    "description": "A drover from the lost wagons, hiding in the reeds.",
+    "requires": { "kind": "evidence", "evidence": "impossible_fork" },
+    "dialogue": "ennick"
+  },
+  {
+    "id": "stone_ring",
+    "kind": "feature",
+    "name": "the stone ring",
+    "description": "Knee-high stones in a perfect circle.",
+    "dialogue": "stone_ring"
+  }
+]

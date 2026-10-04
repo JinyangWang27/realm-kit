@@ -1,0 +1,62 @@
+[
+  {
+    "id": "south_road",
+    "name": "The South Road",
+    "description": "The caravan creaks north through dry hills. Thornwick's towers show on the horizon.",
+    "characters": ["iselt"],
+    "map": { "x": 900, "y": 1200, "kind": "waypoint" }
+  },
+  {
+    "id": "thornwick",
+    "name": "Thornwick",
+    "description": "A walled market town where three roads meet. Warehouses crowd the gate square, and the Dawn Hall's bell carries over the roofs.",
+    "characters": ["iselt", "city_gate", "dravin", "moss", "caravan_bales", "ama", "tenko", "garrow"],
+    "safe": true,
+    "map": { "x": 1000, "y": 1000, "kind": "town" }
+  },
+  {
+    "id": "abandoned_camp",
+    "name": "Abandoned Camp",
+    "description": "A ring of cold firepits beside the east track. Nobody has slept here for days.",
+    "characters": ["cold_camp"],
+    "map": { "x": 1150, "y": 900, "kind": "waypoint" },
+    "known_when": { "kind": "phase", "phase": "lost_wagons" }
+  },
+  {
+    "id": "bandit_ridge",
+    "name": "Bandit Ridge",
+    "description": "A rocky shelf over the track, good for watching travellers.",
+    "characters": ["rask", "lookout", "bandit_spoils"],
+    "map": { "x": 1260, "y": 820, "kind": "waypoint" },
+    "known_when": { "kind": "phase", "phase": "lost_wagons" }
+  },
+  {
+    "id": "impossible_fork",
+    "name": "The Impossible Fork",
+    "description": "The track splits. One branch runs on as it always has. The other is paved, and should not be here.",
+    "characters": ["fork_stones", "ennick"],
+    "map": { "x": 1280, "y": 960, "kind": "waypoint" },
+    "known_when": { "kind": "evidence", "evidence": "wheel_ruts" }
+  },
+  {
+    "id": "old_stones",
+    "name": "The Stone Ring",
+    "description": "The paved branch ends on a bare hilltop, at a low ring of fitted stones.",
+    "characters": ["stone_ring"],
+    "map": { "x": 1420, "y": 930, "kind": "waypoint" },
+    "known_when": {
+      "kind": "all",
+      "of": [
+        { "kind": "evidence", "evidence": "impossible_fork" },
+        {
+          "kind": "any",
+          "of": [
+            { "kind": "evidence", "evidence": "displaced_cargo" },
+            { "kind": "evidence", "evidence": "bandit_testimony" },
+            { "kind": "evidence", "evidence": "survivor_testimony" }
+          ]
+        }
+      ]
+    }
+  }
+]

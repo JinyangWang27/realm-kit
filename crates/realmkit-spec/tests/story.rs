@@ -143,3 +143,82 @@ fn outcomes_are_checked() {
     }];
     assert!(codes(&world).contains(&"missing_reference".to_string()));
 }
+
+/// The caravan slice, broken in the ways an author could break it.
+#[test]
+fn the_caravan_slice_rejects_impossible_progression() {
+    assert!(caravan_trail().diagnostics().is_empty());
+    fn choices<'w>(w: &'w mut WorldSpec, id: &str) -> impl Iterator<Item = &'w mut DialogueChoice> {
+        let dialogue = w.dialogues.iter_mut().find(|d| d.id == id).unwrap();
+        dialogue.nodes.iter_mut().flat_map(|n| &mut n.choices)
+    }
+    fn quest<'w>(w: &'w mut WorldSpec, id: &str) -> &'w mut Quest {
+        w.quests.iter_mut().find(|q| q.id == id).unwrap()
+    }
+    type Change = fn(&mut WorldSpec);
+    let cases: Vec<(Change, &str)> = vec![
+        // Nothing enters The Buried Road's phase any more.
+        (
+            |w| {
+                for choice in choices(w, "tenko") {
+                    choice
+                        .effects
+                        .retain(|e| !matches!(e, Effect::EnterPhase { .. }));
+                }
+            },
+            "unreachable_phase",
+        ),
+        // Without the ring, no reading can be asked for.
+        (
+            |w| {
+                for choice in choices(w, "stone_ring") {
+                    choice
+                        .effects
+                        .retain(|e| !matches!(e, Effect::DiscoverEvidence { .. }));
+                }
+            },
+            "undiscoverable_evidence",
+        ),
+        // The mystery cannot wait on its own sequel.
+        (
+            |w| quest(w, "lost_wagons").requires = Some(done("buried_road")),
+            "quest_cycle",
+        ),
+        // Nor on the ostler's errand.
+        (
+            |w| quest(w, "buried_road").requires = Some(done("bales")),
+            "main_requires_side",
+        ),
+        (
+            |w| {
+                w.locations[2].known_when = Some(Condition::Evidence {
+                    evidence: "rumour".into(),
+                })
+            },
+            "missing_reference",
+        ),
+        (
+            |w| w.world.evidence[1].item = Some("crate".into()),
+            "missing_reference",
+        ),
+        (
+            |w| {
+                w.characters
+                    .iter_mut()
+                    .find(|c| c.id == "rask")
+                    .unwrap()
+                    .kind = CharacterKind::Feature
+            },
+            "invalid_feature",
+        ),
+    ];
+    for (change, code) in cases {
+        let mut world = caravan_trail();
+        change(&mut world);
+        assert!(
+            codes(&world).contains(&code.to_string()),
+            "{code}: {:?}",
+            codes(&world)
+        );
+    }
+}

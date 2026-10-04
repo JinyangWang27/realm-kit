@@ -1,0 +1,140 @@
+{
+  "format_version": 17,
+  "id": "caravan_trail",
+  "name": "The Caravan Trail",
+  "language": "en",
+  "start": "south_road",
+  "player": "traveller",
+  "flags": [
+    "guard_background", "merchant_background", "scribe_background",
+    "arrived", "bales_unloaded", "caravan_overdue",
+    "bandits_beaten", "bandits_paid", "bandits_cowed", "seal_taken",
+    "structure_found", "lead_chosen",
+    "shrines_reached", "milestones_reached", "hill_folk_reached"
+  ],
+  "combat": {
+    "special_name": "Focus",
+    "timeline": { "action_cost": 100000, "speed_cap": 200 },
+    "levels": [
+      { "xp": 0, "stats": { "hp": 60, "patk": 12, "pdef": 8, "satk": 2, "sdef": 6, "speed": 100 } },
+      { "xp": 30, "stats": { "hp": 68, "patk": 13, "pdef": 9, "satk": 2, "sdef": 7, "speed": 100 } }
+    ],
+    "groups": [{ "id": "ridge_bandits", "victory_flags": ["bandits_beaten"] }],
+    "narrative": {
+      "attack": ["{attacker} strike {target} for {damage} damage."],
+      "hurt": ["{attacker} hits {target}: {damage} damage."],
+      "victory": "{target} goes down.",
+      "death": "The dust of the ridge is the last thing you see.\nStart a new game to try again."
+    }
+  },
+  "time": {
+    "start": 360,
+    "clock": "Day {day}, {hour}:{minute}",
+    "wait": 60,
+    "rest": 480
+  },
+  "roads": [
+    { "id": "south-road", "between": ["south_road", "thornwick"], "minutes": 240 },
+    { "id": "east-track", "between": ["thornwick", "abandoned_camp"], "minutes": 180 },
+    { "id": "ridge-path", "between": ["abandoned_camp", "bandit_ridge"], "minutes": 60 },
+    { "id": "rut-trail", "between": ["abandoned_camp", "impossible_fork"], "minutes": 90 },
+    { "id": "ridge-descent", "between": ["bandit_ridge", "impossible_fork"], "minutes": 60 },
+    { "id": "old-way", "between": ["impossible_fork", "old_stones"], "minutes": 120 }
+  ],
+  "events": [
+    {
+      "id": "caravan_overdue",
+      "schedule": { "at": 1080 },
+      "effects": [{ "kind": "set_flag", "flag": "caravan_overdue" }]
+    }
+  ],
+  "start_questions": [
+    {
+      "id": "background",
+      "name": "Background",
+      "text": "Before the caravan, who were you?",
+      "options": [
+        {
+          "id": "caravan_guard",
+          "text": "A caravan guard, hired at the southern wells.",
+          "effects": [{ "kind": "set_flag", "flag": "guard_background" }]
+        },
+        {
+          "id": "merchant_child",
+          "text": "A merchant's child, sent north with a little silver.",
+          "effects": [
+            { "kind": "set_flag", "flag": "merchant_background" },
+            { "kind": "grant_items", "items": [{ "item": "silver", "quantity": 2 }] }
+          ]
+        },
+        {
+          "id": "temple_scribe",
+          "text": "A temple scribe, who reads the old letters.",
+          "effects": [{ "kind": "set_flag", "flag": "scribe_background" }]
+        }
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "wheel_ruts",
+      "name": "Wheel ruts",
+      "description": "Deep ruts lead from the cold camp to a fork in the track that no map shows."
+    },
+    {
+      "id": "displaced_cargo",
+      "name": "Displaced cargo",
+      "description": "The bandits' crates carry the lost wagons' seal; they found them scattered beyond the fork, not taken from wagons.",
+      "item": "caravan_seal"
+    },
+    {
+      "id": "bandit_testimony",
+      "name": "Rask's account",
+      "description": "Rask swears the crates lay in the grass past the fork, with no wagons and no tracks leading away."
+    },
+    {
+      "id": "impossible_fork",
+      "name": "The impossible fork",
+      "description": "A second road branches east where the land should allow none, paved with stones older than Thornwick."
+    },
+    {
+      "id": "survivor_testimony",
+      "name": "Ennick's account",
+      "description": "The drover Ennick saw the lead wagons take the east branch at dusk. By morning the branch was gone."
+    },
+    {
+      "id": "strange_stonework",
+      "name": "Strange stonework",
+      "description": "A low ring of fitted stones on the hill where the east road ends. The caravan's tracks stop at its threshold."
+    },
+    {
+      "id": "priest_reading",
+      "name": "The Dawn Hall's reading",
+      "description": "Sister Ama calls the ring a drowned-god shrine: a road that opens to prayer and closes behind the faithless."
+    },
+    {
+      "id": "scholar_reading",
+      "name": "The archivist's reading",
+      "description": "Archivist Tenko names the stones a milestone of an older road, built and then hidden, running north."
+    },
+    {
+      "id": "veteran_reading",
+      "name": "The hill-folk reading",
+      "description": "Old Garrow says the hill folk leave the rings alone, because the roads between them walk at night."
+    }
+  ],
+  "phases": [
+    { "id": "road", "name": "The Road to Thornwick" },
+    { "id": "thornwick", "name": "Thornwick" },
+    { "id": "lost_wagons", "name": "The Lost Wagons" },
+    { "id": "leads", "name": "The Buried Road" }
+  ],
+  "outcomes": [
+    {
+      "id": "first_chapter",
+      "name": "The first chapter closes",
+      "text": "You have chosen your road. The rest of the realm waits beyond Thornwick's walls. (End of the slice.)",
+      "when": { "kind": "flag", "flag": "lead_chosen" }
+    }
+  ]
+}

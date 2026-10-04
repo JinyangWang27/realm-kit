@@ -88,3 +88,66 @@ fn snapshots_of_another_format_are_refused_by_version() {
         .to_string()
         .contains("unsupported save format version 1"));
 }
+
+/// The caravan slice as a browser would fetch it.
+fn caravan_files(name: &str) -> std::io::Result<Vec<u8>> {
+    let bytes: &[u8] = match name {
+        "world.json" => include_bytes!("../../../examples/caravan-trail/world.json"),
+        "locations.json" => include_bytes!("../../../examples/caravan-trail/locations.json"),
+        "characters.json" => include_bytes!("../../../examples/caravan-trail/characters.json"),
+        "items.json" => include_bytes!("../../../examples/caravan-trail/items.json"),
+        "quests.json" => include_bytes!("../../../examples/caravan-trail/quests.json"),
+        "dialogues.json" => include_bytes!("../../../examples/caravan-trail/dialogues.json"),
+        _ => return Err(std::io::ErrorKind::NotFound.into()),
+    };
+    Ok(bytes.to_vec())
+}
+
+/// A graphical client's whole loop over JSON: it picks offered actions and
+/// dialogue choices, reads the journal and map views, and saves halfway.
+#[test]
+fn a_host_plays_the_caravan_slice_through_json_alone() {
+    let world = WorldSpec::from_files(caravan_files).unwrap();
+    // The start question and its answer travel as plain data too.
+    let question = &world.world.start_questions[0];
+    let answer: Id = wire(&question.options[1].id);
+    let mut host = Engine::start(&world, 7, &[answer]).unwrap();
+    let commands: Vec<Command> = serde_json::from_str(
+        r#"[{"talk":"iselt"}, {"choose_dialogue":1}, {"travel":"thornwick"},
+            {"talk":"city_gate"}, {"choose_dialogue":1}, {"talk":"iselt"}, {"choose_dialogue":1},
+            "rest", {"talk":"dravin"}, {"choose_dialogue":1}, {"choose_dialogue":1},
+            {"travel":"abandoned_camp"}, {"talk":"cold_camp"}, {"choose_dialogue":1},
+            {"travel":"bandit_ridge"}, {"talk":"rask"}, {"choose_dialogue":1}, {"choose_dialogue":1},
+            {"travel":"impossible_fork"}, {"talk":"fork_stones"}, {"choose_dialogue":1},
+            {"travel":"old_stones"}, {"talk":"stone_ring"}, {"choose_dialogue":1}, "quests", "map"]"#,
+    )
+    .unwrap();
+    let mut saved = None;
+    for (i, command) in commands.into_iter().enumerate() {
+        // Every command is one the host could have offered.
+        let offered = wire(&host.actions());
+        let in_dialogue = !host.dialogue_choices().is_empty();
+        assert!(
+            in_dialogue || offered.iter().any(|a| a.command == command && a.available),
+            "{command:?} not offered"
+        );
+        let events = host.execute(command).unwrap();
+        assert_eq!(wire(&events), events);
+        if i == 10 {
+            saved = Some(host.snapshot().to_json());
+        }
+    }
+    let journal = wire(&host.journal());
+    assert_eq!(journal, host.journal());
+    assert_eq!(journal.phase.as_deref(), Some("lost_wagons"));
+    assert!(journal.evidence.contains(&"bandit_testimony".to_string()));
+    let map = wire(&host.map_view().unwrap());
+    assert_eq!(map.here, "old_stones");
+    assert_eq!(map.places.len(), 6);
+    // The save resumes from its bytes alone, with the quest just taken.
+    let resumed =
+        Engine::restore(&world, SaveSnapshot::from_json(&saved.unwrap()).unwrap()).unwrap();
+    assert_eq!(resumed.state().start_choices, ["merchant_child"]);
+    assert_eq!(resumed.state().player.location, "thornwick");
+    assert_eq!(resumed.journal().phase.as_deref(), Some("lost_wagons"));
+}

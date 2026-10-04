@@ -1,0 +1,96 @@
+[
+  {
+    "id": "road_to_thornwick",
+    "name": "The Road to Thornwick",
+    "giver": "iselt",
+    "main": true,
+    "objective": { "kind": "flag", "flag": "arrived" },
+    "introduction": "Iselt nods. 'Then see us through the south gate of Thornwick. Four hours, if the axles hold.'",
+    "progress": "The caravan is through the gate. Iselt will want to know.",
+    "completion": "Iselt closes her ledger. 'Delivered. Welcome to Thornwick.'"
+  },
+  {
+    "id": "bales",
+    "name": "Bales for the Ostler",
+    "giver": "moss",
+    "requires": { "kind": "phase", "phase": "thornwick" },
+    "objective": { "kind": "flag", "flag": "bales_unloaded" },
+    "introduction": "Moss points at the stacked cotton. 'Into the warehouse, before the dew gets at it.'",
+    "progress": "The bales are in the warehouse. Moss owes you two silver.",
+    "completion": "Moss pays you two silver.",
+    "reward_items": [{ "item": "silver", "quantity": 2 }]
+  },
+  {
+    "id": "lost_wagons",
+    "name": "The Lost Wagons",
+    "giver": "dravin",
+    "main": true,
+    "requires": {
+      "kind": "all",
+      "of": [
+        { "kind": "quest", "quest": "road_to_thornwick", "status": "completed" },
+        { "kind": "flag", "flag": "caravan_overdue" }
+      ]
+    },
+    "objective": { "kind": "flag", "flag": "structure_found" },
+    "introduction": "Dravin grips your arm. 'Find the Hadda caravan, or find what happened to it.'",
+    "progress": "The caravan's tracks end at a ring of old stones. Dravin should hear it.",
+    "completion": "Dravin pays the finder's fee with a shaking hand.",
+    "reward_xp": 20,
+    "reward_items": [{ "item": "silver", "quantity": 3 }]
+  },
+  {
+    "id": "buried_road",
+    "name": "The Buried Road",
+    "giver": "tenko",
+    "main": true,
+    "requires": {
+      "kind": "all",
+      "of": [
+        { "kind": "quest", "quest": "lost_wagons", "status": "completed" },
+        {
+          "kind": "any",
+          "of": [
+            { "kind": "all", "of": [{ "kind": "evidence", "evidence": "priest_reading" }, { "kind": "evidence", "evidence": "scholar_reading" }] },
+            { "kind": "all", "of": [{ "kind": "evidence", "evidence": "priest_reading" }, { "kind": "evidence", "evidence": "veteran_reading" }] },
+            { "kind": "all", "of": [{ "kind": "evidence", "evidence": "scholar_reading" }, { "kind": "evidence", "evidence": "veteran_reading" }] }
+          ]
+        }
+      ]
+    },
+    "objective": { "kind": "flag", "flag": "lead_chosen" },
+    "introduction": "Tenko spreads a blank map. 'A buried road, hidden and walking. Three threads lead from here. Choose which to pull.'",
+    "progress": "You have chosen a lead to follow along the Buried Road.",
+    "completion": "The Buried Road lies open before you."
+  },
+  {
+    "id": "lead_shrines",
+    "name": "Lead: The Drowned Shrines",
+    "giver": "ama",
+    "requires": { "kind": "phase", "phase": "leads" },
+    "objective": { "kind": "flag", "flag": "shrines_reached" },
+    "introduction": "Sister Ama's drowned shrines lie in the marshes south and west.",
+    "progress": "You have reached the drowned shrines.",
+    "completion": "The shrines have given up their secret."
+  },
+  {
+    "id": "lead_milestones",
+    "name": "Lead: The Northern Milestones",
+    "giver": "tenko",
+    "requires": { "kind": "phase", "phase": "leads" },
+    "objective": { "kind": "flag", "flag": "milestones_reached" },
+    "introduction": "Tenko's milestones run north, if the archive's oldest map is right.",
+    "progress": "You have found the next milestone.",
+    "completion": "The milestones point onward."
+  },
+  {
+    "id": "lead_hill_folk",
+    "name": "Lead: The Hill Folk",
+    "giver": "garrow",
+    "requires": { "kind": "phase", "phase": "leads" },
+    "objective": { "kind": "flag", "flag": "hill_folk_reached" },
+    "introduction": "Garrow's hill folk live east, among the rings they will not touch.",
+    "progress": "You have reached the hill folk.",
+    "completion": "The hill folk have told you what they know."
+  }
+]
