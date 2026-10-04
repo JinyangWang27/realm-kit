@@ -316,6 +316,12 @@ impl<'w> Engine<'w> {
         rules::map_view(self.world, &self.state)
     }
 
+    /// Whether the player knows of a place: where they stand, or its
+    /// `known_when` holds. Clients name only known places, roads included.
+    pub fn knows(&self, location: &str) -> bool {
+        rules::known(self.world, &self.state, location)
+    }
+
     /// The player's journal: phase, known quests, evidence and outcome.
     pub fn journal(&self) -> Journal {
         rules::journal(self.world, &self.state)

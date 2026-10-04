@@ -753,3 +753,25 @@ fn help_offers_examine_only_where_there_are_features() {
     assert!(help(CARAVAN).contains("examine <feature-id>"));
     assert!(!help(ARCHIVE).contains("examine"));
 }
+
+#[test]
+fn a_road_to_an_unknown_place_is_not_named() {
+    // Arrive at the camp, then study the ruts that point to the fork.
+    let walkthrough = std::fs::read_to_string(format!("{CARAVAN}/walkthrough.txt")).unwrap();
+    let until_camp = walkthrough.split("examine cold_camp").next().unwrap();
+    let output = run(
+        &["play", CARAVAN, "--line", "--seed", "7"],
+        &format!("{until_camp}examine cold_camp\nchoose 1\nlook\n"),
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    let (before, after) = text.split_once("New evidence: Wheel ruts").unwrap();
+    assert!(
+        before.contains("Roads: Thornwick (3 h), Bandit Ridge (1 h)\n"),
+        "{before}"
+    );
+    assert!(!before.contains("Impossible Fork"), "{before}");
+    assert!(
+        after.contains("The Impossible Fork (1 h 30 min)"),
+        "{after}"
+    );
+}

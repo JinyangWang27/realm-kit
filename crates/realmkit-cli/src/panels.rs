@@ -27,7 +27,9 @@ pub fn location(
         .roads
         .iter()
         .filter_map(|road| {
-            let to = world.location(road.leads(&location.id)?)?;
+            // A road to a place the player has not heard of is not shown.
+            let to = road.leads(&location.id).filter(|to| engine.knows(to))?;
+            let to = world.location(to)?;
             let mut notes = Vec::new();
             if road.minutes > 0 {
                 notes.push(duration(road.minutes));
