@@ -296,3 +296,34 @@ fn a_phase_behind_a_choice_this_playthrough_never_had_is_refused() {
     scholar.state.phases.push("search".into());
     assert!(Engine::restore(&world, scholar).is_ok());
 }
+
+#[test]
+fn a_choice_that_accepts_a_locked_quest_waits_for_it() {
+    // Pell offers the catalogue with no condition of her own; her thanks
+    // no longer hand it over.
+    let mut world = chained();
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    pell.nodes[0].choices[1].effects.pop();
+    pell.nodes[0].choices.push(realmkit_spec::DialogueChoice {
+        text: "Shall I catalogue the vault?".into(),
+        next: None,
+        requires: Some(Condition::Quest {
+            quest: "catalogue".into(),
+            status: QuestStatus::Available,
+        }),
+        effects: vec![Effect::AcceptQuest {
+            quest: "catalogue".into(),
+        }],
+    });
+    let offer = "Shall I catalogue the vault?";
+    let mut engine = reader(&world);
+    engine.execute(Talk("archivist".into())).unwrap();
+    assert!(!engine.dialogue_choices().contains(&offer));
+    // Once the map is home the catalogue opens, and Pell offers it.
+    solve(&mut engine);
+    engine.execute(Talk("archivist".into())).unwrap();
+    let choices = engine.dialogue_choices();
+    let number = choices.iter().position(|c| *c == offer).unwrap() + 1;
+    engine.execute(ChooseDialogue(number)).unwrap();
+    assert_eq!(engine.state().quests["catalogue"], QuestStatus::Ready);
+}

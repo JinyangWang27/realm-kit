@@ -18,7 +18,24 @@ pub(crate) fn choices<'a>(
         .choices
         .iter()
         .filter(|c| allowed(state, c.requires.as_ref()))
+        .filter(|c| !offers_locked_quest(world, state, c))
         .collect()
+}
+
+/// Whether taking the choice would be refused because a quest it accepts
+/// is not yet open. Earlier effects in its list count: completing one quest
+/// may open the next. Only choices accepting a gated quest are tried.
+// ponytail: tries the effects on a copy of the state each time choices are
+// listed; cache per node if worlds grow large.
+fn offers_locked_quest(world: &WorldSpec, state: &GameState, choice: &DialogueChoice) -> bool {
+    let gated = choice.effects.iter().any(|e| {
+        matches!(e, Effect::AcceptQuest { quest } if world.quest(quest).unwrap().requires.is_some())
+    });
+    gated
+        && matches!(
+            apply(world, &mut state.clone(), &choice.effects, &mut Vec::new()),
+            Err(EngineError::QuestLocked(_))
+        )
 }
 
 pub(crate) fn dialogue(

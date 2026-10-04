@@ -821,8 +821,10 @@ questline. Accepting after the defeat or flag makes the quest ready immediately.
 `reward_techniques` lists technique grants (see [Techniques](#techniques)). Accept/complete actions require the available
 giver in the player's current location, whether invoked by dialogue or a direct
 command. Completion grants rewards once, sets flags, and emits stored completion
-prose. A quest's own `requires` is its prerequisite; a dialogue choice that
-accepts it should carry the same condition, or taking the choice is refused.
+prose. A quest's own `requires` is its prerequisite: a dialogue choice that
+accepts the quest is hidden while taking it would be refused for that reason,
+counting the effects before it in the list (completing one quest may open
+the next), so the choice need not repeat the condition.
 
 ## Combat block, numeric rules and templates
 
