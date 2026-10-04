@@ -2,8 +2,8 @@
 
 use realmkit_spec::{
     Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack, MapPoint,
-    Proficiency, QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat, Stats,
-    WorldSpec, BASIC_POWER,
+    Proficiency, Quest, QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat,
+    Stats, WorldSpec, BASIC_POWER,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -318,6 +318,11 @@ impl<'w> Engine<'w> {
     /// places have no positions.
     pub fn map_view(&self) -> Option<MapView> {
         rules::map_view(self.world, &self.state)
+    }
+
+    /// The player's journal: phase, known quests, evidence and outcome.
+    pub fn journal(&self) -> Journal {
+        rules::journal(self.world, &self.state)
     }
 
     /// Who is here now: present under their conditions and not defeated.

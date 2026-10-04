@@ -433,3 +433,24 @@ pub struct MapExit {
     pub to: Id,
     pub direction: Direction,
 }
+
+/// What the player's journal shows: the story's phase, the quests the
+/// player knows of, the evidence discovered and the outcome reached.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Journal {
+    /// The current phase; `None` in a world without phases.
+    pub phase: Option<Id>,
+    /// Main quests, then side quests, each in authored order. An available
+    /// quest whose prerequisites do not hold yet is left out.
+    pub quests: Vec<JournalQuest>,
+    /// Known evidence, in authored order.
+    pub evidence: Vec<Id>,
+    pub outcome: Option<Id>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JournalQuest {
+    pub quest: Id,
+    pub main: bool,
+    pub status: QuestStatus,
+}

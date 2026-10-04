@@ -22,7 +22,7 @@ pub(super) use proficiency::{
 };
 pub(super) use retinue::{leave, promote, prune};
 pub(super) use story::{
-    apply as apply_effects, choices, grant_items, grant_xp, progress, set_flag,
+    apply as apply_effects, choices, grant_items, grant_xp, journal, progress, set_flag,
 };
 
 /// Evaluates a condition against the state; pure, so it may run any number of times.

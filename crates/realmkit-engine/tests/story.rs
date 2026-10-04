@@ -251,3 +251,43 @@ fn saves_record_an_outcome_exactly_when_one_was_reached() {
         assert!(Engine::restore(&world, snapshot).is_err());
     }
 }
+
+#[test]
+fn the_journal_shows_only_what_the_player_knows() {
+    let mut world = chained();
+    // The map is the main quest, though authored after its sequel.
+    world.quests[0].main = true;
+    world.quests.swap(0, 1);
+    world.world.outcomes = vec![outcome("map_home", map_home())];
+    let mut engine = reader(&world);
+    let entry = |quest: &str, main, status| JournalQuest {
+        quest: quest.into(),
+        main,
+        status,
+    };
+    // The catalogue waits on the map, so it is not listed yet.
+    assert_eq!(
+        engine.journal(),
+        Journal {
+            phase: Some("visit".into()),
+            quests: vec![entry("lost_map", true, QuestStatus::Available)],
+            evidence: vec![],
+            outcome: None,
+        }
+    );
+    solve(&mut engine);
+    assert_eq!(
+        engine.journal(),
+        Journal {
+            phase: Some("vault".into()),
+            // Main quests first.
+            quests: vec![
+                entry("lost_map", true, QuestStatus::Completed),
+                // Its objective, the map found, is already met.
+                entry("catalogue", false, QuestStatus::Ready),
+            ],
+            evidence: vec!["stitched_map".into()],
+            outcome: Some("map_home".into()),
+        }
+    );
+}

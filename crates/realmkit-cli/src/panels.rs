@@ -348,17 +348,35 @@ fn holdings(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
     Ok(())
 }
 
-/// Every quest and its status.
+/// The journal: the story's phase, the quests the player knows of, and the
+/// evidence they have found.
 pub fn quests(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();
-    let state = engine.state();
+    let journal = engine.journal();
+    if let Some(phase) = &journal.phase {
+        let phase = &world.world.phases[world.phase_index(phase).unwrap()];
+        writeln!(output, "{}: {}", paint.title("Chapter"), phase.name)?;
+    }
     writeln!(output, "{}", paint.title("Quests:"))?;
-    for quest in &world.quests {
+    for entry in &journal.quests {
+        let quest = world.quest(&entry.quest).unwrap();
+        let main = if entry.main { " — main" } else { "" };
         writeln!(
             output,
-            "  {} [{}]: {:?}",
-            quest.name, quest.id, state.quests[&quest.id]
+            "  {} [{}]: {:?}{main}",
+            quest.name, quest.id, entry.status
         )?;
+    }
+    if !journal.evidence.is_empty() {
+        writeln!(output, "{}", paint.title("Evidence:"))?;
+        for id in &journal.evidence {
+            let evidence = world.evidence(id).unwrap();
+            writeln!(output, "  {}: {}", evidence.name, evidence.description)?;
+        }
+    }
+    if let Some(id) = &journal.outcome {
+        let outcome = world.world.outcomes.iter().find(|o| &o.id == id).unwrap();
+        writeln!(output, "{}: {}", paint.title("Reached"), outcome.name)?;
     }
     Ok(())
 }

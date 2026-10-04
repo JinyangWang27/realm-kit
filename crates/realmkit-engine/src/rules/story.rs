@@ -326,3 +326,31 @@ pub(crate) fn choose(
     }
     Ok(())
 }
+
+pub(crate) fn journal(world: &WorldSpec, state: &GameState) -> Journal {
+    let known = |q: &&Quest| {
+        state.quests[&q.id] != QuestStatus::Available || allowed(state, q.requires.as_ref())
+    };
+    let main = world.quests.iter().filter(|q| q.main);
+    let side = world.quests.iter().filter(|q| !q.main);
+    Journal {
+        phase: state.phases.last().cloned(),
+        quests: main
+            .chain(side)
+            .filter(known)
+            .map(|q| JournalQuest {
+                quest: q.id.clone(),
+                main: q.main,
+                status: state.quests[&q.id],
+            })
+            .collect(),
+        evidence: world
+            .world
+            .evidence
+            .iter()
+            .filter(|e| state.evidence.contains(&e.id))
+            .map(|e| e.id.clone())
+            .collect(),
+        outcome: state.outcome.clone(),
+    }
+}
