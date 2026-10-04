@@ -924,6 +924,41 @@ mod tests {
     }
 
     #[test]
+    fn an_exit_to_an_unknown_place_is_neither_offered_nor_listed() {
+        let mut world = demo();
+        for (i, l) in world.locations.iter_mut().enumerate() {
+            l.map = Some(realmkit_spec::MapPoint {
+                x: i as u32,
+                y: 0,
+                kind: realmkit_spec::PlaceKind::Waypoint,
+            });
+        }
+        // The chapel is unheard of until its gate is opened.
+        world.locations[2].known_when = Some(realmkit_spec::Condition::Flag {
+            flag: "ruins_open".into(),
+        });
+        let mut engine = Engine::new(&world).unwrap();
+        let menu = Menu::new(&engine, false, None);
+        let labels: Vec<_> = menu.entries().iter().map(|e| e.label.clone()).collect();
+        assert!(labels.contains(&"Travel north — The Pine Track".to_string()));
+        assert!(!labels.iter().any(|l| l.contains("Chapel")), "{labels:?}");
+        let mut panel = Vec::new();
+        crate::panels::location(
+            &mut panel,
+            &engine,
+            "village",
+            crate::render::Paint::default(),
+        )
+        .unwrap();
+        let panel = String::from_utf8(panel).unwrap();
+        assert!(panel.contains("Exits: north\n"), "{panel}");
+        assert!(matches!(
+            engine.execute(Command::Move(Direction::East)),
+            Err(realmkit_engine::EngineError::NoExit)
+        ));
+    }
+
+    #[test]
     fn labels_use_authored_names_and_mark_locked_exits() {
         let world = demo();
         let engine = Engine::new(&world).unwrap();

@@ -332,7 +332,11 @@ fn move_to(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let location = world.location(&state.player.location).unwrap();
-    let exit = location.exits.get(&direction).ok_or(EngineError::NoExit)?;
+    let exit = location
+        .exits
+        .get(&direction)
+        .filter(|exit| known(world, state, &exit.destination))
+        .ok_or(EngineError::NoExit)?;
     if !allowed(state, exit.requires.as_ref()) {
         return Err(EngineError::ExitLocked {
             location: location.id.clone(),

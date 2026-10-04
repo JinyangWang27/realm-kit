@@ -944,8 +944,8 @@ of it the way a traveller would, not see everything at once.
   character's last known location. Seeing them refreshes it, and an authored
   `RevealWhereabouts` effect, such as paying a traveller, reveals it.
 - **Places.** Delivered (Format 17) in its smallest form: a place may author
-  `known_when`, and until it holds the map leaves it out and no road there
-  is offered. It is derived from evidence and flags, so nothing new is saved;
+  `known_when`, and until it holds the map leaves it out and no road or exit
+  there is offered. It is derived from evidence and flags, so nothing new is saved;
   places discovered by seeing them on a journey wait for this capability.
 - **Presentation.** Clients show only what the player knows. The engine still
   holds the whole state, so this is information disclosure

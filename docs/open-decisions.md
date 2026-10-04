@@ -1294,7 +1294,8 @@ castle, village, waypoint), all or none and never two on one spot.
 Coordinates carry no movement semantics. The engine's map query returns the
 places the player knows of: since Format 17 a place may author a `known_when`
 condition, usually on evidence or a flag, and until it holds the place, its
-roads and its exits are off the map and no road there is offered or travelled.
+roads and its exits are off the map and no road or exit there is offered or
+taken.
 The player's own place is always known. This is the smallest knowledge the
 MVP slice needs; it derives from existing state and saves nothing. The query
 leaves out characters who move,

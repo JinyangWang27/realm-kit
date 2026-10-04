@@ -50,7 +50,10 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 .map(|id| available(Command::Engage((*id).clone()))),
         );
     }
-    actions.extend(location.exits.iter().map(|(direction, exit)| Action {
+    // An exit, like a road, to a place the player does not know of is not offered.
+    let exits = location.exits.iter();
+    let exits = exits.filter(|(_, exit)| known(world, state, &exit.destination));
+    actions.extend(exits.map(|(direction, exit)| Action {
         command: Command::Move(*direction),
         available: allowed(state, exit.requires.as_ref()),
     }));

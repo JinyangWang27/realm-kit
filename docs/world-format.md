@@ -146,8 +146,8 @@ stands there:
 "known_when": { "kind": "evidence", "evidence": "wheel_ruts" }
 ```
 
-An unknown place is off the map, and no road to it is offered or travelled
-(`NoRoad`), so a hidden branch is no spoiler; compass exits are unaffected.
+An unknown place is off the map, and no road or compass exit to it is shown,
+offered or taken (`NoRoad`, `NoExit`), so a hidden branch is no spoiler.
 Knowledge is derived from conditions, usually evidence or flags, and is not
 saved. `known_when` needs map positions (`map_disabled`). Characters who
 move are not shown, since the map would reveal where they are now. Long roads can be split at waypoints (bridges, fords,

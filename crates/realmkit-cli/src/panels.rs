@@ -46,9 +46,15 @@ pub fn location(
     if !roads.is_empty() {
         writeln!(output, "Roads: {}", roads.join(", "))?;
     }
+    // Exits to places the player has not heard of are not shown either.
+    let exits: Vec<_> = location
+        .exits
+        .iter()
+        .filter(|(_, exit)| engine.knows(&exit.destination))
+        .collect();
     // A place reached only by road has no compass exits to list.
-    if !location.exits.is_empty() || roads.is_empty() {
-        location_exits(output, engine, location)?;
+    if !exits.is_empty() || roads.is_empty() {
+        location_exits(output, engine, &exits)?;
     }
     for character in engine.present_here() {
         // A fighter shows its HP: current in a fight, full otherwise.
@@ -75,14 +81,14 @@ pub fn location(
 fn location_exits(
     output: &mut impl Write,
     engine: &Engine<'_>,
-    location: &realmkit_spec::Location,
+    exits: &[(&realmkit_spec::Direction, &realmkit_spec::Exit)],
 ) -> io::Result<()> {
     write!(output, "Exits:")?;
-    for (direction, exit) in &location.exits {
+    for (direction, exit) in exits {
         write!(
             output,
             " {}{}",
-            direction_name(*direction),
+            direction_name(**direction),
             if engine.allows(exit.requires.as_ref()) {
                 ""
             } else {
@@ -90,7 +96,7 @@ fn location_exits(
             }
         )?;
     }
-    if location.exits.is_empty() {
+    if exits.is_empty() {
         write!(output, " none")?;
     }
     writeln!(output)
