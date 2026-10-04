@@ -140,6 +140,44 @@ fn outcomes_are_checked() {
     // Two endings on one condition would always be reached together.
     world.world.outcomes[1].id = "twin".into();
     assert_eq!(codes(&world), ["ambiguous_outcomes"]);
+    // So would two that merely overlap: the map home, and the map home with
+    // evidence found first. Even a world event could meet both at once.
+    let flag = |f: &str| Condition::Flag { flag: f.into() };
+    let found = Condition::Evidence {
+        evidence: "stitched_map".into(),
+    };
+    let not = |c: Condition| Condition::Not {
+        condition: Box::new(c),
+    };
+    let both = |a: Condition, b: Condition| Condition::All { of: vec![a, b] };
+    world.world.outcomes[1].when = both(done("lost_map"), found.clone());
+    assert_eq!(codes(&world), ["ambiguous_outcomes"]);
+    // A condition one requires and the other refuses keeps them apart, and
+    // so do two statuses of one quest.
+    let active = Condition::Quest {
+        quest: "lost_map".into(),
+        status: QuestStatus::Active,
+    };
+    for (a, b) in [
+        (
+            both(done("lost_map"), not(found.clone())),
+            both(done("lost_map"), found.clone()),
+        ),
+        (done("lost_map"), both(active, found.clone())),
+        (
+            both(flag("map_found"), done("lost_map")),
+            Condition::Any {
+                of: vec![
+                    both(not(flag("map_found")), found.clone()),
+                    both(not(done("lost_map")), found),
+                ],
+            },
+        ),
+    ] {
+        world.world.outcomes[0].when = a;
+        world.world.outcomes[1].when = b;
+        assert!(world.diagnostics().is_empty(), "{:?}", codes(&world));
+    }
     world.world.outcomes = vec![RouteOutcome {
         when: done("missing"),
         ..ending.clone()

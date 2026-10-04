@@ -303,16 +303,11 @@ pub(super) fn execute(
                 events.push(Event::DialogueEnded);
             }
         }
+        // Validation proves outcomes exclude each other, so at most one holds.
         if state.outcome.is_none() {
-            match outcomes(world, state).as_slice() {
-                [] => {}
-                [one] => {
-                    state.outcome = Some(one.clone());
-                    events.push(Event::OutcomeReached {
-                        outcome: one.clone(),
-                    });
-                }
-                many => return Err(EngineError::AmbiguousOutcome(many.to_vec())),
+            if let Some(reached) = outcomes(world, state).pop() {
+                state.outcome = Some(reached.clone());
+                events.push(Event::OutcomeReached { outcome: reached });
             }
         }
     }

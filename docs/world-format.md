@@ -750,8 +750,10 @@ is no failure for a lead not taken.
 
 After each command, if no outcome has been recorded, the outcome whose `when`
 now holds is recorded for good and reported as `OutcomeReached`; play goes on.
-Two holding at once refuse the command (`AmbiguousOutcome`); two outcomes
-with the same `when` are rejected at load (`ambiguous_outcomes`). No outcome may
+Outcomes must exclude each other provably, or two could hold at once
+(`ambiguous_outcomes`): of every pair, one must require a condition the
+other requires under `not`, or the two must require different statuses of
+one quest. So at most one ever holds, whatever order things happen in. No outcome may
 hold at the start: each `when` must require, on every branch, something no
 start provides, such as a quest taken up, evidence, a workshop, a phase after
 the first or a flag no start answer sets (`outcome_at_start`). Terminal and failure

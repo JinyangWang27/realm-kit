@@ -110,14 +110,42 @@ pub enum Condition {
 
 impl Condition {
     /// Whether this condition can only hold while `leaf` holds: `leaf` is
-    /// required on every branch, never under a `not`.
+    /// required on every branch. A `not` is offered to `leaf` whole; what is
+    /// inside it is never required.
     pub fn requires(&self, leaf: &dyn Fn(&Condition) -> bool) -> bool {
         match self {
             Self::All { of } => of.iter().any(|c| c.requires(leaf)),
             Self::Any { of } => !of.is_empty() && of.iter().all(|c| c.requires(leaf)),
-            Self::Not { .. } => false,
             _ => leaf(self),
         }
+    }
+
+    /// Whether this and `other` can never hold together: on every branch,
+    /// one requires a condition the other requires to fail, or a different
+    /// status of a quest the other requires.
+    pub fn excludes(&self, other: &Condition) -> bool {
+        // Whether `b` cannot hold alongside anything `a` requires.
+        let refutes = |a: &Condition, b: &Condition| {
+            let required: Vec<&Condition> = a
+                .leaves()
+                .into_iter()
+                .filter(|l| a.requires(&|c| c == *l))
+                .collect();
+            b.requires(&|c| {
+                required.iter().any(|l| match (c, l) {
+                    (Self::Not { condition }, _) => **condition == **l,
+                    (
+                        Self::Quest { quest, status },
+                        Self::Quest {
+                            quest: q,
+                            status: s,
+                        },
+                    ) => quest == q && status != s,
+                    _ => false,
+                })
+            })
+        };
+        refutes(self, other) || refutes(other, self)
     }
 
     /// Every leaf predicate, depth first.

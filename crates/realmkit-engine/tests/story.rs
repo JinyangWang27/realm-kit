@@ -180,41 +180,38 @@ fn an_outcome_is_reached_once_and_play_goes_on() {
 }
 
 #[test]
-fn two_outcomes_at_once_refuse_the_command() {
+fn exclusive_outcomes_each_end_their_own_playthrough() {
+    // The same deed ends differently for a former apprentice.
+    let apprentice = || Condition::Flag {
+        flag: "apprentice".into(),
+    };
     let mut world = chained();
     world.world.outcomes = vec![
-        outcome("map_home", map_home()),
         outcome(
-            "vault_open",
-            Condition::Flag {
-                flag: "vault_open".into(),
+            "map_home",
+            Condition::All {
+                of: vec![
+                    map_home(),
+                    Condition::Not {
+                        condition: Box::new(apprentice()),
+                    },
+                ],
+            },
+        ),
+        outcome(
+            "apprentice_home",
+            Condition::All {
+                of: vec![map_home(), apprentice()],
             },
         ),
     ];
-    let mut engine = reader(&world);
-    let error = solve_last_refused(&mut engine);
-    assert!(
-        matches!(error, EngineError::AmbiguousOutcome(ids) if ids == ["map_home", "vault_open"])
-    );
-    assert_eq!(engine.state().outcome, None);
-    assert_eq!(engine.state().quests["lost_map"], QuestStatus::Ready);
-}
-
-/// Plays up to Pell's thanks, which must be refused.
-fn solve_last_refused(engine: &mut Engine<'_>) -> EngineError {
-    for command in [
-        Talk("archivist".into()),
-        ChooseDialogue(1),
-        ChooseDialogue(1),
-        Move(North),
-        Talk("copyist".into()),
-        ChooseDialogue(1),
-        Move(South),
-        Talk("archivist".into()),
-    ] {
-        engine.execute(command).unwrap();
+    for (answer, ending) in [("reader", "map_home"), ("apprentice", "apprentice_home")] {
+        let mut engine = Engine::start(&world, 0, &[answer.into()]).unwrap();
+        let events = solve(&mut engine);
+        assert!(events.contains(&Event::OutcomeReached {
+            outcome: ending.into()
+        }));
     }
-    engine.execute(ChooseDialogue(1)).unwrap_err()
 }
 
 #[test]
