@@ -324,9 +324,11 @@ pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 /// can discover; otherwise it could never hold.
 pub(super) fn evidence_known(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, id: &str) {
     reference(out, owner, "evidence", id, w.evidence(id).is_some());
-    let discoverable = w
-        .effects()
-        .any(|e| matches!(e, Effect::DiscoverEvidence { evidence } if evidence == id));
+    let discoverable = establishes(
+        w,
+        |e| matches!(e, Effect::DiscoverEvidence { evidence } if evidence == id),
+        |leaf| matches!(leaf, Condition::Evidence { evidence } if evidence == id),
+    );
     if w.evidence(id).is_some() && !discoverable {
         issue(
             out,
@@ -337,14 +339,36 @@ pub(super) fn evidence_known(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &s
     }
 }
 
+/// Whether some dialogue choice has an effect that `matches` without needing,
+/// on every branch of its condition, what that effect would establish. Only
+/// dialogue discovers evidence or enters phases.
+fn establishes(
+    w: &WorldSpec,
+    matches: impl Fn(&Effect) -> bool,
+    needs: impl Fn(&Condition) -> bool,
+) -> bool {
+    w.dialogues
+        .iter()
+        .flat_map(|d| &d.nodes)
+        .flat_map(|n| &n.choices)
+        .filter(|c| c.effects.iter().any(&matches))
+        .any(|c| !c.requires.as_ref().is_some_and(|r| r.requires(&needs)))
+}
+
 /// Phases have unique IDs, and every phase after the first is entered by
 /// some effect; otherwise the story could never reach it.
 pub(super) fn phases(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     ids(out, "phase", w.world.phases.iter().map(|p| p.id.as_str()));
-    for phase in w.world.phases.iter().skip(1) {
-        let entered = w
-            .effects()
-            .any(|e| matches!(e, Effect::EnterPhase { phase: p } if *p == phase.id));
+    for (index, phase) in w.world.phases.iter().enumerate().skip(1) {
+        // A choice that needs this phase or a later one cannot be what enters it.
+        let entered = establishes(
+            w,
+            |e| matches!(e, Effect::EnterPhase { phase: p } if *p == phase.id),
+            |leaf| {
+                matches!(leaf, Condition::Phase { phase: p }
+                    if w.phase_index(p).is_some_and(|i| i >= index))
+            },
+        );
         if !entered {
             issue(
                 out,

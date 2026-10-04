@@ -268,3 +268,49 @@ fn the_caravan_slice_rejects_impossible_progression() {
         );
     }
 }
+
+#[test]
+fn a_choice_cannot_establish_what_it_needs() {
+    // Pell's thanks enter the vault phase, but only once it is reached.
+    let mut world = chained();
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    pell.nodes[0].choices[1].requires = Some(Condition::Phase {
+        phase: "vault".into(),
+    });
+    assert!(codes(&world).contains(&"unreachable_phase".to_string()));
+    // The copyist shows the map only to someone who has already seen it.
+    let mut world = archive();
+    let copyist = world
+        .dialogues
+        .iter_mut()
+        .find(|d| d.id == "copyist")
+        .unwrap();
+    copyist.nodes[0].choices[0].requires = Some(Condition::All {
+        of: vec![
+            Condition::Evidence {
+                evidence: "stitched_map".into(),
+            },
+            Condition::Flag {
+                flag: "pen_borrowed".into(),
+            },
+        ],
+    });
+    assert!(codes(&world).contains(&"undiscoverable_evidence".to_string()));
+    // Needing it on one branch only leaves the other way open.
+    let copyist = world
+        .dialogues
+        .iter_mut()
+        .find(|d| d.id == "copyist")
+        .unwrap();
+    copyist.nodes[0].choices[0].requires = Some(Condition::Any {
+        of: vec![
+            Condition::Evidence {
+                evidence: "stitched_map".into(),
+            },
+            Condition::Flag {
+                flag: "pen_borrowed".into(),
+            },
+        ],
+    });
+    assert!(world.diagnostics().is_empty(), "{:?}", codes(&world));
+}
