@@ -34,6 +34,7 @@ pub(super) fn check(
     }
     inventory(world, state, &progress)?;
     flags(world, state, &progress)?;
+    evidence(state, &progress)?;
     dialogue(world, state)
 }
 
@@ -347,7 +348,10 @@ fn could_have_been(
         Condition::Any { of } if value => of.iter().any(|c| could(c, true)),
         Condition::Any { of } => of.iter().all(|c| could(c, false)),
         Condition::Not { condition } => could(condition, !value),
-        Condition::Flag { .. } | Condition::Technique { .. } | Condition::Proficiency { .. }
+        Condition::Flag { .. }
+        | Condition::Technique { .. }
+        | Condition::Proficiency { .. }
+        | Condition::Evidence { .. }
             if value =>
         {
             rules::holds(state, condition)
@@ -771,6 +775,20 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
                     || group_flags.contains(f)
             }),
         "story flags do not match progress",
+    )
+}
+
+/// Known evidence was discovered by an effect that could have fired; evidence
+/// is never forgotten, so nothing else could have made it known.
+fn evidence(state: &GameState, progress: &Progress) -> Result<(), String> {
+    ensure(
+        state.evidence.iter().all(|id| {
+            progress
+                .fired
+                .iter()
+                .any(|e| matches!(e, Effect::DiscoverEvidence { evidence } if evidence == id))
+        }),
+        "known evidence could not have been discovered",
     )
 }
 

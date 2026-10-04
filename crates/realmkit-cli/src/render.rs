@@ -6,6 +6,7 @@ use std::io::{self, Write};
 
 const CRITICAL: &str = "Critical hit!";
 const TECHNIQUE_XP: &str = "Technique XP";
+const EVIDENCE: &str = "New evidence";
 
 /// Single-pass interpolation: inserted values are data, never template syntax.
 fn interpolate(template: &TextTemplate, values: &[(&str, &str)]) -> io::Result<String> {
@@ -603,6 +604,12 @@ pub fn events(
             Event::QuestCompleted { quest } => {
                 writeln!(output, "{}", world.quest(quest).unwrap().completion)?
             }
+            Event::EvidenceDiscovered { evidence } => writeln!(
+                output,
+                "{}: {}",
+                paint.good(EVIDENCE),
+                world.evidence(evidence).unwrap().name
+            )?,
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,
             Event::QuestsViewed => panels::quests(output, engine, paint)?,

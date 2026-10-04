@@ -151,6 +151,13 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
         Effect::RaiseProficiency { proficiency, ranks } => {
             economy::proficiency(out, w, owner, *proficiency, *ranks)
         }
+        Effect::DiscoverEvidence { evidence } => reference(
+            out,
+            owner,
+            "evidence",
+            evidence,
+            w.evidence(evidence).is_some(),
+        ),
         Effect::GrantTechnique(grant) => {
             progression::technique_grant(out, w, owner, grant);
             // A choice can be taken again; teaching a rank is idempotent,
@@ -205,7 +212,8 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 | Effect::TakeItems { .. }
                 | Effect::PayCurrency { .. }
                 | Effect::BuyWorkshop { .. }
-                | Effect::SellWorkshop { .. } => issue(
+                | Effect::SellWorkshop { .. }
+                | Effect::DiscoverEvidence { .. } => issue(
                     out,
                     &question.id,
                     "invalid_effect",
@@ -239,5 +247,36 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 format!("the starting currency and the most the start answers grant come to {most}, past {CURRENCY_BOUND}"),
             );
         }
+    }
+}
+
+/// Evidence definitions have unique IDs, and a linked item exists.
+pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    ids(
+        out,
+        "evidence",
+        w.world.evidence.iter().map(|e| e.id.as_str()),
+    );
+    for evidence in &w.world.evidence {
+        if let Some(item) = &evidence.item {
+            reference(out, &evidence.id, "item", item, w.item(item).is_some());
+        }
+    }
+}
+
+/// A condition on evidence names defined evidence that some authored effect
+/// can discover; otherwise it could never hold.
+pub(super) fn evidence_known(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, id: &str) {
+    reference(out, owner, "evidence", id, w.evidence(id).is_some());
+    let discoverable = w
+        .effects()
+        .any(|e| matches!(e, Effect::DiscoverEvidence { evidence } if evidence == id));
+    if w.evidence(id).is_some() && !discoverable {
+        issue(
+            out,
+            owner,
+            "undiscoverable_evidence",
+            format!("no effect discovers {id}, so this condition can never hold"),
+        );
     }
 }

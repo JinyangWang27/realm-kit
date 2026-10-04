@@ -218,6 +218,13 @@ pub(crate) fn apply(
             Effect::RaiseProficiency { proficiency, ranks } => {
                 proficiency::raise(world, state, *proficiency, *ranks, events)
             }
+            Effect::DiscoverEvidence { evidence } => {
+                if state.evidence.insert(evidence.clone()) {
+                    events.push(Event::EvidenceDiscovered {
+                        evidence: evidence.clone(),
+                    });
+                }
+            }
         }
     }
     Ok(())

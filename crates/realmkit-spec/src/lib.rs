@@ -31,7 +31,7 @@ pub use troops::*;
 pub use validation::{Diagnostic, Severity, SpecError};
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 16;
+pub const FORMAT_VERSION: u32 = 17;
 /// The files every package holds, by name.
 pub const PACKAGE_FILES: [&str; 6] = [
     "world.json",
@@ -89,6 +89,9 @@ pub struct World {
     /// Questions answered at New Game, each option shaping the start.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub start_questions: Vec<StartQuestion>,
+    /// What the player can discover in an investigation.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<EvidenceDefinition>,
 }
 
 // Serde defaults shared by several content types.
@@ -262,6 +265,9 @@ impl WorldSpec {
     }
     pub fn quest(&self, id: &str) -> Option<&Quest> {
         self.quests.iter().find(|v| v.id == id)
+    }
+    pub fn evidence(&self, id: &str) -> Option<&EvidenceDefinition> {
+        self.world.evidence.iter().find(|v| v.id == id)
     }
     pub fn dialogue(&self, id: &str) -> Option<&Dialogue> {
         self.dialogues.iter().find(|v| v.id == id)

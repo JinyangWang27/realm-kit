@@ -339,6 +339,9 @@ pub enum Event {
     StoryFlagSet {
         flag: Id,
     },
+    EvidenceDiscovered {
+        evidence: Id,
+    },
     InventoryViewed,
     StatusViewed,
     QuestsViewed,

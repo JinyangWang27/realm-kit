@@ -166,6 +166,7 @@ impl<'w> Engine<'w> {
                 }),
                 proficiencies: BTreeMap::new(),
                 start_choices: Vec::new(),
+                evidence: BTreeSet::new(),
             },
         };
         // Merchants open with their stock at its targets, drawing nothing.

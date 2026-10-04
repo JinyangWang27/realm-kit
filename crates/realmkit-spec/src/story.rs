@@ -91,6 +91,10 @@ pub enum Condition {
         proficiency: Proficiency,
         rank: u32,
     },
+    /// The player has discovered this evidence.
+    Evidence {
+        evidence: Id,
+    },
 }
 
 impl Condition {
@@ -188,6 +192,25 @@ pub enum Effect {
         proficiency: Proficiency,
         ranks: u32,
     },
+    /// The player recognises a piece of evidence; once known, it stays known.
+    DiscoverEvidence {
+        evidence: Id,
+    },
+}
+
+/// Something the player can learn in an investigation: an observation,
+/// testimony or a physical clue. Knowing it is investigation state, separate
+/// from carrying any item.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceDefinition {
+    pub id: Id,
+    pub name: String,
+    pub description: String,
+    /// The physical item this evidence concerns, if any. Carrying the item
+    /// does not make the evidence known, nor the reverse.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item: Option<Id>,
 }
 
 /// A question the route asks at New Game, before the first turn, such as the

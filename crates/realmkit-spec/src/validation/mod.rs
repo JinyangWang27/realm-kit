@@ -55,6 +55,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     story::quests(&mut out, w, &placed);
     story::dialogues(&mut out, w);
     story::start_questions(&mut out, w);
+    story::evidence(&mut out, w);
     time::rules(&mut out, w);
     if let Some(economy) = w.economy() {
         economy::rules(&mut out, w, economy);
@@ -187,6 +188,7 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
         Condition::Proficiency { proficiency, rank } => {
             economy::proficiency(out, w, owner, *proficiency, *rank)
         }
+        Condition::Evidence { evidence } => story::evidence_known(out, w, owner, evidence),
     }
 }
 
