@@ -292,7 +292,8 @@ the start (`outcome_at_start`) by requiring, on every branch, something no
 start provides. Only
 completed, non-terminal outcomes exist so far: the original game's MVP ends by
 choosing a lead while the others stay open. `terminal` and failure outcomes
-wait for content that needs them, and validation does not yet prove overlaps.
+wait for content that needs them; validation rejects outcomes with identical
+conditions (`ambiguous_outcomes`) but does not yet prove other overlaps.
 
 ## 4. Canon fidelity and divergence
 

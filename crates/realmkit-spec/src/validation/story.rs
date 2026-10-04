@@ -405,8 +405,24 @@ pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
         Condition::Flag { flag } => !answered.contains(flag),
         _ => false,
     };
-    for outcome in &w.world.outcomes {
+    for (i, outcome) in w.world.outcomes.iter().enumerate() {
         condition(out, w, &outcome.id, Some(&outcome.when));
+        // The same condition would always reach both at once.
+        // ponytail: only identical conditions; prove overlaps when an analyzer exists.
+        if let Some(twin) = w.world.outcomes[..i]
+            .iter()
+            .find(|o| o.when == outcome.when)
+        {
+            issue(
+                out,
+                &outcome.id,
+                "ambiguous_outcomes",
+                format!(
+                    "{} and {} have the same condition, so neither can ever be reached",
+                    twin.id, outcome.id
+                ),
+            );
+        }
         if !outcome.when.requires(&never_at_start) {
             issue(
                 out,

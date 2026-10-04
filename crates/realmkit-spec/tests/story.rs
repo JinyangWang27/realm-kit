@@ -137,6 +137,9 @@ fn outcomes_are_checked() {
     assert!(world.diagnostics().is_empty());
     world.world.outcomes.push(ending.clone());
     assert!(codes(&world).contains(&"duplicate_id".to_string()));
+    // Two endings on one condition would always be reached together.
+    world.world.outcomes[1].id = "twin".into();
+    assert_eq!(codes(&world), ["ambiguous_outcomes"]);
     world.world.outcomes = vec![RouteOutcome {
         when: done("missing"),
         ..ending.clone()
