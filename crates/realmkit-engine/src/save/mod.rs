@@ -328,10 +328,11 @@ fn lasting(world: &WorldSpec, state: &GameState, requires: Option<&Condition>) -
 
 /// Whether `condition` could once have evaluated to `value`. Flags are never
 /// cleared and ranks never fall, so a flag or rank that was once required
-/// still holds. Every flag starts unset, and techniques other than the
-/// starting ones start unlearned; quest states and items move both ways, so
-/// anything else proves nothing. Branches are judged separately, which can
-/// only accept more.
+/// still holds. Every flag starts unset and every technique and proficiency
+/// unlearned, except what the world starts the player with and what the
+/// saved start answers did before the first turn; quest states and items
+/// move both ways, so anything else proves nothing. Branches are judged
+/// separately, which can only accept more.
 fn could_have_been(
     world: &WorldSpec,
     state: &GameState,
@@ -339,6 +340,7 @@ fn could_have_been(
     value: bool,
 ) -> bool {
     let could = |c, v| could_have_been(world, state, c, v);
+    let answers = || chosen(world, state).into_iter().flat_map(|o| &o.effects);
     match condition {
         Condition::All { of } if value => of.iter().all(|c| could(c, true)),
         Condition::All { of } => of.iter().any(|c| could(c, false)),
@@ -350,12 +352,31 @@ fn could_have_been(
         {
             rules::holds(state, condition)
         }
-        // A starting technique was known at that rank from the first moment.
+        // What the start set or taught held from the first moment.
+        Condition::Flag { flag } => {
+            !answers().any(|e| matches!(e, Effect::SetFlag { flag: f } if f == flag))
+        }
         Condition::Technique { technique, rank } => !world
             .combat()
             .into_iter()
             .flat_map(|c| &c.player_techniques)
+            .chain(answers().filter_map(|e| match e {
+                Effect::GrantTechnique(grant) => Some(grant),
+                _ => None,
+            }))
             .any(|g| &g.technique == technique && g.rank.unwrap_or(1) >= *rank),
+        Condition::Proficiency { proficiency, rank } => {
+            let taught = answers()
+                .filter_map(|e| match e {
+                    Effect::RaiseProficiency {
+                        proficiency: p,
+                        ranks,
+                    } if p == proficiency => Some(*ranks),
+                    _ => None,
+                })
+                .fold(0, u32::saturating_add);
+            taught.min(world.proficiency_max(*proficiency).unwrap_or(0)) < *rank
+        }
         _ => true,
     }
 }
