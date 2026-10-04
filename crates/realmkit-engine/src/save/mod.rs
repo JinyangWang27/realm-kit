@@ -35,6 +35,7 @@ pub(super) fn check(
     inventory(world, state, &progress)?;
     flags(world, state, &progress)?;
     evidence(state, &progress)?;
+    phases(world, state, &progress)?;
     dialogue(world, state)
 }
 
@@ -331,8 +332,8 @@ fn lasting(world: &WorldSpec, state: &GameState, requires: Option<&Condition>) -
 /// cleared and ranks never fall, so a flag or rank that was once required
 /// still holds. Every flag starts unset and every technique and proficiency
 /// unlearned, except what the world starts the player with and what the
-/// saved start answers did before the first turn; quest states and items
-/// move both ways, so anything else proves nothing. Branches are judged
+/// saved start answers did before the first turn. Quests only move forward
+/// from available; items and the like move both ways, so they prove nothing. Branches are judged
 /// separately, which can only accept more.
 fn could_have_been(
     world: &WorldSpec,
@@ -352,6 +353,7 @@ fn could_have_been(
         | Condition::Technique { .. }
         | Condition::Proficiency { .. }
         | Condition::Evidence { .. }
+        | Condition::Phase { .. }
             if value =>
         {
             rules::holds(state, condition)
@@ -369,6 +371,13 @@ fn could_have_been(
                 _ => None,
             }))
             .any(|g| &g.technique == technique && g.rank.unwrap_or(1) >= *rank),
+        // A quest passes through every status in order, starting available.
+        Condition::Quest { quest, status } if value => state.quests[quest] >= *status,
+        Condition::Quest { quest, status } => {
+            *status != QuestStatus::Available || state.quests[quest] != QuestStatus::Available
+        }
+        // The first phase holds from the start.
+        Condition::Phase { phase } => world.phase_index(phase) != Some(0),
         Condition::Proficiency { proficiency, rank } => {
             let taught = answers()
                 .filter_map(|e| match e {
@@ -423,10 +432,15 @@ fn repeatable(world: &WorldSpec, id: &str) -> bool {
         .is_some_and(|g| g.repeatable)
 }
 
-/// Every quest's status agrees with its objective.
+/// Every quest's status agrees with its objective, and a quest taken up
+/// once met its prerequisites.
 fn quests(world: &WorldSpec, fresh: &GameState, state: &GameState) -> Result<(), String> {
     ensure(
         state.quests.keys().eq(fresh.quests.keys())
+            && world.quests.iter().all(|quest| {
+                state.quests[&quest.id] == QuestStatus::Available
+                    || lasting(world, state, quest.requires.as_ref())
+            })
             && world.quests.iter().all(|quest| {
                 let done = match &quest.objective {
                     // Any status is possible: a repeatable victory leaves no record.
@@ -789,6 +803,26 @@ fn evidence(state: &GameState, progress: &Progress) -> Result<(), String> {
                 .any(|e| matches!(e, Effect::DiscoverEvidence { evidence } if evidence == id))
         }),
         "known evidence could not have been discovered",
+    )
+}
+
+/// The phases reached are the authored ones up to the current, which is the
+/// first or one some effect that could have fired enters.
+fn phases(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<(), String> {
+    let authored = &world.world.phases;
+    let current = state.phases.last();
+    ensure(
+        state.phases.len() <= authored.len()
+            && state.phases.iter().zip(authored).all(|(a, b)| *a == b.id)
+            && state.phases.is_empty() == authored.is_empty()
+            && current.is_none_or(|current| {
+                state.phases.len() == 1
+                    || progress
+                        .fired
+                        .iter()
+                        .any(|e| matches!(e, Effect::EnterPhase { phase } if phase == current))
+            }),
+        "invalid story phase",
     )
 }
 

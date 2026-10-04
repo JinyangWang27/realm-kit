@@ -167,6 +167,14 @@ impl<'w> Engine<'w> {
                 proficiencies: BTreeMap::new(),
                 start_choices: Vec::new(),
                 evidence: BTreeSet::new(),
+                // The story opens in its first phase.
+                phases: world
+                    .world
+                    .phases
+                    .iter()
+                    .take(1)
+                    .map(|p| p.id.clone())
+                    .collect(),
             },
         };
         // Merchants open with their stock at its targets, drawing nothing.

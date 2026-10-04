@@ -44,6 +44,58 @@ pub(super) fn quests(out: &mut Vec<Diagnostic>, w: &WorldSpec, placed: &BTreeSet
         for flag in &quest.completion_flags {
             reference(out, &quest.id, "flag", flag, w.world.flags.contains(flag));
         }
+        condition(out, w, &quest.id, quest.requires.as_ref());
+        // The main story may branch on side stories, never wait on one.
+        if quest.main {
+            for side in prerequisites(w, quest).filter(|p| !p.main) {
+                issue(
+                    out,
+                    &quest.id,
+                    "main_requires_side",
+                    format!(
+                        "main quest {} cannot require side quest {}",
+                        quest.id, side.id
+                    ),
+                );
+            }
+        }
+    }
+    quest_cycles(out, w);
+}
+
+/// Quests `quest` cannot be taken up without having taken up first: those
+/// its condition requires past `available` on every branch.
+fn prerequisites<'w>(w: &'w WorldSpec, quest: &'w Quest) -> impl Iterator<Item = &'w Quest> {
+    w.quests.iter().filter(|other| {
+        quest.requires.as_ref().is_some_and(|c| {
+            c.requires(&|leaf| {
+                matches!(leaf, Condition::Quest { quest, status }
+                    if *quest == other.id && *status != QuestStatus::Available)
+            })
+        })
+    })
+}
+
+/// A quest that waits, through its prerequisites, on itself can never be
+/// taken up.
+fn quest_cycles(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    for quest in &w.quests {
+        let mut seen = BTreeSet::new();
+        let mut next: Vec<&Quest> = prerequisites(w, quest).collect();
+        while let Some(prior) = next.pop() {
+            if prior.id == quest.id {
+                issue(
+                    out,
+                    &quest.id,
+                    "quest_cycle",
+                    format!("{} waits on itself through its prerequisites", quest.id),
+                );
+                break;
+            }
+            if seen.insert(&prior.id) {
+                next.extend(prerequisites(w, prior));
+            }
+        }
     }
 }
 
@@ -151,6 +203,9 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
         Effect::RaiseProficiency { proficiency, ranks } => {
             economy::proficiency(out, w, owner, *proficiency, *ranks)
         }
+        Effect::EnterPhase { phase } => {
+            reference(out, owner, "phase", phase, w.phase_index(phase).is_some())
+        }
         Effect::DiscoverEvidence { evidence } => reference(
             out,
             owner,
@@ -213,7 +268,8 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 | Effect::PayCurrency { .. }
                 | Effect::BuyWorkshop { .. }
                 | Effect::SellWorkshop { .. }
-                | Effect::DiscoverEvidence { .. } => issue(
+                | Effect::DiscoverEvidence { .. }
+                | Effect::EnterPhase { .. } => issue(
                     out,
                     &question.id,
                     "invalid_effect",
@@ -278,5 +334,24 @@ pub(super) fn evidence_known(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &s
             "undiscoverable_evidence",
             format!("no effect discovers {id}, so this condition can never hold"),
         );
+    }
+}
+
+/// Phases have unique IDs, and every phase after the first is entered by
+/// some effect; otherwise the story could never reach it.
+pub(super) fn phases(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    ids(out, "phase", w.world.phases.iter().map(|p| p.id.as_str()));
+    for phase in w.world.phases.iter().skip(1) {
+        let entered = w
+            .effects()
+            .any(|e| matches!(e, Effect::EnterPhase { phase: p } if *p == phase.id));
+        if !entered {
+            issue(
+                out,
+                &phase.id,
+                "unreachable_phase",
+                format!("no effect enters phase {}", phase.id),
+            );
+        }
     }
 }

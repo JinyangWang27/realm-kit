@@ -342,6 +342,10 @@ pub enum Event {
     EvidenceDiscovered {
         evidence: Id,
     },
+    /// The story moved on to this phase.
+    PhaseEntered {
+        phase: Id,
+    },
     InventoryViewed,
     StatusViewed,
     QuestsViewed,

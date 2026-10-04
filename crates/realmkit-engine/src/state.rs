@@ -191,6 +191,10 @@ pub struct GameState {
     /// Evidence the player has discovered; present only in worlds that author it.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub evidence: BTreeSet<Id>,
+    /// The story phases reached so far: always the authored phases up to the
+    /// current one, which is last. Empty in a world without phases.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub phases: Vec<Id>,
 }
 
 /// A proficiency's rank, split by where it came from: points the player

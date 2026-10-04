@@ -610,6 +610,10 @@ pub fn events(
                 paint.good(EVIDENCE),
                 world.evidence(evidence).unwrap().name
             )?,
+            Event::PhaseEntered { phase } => {
+                let phase = &world.world.phases[world.phase_index(phase).unwrap()];
+                writeln!(output, "{}", paint.title(&format!("— {} —", phase.name)))?
+            }
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,
             Event::QuestsViewed => panels::quests(output, engine, paint)?,

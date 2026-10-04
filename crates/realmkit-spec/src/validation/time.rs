@@ -171,7 +171,8 @@ fn event_effect(
         | Effect::BuyWorkshop { .. }
         | Effect::SellWorkshop { .. }
         | Effect::RaiseProficiency { .. }
-        | Effect::DiscoverEvidence { .. } => issue(
+        | Effect::DiscoverEvidence { .. }
+        | Effect::EnterPhase { .. } => issue(
             out,
             owner,
             "invalid_effect",

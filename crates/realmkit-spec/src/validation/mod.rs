@@ -56,6 +56,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     story::dialogues(&mut out, w);
     story::start_questions(&mut out, w);
     story::evidence(&mut out, w);
+    story::phases(&mut out, w);
     time::rules(&mut out, w);
     if let Some(economy) = w.economy() {
         economy::rules(&mut out, w, economy);
@@ -189,6 +190,9 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
             economy::proficiency(out, w, owner, *proficiency, *rank)
         }
         Condition::Evidence { evidence } => story::evidence_known(out, w, owner, evidence),
+        Condition::Phase { phase } => {
+            reference(out, owner, "phase", phase, w.phase_index(phase).is_some())
+        }
     }
 }
 

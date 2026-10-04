@@ -59,6 +59,7 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
             rank: at_least,
         } => rank(state, *proficiency) >= *at_least,
         Condition::Evidence { evidence } => state.evidence.contains(evidence),
+        Condition::Phase { phase } => state.phases.contains(phase),
         Condition::TimeOfDay { from, to } => state.time.is_some_and(|now| {
             let minute = now % realmkit_spec::MINUTES_PER_DAY;
             if from < to {

@@ -164,6 +164,9 @@ pub(crate) fn quest(
     if state.quests[id] != required {
         return Err(EngineError::QuestState(id.into()));
     }
+    if !complete && !allowed(state, quest.requires.as_ref()) {
+        return Err(EngineError::QuestLocked(id.into()));
+    }
     if complete {
         state.quests.insert(id.into(), QuestStatus::Completed);
         events.push(Event::QuestCompleted { quest: id.into() });
@@ -189,6 +192,20 @@ pub(crate) fn quest(
         }
     }
     Ok(())
+}
+
+/// Moves the story on to `phase`, passing any phases between; a phase
+/// already reached changes nothing.
+fn enter_phase(world: &WorldSpec, state: &mut GameState, phase: &str, events: &mut Vec<Event>) {
+    let index = world.phase_index(phase).unwrap();
+    if index < state.phases.len() {
+        return;
+    }
+    let passed = world.world.phases[state.phases.len()..=index].iter();
+    state.phases.extend(passed.map(|p| p.id.clone()));
+    events.push(Event::PhaseEntered {
+        phase: phase.into(),
+    });
 }
 
 /// Applies effects in authored order to the staged state. An error refuses
@@ -218,6 +235,7 @@ pub(crate) fn apply(
             Effect::RaiseProficiency { proficiency, ranks } => {
                 proficiency::raise(world, state, *proficiency, *ranks, events)
             }
+            Effect::EnterPhase { phase } => enter_phase(world, state, phase, events),
             Effect::DiscoverEvidence { evidence } => {
                 if state.evidence.insert(evidence.clone()) {
                     events.push(Event::EvidenceDiscovered {

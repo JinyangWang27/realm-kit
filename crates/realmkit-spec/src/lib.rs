@@ -92,6 +92,9 @@ pub struct World {
     /// What the player can discover in an investigation.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<EvidenceDefinition>,
+    /// The story's phases in order; absent in a world without them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub phases: Vec<Phase>,
 }
 
 // Serde defaults shared by several content types.
@@ -268,6 +271,10 @@ impl WorldSpec {
     }
     pub fn evidence(&self, id: &str) -> Option<&EvidenceDefinition> {
         self.world.evidence.iter().find(|v| v.id == id)
+    }
+    /// A phase's place in the story's order.
+    pub fn phase_index(&self, id: &str) -> Option<usize> {
+        self.world.phases.iter().position(|p| p.id == id)
     }
     pub fn dialogue(&self, id: &str) -> Option<&Dialogue> {
         self.dialogues.iter().find(|v| v.id == id)

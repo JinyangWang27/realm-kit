@@ -184,6 +184,8 @@ fn groups_and_profile_levels_are_validated() {
                 reward_xp: 0,
                 reward_items: vec![],
                 completion_flags: vec![],
+                main: false,
+                requires: None,
                 reward_techniques: vec![],
             })
         },

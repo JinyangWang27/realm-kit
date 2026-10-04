@@ -12,6 +12,12 @@ pub struct Quest {
     pub introduction: String,
     pub progress: String,
     pub completion: String,
+    /// Part of the route's main questline rather than a side story.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub main: bool,
+    /// The condition to take the quest up, such as an earlier quest done.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<Condition>,
     #[serde(default)]
     pub reward_xp: u64,
     #[serde(default)]
@@ -29,7 +35,8 @@ pub enum QuestObjective {
     Flag { flag: Id },
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+/// A quest only ever moves forward through these, in order.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestStatus {
     Available,
@@ -94,6 +101,10 @@ pub enum Condition {
     /// The player has discovered this evidence.
     Evidence {
         evidence: Id,
+    },
+    /// The story has reached this phase, or a later one.
+    Phase {
+        phase: Id,
     },
 }
 
@@ -196,6 +207,21 @@ pub enum Effect {
     DiscoverEvidence {
         evidence: Id,
     },
+    /// The story moves on to a later phase; an earlier or the current one
+    /// changes nothing.
+    EnterPhase {
+        phase: Id,
+    },
+}
+
+/// A period of the story, such as the opening journey. Phases come in
+/// authored order, the first current at the start; only story effects move
+/// them on, never world time.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Phase {
+    pub id: Id,
+    pub name: String,
 }
 
 /// Something the player can learn in an investigation: an observation,
