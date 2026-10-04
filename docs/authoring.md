@@ -130,7 +130,7 @@ shared world / canon timeline
 Do not introduce a dedicated runtime `Campaign` abstraction merely to express
 this before a concrete multi-route package needs one. For now, treat "route" as
 the conceptual unit for an independently playable player-controlled entry and
-storyline. The current Format 15 still supports one fixed implicit `default`
+storyline. The current Format 16 still supports one fixed implicit `default`
 route, with its player binding stored as `world.player`; a serialized route
 collection and `PlayerSpec` arrive only when a concrete multi-route package needs
 them. Multiple simultaneously controlled characters remain a separate future

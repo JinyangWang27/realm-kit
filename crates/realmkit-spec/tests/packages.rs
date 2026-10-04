@@ -270,3 +270,33 @@ fn older_packages_are_rejected_clearly() {
             .contains("older packages are not migrated"));
     }
 }
+
+#[test]
+fn packages_load_from_memory_as_from_a_directory() {
+    let files = |name: &str| -> std::io::Result<Vec<u8>> {
+        let bytes: &[u8] = match name {
+            "world.json" => include_bytes!("../../../examples/demo-world/world.json"),
+            "locations.json" => include_bytes!("../../../examples/demo-world/locations.json"),
+            "characters.json" => include_bytes!("../../../examples/demo-world/characters.json"),
+            "items.json" => include_bytes!("../../../examples/demo-world/items.json"),
+            "quests.json" => include_bytes!("../../../examples/demo-world/quests.json"),
+            "dialogues.json" => include_bytes!("../../../examples/demo-world/dialogues.json"),
+            _ => return Err(std::io::ErrorKind::NotFound.into()),
+        };
+        Ok(bytes.to_vec())
+    };
+    assert_eq!(WorldSpec::from_files(files).unwrap(), demo());
+    for name in PACKAGE_FILES {
+        let missing = WorldSpec::from_files(|f| {
+            if f == name {
+                Err(std::io::ErrorKind::NotFound.into())
+            } else {
+                files(f)
+            }
+        });
+        assert!(
+            matches!(&missing, Err(SpecError::Io { path, .. }) if path == std::path::Path::new(name)),
+            "{name}"
+        );
+    }
+}

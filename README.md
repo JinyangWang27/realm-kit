@@ -45,6 +45,14 @@ such as `:talk elder`. Ctrl-C quits. Terminal play adds bold and colour;
 set `NO_COLOR` for plain text. A fight takes over the screen with health
 bars and its last few lines, and leaves only its outcome behind.
 
+A world may ask a few questions at New Game, such as why you came; your
+answers shape the start and appear on the character panel. In a world whose
+places have map positions, `Map` opens the overland map on its own screen:
+`+`/`-` zoom, the arrows pan, `0` fits every place, `c` centres on you, Tab
+steps through the places one road away with their travel time, and Esc
+returns to play. Line mode prints the whole map in an 80 × 24 frame, and
+`map zoom <0-6> <place>` a closer view of one place.
+
 Piped input, scripts and `realmkit play <world> --line` use line mode: type a
 menu number or a command and press Enter. Type `help` for the command list.
 Typed commands still work everywhere:
@@ -109,6 +117,12 @@ The engine is synchronous. `Engine::new(&world)` validates its input;
 `snapshot()` captures a storage-neutral `SaveSnapshot` without changing state;
 `Engine::restore(&world, snapshot)` resumes it or rejects it whole when it
 belongs to another package, revision or route, or holds impossible state.
+`Engine::start(&world, seed, &answers)` begins a world that asks start
+questions. Nothing assumes a terminal or a filesystem: a browser or desktop
+host loads a package from memory with `WorldSpec::from_files`, passes
+commands, events and the map view as JSON, and stores
+`SaveSnapshot::to_json` bytes wherever it likes; the engine builds for
+`wasm32-unknown-unknown`.
 Given the same world and command sequence, state and events are identical.
 There are no wall clocks, network clients or AI SDKs in gameplay. Randomness exists
 only in worlds that author it (critical hits in `examples/arena`, a wandering

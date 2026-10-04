@@ -250,6 +250,16 @@ pub fn inventory(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> 
 }
 
 /// The player's level, realm, vitals, stats, XP and unspent points.
+/// How the player answered the start questions: "Errand: Only to read."
+fn answers(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
+    let questions = &engine.world().world.start_questions;
+    for (question, choice) in questions.iter().zip(&engine.state().start_choices) {
+        let option = question.options.iter().find(|o| &o.id == choice).unwrap();
+        writeln!(output, "  {}: {}", question.name, option.text)?;
+    }
+    Ok(())
+}
+
 pub fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();
     let player = &world.character(&world.world.player).unwrap().name;
@@ -260,6 +270,7 @@ pub fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
         world.combat(),
     ) else {
         writeln!(output, "{}", paint.title(player))?;
+        answers(output, engine)?;
         return holdings(output, engine);
     };
     // Who and where: the level, and the core internal art's rank as the realm.
@@ -272,6 +283,7 @@ pub fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
         heading += &format!(" · Realm {realm}");
     }
     writeln!(output, "{}", paint.title(&heading))?;
+    answers(output, engine)?;
     // Vitals; a world or build without MP shows none.
     write!(output, "  HP {}/{}", vitals.hp, stats.hp)?;
     match stats.mp {

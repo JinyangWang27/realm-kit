@@ -304,7 +304,7 @@ not which source characters exist.
 ## Suggested implementation order
 
 The implementation is already beyond the original investigation-first planning
-note: Format 15 includes world time, economy, troop recruitment and a first mass
+note: Format 16 includes world time, economy, troop recruitment and a first mass
 battle slice. The next priorities are driven by Astraea as RealmKit's first full
 original-game pressure test, while every capability remains optional.
 

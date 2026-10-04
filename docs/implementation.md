@@ -127,20 +127,35 @@ proves the complete single-player loop with authored content.
   the spread. `scripts/combat_sim/economy.py` mirrors all of it, and a
   world without these parts keeps its Format 14 numbers.
   `examples/marches` exercises them. Package and save format 15.
+- [x] Presentation seam and start choices (Astraea P0): locations may author
+  map positions and kinds, all or none; `Engine::map_view` returns the places,
+  roads with travel minutes, one-way exits and the player's place, behind a
+  `Map` panel; the CLI draws it as text, in a fixed 80 × 24 frame in line
+  mode (`map`, `map zoom <n> <place>`) and on its own screen with zoom, pan
+  and a Tab cycle in terminal play. Packages load from memory
+  (`WorldSpec::from_files`), commands, events and actions serialize, and
+  snapshots read and write JSON bytes, so a browser or Tauri host needs no
+  filesystem or terminal; `realmkit-engine` builds for
+  `wasm32-unknown-unknown`. Start questions are answered at New Game, their
+  options' effects applied to the starting state and the answers saved.
+  `examples/marches` has positions; `examples/quiet-archive` asks why the
+  player came. Package and save format 16.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
 ## Next implementation priorities
 
-These items are **not delivered** and do not change Format 15 by themselves. They
-mirror the Astraea-driven roadmap priority while keeping every capability
-optional:
+The open items are **not delivered** and do not change Format 16 by
+themselves. They mirror the Astraea-driven roadmap priority while keeping
+every capability optional:
 
-- [ ] Overland-map authored placement + player-knowledge-aware engine query.
-- [ ] Embeddable graphical-client seam, including a browser/WASM hosting proof
-  without terminal or native-filesystem assumptions.
-- [ ] Start choices and first-class authored
-  story-phase/main-side-questline/outcome progression.
+- [x] Overland-map authored placement + engine map query (Format 16). Player
+  knowledge waits for knowledge and news; until then every place is known.
+- [x] Embeddable graphical-client seam, including a browser/WASM hosting proof
+  without terminal or native-filesystem assumptions (Format 16).
+- [x] Start choices (Format 16).
+- [ ] First-class authored story-phase/main-side-questline/outcome
+  progression.
 - [ ] Factions, war/peace and typed standing/relation tracks.
 - [ ] Remaining retinue needs used by the representative Erdain world:
   companions, roster limit, provisions/morale and travel speed.

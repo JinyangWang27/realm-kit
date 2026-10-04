@@ -6,6 +6,7 @@ mod actions;
 mod consume;
 mod crafting;
 mod economy;
+mod map;
 mod player;
 mod proficiency;
 mod retinue;
@@ -14,12 +15,15 @@ mod time;
 
 pub(super) use actions::actions;
 pub(super) use economy::{quote, stock_up, ware_price};
+pub(super) use map::map_view;
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
 pub(super) use proficiency::{
     granted_points as granted_proficiency_points, rank, unspent_proficiency_points,
 };
 pub(super) use retinue::{leave, promote, prune};
-pub(super) use story::{choices, grant_items, grant_xp, progress, set_flag};
+pub(super) use story::{
+    apply as apply_effects, choices, grant_items, grant_xp, progress, set_flag,
+};
 
 /// Evaluates a condition against the state; pure, so it may run any number of times.
 pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
@@ -181,6 +185,7 @@ pub(super) fn is_panel(command: &Command) -> bool {
             | Command::Techniques
             | Command::Market
             | Command::Retinue
+            | Command::Map
     )
 }
 
@@ -215,6 +220,12 @@ pub(super) fn execute(
         Command::Status => events.push(Event::StatusViewed),
         Command::Quests => events.push(Event::QuestsViewed),
         Command::Techniques => events.push(Event::TechniquesViewed),
+        Command::Map => {
+            if map_view(world, state).is_none() {
+                return Err(EngineError::NoMap);
+            }
+            events.push(Event::MapViewed)
+        }
         Command::Retinue => {
             if state.retinue.is_none() {
                 return Err(EngineError::NoRetinue);

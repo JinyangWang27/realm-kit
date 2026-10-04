@@ -16,7 +16,12 @@ fn smithy() -> WorldSpec {
 
 /// Learns from Bran, beats `ingots` beetles in the mine, and stands at the anvil.
 fn at_the_anvil(world: &WorldSpec, ingots: u64) -> Engine<'_> {
-    let mut engine = Engine::new(world).unwrap();
+    answered_at_the_anvil(world, ingots, &[])
+}
+
+/// [`at_the_anvil`] after answering the start questions with `choices`.
+fn answered_at_the_anvil<'w>(world: &'w WorldSpec, ingots: u64, choices: &[Id]) -> Engine<'w> {
+    let mut engine = Engine::start(world, 0, choices).unwrap();
     engine.execute(Talk("bran".into())).unwrap();
     engine.execute(ChooseDialogue(1)).unwrap();
     engine.execute(ChooseDialogue(1)).unwrap();
@@ -697,4 +702,77 @@ fn a_sword_for_sale_is_no_evidence_of_forging_one() {
         .unwrap(),
     );
     assert!(!claims_the_lesson(&world));
+}
+
+#[test]
+fn a_recipe_closed_to_an_answer_explains_no_piece_in_a_save_with_it() {
+    // The sword is closed to outsiders, or to enchanters; a start answer
+    // makes the player one before the first turn.
+    let outsider = (
+        Condition::Flag {
+            flag: "outsider".into(),
+        },
+        Effect::SetFlag {
+            flag: "outsider".into(),
+        },
+    );
+    let enchanter = (
+        Condition::Technique {
+            technique: "enchanting".into(),
+            rank: 1,
+        },
+        Effect::GrantTechnique(TechniqueGrant {
+            technique: "enchanting".into(),
+            rank: None,
+            xp: 0,
+        }),
+    );
+    for (closed, effect) in [outsider, enchanter] {
+        let mut world = smithy();
+        world.world.flags.push("outsider".into());
+        let recipe = &mut world.world.combat.as_mut().unwrap().recipes[0];
+        assert_eq!(recipe.id, "iron_sword");
+        recipe.known_when = Some(Condition::All {
+            of: vec![
+                recipe.known_when.clone().unwrap(),
+                Condition::Not {
+                    condition: Box::new(closed),
+                },
+            ],
+        });
+        let option = |id: &str, effects| StartOption {
+            id: id.into(),
+            text: id.into(),
+            effects,
+        };
+        world.world.start_questions = vec![StartQuestion {
+            id: "origin".into(),
+            name: "Origin".into(),
+            text: "Who are you?".into(),
+            options: vec![
+                option("local", vec![]),
+                option("closed", vec![effect.clone()]),
+            ],
+        }];
+        let mut engine = answered_at_the_anvil(&world, 5, &["local".into()]);
+        engine.execute(Forge("iron_sword".into())).unwrap();
+        let snapshot = engine.snapshot();
+        assert!(Engine::restore(&world, snapshot.clone()).is_ok());
+        // Claim the other answer, with what it did, and the sword cannot
+        // have been forged.
+        let honest = Engine::start(&world, 0, &["closed".into()]).unwrap();
+        let mut forged = snapshot;
+        forged.state.start_choices = vec!["closed".into()];
+        forged.state.flags.extend(honest.state().flags.clone());
+        let taught = &combat(&honest).techniques;
+        let techniques = &mut forged.state.combat.as_mut().unwrap().techniques;
+        techniques.extend(taught.iter().map(|(k, v)| (k.clone(), *v)));
+        assert!(
+            matches!(
+                Engine::restore(&world, forged),
+                Err(EngineError::InvalidSave(_))
+            ),
+            "{effect:?}"
+        );
+    }
 }

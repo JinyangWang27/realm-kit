@@ -24,7 +24,7 @@ fn accept_map(engine: &mut Engine<'_>) {
 #[test]
 fn a_world_without_combat_plays_its_main_quest_by_talking() {
     let world = archive();
-    let mut engine = Engine::new(&world).unwrap();
+    let mut engine = reader(&world);
     assert_eq!(engine.state().combat, None);
     assert!(!engine.is_dead());
     accept_map(&mut engine);
@@ -52,7 +52,7 @@ fn a_world_without_combat_plays_its_main_quest_by_talking() {
 #[test]
 fn a_world_without_combat_offers_no_attack_and_refuses_one() {
     let world = archive();
-    let mut engine = Engine::new(&world).unwrap();
+    let mut engine = reader(&world);
     engine.execute(Move(North)).unwrap();
     assert_eq!(
         offered(&engine),
@@ -75,7 +75,7 @@ fn a_world_without_combat_offers_no_attack_and_refuses_one() {
 #[test]
 fn a_flag_set_before_accepting_readies_the_quest_on_acceptance() {
     let world = archive();
-    let mut engine = Engine::new(&world).unwrap();
+    let mut engine = reader(&world);
     find_map(&mut engine);
     assert_eq!(engine.state().quests["lost_map"], QuestStatus::Available);
     engine.execute(Talk("archivist".into())).unwrap();
@@ -90,7 +90,7 @@ fn a_flag_set_before_accepting_readies_the_quest_on_acceptance() {
 #[test]
 fn a_world_without_combat_rejects_inconsistent_saves() {
     let world = archive();
-    let mut engine = Engine::new(&world).unwrap();
+    let mut engine = reader(&world);
     accept_map(&mut engine);
     let good = engine.snapshot();
     let json = serde_json::to_string(&good).unwrap();

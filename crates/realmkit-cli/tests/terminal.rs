@@ -205,14 +205,17 @@ const ARCHIVE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/quiet
 #[test]
 fn a_world_without_combat_plays_by_menus_with_no_fighting() {
     let dir = saves_dir("archive");
-    // Accept, learn where the map is, report back, and enter the vault.
-    let input = "help\nstatus\n1\n1\n1\n2\n1\n1\n2\n1\n1\n3\n";
+    // Come only to read; accept, learn where the map is, report back, and
+    // enter the vault.
+    let input = "help\n9\n3\nhelp\nstatus\n1\n1\n1\n2\n1\n1\n2\n1\n1\n3\n";
     let output = run(&["play", ARCHIVE, "--line", "--saves", &dir], input);
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
     for passage in [
+        "What brings you to the archive?\n  1. I study the old river and its maps.\n",
+        "\n> Choose one of the listed answers.\n\n> Choose one of the listed answers.\n\n> The Reading Room",
         "talk <character-id>",
-        "\n> You\n",
+        "\n> You\n  Errand: Only to read.\n",
         "1. Talk to Old Copyist",
         "You know where the map is.",
         "Received: Vault key ×1",
@@ -564,6 +567,35 @@ fn the_smithy_forges_improves_and_keeps_copies_apart() {
 
 const MARCHES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/marches");
 
+/// The marches at zoom 0 in line mode's fixed 80 × 24 frame: the first row
+/// is empty margin, so it follows the prompt.
+const MARCHES_MAP: &str = r#"
+> 
+                                           ·# Hollin Keep
+                                         ··  ·
+                                       ··     ·
+                                     ··        ·
+                                   ··           ·
+                                 ··              ·
+                              ···                 ·
+                            ··                     ·
+                          ··                        ·
+                        ··                           ·
+                      ··                              ·
+                    ··                                 ·
+                  @ Greyford                            ·
+                   ··                                    ·
+                     ·                                    ·
+                      ··                                   ·
+                        ·                                   ·
+                         ··                                  ·
+                           ·                           ·······O Vellmarket
+                            ··         ················
+                              o········
+
+@ you   O town   # castle   o village
+"#;
+
 #[test]
 fn the_marches_pass_time_on_roads_and_by_waiting() {
     let dir = saves_dir("marches");
@@ -574,6 +606,7 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
     );
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.contains(MARCHES_MAP), "{text}");
     for passage in [
         "Greyford\nDay 1, 08:00\n",
         "Roads: Ashmere (2 h), Hollin Keep (4 h)\n",

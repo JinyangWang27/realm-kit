@@ -6,7 +6,7 @@ use crate::{
     saves::{Entry, Kind, Saves},
 };
 use realmkit_engine::{Command, Engine, EngineError};
-use realmkit_spec::WorldSpec;
+use realmkit_spec::{StartQuestion, WorldSpec};
 use std::{
     error::Error,
     io::{self, Write},
@@ -89,7 +89,21 @@ fn restore(
     index: Option<usize>,
     output: &mut impl Write,
 ) -> io::Result<bool> {
-    let world = engine.world();
+    let Some(restored) = load(engine.world(), saves, log, index, output)? else {
+        return Ok(false);
+    };
+    *engine = restored;
+    Ok(true)
+}
+
+/// [`restore`] without a playthrough to replace: the loaded one, if any.
+fn load<'w>(
+    world: &'w WorldSpec,
+    saves: &Saves,
+    log: &mut render::Log,
+    index: Option<usize>,
+    output: &mut impl Write,
+) -> io::Result<Option<Engine<'w>>> {
     let loaded = saves.load(index, |snapshot| {
         let restored = Engine::restore(world, snapshot)?;
         // Recovery resumes a living player; a dead save could never recover.
@@ -99,15 +113,15 @@ fn restore(
         Ok(restored)
     });
     match loaded {
-        Ok((index, restored)) => {
-            *engine = restored;
+        Ok((index, engine)) => {
             // Progress since the save is gone, and so is anything tallied for it.
             log.reset();
             writeln!(output, "Loaded save {}.\n", index + 1)?;
+            let mut engine = engine;
             let events = engine
                 .execute(Command::Look)
                 .expect("looking is always allowed");
-            render::events(output, engine, &events, log.paint)?;
+            render::events(output, &engine, &events, log.paint)?;
             // Resume a conversation with the line its choices answer.
             if let Some(dialogue) = engine.state().dialogue.clone() {
                 let event = realmkit_engine::Event::Dialogue {
@@ -115,11 +129,11 @@ fn restore(
                     node: dialogue.node,
                     choices: Vec::new(),
                 };
-                render::events(output, engine, &[event], log.paint)?;
+                render::events(output, &engine, &[event], log.paint)?;
             }
-            Ok(true)
+            Ok(Some(engine))
         }
-        Err((None, error)) => writeln!(output, "{error}").map(|()| false),
+        Err((None, error)) => writeln!(output, "{error}").map(|()| None),
         Err((Some(index), error)) => {
             writeln!(output, "Save {} could not be loaded: {error}", index + 1)?;
             let entries = saves.entries().unwrap_or_default();
@@ -128,7 +142,7 @@ fn restore(
                 writeln!(output, "Type load <number> to restore an older save:")?;
                 list(older, output)?;
             }
-            Ok(false)
+            Ok(None)
         }
     }
 }
@@ -173,15 +187,18 @@ pub(crate) fn persist(
     }
 }
 
-/// Resumes the newest save when there is one; otherwise starts the route and
-/// auto-saves its start.
-pub(crate) fn start<'w>(
+/// Resumes the newest save when there is one; otherwise asks the start
+/// questions through `ask`, starts the route and auto-saves its start.
+/// `ask` returns the chosen option's index, or `None` when the player quits,
+/// and then so does this.
+pub(crate) fn start<'w, W: Write>(
     world: &'w WorldSpec,
     saves: Option<&Saves>,
     seed: Option<u64>,
     log: &mut render::Log,
-    output: &mut impl Write,
-) -> Result<Engine<'w>, Box<dyn Error>> {
+    output: &mut W,
+    mut ask: impl FnMut(&StartQuestion, &mut W) -> io::Result<Option<usize>>,
+) -> Result<Option<Engine<'w>>, Box<dyn Error>> {
     // Without a chosen seed, the clock picks one; it is printed so a run
     // with random content can be replayed with --seed.
     let seed = seed.unwrap_or_else(|| {
@@ -189,7 +206,6 @@ pub(crate) fn start<'w>(
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos() as u64)
     });
-    let mut engine = Engine::new_with_seed(world, seed)?;
     let note = if saves.is_some() {
         "Progress is saved when you complete a quest; type save to save now."
     } else {
@@ -198,17 +214,27 @@ pub(crate) fn start<'w>(
     writeln!(output, "{}\n{note}\n", world.world.name)?;
     if let Some(saves) = saves {
         let resumable = !saves.entries().is_ok_and(|e| e.is_empty());
-        if resumable && restore(&mut engine, saves, log, None, output)? {
-            return Ok(engine);
-        }
         if resumable {
+            if let Some(engine) = load(world, saves, log, None, output)? {
+                return Ok(Some(engine));
+            }
             writeln!(
                 output,
                 "Starting a new game; older saves stay available with load.\n"
             )?;
         }
-        // The new start becomes the newest save, so death recovery never
-        // falls back to the save that just failed.
+    }
+    let mut choices = Vec::new();
+    for question in &world.world.start_questions {
+        let Some(index) = ask(question, output)? else {
+            return Ok(None);
+        };
+        choices.push(question.options[index].id.clone());
+    }
+    let mut engine = Engine::start(world, seed, &choices)?;
+    // The new start becomes the newest save, so death recovery never
+    // falls back to the save that just failed.
+    if let Some(saves) = saves {
         save(&engine, saves, Kind::Auto, output)?;
     }
     if world.stochastic() {
@@ -216,5 +242,5 @@ pub(crate) fn start<'w>(
     }
     let events = engine.execute(Command::Look)?;
     render::events(output, &engine, &events, log.paint)?;
-    Ok(engine)
+    Ok(Some(engine))
 }

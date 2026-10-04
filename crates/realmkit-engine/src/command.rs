@@ -2,7 +2,8 @@
 
 use super::*;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Command {
     Look,
     Move(Direction),
@@ -89,9 +90,12 @@ pub enum Command {
     Quests,
     /// Lists learned techniques and their ranks; only in worlds with techniques.
     Techniques,
+    /// Shows the overland map; only in worlds whose places have positions.
+    Map,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Event {
     LocationViewed {
         location: Id,
@@ -338,10 +342,12 @@ pub enum Event {
     InventoryViewed,
     StatusViewed,
     QuestsViewed,
+    MapViewed,
 }
 
 /// The player's order for one round of a battle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BattleOrder {
     Charge,
     /// Melee troops brace: every melee hit either side deals is weakened.
@@ -353,7 +359,8 @@ pub enum BattleOrder {
 }
 
 /// How a battle ended for the player's side.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BattleOutcome {
     Victory,
     Defeat,
@@ -361,7 +368,8 @@ pub enum BattleOutcome {
 }
 
 /// How an encounter ended; the player's death leaves it open instead.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Outcome {
     /// Every opponent died or yielded.
     Victory,
@@ -372,8 +380,45 @@ pub enum Outcome {
 
 /// A command a client may offer in the current scene. Unavailable actions are
 /// shown for explanation; the engine still rechecks legality on execution.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Action {
     pub command: Command,
     pub available: bool,
+}
+
+/// What the player may know of the map: places, the roads and exits between
+/// them, and where the player is. Until the world tracks knowledge, every
+/// place is known; characters who move are left out, since a map would show
+/// where they are now, not where they were last seen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MapView {
+    pub here: Id,
+    /// In authored order.
+    pub places: Vec<MapPlace>,
+    /// In authored order.
+    pub roads: Vec<MapRoad>,
+    /// One-way links, each drawn towards its destination.
+    pub exits: Vec<MapExit>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MapPlace {
+    pub location: Id,
+    pub point: MapPoint,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MapRoad {
+    pub road: Id,
+    pub between: [Id; 2],
+    /// The player's travel time along it.
+    pub minutes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MapExit {
+    pub from: Id,
+    pub to: Id,
+    pub direction: Direction,
 }

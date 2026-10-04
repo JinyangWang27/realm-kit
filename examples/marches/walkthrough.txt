@@ -1,4 +1,5 @@
 look
+map
 market
 train trading
 buy grain 30

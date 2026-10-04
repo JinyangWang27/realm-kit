@@ -464,7 +464,7 @@ Decisions:
 - `PlayerState` remains mutable state intrinsic to the controlled character;
   run-wide story/world state belongs to `GameState` or typed state beneath it.
 
-Shared `Character` definitions are already delivered. Format 15's remaining
+Shared `Character` definitions are already delivered. Format 16's remaining
 limitation is the single fixed `world.player` binding for the implicit `default`
 route. When a concrete multi-route package arrives, add a small route-level
 `PlayerSpec` binding to the same shared Character rather than duplicating a
@@ -1266,14 +1266,23 @@ For overland worlds, the [overland map](sandbox-worlds.md#overland-map) proposal
 applies this: authored display positions, an engine map-view query, and a
 client-owned viewport with zoom and panning.
 
-**Astraea priority.** The overland map is now a concrete P0 consumer rather than
-a distant presentation idea. Settle only the placement/kind/discovery data needed
-for its first continent slice; do not turn coordinates into movement semantics or
-invent a generic scene graph.
+**Astraea priority · delivered (Format 16).** Locations author optional
+positions (`x` east, `y` south, within `MAP_BOUND`) and a closed kind (town,
+castle, village, waypoint), all or none and never two on one spot.
+Coordinates carry no movement semantics. The engine's map query returns every
+place until knowledge and news exists, and leaves out characters who move,
+since a map would show where they are rather than where they were last seen;
+road open/closed state is likewise left to the action list. Areas and a
+generic scene graph remain undefined.
 
 ### Client integration surface
 
-**Open; Astraea P0.**
+**Decided for Astraea P0 (Format 16).** Packages load from memory through
+`WorldSpec::from_files`; `Command`, `Event`, `Action` and the map view are
+serializable; `SaveSnapshot` reads and writes JSON bytes, checking the save
+format first; and `realmkit-engine` builds for `wasm32-unknown-unknown`
+without an adapter crate. The rest of this section stays the rule for what
+comes next.
 
 The graphical Astraea client is a concrete consumer of RealmKit, but its framework
 must not leak into the engine. The next presentation slice should define/prove the
@@ -1579,8 +1588,10 @@ needs to be confirmed:
   at New Game; each option applies an ordered effect list to the initial state,
   and the save keeps only the resulting state plus the chosen option IDs. This
   is authored initial state, not runtime identity editing, so it stays within
-  the original-character rules above. Still open: whether an option may skip
-  or add later questions.
+  the original-character rules above. **Decided and delivered (Format 16):**
+  every question is asked, in order, and no option skips or adds one; options
+  may set flags, grant items, currency and techniques (XP included) and raise
+  proficiencies; their events are not shown, only the state they produce.
 - **Characters who move (M5b) · decided.** A character may author a set of
   locations and a recurring schedule; each occurrence moves it to one of them,
   uniformly drawn from a `world` RNG domain, possibly where it already is or

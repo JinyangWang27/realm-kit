@@ -185,6 +185,9 @@ pub struct GameState {
     /// Ranks in the proficiencies the world defines, once any is gained.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub proficiencies: BTreeMap<Proficiency, ProficiencyState>,
+    /// The option chosen for each start question, in order, for display.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub start_choices: Vec<Id>,
 }
 
 /// A proficiency's rank, split by where it came from: points the player
@@ -267,7 +270,7 @@ pub struct MarketStock {
     pub goods: BTreeMap<Id, u64>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 15;
+pub const SAVE_FORMAT_VERSION: u32 = 16;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -281,4 +284,23 @@ pub struct SaveSnapshot {
     pub package_revision: String,
     pub player_route_id: Id,
     pub state: GameState,
+}
+
+impl SaveSnapshot {
+    /// Reads a snapshot from JSON, rejecting another save format by its
+    /// version before the typed parse, which would fail obscurely.
+    pub fn from_json(bytes: &[u8]) -> Result<Self, EngineError> {
+        let invalid = |e: serde_json::Error| EngineError::InvalidSave(e.to_string());
+        let value: serde_json::Value = serde_json::from_slice(bytes).map_err(invalid)?;
+        match value["save_format_version"].as_u64() {
+            Some(version) if version != u64::from(SAVE_FORMAT_VERSION) => Err(
+                EngineError::InvalidSave(format!("unsupported save format version {version}")),
+            ),
+            _ => serde_json::from_value(value).map_err(invalid),
+        }
+    }
+
+    pub fn to_json(&self) -> Vec<u8> {
+        serde_json::to_vec_pretty(self).expect("snapshots always serialize")
+    }
 }

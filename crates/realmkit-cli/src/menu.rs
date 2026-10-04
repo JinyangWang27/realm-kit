@@ -4,7 +4,7 @@ use crate::{
     render::{direction_name, duration, gear_name, money, piece_name, soldier, stat_name},
 };
 use realmkit_engine::{BattleOrder, Command, Engine};
-use realmkit_spec::{Resource, Stat};
+use realmkit_spec::{Resource, StartQuestion, Stat};
 use std::io::{self, Write};
 
 // Fixed interface words live here, apart from authored world text, so a locale
@@ -65,20 +65,29 @@ const INVENTORY: &str = "Inventory";
 const CHARACTER: &str = "Character";
 const QUESTS: &str = "Quests";
 const TECHNIQUES: &str = "Techniques";
+const MAP: &str = "Map";
 const KEYS_HINT: &str = "↑/↓ select · Enter confirm · number choose · : command";
 const ESC_HINT: &str = " · Esc back";
 pub const LINE_HINT: &str = "Enter a number, or type help for commands.";
 pub const NOT_LISTED: &str = "Choose one of the listed numbers.";
+pub const CHOOSE_ANSWER: &str = "Choose one of the listed answers.";
+pub const NOT_ON_MAP: &str = "That place is not on the map.";
+pub const MAP_AFTER_FIGHT: &str = "The map can wait until the fight is over.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Up,
     Down,
+    Left,
+    Right,
+    Tab,
     Enter,
     Esc,
     Backspace,
     Char(char),
     Quit,
+    /// The terminal is now this many columns and rows.
+    Resize(u16, u16),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -595,6 +604,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Status => CHARACTER.into(),
         Command::Quests => QUESTS.into(),
         Command::Techniques => TECHNIQUES.into(),
+        Command::Map => MAP.into(),
         _ => return None,
     })
 }
@@ -747,6 +757,29 @@ impl Menu {
                 encounter_lines(engine)
             },
             context: input::Context::of(engine.world()),
+        }
+    }
+
+    /// A start question at New Game, its options numbered in order. Choosing
+    /// one runs `ChooseDialogue(n)`; the caller takes it as the answer.
+    pub fn question(question: &StartQuestion) -> Self {
+        let top = question
+            .options
+            .iter()
+            .enumerate()
+            .map(|(i, option)| Entry {
+                pick: Pick::Run(Command::ChooseDialogue(i + 1)),
+                label: option.text.clone(),
+            })
+            .collect();
+        Self {
+            top,
+            groups: Vec::new(),
+            open: None,
+            cursor: 0,
+            dialogue: false,
+            header: vec![question.text.clone()],
+            context: input::Context::default(),
         }
     }
 

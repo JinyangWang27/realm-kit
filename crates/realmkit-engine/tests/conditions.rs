@@ -16,7 +16,7 @@ fn choices(engine: &Engine<'_>) -> Vec<String> {
 }
 
 fn at_the_copyist(world: &WorldSpec) -> Engine<'_> {
-    let mut engine = Engine::new(world).unwrap();
+    let mut engine = reader(world);
     engine.execute(Move(North)).unwrap();
     engine.execute(Talk("copyist".into())).unwrap();
     engine
@@ -75,7 +75,7 @@ fn a_not_condition_hides_a_choice_once_its_effects_have_run() {
 #[test]
 fn an_any_condition_holds_while_one_branch_does() {
     let world = archive();
-    let mut engine = Engine::new(&world).unwrap();
+    let mut engine = reader(&world);
     let question = "Is the vault always locked?".to_string();
     engine.execute(Talk("archivist".into())).unwrap();
     assert!(!choices(&engine).contains(&question));
@@ -198,7 +198,7 @@ fn an_item_that_effects_only_take_keeps_its_upper_bound_in_saves() {
             }],
         },
     );
-    let engine = Engine::new(&world).unwrap();
+    let engine = reader(&world);
     let mut forged = engine.snapshot();
     forged.state.player.inventory.insert("vault_key".into(), 5);
     assert!(matches!(

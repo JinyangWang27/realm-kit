@@ -10,6 +10,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo test -p realmkit-engine --test techniques <name_substring>   # one test file, filtered
 cargo test -p realmkit-cli menu::tests                            # unit tests in one module
+cargo build -p realmkit-engine --target wasm32-unknown-unknown --locked   # browser hosting check (rustup target add wasm32-unknown-unknown)
 
 cargo run -p realmkit-cli -- play examples/arena --seed 1 --line < examples/arena/walkthrough.txt
 cargo run -p realmkit-cli -- validate examples/sect
@@ -29,7 +30,7 @@ The workspace has four crates. The CLI must not depend on worldgen or any AI dep
 
 - **`realmkit-spec`**: static world content, meaning serde types, package loading and validation. Types are split by domain (`stats`, `combat`, `techniques`, `items`, `places`, `story`, `time`, `economy`) and re-exported from the crate root. `validation/` has one file per domain. Every check pushes a `Diagnostic` with a stable `code`, and tests assert on those codes.
 - **`realmkit-engine`**: deterministic rules. `Engine::execute(Command) -> Vec<Event>` runs on a clone of `GameState` and commits only on success, so a refused command changes nothing. `lib.rs` is the public API only. `rules/` dispatches commands (`mod.rs`), lists `actions()`, and holds story (dialogue, quests, rewards, effect lists), player (effective stats, points, rest), proficiency (ranks from points and effects), time (travel, waiting, scheduled occurrences) and economy (trade, currency, the price tick, prosperity, stock, workshops) rules. `encounter/` runs fights on the paused initiative timeline: flow in `mod.rs`, time in `timeline.rs`, one action in `action.rs`. Gear, techniques and the RNG each have their own module. `save/` checks that a `SaveSnapshot` is state the rules could actually have produced.
-- **`realmkit-cli`**: parses input, renders events and manages save files. `main.rs` parses arguments; `session.rs` runs commands and saves; `play.rs` holds the key and line loops. `menu.rs` builds numbered menus, with submenus, from `engine.actions()`. The same menus serve raw-key play (crossterm) and line mode (pipes, `--line`). Events render in `render.rs`, state views in `panels.rs`. Fixed English interface strings live in `menu.rs`, `render.rs` and `panels.rs`.
+- **`realmkit-cli`**: parses input, renders events and manages save files. `main.rs` parses arguments; `session.rs` runs commands and saves; `play.rs` holds the key and line loops. `menu.rs` builds numbered menus, with submenus, from `engine.actions()`. The same menus serve raw-key play (crossterm) and line mode (pipes, `--line`). Events render in `render.rs`, state views in `panels.rs`. The overland map draws in `map.rs`. Fixed English interface strings live in `menu.rs`, `render.rs`, `panels.rs` and `map.rs`.
 - **`realmkit-worldgen`**: a typed authoring API (`WorldDraft`) with no AI provider.
 
 Invariants the code relies on:
@@ -41,7 +42,7 @@ Invariants the code relies on:
 - **Simulator parity.** The damage, timeline and XP formulas mirror `scripts/combat_sim`, the price tick, prosperity, restocking, workshop settlement and trade prices mirror `scripts/combat_sim/economy.py`, and the mass-battle round rule mirrors `scripts/combat_sim/battle.py`. Tests in `engine/tests/encounters.rs`, `engine/tests/economy.rs`, `engine/tests/market_life.rs` and `engine/tests/battles.rs` pin numbers produced by the simulator, so formula changes must keep both in step.
 - **Language.** Player-facing text comes from the world package, in the world's declared language. IDs and typed-command tokens stay ASCII.
 
-`examples/` holds the test worlds: `demo-world` (the quest loop), `quiet-archive` (no combat; condition trees and effect lists), `duel` (skills, MP, resting), `arena` (groups, flee, yielding, crits, stat points, gear, consumables and wares), `sect` (technique ranks), `smithy` (forging, improvement and enchanting) and `marches` (world time, roads, movers, markets, prosperity, stock, workshops and the trading proficiency, troops and mass battles; the sandbox reference fixture). Each has a `walkthrough.txt`, except `quiet-archive`. The CLI terminal tests in `crates/realmkit-cli/tests/terminal.rs` run the real binary.
+`examples/` holds the test worlds: `demo-world` (the quest loop), `quiet-archive` (no combat; condition trees, effect lists and start questions), `duel` (skills, MP, resting), `arena` (groups, flee, yielding, crits, stat points, gear, consumables and wares), `sect` (technique ranks), `smithy` (forging, improvement and enchanting) and `marches` (world time, roads, movers, markets, prosperity, stock, workshops and the trading proficiency, troops and mass battles, map positions; the sandbox reference fixture). Each has a `walkthrough.txt`, except `quiet-archive`. The CLI terminal tests in `crates/realmkit-cli/tests/terminal.rs` run the real binary.
 
 ## Docs to update with changes
 

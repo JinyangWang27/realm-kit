@@ -98,6 +98,8 @@ pub enum EngineError {
     TooFewRecruits { line: Id, left: u64 },
     #[error("this world has no soldiers")]
     NoRetinue,
+    #[error("this world has no map")]
+    NoMap,
     #[error("{0} is on your side")]
     NotHostile(Id),
     #[error("you have no riders to send round the flank")]
@@ -126,6 +128,8 @@ pub enum EngineError {
     PlayerDead,
     #[error("numeric limit exceeded; command was not applied")]
     NumericLimit,
+    #[error("answer each start question, in order, with one of its options")]
+    StartChoices,
     #[error("save cannot be loaded: {0}")]
     InvalidSave(String),
 }

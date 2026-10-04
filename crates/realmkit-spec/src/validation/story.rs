@@ -166,3 +166,78 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
         }
     }
 }
+
+/// Every question has options with unique IDs, and an option only shapes
+/// the start: no quest giver or market is at hand before the first turn.
+pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    let questions = &w.world.start_questions;
+    ids(
+        out,
+        "start question",
+        questions.iter().map(|q| q.id.as_str()),
+    );
+    for question in questions {
+        if question.options.is_empty() {
+            issue(
+                out,
+                &question.id,
+                "empty_start_question",
+                "a start question needs at least one option",
+            );
+        }
+        ids(
+            out,
+            "start option",
+            question.options.iter().map(|o| o.id.as_str()),
+        );
+        for effect in question.options.iter().flat_map(|o| &o.effects) {
+            match effect {
+                Effect::SetFlag { .. }
+                | Effect::GrantItems { .. }
+                | Effect::GrantCurrency { .. }
+                | Effect::RaiseProficiency { .. } => self::effect(out, w, &question.id, effect),
+                // Answered once, so a grant may carry XP like a quest reward.
+                Effect::GrantTechnique(grant) => {
+                    progression::technique_grant(out, w, &question.id, grant)
+                }
+                Effect::AcceptQuest { .. }
+                | Effect::CompleteQuest { .. }
+                | Effect::TakeItems { .. }
+                | Effect::PayCurrency { .. }
+                | Effect::BuyWorkshop { .. }
+                | Effect::SellWorkshop { .. } => issue(
+                    out,
+                    &question.id,
+                    "invalid_effect",
+                    "a start option may set flags, grant items or currency, teach techniques and raise proficiencies",
+                ),
+            }
+        }
+    }
+    // The richest answers on top of the starting purse must stay in bounds,
+    // or choosing them could not start a game. Amounts already out of
+    // bounds on their own are reported as such.
+    if let Some(economy) = w.economy().filter(|e| e.currency.start <= CURRENCY_BOUND) {
+        let granted = |o: &StartOption| {
+            o.effects
+                .iter()
+                .filter_map(|e| match e {
+                    Effect::GrantCurrency { amount } if *amount <= CURRENCY_BOUND => Some(*amount),
+                    _ => None,
+                })
+                .fold(0, u64::saturating_add)
+        };
+        let most = questions
+            .iter()
+            .map(|q| q.options.iter().map(granted).max().unwrap_or(0))
+            .fold(economy.currency.start, u64::saturating_add);
+        if most > CURRENCY_BOUND {
+            issue(
+                out,
+                &w.world.id,
+                "start_overflow",
+                format!("the starting currency and the most the start answers grant come to {most}, past {CURRENCY_BOUND}"),
+            );
+        }
+    }
+}

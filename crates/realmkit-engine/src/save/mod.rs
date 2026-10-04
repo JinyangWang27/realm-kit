@@ -83,9 +83,69 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
         },
         "random state does not match the world",
     )?;
+    let questions = &world.world.start_questions;
+    ensure(
+        state.start_choices.len() == questions.len()
+            && questions
+                .iter()
+                .zip(&state.start_choices)
+                .all(|(q, choice)| q.options.iter().any(|o| &o.id == choice)),
+        "start choices do not answer the start questions",
+    )?;
     time(world, state)?;
     economy(world, state)?;
-    proficiencies(world, state)
+    proficiencies(world, state)?;
+    answered(world, state)
+}
+
+/// The options the saved answers chose; unknown ones are skipped, since
+/// `basics` rejects them.
+fn chosen<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w realmkit_spec::StartOption> {
+    world
+        .world
+        .start_questions
+        .iter()
+        .zip(&state.start_choices)
+        .filter_map(|(q, choice)| q.options.iter().find(|o| &o.id == choice))
+        .collect()
+}
+
+/// What the answers did before the first turn lasts: flags are never
+/// cleared, techniques never forgotten or lowered, and taught ranks never
+/// fall.
+fn answered(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let mut taught: BTreeMap<Proficiency, u32> = BTreeMap::new();
+    for effect in chosen(world, state).into_iter().flat_map(|o| &o.effects) {
+        match effect {
+            Effect::SetFlag { flag } => {
+                ensure(state.flags.contains(flag), "a start answer's flag is unset")?
+            }
+            Effect::GrantTechnique(grant) => ensure(
+                state
+                    .combat
+                    .as_ref()
+                    .and_then(|c| c.techniques.get(&grant.technique))
+                    .is_some_and(|learned| learned.rank >= grant.rank.unwrap_or(1)),
+                "a start answer's technique is not known",
+            )?,
+            Effect::RaiseProficiency { proficiency, ranks } => {
+                let sum = taught.entry(*proficiency).or_default();
+                *sum = sum.saturating_add(*ranks);
+            }
+            _ => {}
+        }
+    }
+    ensure(
+        taught.into_iter().all(|(proficiency, ranks)| {
+            let max = world.proficiency_max(proficiency).unwrap_or(0);
+            let held = state
+                .proficiencies
+                .get(&proficiency)
+                .map_or(0, |p| p.taught);
+            held >= ranks.min(max)
+        }),
+        "a start answer's proficiency rank is missing",
+    )
 }
 
 /// Only authored proficiencies, each gained and within its top rank, with
@@ -240,8 +300,9 @@ fn time(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     )
 }
 
-/// Effects that could have happened by the saved minute: every dialogue
-/// choice's, and every event's whose first occurrence has come.
+/// Effects that could have happened by the saved minute: the chosen start
+/// options', every dialogue choice's, and every event's whose first
+/// occurrence has come.
 pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effect> {
     let now = state.time.unwrap_or(0);
     let choices = world
@@ -256,7 +317,8 @@ pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effe
         .iter()
         .filter(|e| e.schedule.at <= now)
         .flat_map(|e| &e.effects);
-    choices.chain(events).collect()
+    let start = chosen(world, state).into_iter().flat_map(|o| &o.effects);
+    start.chain(choices).chain(events).collect()
 }
 
 /// Whether an optional requirement could have held at some earlier moment.
@@ -266,10 +328,11 @@ fn lasting(world: &WorldSpec, state: &GameState, requires: Option<&Condition>) -
 
 /// Whether `condition` could once have evaluated to `value`. Flags are never
 /// cleared and ranks never fall, so a flag or rank that was once required
-/// still holds. Every flag starts unset, and techniques other than the
-/// starting ones start unlearned; quest states and items move both ways, so
-/// anything else proves nothing. Branches are judged separately, which can
-/// only accept more.
+/// still holds. Every flag starts unset and every technique and proficiency
+/// unlearned, except what the world starts the player with and what the
+/// saved start answers did before the first turn; quest states and items
+/// move both ways, so anything else proves nothing. Branches are judged
+/// separately, which can only accept more.
 fn could_have_been(
     world: &WorldSpec,
     state: &GameState,
@@ -277,6 +340,7 @@ fn could_have_been(
     value: bool,
 ) -> bool {
     let could = |c, v| could_have_been(world, state, c, v);
+    let answers = || chosen(world, state).into_iter().flat_map(|o| &o.effects);
     match condition {
         Condition::All { of } if value => of.iter().all(|c| could(c, true)),
         Condition::All { of } => of.iter().any(|c| could(c, false)),
@@ -288,12 +352,31 @@ fn could_have_been(
         {
             rules::holds(state, condition)
         }
-        // A starting technique was known at that rank from the first moment.
+        // What the start set or taught held from the first moment.
+        Condition::Flag { flag } => {
+            !answers().any(|e| matches!(e, Effect::SetFlag { flag: f } if f == flag))
+        }
         Condition::Technique { technique, rank } => !world
             .combat()
             .into_iter()
             .flat_map(|c| &c.player_techniques)
+            .chain(answers().filter_map(|e| match e {
+                Effect::GrantTechnique(grant) => Some(grant),
+                _ => None,
+            }))
             .any(|g| &g.technique == technique && g.rank.unwrap_or(1) >= *rank),
+        Condition::Proficiency { proficiency, rank } => {
+            let taught = answers()
+                .filter_map(|e| match e {
+                    Effect::RaiseProficiency {
+                        proficiency: p,
+                        ranks,
+                    } if p == proficiency => Some(*ranks),
+                    _ => None,
+                })
+                .fold(0, u32::saturating_add);
+            taught.min(world.proficiency_max(*proficiency).unwrap_or(0)) < *rank
+        }
         _ => true,
     }
 }

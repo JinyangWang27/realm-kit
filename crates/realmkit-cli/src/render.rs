@@ -606,6 +606,12 @@ pub fn events(
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,
             Event::QuestsViewed => panels::quests(output, engine, paint)?,
+            Event::MapViewed => {
+                let view = engine.map_view().unwrap();
+                for line in crate::map::frame(world, &view, None).unwrap() {
+                    writeln!(output, "{line}")?;
+                }
+            }
             Event::TimePassed {
                 eventful: false, ..
             } if travelled => {}

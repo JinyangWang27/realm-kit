@@ -49,6 +49,10 @@ pub fn help(world: &WorldSpec) -> String {
     if world.battle().is_some() {
         attack += "engage <army-id> — start a battle\ncharge | hold | flank | retreat — order a round\nautoresolve — charge to the end\n";
     }
+    if world.locations.iter().any(|l| l.map.is_some()) {
+        attack +=
+            "map — the overland map\nmap zoom <0-6> <location-id> — a closer view of a place\n";
+    }
     if world.world.time.as_ref().is_some_and(|t| t.wait.is_some()) {
         attack += "wait [minutes] — let time pass (90, 2h or 1d)\n";
     }
@@ -65,6 +69,11 @@ pub enum Input {
     Save,
     /// List saves, or restore the one-based save shown in that list.
     Load(Option<usize>),
+    /// A closer view of the map, centred on a place.
+    MapZoom {
+        zoom: u32,
+        place: String,
+    },
     Blank,
 }
 
@@ -133,6 +142,8 @@ pub struct Context {
     pub roads: bool,
     /// `market` and `m` exist only with an economy.
     pub markets: bool,
+    /// `map` exists only where places have positions.
+    pub map: bool,
 }
 
 impl Context {
@@ -141,6 +152,7 @@ impl Context {
             wait_step: world.world.time.as_ref().and_then(|t| t.wait),
             roads: !world.world.roads.is_empty(),
             markets: world.economy().is_some(),
+            map: world.locations.iter().any(|l| l.map.is_some()),
         }
     }
 }
@@ -183,6 +195,17 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
         },
         ("travel", [id]) => Command::Travel((*id).into()),
         ("market" | "m", []) if context.markets => Command::Market,
+        ("map", []) if context.map => Command::Map,
+        ("map", [zoom, level, place]) if context.map && zoom.eq_ignore_ascii_case("zoom") => {
+            return Ok(Input::MapZoom {
+                zoom: level
+                    .parse()
+                    .ok()
+                    .filter(|z| *z <= crate::map::MAX_ZOOM)
+                    .ok_or("expected a zoom level from 0 to 6")?,
+                place: (*place).into(),
+            })
+        }
         ("buy", [good, rest @ ..]) if rest.len() <= 1 => Command::Buy {
             good: (*good).into(),
             quantity: quantity(rest)?,
@@ -403,8 +426,23 @@ mod tests {
             wait_step: Some(60),
             roads: true,
             markets: true,
+            map: true,
         };
         assert_eq!(shortcut('m', sandbox), Ok(Input::Command(Command::Market)));
+        // The map, and a closer view of one place on it.
+        assert!(parse("map").is_err());
+        assert_eq!(
+            super::parse_with("map", sandbox),
+            Ok(Input::Command(Command::Map))
+        );
+        assert_eq!(
+            super::parse_with("map zoom 2 ashmere", sandbox),
+            Ok(Input::MapZoom {
+                zoom: 2,
+                place: "ashmere".into()
+            })
+        );
+        assert!(super::parse_with("map zoom 7 ashmere", sandbox).is_err());
         // `go` takes a direction, or else a place a road leads to.
         assert_eq!(
             super::parse_with("go Ashmere", sandbox),

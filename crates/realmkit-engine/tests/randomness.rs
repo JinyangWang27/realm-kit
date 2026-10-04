@@ -22,10 +22,12 @@ fn splitmix64_produces_its_published_sequence() {
 
 #[test]
 fn a_world_without_random_content_keeps_no_generator() {
-    for world in [demo(), duel(), archive()] {
+    for world in [demo(), duel()] {
         assert!(!world.stochastic());
         assert_eq!(Engine::new_with_seed(&world, 7).unwrap().state().rng, None);
     }
+    assert!(!archive().stochastic());
+    assert_eq!(reader(&archive()).state().rng, None);
     let world = arena();
     assert!(world.stochastic());
     // Only the combat stream: nothing in the arena moves.

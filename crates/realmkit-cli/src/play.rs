@@ -3,7 +3,7 @@
 
 use crate::{
     fight::{self, FightScreen},
-    input,
+    input, map,
     menu::{self, Key, Menu, Outcome, Pick},
     render::{self, Paint},
     saves::Saves,
@@ -15,8 +15,9 @@ use crossterm::{
     terminal::{Clear, ClearType},
 };
 use realmkit_engine::{Command, Engine};
-use realmkit_spec::WorldSpec;
+use realmkit_spec::{StartQuestion, WorldSpec};
 use std::{
+    cell::Cell,
     error::Error,
     io::{self, BufRead, Write},
 };
@@ -30,7 +31,12 @@ pub(crate) fn play(
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
     let mut log = render::Log::default();
-    let mut engine = start(world, saves, seed, &mut log, output)?;
+    let answer =
+        |question: &StartQuestion, output: &mut _| ask(world, question, &mut input, output);
+    let Some(mut engine) = start(world, saves, seed, &mut log, output, answer)? else {
+        writeln!(output)?;
+        return Ok(());
+    };
     let mut menu = Menu::new(&engine, false, None);
     menu.write(output, false, Paint::default())?;
     writeln!(output, "{}", menu::LINE_HINT)?;
@@ -48,6 +54,10 @@ pub(crate) fn play(
             Ok(input::Input::Blank) => continue,
             Ok(input::Input::Help) => {
                 writeln!(output, "{}", input::help(world))?;
+                continue;
+            }
+            Ok(input::Input::MapZoom { zoom, place }) => {
+                zoomed_map(&engine, zoom, &place, output)?;
                 continue;
             }
             Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
@@ -82,6 +92,85 @@ pub(crate) fn play(
         menu.write(output, false, Paint::default())?;
     }
     Ok(())
+}
+
+/// Prints a closer view of the map centred on a place.
+fn zoomed_map(
+    engine: &Engine<'_>,
+    zoom: u32,
+    place: &str,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    let frame = engine
+        .map_view()
+        .and_then(|view| map::frame(engine.world(), &view, Some((zoom, place))));
+    match frame {
+        Some(lines) => lines.iter().try_for_each(|line| writeln!(output, "{line}")),
+        None => writeln!(output, "{}", menu::NOT_ON_MAP),
+    }
+}
+
+/// Asks a start question by numbered lines until one of its options is
+/// chosen; `None` when the player quits or input ends.
+fn ask(
+    world: &WorldSpec,
+    question: &StartQuestion,
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+) -> io::Result<Option<usize>> {
+    let mut menu = Menu::question(question);
+    menu.write(output, false, Paint::default())?;
+    let mut line = String::new();
+    loop {
+        write!(output, "\n> ")?;
+        output.flush()?;
+        line.clear();
+        if input.read_line(&mut line)? == 0 {
+            return Ok(None);
+        }
+        match input::parse(world, &line) {
+            Ok(input::Input::Quit) => return Ok(None),
+            Ok(input::Input::Select(number)) => {
+                if let Outcome::Run(Command::ChooseDialogue(n)) = menu.choose(number) {
+                    return Ok(Some(n - 1));
+                }
+            }
+            _ => {}
+        }
+        writeln!(output, "{}", menu::CHOOSE_ANSWER)?;
+    }
+}
+
+/// Asks a start question by keys, leaving the question and the answer on
+/// screen; `None` when the player quits.
+fn ask_keys(
+    question: &StartQuestion,
+    keys: &mut impl Iterator<Item = io::Result<Key>>,
+    output: &mut impl Write,
+    paint: Paint,
+) -> io::Result<Option<usize>> {
+    let mut menu = Menu::question(question);
+    let mut lines = menu.write(output, true, paint)?;
+    loop {
+        output.flush()?;
+        let key = match keys.next().transpose()? {
+            None | Some(Key::Quit) => return Ok(None),
+            Some(key) => key,
+        };
+        match menu.handle(key) {
+            Outcome::Run(Command::ChooseDialogue(n)) => {
+                erase(output, lines)?;
+                let answer = &question.options[n - 1].text;
+                writeln!(output, "\n{}\n> {answer}\n", question.text)?;
+                return Ok(Some(n - 1));
+            }
+            Outcome::Redraw => {
+                erase(output, lines)?;
+                lines = menu.write(output, true, paint)?;
+            }
+            _ => {}
+        }
+    }
 }
 
 fn erase(output: &mut impl Write, lines: u16) -> io::Result<()> {
@@ -128,11 +217,24 @@ pub(crate) fn play_keys(
     saves: Option<&Saves>,
     seed: Option<u64>,
     paint: Paint,
-    mut keys: impl Iterator<Item = io::Result<Key>>,
+    keys: impl Iterator<Item = io::Result<Key>>,
     output: &mut impl Write,
 ) -> Result<(), Box<dyn Error>> {
+    // The terminal's size, as the keys last reported it; the map fills it.
+    let size = Cell::new((map::LINE_COLS as u16, map::LINE_ROWS as u16 + 1));
+    let mut keys = keys.inspect(|key| {
+        if let Ok(Key::Resize(cols, rows)) = key {
+            size.set((*cols, *rows));
+        }
+    });
+    let mut map_zoom = 0;
     let mut log = render::Log::new(paint);
-    let mut engine = start(world, saves, seed, &mut log, output)?;
+    let answer =
+        |question: &StartQuestion, output: &mut _| ask_keys(question, &mut keys, output, paint);
+    let Some(mut engine) = start(world, saves, seed, &mut log, output, answer)? else {
+        writeln!(output)?;
+        return Ok(());
+    };
     let (mut leave_dialogue, mut open) = (false, None);
     // What the last command printed, shown on whichever screen play is on,
     // and messages that are no command (help, typos, saving), shown apart.
@@ -213,6 +315,27 @@ pub(crate) fn play_keys(
                             continue 'scene;
                         }
                         Ok(input::Input::Blank) => continue 'scene,
+                        Ok(input::Input::MapZoom { zoom, place }) => {
+                            if screen.is_some() {
+                                writeln!(notice, "{}", menu::MAP_AFTER_FIGHT)?;
+                            } else if !engine
+                                .map_view()
+                                .is_some_and(|v| v.places.iter().any(|p| p.location == place))
+                            {
+                                writeln!(notice, "{}", menu::NOT_ON_MAP)?;
+                            } else if !map::explore(
+                                &engine,
+                                &mut keys,
+                                output,
+                                paint,
+                                &size,
+                                &mut map_zoom,
+                                Some((zoom, &place)),
+                            )? {
+                                break 'scene;
+                            }
+                            continue 'scene;
+                        }
                         Ok(request @ (input::Input::Save | input::Input::Load(_))) => {
                             persist(&mut engine, saves, &mut log, request, &mut notice)?;
                             leave_dialogue = false;
@@ -225,6 +348,23 @@ pub(crate) fn play_keys(
                     }
                 }
             };
+            // The map takes the screen instead of printing a frame.
+            if command == Command::Map && engine.map_view().is_some() {
+                if screen.is_some() {
+                    writeln!(notice, "{}", menu::MAP_AFTER_FIGHT)?;
+                } else if !map::explore(
+                    &engine,
+                    &mut keys,
+                    output,
+                    paint,
+                    &size,
+                    &mut map_zoom,
+                    None,
+                )? {
+                    break 'scene;
+                }
+                continue 'scene;
+            }
             open = menu.stays_open(&command);
             // Stepping back from a conversation lasts until the player speaks again.
             leave_dialogue &= !matches!(command, Command::Talk(_) | Command::ChooseDialogue(_));
@@ -345,6 +485,164 @@ mod tests {
         assert!(after.starts_with("You face The Ash Wolf.\n"), "{after}");
         assert!(after.contains("Level 2"), "{after}");
         assert_eq!(after.matches("damage").count(), 1, "{after}");
+    }
+
+    #[test]
+    fn the_map_takes_the_screen_and_keeps_its_zoom() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/marches"
+        ))
+        .unwrap();
+        let typed = |text: &str| {
+            let mut keys = vec![Char(':')];
+            keys.extend(text.chars().map(Char));
+            keys.push(Enter);
+            keys
+        };
+        let mut keys = typed("map");
+        // Zoom in, step through the places one road away, resize, leave.
+        keys.extend([Char('+'), Tab, Tab, Resize(100, 30), Esc]);
+        keys.extend(typed("map"));
+        keys.extend([Esc, Quit]);
+        let mut output = Vec::new();
+        play_keys(
+            &world,
+            None,
+            Some(7),
+            Paint::default(),
+            keys.into_iter().map(Ok),
+            &mut output,
+        )
+        .unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert_eq!(text.matches("\u{1b}[?1049h").count(), 2, "{text}");
+        assert_eq!(text.matches("\u{1b}[?1049l").count(), 2, "{text}");
+        let frames: Vec<_> = text.split("\u{1b}[2J").skip(1).collect();
+        assert_eq!(frames.len(), 6, "{text}");
+        // The map opens on the player, at 80 × 24 until told otherwise.
+        assert!(frames[0].contains("\nGreyford\n@ you"), "{}", frames[0]);
+        assert_eq!(frames[0].matches('\n').count(), 23);
+        assert!(frames[2].contains("\nAshmere — 2 h\n"), "{}", frames[2]);
+        assert!(frames[3].contains("\nHollin Keep — 4 h\n"), "{}", frames[3]);
+        // Resized, it fills the larger terminal; the key hint ends the frame.
+        let resized = frames[4].split("Esc back").next().unwrap();
+        assert_eq!(resized.matches('\n').count(), 29);
+        // Opened again, it is centred on the player at the zoom last used.
+        let view = Engine::new_with_seed(&world, 7)
+            .unwrap()
+            .map_view()
+            .unwrap();
+        let expected = map::Viewport::on(&view, "greyford", 1, 100, 27).unwrap();
+        let expected = map::render(&world, &view, &expected).join("\n");
+        assert!(frames[5].contains(&expected), "{}", frames[5]);
+        // Leaving returns to the menu.
+        let after = text.rsplit_once("\u{1b}[?1049l").unwrap().1;
+        assert!(after.contains("12. Map"), "{after}");
+    }
+
+    #[test]
+    fn a_typed_zoom_opens_the_map_on_a_place_and_a_fight_keeps_the_screen() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/marches"
+        ))
+        .unwrap();
+        let typed = |text: &str| {
+            let mut keys = vec![Char(':')];
+            keys.extend(text.chars().map(Char));
+            keys.push(Enter);
+            keys
+        };
+        let mut keys = typed("map zoom 1 nowhere");
+        keys.extend(typed("map zoom 1 ashmere"));
+        keys.extend([Esc, Quit]);
+        let mut output = Vec::new();
+        play_keys(
+            &world,
+            None,
+            Some(7),
+            Paint::default(),
+            keys.into_iter().map(Ok),
+            &mut output,
+        )
+        .unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains(menu::NOT_ON_MAP), "{text}");
+        let map = text.split_once("\u{1b}[2J").expect(&text).1;
+        assert!(map.contains("o Ashmere"), "{map}");
+        // In a fight, the map waits.
+        let mut arena =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena")).unwrap();
+        for (i, location) in arena.locations.iter_mut().enumerate() {
+            location.map = Some(realmkit_spec::MapPoint {
+                x: 10 * i as u32,
+                y: 0,
+                kind: realmkit_spec::PlaceKind::Town,
+            });
+        }
+        let mut keys = typed("north");
+        keys.extend(typed("engage grey_wolf"));
+        keys.extend(typed("map"));
+        keys.push(Quit);
+        let mut output = Vec::new();
+        play_keys(
+            &arena,
+            None,
+            Some(7),
+            Paint::default(),
+            keys.into_iter().map(Ok),
+            &mut output,
+        )
+        .unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains(menu::MAP_AFTER_FIGHT), "{text}");
+        assert_eq!(
+            text.matches("\u{1b}[?1049h").count(),
+            1,
+            "only the fight: {text}"
+        );
+    }
+
+    #[test]
+    fn start_questions_are_answered_by_keys_before_play() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/quiet-archive"
+        ))
+        .unwrap();
+        let mut output = Vec::new();
+        // Letters do nothing here; the arrows move to the second answer.
+        let keys = [Char('i'), Down, Enter, Char('c'), Quit];
+        play_keys(
+            &world,
+            None,
+            None,
+            Paint::default(),
+            keys.into_iter().map(Ok),
+            &mut output,
+        )
+        .unwrap();
+        let text = String::from_utf8(output).unwrap();
+        assert!(text.contains(
+            "What brings you to the archive?\n> I was a copyist's apprentice, and I keep my own pen.\n"
+        ));
+        assert!(text.contains("  Errand: I was a copyist's apprentice"));
+        // Quitting at the question ends play without starting it.
+        let mut output = Vec::new();
+        let keys = [Quit];
+        play_keys(
+            &world,
+            None,
+            None,
+            Paint::default(),
+            keys.into_iter().map(Ok),
+            &mut output,
+        )
+        .unwrap();
+        assert!(!String::from_utf8(output)
+            .unwrap()
+            .contains("The Reading Room"));
     }
 
     #[test]

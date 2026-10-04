@@ -2,6 +2,7 @@
   {
     "id": "greyford",
     "name": "Greyford",
+    "map": { "x": 1000, "y": 1000, "kind": "town" },
     "description": "A market town where three roads meet at a stone bridge. Barges wait below for the river to rise.",
     "characters": ["hild", "wenna"],
     "safe": true
@@ -9,6 +10,7 @@
   {
     "id": "ashmere",
     "name": "Ashmere",
+    "map": { "x": 1080, "y": 1110, "kind": "village" },
     "description": "Reed roofs and smoking chimneys on the edge of the fen. Eel traps dry on every fence.",
     "characters": ["reeve", "outlaws", "warden"],
     "recruits": {
@@ -19,12 +21,14 @@
   {
     "id": "hollin_keep",
     "name": "Hollin Keep",
+    "map": { "x": 1180, "y": 840, "kind": "castle" },
     "description": "A square tower on a holly-covered rise, watching both roads. Its gate closes at dusk.",
     "characters": ["steward"]
   },
   {
     "id": "vellmarket",
     "name": "Vellmarket",
+    "map": { "x": 1300, "y": 1080, "kind": "town" },
     "description": "A walled town of wool merchants. Bales stand in the square under oiled cloth.",
     "characters": ["maddoc"]
   }

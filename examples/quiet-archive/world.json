@@ -1,9 +1,33 @@
 {
-  "format_version": 15,
+  "format_version": 16,
   "id": "quiet_archive",
   "name": "The Quiet Archive",
   "language": "en",
   "start": "reading_room",
   "player": "visitor",
-  "flags": ["map_found", "vault_open", "pen_borrowed"]
+  "flags": ["map_found", "vault_open", "pen_borrowed", "river_scholar", "apprentice"],
+  "start_questions": [
+    {
+      "id": "errand",
+      "name": "Errand",
+      "text": "What brings you to the archive?",
+      "options": [
+        {
+          "id": "scholar",
+          "text": "I study the old river and its maps.",
+          "effects": [{ "kind": "set_flag", "flag": "river_scholar" }]
+        },
+        {
+          "id": "apprentice",
+          "text": "I was a copyist's apprentice, and I keep my own pen.",
+          "effects": [
+            { "kind": "set_flag", "flag": "apprentice" },
+            { "kind": "set_flag", "flag": "pen_borrowed" },
+            { "kind": "grant_items", "items": [{ "item": "pen", "quantity": 1 }] }
+          ]
+        },
+        { "id": "reader", "text": "Only to read." }
+      ]
+    }
+  ]
 }

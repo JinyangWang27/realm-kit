@@ -1,6 +1,8 @@
-# World package format 15
+# World package format 16
 
-Format 15 completes the economy: markets that prosper or decline, merchants
+Format 16 adds optional map positions, so a client can draw the places and
+roads, and start questions the player answers at New Game. Format 15
+completed the economy: markets that prosper or decline, merchants
 with limited stock and purses, villages that feed their market town,
 workshops the player owns, and the trading proficiency with proficiency
 points from the level table. Format 14 added troops, who are recruited, level up in squads and draw
@@ -39,13 +41,13 @@ there is no migration. Convert them by hand:
   condition. A list of one condition becomes that condition; a longer list
   becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
   dialogue choice's `effect` becomes a one-element `effects` list.
-- **Formats 12–14** (M5a, M5b, M6a-1, consumables, troops): only raise the
-  number. Every economy part below `tick`, and `proficiency_points`, are
-  optional.
+- **Formats 12–15** (M5a, M5b, M6a-1, consumables, troops, M6a-2): only
+  raise the number. Every economy part below `tick`, `proficiency_points`,
+  map positions and `start_questions` are optional.
 
-Format 15 represents one fixed player-controlled character and one playable
+Format 16 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 15 does not serialize a route collection
+stable logical route ID `default`; Format 16 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -61,7 +63,7 @@ differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 15 also requires item and quest tables because they serve the current demo.
+Format 16 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 future formats should generalize quests into main and optional side questlines
 rather than remove them. A non-combat player route still has a main questline whose objectives may use
@@ -73,17 +75,19 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads` and `events` |
-| `locations.json` | Array of locations with descriptions, directional exits and placed character IDs |
+| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events` and `start_questions` |
+| `locations.json` | Array of locations with descriptions, directional exits, placed character IDs and optional map positions |
 | `characters.json` | Array of characters with descriptions, availability conditions, and optional dialogue and combat profile |
 | `items.json` | Array of items with names and descriptions |
 | `quests.json` | Array of quests with giver, defeat or flag objective, prose, rewards and completion flags |
 | `dialogues.json` | Array of dialogue trees with nodes, choices, conditions and effects |
 
-Empty content tables are `[]`; files must still exist. Extra files such as
+Empty content tables are `[]`; files must still exist. A host without a
+filesystem, such as a browser, hands the same six files to
+`WorldSpec::from_files` from memory; `PACKAGE_FILES` lists them. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
-Format 15 describes the current schema; incompatible changes require an explicit
+Format 16 describes the current schema; incompatible changes require an explicit
 version/migration decision.
 
 IDs use ASCII letters, digits, `_` and `-`, with uniqueness within each entity
@@ -96,7 +100,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 15 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 16 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -105,14 +109,36 @@ for English worlds.
 Exits are directed. To return along a path, author a separate reverse exit.
 Directions are `north`, `south`, `east`, `west`, `up`, `down`.
 
-The long-term presentation model distinguishes **spatial placement** from
-**traversal connectivity**. The explicit exit graph is authoritative movement
-state. Future formats may optionally group locations into Areas (for example a
-city, one building floor or a wilderness region) and give locations area-local
-integer `(x, y)` positions for map presentation.
+The presentation model distinguishes **spatial placement** from **traversal
+connectivity**. The explicit exit and road graph is authoritative movement
+state. A location may give a `map` position for drawing an overland map:
 
-Coordinates never create exits: adjacent cells need not be traversable, and an
-explicit exit may connect locations that are not adjacent in the layout. For an
+```json
+"map": { "x": 1180, "y": 840, "kind": "castle" }
+```
+
+- `x` grows east and `y` south, as on a screen, each from 0 to `MAP_BOUND`
+  (10 000; `map_bounds`). Only relative positions matter: a client scales
+  them to fit.
+- `kind` is `town`, `castle`, `village` or `waypoint`. It chooses the glyph
+  and how soon a label appears as the map zooms in; in that order, earlier
+  kinds win when labels compete for room.
+- Either every location has a position or none does (`map_partial`), and no
+  two share one (`map_duplicate`).
+- Positions never create, block or time a road or exit: adjacent places need
+  not be connected, and a road or exit may join places far apart. A road is
+  drawn as a line between its ends, and an exit as a line with an arrow
+  towards its destination.
+
+With positions, the engine offers a `Map` panel and answers a map query with
+every place, the roads with their travel minutes, the exits and the player's
+place. Until the world tracks what the player has learned, every place is
+known, and characters who move are not shown, since the map would reveal
+where they are now. Long roads can be split at waypoints (bridges, fords,
+camps) whose legs' minutes add up to the whole.
+
+Future formats may also group locations into Areas (for example a city, one
+building floor or a wilderness region) with area-local positions; for an
 initial grid layout, one coordinate should identify at most one location.
 
 Clients decide how much of an area to show. A compact 5×5 city or building may be
@@ -586,9 +612,51 @@ repeatable. Other
 characters may appear at several locations. Combat profiles require the world's
 `combat` block.
 
+## Start questions
+
+`start_questions` in `world.json` are asked at New Game, before the first
+turn, such as the player's background. Every question is asked, in order, and
+an answer never skips or adds a question.
+
+```json
+"start_questions": [
+  {
+    "id": "errand",
+    "name": "Errand",
+    "text": "What brings you to the archive?",
+    "options": [
+      {
+        "id": "scholar",
+        "text": "I study the old river and its maps.",
+        "effects": [{ "kind": "set_flag", "flag": "river_scholar" }]
+      },
+      { "id": "reader", "text": "Only to read." }
+    ]
+  }
+]
+```
+
+- `name` is a short label for the answer once given; the status panel shows
+  `Errand: Only to read.`
+- Each question needs at least one option (`empty_start_question`); question
+  IDs, and option IDs within a question, are unique.
+- An option's `effects` apply in order to the starting state: `set_flag`,
+  `grant_items`, `grant_currency`, `grant_technique` (with XP, since an answer
+  is given once) and `raise_proficiency`. Quests, `take_items`,
+  `pay_currency` and workshops are refused (`invalid_effect`): no giver or
+  market is at hand before play begins. The starting currency plus the
+  largest currency grant of each question must stay within `CURRENCY_BOUND`
+  (`start_overflow`).
+- Later conditions and text read what an answer produced like any other
+  state. Saves keep the chosen option IDs, and a save must answer every
+  question with one of its options.
+
+Start questions shape the initial state; they are not identity editing, and
+nothing re-runs them once play begins.
+
 ## Dialogue and quests
 
-Format 15 has a single flat quest collection. The long-term model should retain
+Format 16 has a single flat quest collection. The long-term model should retain
 quests as core story progression but organize them into a main questline plus
 optional side questlines. Questlines share world entities rather than owning
 private copies of NPCs or locations. Side quest availability should be gated by
@@ -1057,7 +1125,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 15 currently selects combat prose variants from the current
+Format 16 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful

@@ -1,7 +1,7 @@
 # Non-spatial simulation worlds
 
 Status: design direction. This document describes a future architecture pressure
-test; it does not change the current Format 15 contract or the active milestone
+test; it does not change the current Format 16 contract or the active milestone
 scope.
 
 RealmKit started with a spatial text-RPG slice, but its long-term model should be
@@ -114,7 +114,7 @@ representative capability requires typed semantics for those concepts.
 
 ## Navigation must not become a hidden universal
 
-Current Format 15 is spatial: worlds contain locations and player movement is an
+Current Format 16 is spatial: worlds contain locations and player movement is an
 important part of the shipped fixtures. That is an implementation fact, not necessarily a
 permanent requirement for every RealmKit game.
 
@@ -126,7 +126,7 @@ instead of a compass and map.
 
 Do not make location/navigation optional speculatively. Make that change only
 when a representative world needs it, then remove the spatial assumption at the
-smallest coherent boundary. Until then, current Format 15 spatial requirements
+smallest coherent boundary. Until then, current Format 16 spatial requirements
 remain unchanged.
 
 ## Capability composition
