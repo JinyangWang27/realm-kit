@@ -407,8 +407,9 @@ pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     };
     for (i, outcome) in w.world.outcomes.iter().enumerate() {
         condition(out, w, &outcome.id, Some(&outcome.when));
-        // Two outcomes holding at once would refuse the command that met
-        // them, every time, so each pair must provably exclude the other.
+        // The engine records whichever outcome holds; were two to hold at
+        // once, the ending would turn on authored order, so each pair must
+        // provably exclude the other.
         for other in w.world.outcomes[..i].iter() {
             if !outcome.when.excludes(&other.when) {
                 issue(

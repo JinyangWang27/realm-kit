@@ -149,7 +149,10 @@ stands there:
 An unknown place is off the map, and no road or compass exit to it is shown,
 offered or taken (`NoRoad`, `NoExit`), so a hidden branch is no spoiler.
 Knowledge is derived from conditions, usually evidence or flags, and is not
-saved. `known_when` needs map positions (`map_disabled`). Characters who
+saved, so a condition that can stop holding, such as a quest being `active`
+or an item carried, makes the player forget the place and lose the road back;
+validation warns (`forgettable_place`). Flags, evidence, phases, technique and
+proficiency ranks and completed quests are never lost. `known_when` needs map positions (`map_disabled`). Characters who
 move are not shown, since the map would reveal where they are now. Long roads can be split at waypoints (bridges, fords,
 camps) whose legs' minutes add up to the whole.
 

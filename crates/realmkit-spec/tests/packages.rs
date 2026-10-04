@@ -323,3 +323,46 @@ fn place_knowledge_and_features_are_checked() {
     wolf(&mut world).kind = CharacterKind::Feature;
     assert!(codes(&world).contains(&"invalid_feature".to_string()));
 }
+
+#[test]
+fn a_place_known_by_a_passing_condition_draws_a_warning() {
+    let warnings = |w: &WorldSpec| -> Vec<String> {
+        w.diagnostics()
+            .into_iter()
+            .filter(|d| d.severity == Severity::Warning)
+            .map(|d| d.code)
+            .collect()
+    };
+    let flag = Condition::Flag {
+        flag: "letter_delivered".into(),
+    };
+    let mut world = marches();
+    // Lasting knowledge, even composed, warns of nothing.
+    world.locations[1].known_when = Some(Condition::Any {
+        of: vec![
+            flag.clone(),
+            Condition::Quest {
+                quest: world.quests[0].id.clone(),
+                status: QuestStatus::Completed,
+            },
+        ],
+    });
+    assert!(warnings(&world).is_empty(), "{:?}", warnings(&world));
+    // An active quest, an item or a `not` can stop holding.
+    for passing in [
+        Condition::Quest {
+            quest: world.quests[0].id.clone(),
+            status: QuestStatus::Active,
+        },
+        Condition::Not {
+            condition: Box::new(flag.clone()),
+        },
+        Condition::All {
+            of: vec![flag, Condition::Currency { amount: 1 }],
+        },
+    ] {
+        world.locations[1].known_when = Some(passing);
+        assert_eq!(warnings(&world), ["forgettable_place"]);
+        assert!(world.validate().is_ok());
+    }
+}

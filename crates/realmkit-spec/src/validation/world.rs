@@ -152,6 +152,16 @@ fn map(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     let positioned = w.locations.iter().filter(|l| l.map.is_some()).count();
     for l in &w.locations {
         condition(out, w, &l.id, l.known_when.as_ref());
+        // Knowledge is derived, not saved: a condition that can stop holding
+        // makes the player forget the place, and lose the road back.
+        if l.known_when.as_ref().is_some_and(|c| !lasts(c)) {
+            warn(
+                out,
+                &l.id,
+                "forgettable_place",
+                "known_when can stop holding, so the player could forget this place; prefer flags, evidence, phases or completed quests",
+            );
+        }
         if l.known_when.is_some() && positioned == 0 {
             issue(
                 out,
@@ -289,5 +299,21 @@ fn combat_profile(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, profile
             "combat_disabled",
             "this world has no combat block, so no character can fight",
         );
+    }
+}
+
+/// Whether a condition, once it holds, holds for good: flags, evidence,
+/// phases reached, technique and proficiency ranks and completed quests
+/// never go back, and neither do compositions of them alone.
+fn lasts(condition: &Condition) -> bool {
+    match condition {
+        Condition::All { of } | Condition::Any { of } => of.iter().all(lasts),
+        Condition::Flag { .. }
+        | Condition::Evidence { .. }
+        | Condition::Phase { .. }
+        | Condition::Technique { .. }
+        | Condition::Proficiency { .. } => true,
+        Condition::Quest { status, .. } => *status == QuestStatus::Completed,
+        _ => false,
     }
 }
