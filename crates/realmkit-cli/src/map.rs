@@ -172,12 +172,16 @@ impl Canvas {
         let at = |d: i64| (2 * d * (steps - 1) + steps).div_euclid(2 * steps);
         let head_at = (head && steps > 1).then(|| (from.0 + at(dc), from.1 + at(dr)));
         for (col, row) in self.points(from, to) {
-            if !self.taken[row][col] {
-                self.cells[row][col] = if head_at == Some((col as i64, row as i64)) {
-                    arrow
-                } else {
-                    ROAD
-                };
+            if self.taken[row][col] {
+                continue;
+            }
+            // An arrow keeps its cell, so a reverse exit or a label cannot
+            // turn a two-way link into a one-way one.
+            if head_at == Some((col as i64, row as i64)) {
+                self.cells[row][col] = arrow;
+                self.taken[row][col] = true;
+            } else {
+                self.cells[row][col] = ROAD;
             }
         }
     }
@@ -529,6 +533,25 @@ mod tests {
         let view = view(&world);
         let text = frame(&world, &view, None).unwrap().join("\n");
         assert!(text.contains("@ Greyford +1"), "{text}");
+    }
+
+    #[test]
+    fn exits_both_ways_keep_both_arrows() {
+        let world = marches();
+        let mut view = view(&world);
+        view.roads.clear();
+        let exit = |from: &str, to: &str, direction| MapExit {
+            from: from.into(),
+            to: to.into(),
+            direction,
+        };
+        view.exits = vec![
+            exit("greyford", "vellmarket", Direction::East),
+            exit("vellmarket", "greyford", Direction::West),
+        ];
+        let text = frame(&world, &view, None).unwrap().join("\n");
+        assert!(text.contains(">O Vellmarket"), "{text}");
+        assert!(text.contains("@<"), "{text}");
     }
 
     #[test]
