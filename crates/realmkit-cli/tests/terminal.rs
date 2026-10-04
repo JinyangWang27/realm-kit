@@ -743,3 +743,13 @@ fn the_caravan_slice_plays_from_the_road_to_a_chosen_lead() {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }
 }
+
+#[test]
+fn help_offers_examine_only_where_there_are_features() {
+    let help = |world: &str| {
+        let output = run(&["play", world, "--line"], "1\nhelp\n");
+        String::from_utf8(output.stdout).unwrap()
+    };
+    assert!(help(CARAVAN).contains("examine <feature-id>"));
+    assert!(!help(ARCHIVE).contains("examine"));
+}

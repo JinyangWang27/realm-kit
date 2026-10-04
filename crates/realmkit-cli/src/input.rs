@@ -1,5 +1,5 @@
 use realmkit_engine::{BattleOrder, Command};
-use realmkit_spec::{Direction, Proficiency, Stat, WorldSpec};
+use realmkit_spec::{CharacterKind, Direction, Proficiency, Stat, WorldSpec};
 
 /// A proficiency's typed token.
 fn proficiency(value: &str) -> Option<Proficiency> {
@@ -55,6 +55,13 @@ pub fn help(world: &WorldSpec) -> String {
     }
     if world.world.time.as_ref().is_some_and(|t| t.wait.is_some()) {
         attack += "wait [minutes] — let time pass (90, 2h or 1d)\n";
+    }
+    if world
+        .characters
+        .iter()
+        .any(|c| c.kind == CharacterKind::Feature)
+    {
+        attack += "examine <feature-id> — look closely at something here\n";
     }
     format!("<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\n{attack}talk <character-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nsave\nload [number] — list saves, or restore one\nhelp\nquit")
 }
