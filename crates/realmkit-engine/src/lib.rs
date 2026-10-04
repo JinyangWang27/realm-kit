@@ -2,8 +2,8 @@
 
 use realmkit_spec::{
     Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack, MapPoint,
-    Proficiency, QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat, Stats,
-    WorldSpec, BASIC_POWER,
+    Proficiency, Quest, QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat,
+    Stats, WorldSpec, BASIC_POWER,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -166,6 +166,16 @@ impl<'w> Engine<'w> {
                 }),
                 proficiencies: BTreeMap::new(),
                 start_choices: Vec::new(),
+                evidence: BTreeSet::new(),
+                // The story opens in its first phase.
+                phases: world
+                    .world
+                    .phases
+                    .iter()
+                    .take(1)
+                    .map(|p| p.id.clone())
+                    .collect(),
+                outcome: None,
             },
         };
         // Merchants open with their stock at its targets, drawing nothing.
@@ -304,6 +314,17 @@ impl<'w> Engine<'w> {
     /// places have no positions.
     pub fn map_view(&self) -> Option<MapView> {
         rules::map_view(self.world, &self.state)
+    }
+
+    /// Whether the player knows of a place: where they stand, or its
+    /// `known_when` holds. Clients name only known places, roads included.
+    pub fn knows(&self, location: &str) -> bool {
+        rules::known(self.world, &self.state, location)
+    }
+
+    /// The player's journal: phase, known quests, evidence and outcome.
+    pub fn journal(&self) -> Journal {
+        rules::journal(self.world, &self.state)
     }
 
     /// Who is here now: present under their conditions and not defeated.

@@ -1,0 +1,65 @@
+1
+look
+talk iselt
+choose 1
+travel thornwick
+examine city_gate
+choose 1
+talk iselt
+choose 1
+talk moss
+choose 1
+examine caravan_bales
+choose 1
+talk moss
+choose 1
+talk dravin
+choose 1
+rest
+talk dravin
+choose 1
+choose 1
+map
+travel abandoned_camp
+examine cold_camp
+choose 1
+travel bandit_ridge
+engage rask
+attack lookout
+attack lookout
+attack rask
+attack rask
+attack rask
+attack rask
+examine bandit_spoils
+choose 2
+examine bandit_spoils
+choose 1
+travel impossible_fork
+examine fork_stones
+choose 1
+talk ennick
+choose 1
+map
+travel old_stones
+examine stone_ring
+choose 1
+quests
+travel impossible_fork
+travel abandoned_camp
+travel thornwick
+talk dravin
+choose 1
+talk ama
+choose 1
+talk garrow
+choose 1
+talk tenko
+choose 1
+talk tenko
+choose 1
+quests
+talk ama
+choose 1
+quests
+map

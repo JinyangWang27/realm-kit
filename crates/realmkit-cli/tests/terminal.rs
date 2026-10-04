@@ -710,3 +710,68 @@ fn a_pursuit_that_catches_nobody_goes_unremarked() {
     assert!(text.contains("Defeat."), "{text}");
     assert!(!text.contains("cuts down 0"), "{text}");
 }
+
+const CARAVAN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/caravan-trail");
+
+#[test]
+fn the_caravan_slice_plays_from_the_road_to_a_chosen_lead() {
+    let walkthrough = std::fs::read_to_string(format!("{CARAVAN}/walkthrough.txt")).unwrap();
+    let output = run(&["play", CARAVAN, "--line", "--seed", "7"], &walkthrough);
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "Before the caravan, who were you?",
+        // Things are examined, not talked to, and describe themselves.
+        "2. Examine the south gate",
+        "> Thornwick's south gate stands open",
+        "— Thornwick —",
+        "8 h later: Day 1, 18:00",
+        "— The Lost Wagons —",
+        "New evidence: Wheel ruts",
+        "Rask goes down.",
+        "Received: Broken caravan seal ×1",
+        "New evidence: Displaced cargo",
+        "Roads: Abandoned Camp (1 h 30 min), Bandit Ridge (1 h), The Stone Ring (2 h)",
+        "Chapter: The Lost Wagons\nQuests:\n  The Road to Thornwick [road_to_thornwick]: Completed — main\n",
+        "Evidence:\n  Wheel ruts: Deep ruts lead",
+        "— The Buried Road —",
+        "  Lead: The Northern Milestones [lead_milestones]: Available\n",
+        "The first chapter closes\nYou have chosen your road.",
+        "  Lead: The Drowned Shrines [lead_shrines]: Active\n",
+        "Reached: The first chapter closes",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+}
+
+#[test]
+fn help_offers_examine_only_where_there_are_features() {
+    let help = |world: &str| {
+        let output = run(&["play", world, "--line"], "1\nhelp\n");
+        String::from_utf8(output.stdout).unwrap()
+    };
+    assert!(help(CARAVAN).contains("examine <feature-id>"));
+    assert!(!help(ARCHIVE).contains("examine"));
+}
+
+#[test]
+fn a_road_to_an_unknown_place_is_not_named() {
+    // Arrive at the camp, then study the ruts that point to the fork.
+    let walkthrough = std::fs::read_to_string(format!("{CARAVAN}/walkthrough.txt")).unwrap();
+    let until_camp = walkthrough.split("examine cold_camp").next().unwrap();
+    let output = run(
+        &["play", CARAVAN, "--line", "--seed", "7"],
+        &format!("{until_camp}examine cold_camp\nchoose 1\nlook\n"),
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    let (before, after) = text.split_once("New evidence: Wheel ruts").unwrap();
+    assert!(
+        before.contains("Roads: Thornwick (3 h), Bandit Ridge (1 h)\n"),
+        "{before}"
+    );
+    assert!(!before.contains("Impossible Fork"), "{before}");
+    assert!(
+        after.contains("The Impossible Fork (1 h 30 min)"),
+        "{after}"
+    );
+}

@@ -1,0 +1,959 @@
+[
+  {
+    "id": "iselt",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Iselt squints at the hills. 'Thornwick by noon, if the axles hold.'",
+        "choices": [
+          {
+            "text": "I'll see the caravan in.",
+            "next": "underway",
+            "requires": {
+              "kind": "quest",
+              "quest": "road_to_thornwick",
+              "status": "available"
+            },
+            "effects": [
+              {
+                "kind": "accept_quest",
+                "quest": "road_to_thornwick"
+              }
+            ]
+          },
+          {
+            "text": "We made it.",
+            "next": "arrived",
+            "requires": {
+              "kind": "quest",
+              "quest": "road_to_thornwick",
+              "status": "ready"
+            },
+            "effects": [
+              {
+                "kind": "complete_quest",
+                "quest": "road_to_thornwick"
+              },
+              {
+                "kind": "enter_phase",
+                "phase": "thornwick"
+              }
+            ]
+          },
+          {
+            "text": "Trouble on this road?",
+            "next": "guard",
+            "requires": {
+              "kind": "flag",
+              "flag": "guard_background"
+            }
+          },
+          {
+            "text": "Leave her to the reins."
+          }
+        ]
+      },
+      {
+        "id": "underway",
+        "text": "'Good. Pass us through the south gate; the wardens know my seal.'"
+      },
+      {
+        "id": "arrived",
+        "text": "Iselt counts her wagons in. 'All here. The Hadda caravan left the wells two days ahead of us, though. They should be here already.'"
+      },
+      {
+        "id": "guard",
+        "text": "'Bandits on the ridges east of the city, they say. Keep your hand near your blade.'"
+      }
+    ]
+  },
+  {
+    "id": "city_gate",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Thornwick's south gate stands open, its wardens checking seals.",
+        "choices": [
+          {
+            "text": "Pass the caravan through.",
+            "next": "through",
+            "requires": {
+              "kind": "quest",
+              "quest": "road_to_thornwick",
+              "status": "active"
+            },
+            "effects": [
+              {
+                "kind": "set_flag",
+                "flag": "arrived"
+              }
+            ]
+          },
+          {
+            "text": "Step back."
+          }
+        ]
+      },
+      {
+        "id": "through",
+        "text": "The wardens wave the wagons into the gate square."
+      }
+    ]
+  },
+  {
+    "id": "moss",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Ostler Moss wipes his hands. 'Caravan folk? Then you can lift.'",
+        "choices": [
+          {
+            "text": "Need a hand?",
+            "next": "asked",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "quest",
+                  "quest": "bales",
+                  "status": "available"
+                },
+                {
+                  "kind": "phase",
+                  "phase": "thornwick"
+                }
+              ]
+            },
+            "effects": [
+              {
+                "kind": "accept_quest",
+                "quest": "bales"
+              }
+            ]
+          },
+          {
+            "text": "The bales are in.",
+            "next": "paid",
+            "requires": {
+              "kind": "quest",
+              "quest": "bales",
+              "status": "ready"
+            },
+            "effects": [
+              {
+                "kind": "complete_quest",
+                "quest": "bales"
+              }
+            ]
+          },
+          {
+            "text": "Not now."
+          }
+        ]
+      },
+      {
+        "id": "asked",
+        "text": "'Your caravan's bales, into my warehouse before dark. Two silver for it.'"
+      },
+      {
+        "id": "paid",
+        "text": "'Honest work. Rare, lately.'"
+      }
+    ]
+  },
+  {
+    "id": "caravan_bales",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Bales of southern cotton, stacked by the wagons.",
+        "choices": [
+          {
+            "text": "Carry them into the warehouse.",
+            "next": "done",
+            "effects": [
+              {
+                "kind": "set_flag",
+                "flag": "bales_unloaded"
+              }
+            ]
+          },
+          {
+            "text": "Leave them for now."
+          }
+        ]
+      },
+      {
+        "id": "done",
+        "text": "An hour's sweat later, the warehouse is full and the wagons light."
+      }
+    ]
+  },
+  {
+    "id": "dravin",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Factor Dravin of the Hadda house paces among the empty stalls.",
+        "choices": [
+          {
+            "text": "Expecting someone?",
+            "next": "waiting",
+            "requires": {
+              "kind": "not",
+              "condition": {
+                "kind": "flag",
+                "flag": "caravan_overdue"
+              }
+            }
+          },
+          {
+            "text": "Is something wrong?",
+            "next": "request",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "quest",
+                  "quest": "lost_wagons",
+                  "status": "available"
+                },
+                {
+                  "kind": "quest",
+                  "quest": "road_to_thornwick",
+                  "status": "completed"
+                },
+                {
+                  "kind": "flag",
+                  "flag": "caravan_overdue"
+                }
+              ]
+            }
+          },
+          {
+            "text": "Any word?",
+            "next": "reminder",
+            "requires": {
+              "kind": "quest",
+              "quest": "lost_wagons",
+              "status": "active"
+            }
+          },
+          {
+            "text": "I found where the caravan went.",
+            "next": "thanks",
+            "requires": {
+              "kind": "quest",
+              "quest": "lost_wagons",
+              "status": "ready"
+            },
+            "effects": [
+              {
+                "kind": "complete_quest",
+                "quest": "lost_wagons"
+              }
+            ]
+          },
+          {
+            "text": "Good day."
+          }
+        ]
+      },
+      {
+        "id": "waiting",
+        "text": "'Our caravan from the wells. It is late, but the day is not over.'"
+      },
+      {
+        "id": "request",
+        "text": "'The Hadda caravan should have been here by noon. Their last camp was on the east track. Find out what happened to them.'",
+        "choices": [
+          {
+            "text": "I'll find them.",
+            "next": "accepted",
+            "effects": [
+              {
+                "kind": "accept_quest",
+                "quest": "lost_wagons"
+              },
+              {
+                "kind": "enter_phase",
+                "phase": "lost_wagons"
+              }
+            ]
+          },
+          {
+            "text": "Not yet."
+          }
+        ]
+      },
+      {
+        "id": "accepted",
+        "text": "'Take the east track. Mind the ridges; there are bandits about.'"
+      },
+      {
+        "id": "reminder",
+        "text": "'Nothing. Their last camp was east of the city.'"
+      },
+      {
+        "id": "thanks",
+        "text": "Dravin listens, then sits down heavily. 'A road that is not there. Ask the Dawn Hall. Ask the archive. Ask anyone who knows the old stones.'"
+      }
+    ]
+  },
+  {
+    "id": "cold_camp",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Cold ashes, a dropped tin cup, and tracks.",
+        "choices": [
+          {
+            "text": "Study the tracks.",
+            "next": "ruts",
+            "requires": {
+              "kind": "not",
+              "condition": {
+                "kind": "evidence",
+                "evidence": "wheel_ruts"
+              }
+            },
+            "effects": [
+              {
+                "kind": "discover_evidence",
+                "evidence": "wheel_ruts"
+              }
+            ]
+          },
+          {
+            "text": "Leave the camp."
+          }
+        ]
+      },
+      {
+        "id": "ruts",
+        "text": "The wagons left heavy and in a hurry, east, towards a fork no map of yours shows."
+      }
+    ]
+  },
+  {
+    "id": "rask",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "A lean man rises from the rocks. 'Toll road, traveller.'",
+        "choices": [
+          {
+            "text": "Two silver for what you know about the Hadda caravan.",
+            "next": "talks",
+            "requires": {
+              "kind": "item",
+              "item": "silver",
+              "quantity": 2
+            },
+            "effects": [
+              {
+                "kind": "take_items",
+                "items": [
+                  {
+                    "item": "silver",
+                    "quantity": 2
+                  }
+                ]
+              },
+              {
+                "kind": "discover_evidence",
+                "evidence": "bandit_testimony"
+              }
+            ]
+          },
+          {
+            "text": "Stand aside, or I'll put you down like the last ones.",
+            "next": "cowed",
+            "requires": {
+              "kind": "flag",
+              "flag": "guard_background"
+            },
+            "effects": [
+              {
+                "kind": "discover_evidence",
+                "evidence": "bandit_testimony"
+              }
+            ]
+          },
+          {
+            "text": "Walk away."
+          }
+        ]
+      },
+      {
+        "id": "talks",
+        "text": "Rask pockets the coins. 'We found their crates in the grass past the fork. No wagons, no tracks out. We took what we could carry.'",
+        "choices": [
+          {
+            "text": "Then clear off this ridge.",
+            "effects": [
+              {
+                "kind": "set_flag",
+                "flag": "bandits_paid"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cowed",
+        "text": "Rask weighs your stance and lowers his club. 'Crates past the fork, that's all. No wagons. We want no part of it.'",
+        "choices": [
+          {
+            "text": "Go, then.",
+            "effects": [
+              {
+                "kind": "set_flag",
+                "flag": "bandits_cowed"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bandit_spoils",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "The bandits' haul lies under a tarp: crates stamped with a red seal.",
+        "choices": [
+          {
+            "text": "Examine the crates.",
+            "next": "crates",
+            "requires": {
+              "kind": "not",
+              "condition": {
+                "kind": "evidence",
+                "evidence": "displaced_cargo"
+              }
+            },
+            "effects": [
+              {
+                "kind": "discover_evidence",
+                "evidence": "displaced_cargo"
+              }
+            ]
+          },
+          {
+            "text": "Take the broken seal.",
+            "next": "seal",
+            "requires": {
+              "kind": "not",
+              "condition": {
+                "kind": "flag",
+                "flag": "seal_taken"
+              }
+            },
+            "effects": [
+              {
+                "kind": "set_flag",
+                "flag": "seal_taken"
+              },
+              {
+                "kind": "grant_items",
+                "items": [
+                  {
+                    "item": "caravan_seal",
+                    "quantity": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "text": "Leave the haul."
+          }
+        ]
+      },
+      {
+        "id": "crates",
+        "text": "Hadda house crates, dented from a fall rather than forced open. The bandits found them; they did not take them from wagons."
+      },
+      {
+        "id": "seal",
+        "text": "You pocket the snapped wax seal."
+      }
+    ]
+  },
+  {
+    "id": "fork_stones",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Two roads where there should be one.",
+        "choices": [
+          {
+            "text": "Walk the paved branch a little way.",
+            "next": "paved",
+            "requires": {
+              "kind": "not",
+              "condition": {
+                "kind": "evidence",
+                "evidence": "impossible_fork"
+              }
+            },
+            "effects": [
+              {
+                "kind": "discover_evidence",
+                "evidence": "impossible_fork"
+              }
+            ]
+          },
+          {
+            "text": "Step back onto the old track."
+          }
+        ]
+      },
+      {
+        "id": "paved",
+        "text": "The paving is older than any road you know, and the caravan's ruts run straight onto it."
+      }
+    ]
+  },
+  {
+    "id": "ennick",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "A drover in a torn coat crouches in the reeds, staring at the paved road.",
+        "choices": [
+          {
+            "text": "What happened here?",
+            "next": "account",
+            "requires": {
+              "kind": "not",
+              "condition": {
+                "kind": "evidence",
+                "evidence": "survivor_testimony"
+              }
+            },
+            "effects": [
+              {
+                "kind": "discover_evidence",
+                "evidence": "survivor_testimony"
+              }
+            ]
+          },
+          {
+            "text": "Leave him be."
+          }
+        ]
+      },
+      {
+        "id": "account",
+        "text": "'The lead wagons took that branch at dusk. I was at the back with a lame ox. In the morning the branch was gone, and so were they. Now it's back.'"
+      }
+    ]
+  },
+  {
+    "id": "stone_ring",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "A ring of fitted stones, knee high, on a bare hill.",
+        "choices": [
+          {
+            "text": "Examine the stones.",
+            "next": "stones",
+            "requires": {
+              "kind": "not",
+              "condition": {
+                "kind": "evidence",
+                "evidence": "strange_stonework"
+              }
+            },
+            "effects": [
+              {
+                "kind": "discover_evidence",
+                "evidence": "strange_stonework"
+              },
+              {
+                "kind": "set_flag",
+                "flag": "structure_found"
+              }
+            ]
+          },
+          {
+            "text": "Read the worn letters.",
+            "next": "letters",
+            "requires": {
+              "kind": "flag",
+              "flag": "scribe_background"
+            }
+          },
+          {
+            "text": "Leave the ring."
+          }
+        ]
+      },
+      {
+        "id": "stones",
+        "text": "The caravan's tracks end at the ring's threshold. Inside, the grass is unbroken."
+      },
+      {
+        "id": "letters",
+        "text": "The letters are older than the temple script you learned, but one word repeats: 'road'."
+      }
+    ]
+  },
+  {
+    "id": "ama",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Sister Ama trims the Dawn Hall's lamps.",
+        "choices": [
+          {
+            "text": "What do you make of a ring of old stones?",
+            "next": "reading",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "evidence",
+                  "evidence": "strange_stonework"
+                },
+                {
+                  "kind": "not",
+                  "condition": {
+                    "kind": "evidence",
+                    "evidence": "priest_reading"
+                  }
+                }
+              ]
+            },
+            "effects": [
+              {
+                "kind": "discover_evidence",
+                "evidence": "priest_reading"
+              }
+            ]
+          },
+          {
+            "text": "I will seek the drowned shrines.",
+            "next": "blessing",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "quest",
+                  "quest": "lead_shrines",
+                  "status": "available"
+                },
+                {
+                  "kind": "phase",
+                  "phase": "leads"
+                }
+              ]
+            },
+            "effects": [
+              {
+                "kind": "accept_quest",
+                "quest": "lead_shrines"
+              },
+              {
+                "kind": "set_flag",
+                "flag": "lead_chosen"
+              }
+            ]
+          },
+          {
+            "text": "Peace, Sister."
+          }
+        ]
+      },
+      {
+        "id": "reading",
+        "text": "'A drowned-god shrine. The old faith made roads that open to prayer and close behind the faithless.'"
+      },
+      {
+        "id": "blessing",
+        "text": "'Then go south and west, to the marsh shrines. Take a lamp.'"
+      }
+    ]
+  },
+  {
+    "id": "tenko",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Archivist Tenko looks up from a crumbling ledger.",
+        "choices": [
+          {
+            "text": "What do you make of a ring of old stones?",
+            "next": "reading",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "evidence",
+                  "evidence": "strange_stonework"
+                },
+                {
+                  "kind": "not",
+                  "condition": {
+                    "kind": "evidence",
+                    "evidence": "scholar_reading"
+                  }
+                }
+              ]
+            },
+            "effects": [
+              {
+                "kind": "discover_evidence",
+                "evidence": "scholar_reading"
+              }
+            ]
+          },
+          {
+            "text": "Where does all this lead?",
+            "next": "leads",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "quest",
+                  "quest": "buried_road",
+                  "status": "available"
+                },
+                {
+                  "kind": "quest",
+                  "quest": "lost_wagons",
+                  "status": "completed"
+                },
+                {
+                  "kind": "any",
+                  "of": [
+                    {
+                      "kind": "all",
+                      "of": [
+                        {
+                          "kind": "evidence",
+                          "evidence": "priest_reading"
+                        },
+                        {
+                          "kind": "evidence",
+                          "evidence": "scholar_reading"
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "all",
+                      "of": [
+                        {
+                          "kind": "evidence",
+                          "evidence": "priest_reading"
+                        },
+                        {
+                          "kind": "evidence",
+                          "evidence": "veteran_reading"
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "all",
+                      "of": [
+                        {
+                          "kind": "evidence",
+                          "evidence": "scholar_reading"
+                        },
+                        {
+                          "kind": "evidence",
+                          "evidence": "veteran_reading"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "effects": [
+              {
+                "kind": "accept_quest",
+                "quest": "buried_road"
+              },
+              {
+                "kind": "enter_phase",
+                "phase": "leads"
+              }
+            ]
+          },
+          {
+            "text": "I will follow the milestones north.",
+            "next": "north",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "quest",
+                  "quest": "lead_milestones",
+                  "status": "available"
+                },
+                {
+                  "kind": "phase",
+                  "phase": "leads"
+                }
+              ]
+            },
+            "effects": [
+              {
+                "kind": "accept_quest",
+                "quest": "lead_milestones"
+              },
+              {
+                "kind": "set_flag",
+                "flag": "lead_chosen"
+              }
+            ]
+          },
+          {
+            "text": "The letters on the stones say 'road'.",
+            "next": "scribe",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "flag",
+                  "flag": "scribe_background"
+                },
+                {
+                  "kind": "evidence",
+                  "evidence": "strange_stonework"
+                }
+              ]
+            }
+          },
+          {
+            "text": "Good day."
+          }
+        ]
+      },
+      {
+        "id": "reading",
+        "text": "'A milestone. Not of any road we keep. Someone built a road and then hid it, and it ran north.'"
+      },
+      {
+        "id": "leads",
+        "text": "'Then we name it the Buried Road. Sister Ama, Garrow and I each have a thread to pull. Choose one.'"
+      },
+      {
+        "id": "north",
+        "text": "'North, then, along the milestones. Write to me.'"
+      },
+      {
+        "id": "scribe",
+        "text": "Tenko's eyes widen. 'Then you read better than half my clerks.'"
+      }
+    ]
+  },
+  {
+    "id": "garrow",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Old Garrow sits by the gate, mending a bridle.",
+        "choices": [
+          {
+            "text": "What do you make of a ring of old stones?",
+            "next": "reading",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "evidence",
+                  "evidence": "strange_stonework"
+                },
+                {
+                  "kind": "not",
+                  "condition": {
+                    "kind": "evidence",
+                    "evidence": "veteran_reading"
+                  }
+                }
+              ]
+            },
+            "effects": [
+              {
+                "kind": "discover_evidence",
+                "evidence": "veteran_reading"
+              }
+            ]
+          },
+          {
+            "text": "Take me to the hill folk.",
+            "next": "hills",
+            "requires": {
+              "kind": "all",
+              "of": [
+                {
+                  "kind": "quest",
+                  "quest": "lead_hill_folk",
+                  "status": "available"
+                },
+                {
+                  "kind": "phase",
+                  "phase": "leads"
+                }
+              ]
+            },
+            "effects": [
+              {
+                "kind": "accept_quest",
+                "quest": "lead_hill_folk"
+              },
+              {
+                "kind": "set_flag",
+                "flag": "lead_chosen"
+              }
+            ]
+          },
+          {
+            "text": "Seen this seal before?",
+            "next": "seal",
+            "requires": {
+              "kind": "item",
+              "item": "caravan_seal",
+              "quantity": 1
+            }
+          },
+          {
+            "text": "Rest easy, Garrow."
+          }
+        ]
+      },
+      {
+        "id": "reading",
+        "text": "'Hill folk leave those rings be. They say the roads between them walk at night.'"
+      },
+      {
+        "id": "hills",
+        "text": "'East, then, into the hills. Bring salt; they trade for it.'"
+      },
+      {
+        "id": "seal",
+        "text": "'Hadda wax. Where did you find that?'"
+      }
+    ]
+  }
+]

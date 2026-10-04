@@ -4,12 +4,13 @@ use crate::{
     render::{direction_name, duration, gear_name, money, piece_name, soldier, stat_name},
 };
 use realmkit_engine::{BattleOrder, Command, Engine};
-use realmkit_spec::{Resource, StartQuestion, Stat};
+use realmkit_spec::{CharacterKind, Resource, StartQuestion, Stat};
 use std::io::{self, Write};
 
 // Fixed interface words live here, apart from authored world text, so a locale
 // table can replace them later without touching menu logic.
 const TALK: &str = "Talk to";
+const EXAMINE: &str = "Examine";
 const ATTACK: &str = "Attack";
 const TRAVEL: &str = "Travel";
 const TRAVEL_TO: &str = "Travel to";
@@ -595,7 +596,12 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
             label
         }
         Command::Talk(id) => {
-            format!("{TALK} {}", world.character(id).unwrap().name)
+            let character = world.character(id).unwrap();
+            let verb = match character.kind {
+                CharacterKind::Person => TALK,
+                CharacterKind::Feature => EXAMINE,
+            };
+            format!("{verb} {}", character.name)
         }
         Command::Attack(id) => {
             format!("{ATTACK} {}", world.character(id).unwrap().name)
@@ -915,6 +921,41 @@ mod tests {
             "/../../examples/demo-world"
         ))
         .unwrap()
+    }
+
+    #[test]
+    fn an_exit_to_an_unknown_place_is_neither_offered_nor_listed() {
+        let mut world = demo();
+        for (i, l) in world.locations.iter_mut().enumerate() {
+            l.map = Some(realmkit_spec::MapPoint {
+                x: i as u32,
+                y: 0,
+                kind: realmkit_spec::PlaceKind::Waypoint,
+            });
+        }
+        // The chapel is unheard of until its gate is opened.
+        world.locations[2].known_when = Some(realmkit_spec::Condition::Flag {
+            flag: "ruins_open".into(),
+        });
+        let mut engine = Engine::new(&world).unwrap();
+        let menu = Menu::new(&engine, false, None);
+        let labels: Vec<_> = menu.entries().iter().map(|e| e.label.clone()).collect();
+        assert!(labels.contains(&"Travel north — The Pine Track".to_string()));
+        assert!(!labels.iter().any(|l| l.contains("Chapel")), "{labels:?}");
+        let mut panel = Vec::new();
+        crate::panels::location(
+            &mut panel,
+            &engine,
+            "village",
+            crate::render::Paint::default(),
+        )
+        .unwrap();
+        let panel = String::from_utf8(panel).unwrap();
+        assert!(panel.contains("Exits: north\n"), "{panel}");
+        assert!(matches!(
+            engine.execute(Command::Move(Direction::East)),
+            Err(realmkit_engine::EngineError::NoExit)
+        ));
     }
 
     #[test]

@@ -12,6 +12,12 @@ pub struct Quest {
     pub introduction: String,
     pub progress: String,
     pub completion: String,
+    /// Part of the route's main questline rather than a side story.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub main: bool,
+    /// The condition to take the quest up, such as an earlier quest done.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<Condition>,
     #[serde(default)]
     pub reward_xp: u64,
     #[serde(default)]
@@ -29,7 +35,8 @@ pub enum QuestObjective {
     Flag { flag: Id },
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+/// A quest only ever moves forward through these, in order.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestStatus {
     Available,
@@ -91,18 +98,54 @@ pub enum Condition {
         proficiency: Proficiency,
         rank: u32,
     },
+    /// The player has discovered this evidence.
+    Evidence {
+        evidence: Id,
+    },
+    /// The story has reached this phase, or a later one.
+    Phase {
+        phase: Id,
+    },
 }
 
 impl Condition {
     /// Whether this condition can only hold while `leaf` holds: `leaf` is
-    /// required on every branch, never under a `not`.
+    /// required on every branch. A `not` is offered to `leaf` whole; what is
+    /// inside it is never required.
     pub fn requires(&self, leaf: &dyn Fn(&Condition) -> bool) -> bool {
         match self {
             Self::All { of } => of.iter().any(|c| c.requires(leaf)),
             Self::Any { of } => !of.is_empty() && of.iter().all(|c| c.requires(leaf)),
-            Self::Not { .. } => false,
             _ => leaf(self),
         }
+    }
+
+    /// Whether this and `other` can never hold together: on every branch,
+    /// one requires a condition the other requires to fail, or a different
+    /// status of a quest the other requires.
+    pub fn excludes(&self, other: &Condition) -> bool {
+        // Whether `b` cannot hold alongside anything `a` requires.
+        let refutes = |a: &Condition, b: &Condition| {
+            let required: Vec<&Condition> = a
+                .leaves()
+                .into_iter()
+                .filter(|l| a.requires(&|c| c == *l))
+                .collect();
+            b.requires(&|c| {
+                required.iter().any(|l| match (c, l) {
+                    (Self::Not { condition }, _) => **condition == **l,
+                    (
+                        Self::Quest { quest, status },
+                        Self::Quest {
+                            quest: q,
+                            status: s,
+                        },
+                    ) => quest == q && status != s,
+                    _ => false,
+                })
+            })
+        };
+        refutes(self, other) || refutes(other, self)
     }
 
     /// Every leaf predicate, depth first.
@@ -188,6 +231,40 @@ pub enum Effect {
         proficiency: Proficiency,
         ranks: u32,
     },
+    /// The player recognises a piece of evidence; once known, it stays known.
+    DiscoverEvidence {
+        evidence: Id,
+    },
+    /// The story moves on to a later phase; an earlier or the current one
+    /// changes nothing.
+    EnterPhase {
+        phase: Id,
+    },
+}
+
+/// A period of the story, such as the opening journey. Phases come in
+/// authored order, the first current at the start; only story effects move
+/// them on, never world time.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Phase {
+    pub id: Id,
+    pub name: String,
+}
+
+/// Something the player can learn in an investigation: an observation,
+/// testimony or a physical clue. Knowing it is investigation state, separate
+/// from carrying any item.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceDefinition {
+    pub id: Id,
+    pub name: String,
+    pub description: String,
+    /// The physical item this evidence concerns, if any. Carrying the item
+    /// does not make the evidence known, nor the reverse.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item: Option<Id>,
 }
 
 /// A question the route asks at New Game, before the first turn, such as the
@@ -210,4 +287,15 @@ pub struct StartOption {
     /// Applied in order to the starting state; nothing re-runs them.
     #[serde(default)]
     pub effects: Vec<Effect>,
+}
+
+/// An authored ending of the route, reached the moment its condition first
+/// holds. A playthrough records at most one, and play may go on after it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RouteOutcome {
+    pub id: Id,
+    pub name: String,
+    pub text: String,
+    pub when: Condition,
 }

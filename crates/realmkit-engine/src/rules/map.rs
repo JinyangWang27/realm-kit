@@ -2,11 +2,21 @@
 
 use super::*;
 
+/// Whether the player knows of a place: it is where they are, or its
+/// authored condition holds.
+pub(crate) fn known(world: &WorldSpec, state: &GameState, location: &str) -> bool {
+    state.player.location == location
+        || world
+            .location(location)
+            .is_some_and(|l| allowed(state, l.known_when.as_ref()))
+}
+
 pub(crate) fn map_view(world: &WorldSpec, state: &GameState) -> Option<MapView> {
     // Validation guarantees every place has a position or none does.
     let places = world
         .locations
         .iter()
+        .filter(|l| known(world, state, &l.id))
         .map(|l| {
             Some(MapPlace {
                 location: l.id.clone(),
@@ -18,6 +28,7 @@ pub(crate) fn map_view(world: &WorldSpec, state: &GameState) -> Option<MapView> 
         .world
         .roads
         .iter()
+        .filter(|r| r.between.iter().all(|end| known(world, state, end)))
         .map(|r| MapRoad {
             road: r.id.clone(),
             between: r.between.clone(),
@@ -27,8 +38,11 @@ pub(crate) fn map_view(world: &WorldSpec, state: &GameState) -> Option<MapView> 
     let exits = world
         .locations
         .iter()
+        .filter(|l| known(world, state, &l.id))
         .flat_map(|l| {
-            l.exits.iter().map(|(direction, exit)| MapExit {
+            let exits = l.exits.iter();
+            let exits = exits.filter(|(_, exit)| known(world, state, &exit.destination));
+            exits.map(|(direction, exit)| MapExit {
                 from: l.id.clone(),
                 to: exit.destination.clone(),
                 direction: *direction,

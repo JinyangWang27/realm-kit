@@ -188,6 +188,16 @@ pub struct GameState {
     /// The option chosen for each start question, in order, for display.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub start_choices: Vec<Id>,
+    /// Evidence the player has discovered; present only in worlds that author it.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub evidence: BTreeSet<Id>,
+    /// The story phases reached so far: always the authored phases up to the
+    /// current one, which is last. Empty in a world without phases.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub phases: Vec<Id>,
+    /// The route outcome reached, for good; at most one per playthrough.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<Id>,
 }
 
 /// A proficiency's rank, split by where it came from: points the player
@@ -270,7 +280,7 @@ pub struct MarketStock {
     pub goods: BTreeMap<Id, u64>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 16;
+pub const SAVE_FORMAT_VERSION: u32 = 17;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 

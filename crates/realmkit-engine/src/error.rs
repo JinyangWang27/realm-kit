@@ -40,6 +40,8 @@ pub enum EngineError {
     NoSuchProficiency,
     #[error("that proficiency cannot rise further")]
     ProficiencyCap,
+    #[error("you cannot take up {0} yet")]
+    QuestLocked(Id),
     #[error("{0} is not available here")]
     NotHere(Id),
     #[error("{0} has already been defeated")]

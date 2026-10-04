@@ -284,6 +284,20 @@ exclusive outcome conditions where the available analyzers can prove them.
 Runtime ambiguity checking remains the deterministic backstop for reachable
 overlaps that static/bounded analysis does not prove.
 
+**Delivered subset (Format 17).** `outcomes` with a `when` condition, checked
+after every non-panel command against the staged state; one match is recorded
+with `OutcomeReached` in the same transition. Rather than a runtime
+ambiguity error, which a scheduled event or an unlucky order of play could
+hit on every attempt and so lock the story, validation requires every pair
+of outcomes to exclude each other provably (`ambiguous_outcomes`): one
+requires a condition the other requires under `not`, or they require
+different statuses of one quest. Validation also rejects an outcome that could hold at
+the start (`outcome_at_start`) by requiring, on every branch, something no
+start provides. Only
+completed, non-terminal outcomes exist so far: the original game's MVP ends by
+choosing a lead while the others stay open. `terminal` and failure outcomes
+wait for content that needs them.
+
 ## 4. Canon fidelity and divergence
 
 **Resolved.**
@@ -698,6 +712,12 @@ transitions, normally main-quest milestones.
 Exploration, side content, ordinary dialogue, menu use and real-world thinking do
 not implicitly advance canonical chronology.
 
+**Delivered (Format 17).** A world lists its `phases` in order; the first is
+current at the start and only the `enter_phase` effect moves the story on,
+never back, passing any phases between. A `phase` condition holds from that
+phase onwards, which gates side quests in waves. Saves keep the phases
+reached, the current one last.
+
 ### World time
 
 World time is optional. When enabled, use a monotonic integer count of minutes
@@ -882,6 +902,8 @@ it.
 Investigation evidence remains a separate authored identity/state. It may
 reference a physical definition or instance, but possession of that object does
 not automatically imply that its evidentiary significance has been discovered.
+As delivered (Format 17), an evidence definition may name an `item`; the
+`discover_evidence` effect is the only way evidence becomes known.
 
 ## 11. Save compatibility and package evolution
 
@@ -1266,25 +1288,32 @@ For overland worlds, the [overland map](sandbox-worlds.md#overland-map) proposal
 applies this: authored display positions, an engine map-view query, and a
 client-owned viewport with zoom and panning.
 
-**Astraea priority · delivered (Format 16).** Locations author optional
+**Original-game priority · delivered (Format 16).** Locations author optional
 positions (`x` east, `y` south, within `MAP_BOUND`) and a closed kind (town,
 castle, village, waypoint), all or none and never two on one spot.
-Coordinates carry no movement semantics. The engine's map query returns every
-place until knowledge and news exists, and leaves out characters who move,
+Coordinates carry no movement semantics. The engine's map query returns the
+places the player knows of: since Format 17 a place may author a `known_when`
+condition, usually on evidence or a flag, and until it holds the place, its
+roads and its exits are off the map and no road or exit there is offered or
+taken.
+The player's own place is always known. This is the smallest knowledge the
+MVP slice needs; it derives from existing state and saves nothing. The query
+leaves out characters who move,
 since a map would show where they are rather than where they were last seen;
 road open/closed state is likewise left to the action list. Areas and a
 generic scene graph remain undefined.
 
 ### Client integration surface
 
-**Decided for Astraea P0 (Format 16).** Packages load from memory through
-`WorldSpec::from_files`; `Command`, `Event`, `Action` and the map view are
+**Decided for original-game P0 (Format 16).** Packages load from memory through
+`WorldSpec::from_files`; `Command`, `Event`, `Action`, the map view and
+(Format 17) the journal view (phase, known quests, evidence, outcome) are
 serializable; `SaveSnapshot` reads and writes JSON bytes, checking the save
 format first; and `realmkit-engine` builds for `wasm32-unknown-unknown`
 without an adapter crate. The rest of this section stays the rule for what
 comes next.
 
-The graphical Astraea client is a concrete consumer of RealmKit, but its framework
+The original game's graphical client is a concrete consumer of RealmKit, but its framework
 must not leak into the engine. The next presentation slice should define/prove the
 smallest host boundary needed to:
 
@@ -1418,8 +1447,8 @@ Authoritative server
    └── emit permitted events/views
 ```
 
-The first concrete consumer is Shared Astraea. Its product assumptions are:
-Solo Erdain and Solo Astraea remain local/offline; choosing the shared mode crosses
+The first concrete consumer is the original game's shared mode. Its product
+assumptions are: solo play remains local/offline; choosing the shared mode crosses
 an explicit authority boundary; local and shared histories fork and are not later
 merged.
 
@@ -1538,7 +1567,7 @@ summary:
 The [sandbox design direction](sandbox-worlds.md) proposes the capabilities,
 and the roadmap schedules them as
 [M5 slices](../ROADMAP.md#delivery-slices--proposed-1) and
-[M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). Astraea's Erdain is now
+[M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). The original game's world is now
 the concrete full-game pressure test: after the delivered economy and first
 troop/battle slices, factions/standing and the remaining party needs come before
 holdings, world agents and faction strategy. Optional detail stays deferred until
@@ -1839,7 +1868,7 @@ needs to be confirmed:
 
 ## Discussion order
 
-Discuss decisions immediately before their first concrete consumer. With Astraea
+Discuss decisions immediately before their first concrete consumer. With the original game
 as the current full-game pressure test:
 
 1. Presentation: overland-map data/disclosure and the minimal embeddable/WASM host
@@ -1850,11 +1879,11 @@ as the current full-game pressure test:
 3. M6b: factions, war/peace and standing tracks.
 4. Remaining M6c: companions, roster limit, provisions/morale and travel speed.
 5. M6e-M6h: holdings, world agents, faction strategy and only the politics/order
-   pieces used by the representative Erdain world.
+   pieces used by the representative sandbox world.
 6. M7/M8: authoring diagnostics, simulation, source adaptation and provenance as
    their consumers become active.
-7. M9: replay/import, persistence, identity and session rules only when Shared
-   Astraea becomes active server work.
+7. M9: replay/import, persistence, identity and session rules only when shared
+   play becomes active server work.
 
 Open decisions for unrelated future capabilities should stay open rather than
 being settled speculatively.

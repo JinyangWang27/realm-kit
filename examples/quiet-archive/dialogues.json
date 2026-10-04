@@ -15,7 +15,13 @@
           {
             "text": "The copyist has the map. He was only mending it.",
             "next": "thanks",
-            "requires": { "kind": "quest", "quest": "lost_map", "status": "ready" },
+            "requires": {
+              "kind": "all",
+              "of": [
+                { "kind": "quest", "quest": "lost_map", "status": "ready" },
+                { "kind": "evidence", "evidence": "stitched_map" }
+              ]
+            },
             "effects": [{ "kind": "complete_quest", "quest": "lost_map" }]
           },
           {
@@ -65,7 +71,7 @@
         "id": "greeting",
         "text": "The copyist does not stop writing. 'Yes?'",
         "choices": [
-          { "text": "Have you seen the river map?", "next": "confession", "effects": [{ "kind": "set_flag", "flag": "map_found" }] },
+          { "text": "Have you seen the river map?", "next": "confession", "effects": [{ "kind": "set_flag", "flag": "map_found" }, { "kind": "discover_evidence", "evidence": "stitched_map" }] },
           {
             "text": "Could I borrow a pen?",
             "next": "pen",

@@ -34,6 +34,9 @@ pub(super) fn check(
     }
     inventory(world, state, &progress)?;
     flags(world, state, &progress)?;
+    evidence(world, state)?;
+    phases(world, state)?;
+    outcome(world, state)?;
     dialogue(world, state)
 }
 
@@ -330,8 +333,8 @@ fn lasting(world: &WorldSpec, state: &GameState, requires: Option<&Condition>) -
 /// cleared and ranks never fall, so a flag or rank that was once required
 /// still holds. Every flag starts unset and every technique and proficiency
 /// unlearned, except what the world starts the player with and what the
-/// saved start answers did before the first turn; quest states and items
-/// move both ways, so anything else proves nothing. Branches are judged
+/// saved start answers did before the first turn. Quests only move forward
+/// from available; items and the like move both ways, so they prove nothing. Branches are judged
 /// separately, which can only accept more.
 fn could_have_been(
     world: &WorldSpec,
@@ -347,7 +350,11 @@ fn could_have_been(
         Condition::Any { of } if value => of.iter().any(|c| could(c, true)),
         Condition::Any { of } => of.iter().all(|c| could(c, false)),
         Condition::Not { condition } => could(condition, !value),
-        Condition::Flag { .. } | Condition::Technique { .. } | Condition::Proficiency { .. }
+        Condition::Flag { .. }
+        | Condition::Technique { .. }
+        | Condition::Proficiency { .. }
+        | Condition::Evidence { .. }
+        | Condition::Phase { .. }
             if value =>
         {
             rules::holds(state, condition)
@@ -365,6 +372,13 @@ fn could_have_been(
                 _ => None,
             }))
             .any(|g| &g.technique == technique && g.rank.unwrap_or(1) >= *rank),
+        // A quest passes through every status in order, starting available.
+        Condition::Quest { quest, status } if value => state.quests[quest] >= *status,
+        Condition::Quest { quest, status } => {
+            *status != QuestStatus::Available || state.quests[quest] != QuestStatus::Available
+        }
+        // The first phase holds from the start.
+        Condition::Phase { phase } => world.phase_index(phase) != Some(0),
         Condition::Proficiency { proficiency, rank } => {
             let taught = answers()
                 .filter_map(|e| match e {
@@ -419,10 +433,15 @@ fn repeatable(world: &WorldSpec, id: &str) -> bool {
         .is_some_and(|g| g.repeatable)
 }
 
-/// Every quest's status agrees with its objective.
+/// Every quest's status agrees with its objective, and a quest taken up
+/// once met its prerequisites.
 fn quests(world: &WorldSpec, fresh: &GameState, state: &GameState) -> Result<(), String> {
     ensure(
         state.quests.keys().eq(fresh.quests.keys())
+            && world.quests.iter().all(|quest| {
+                state.quests[&quest.id] == QuestStatus::Available
+                    || lasting(world, state, quest.requires.as_ref())
+            })
             && world.quests.iter().all(|quest| {
                 let done = match &quest.objective {
                     // Any status is possible: a repeatable victory leaves no record.
@@ -771,6 +790,71 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
                     || group_flags.contains(f)
             }),
         "story flags do not match progress",
+    )
+}
+
+/// Whether a dialogue choice with an effect `matches` could have been taken:
+/// its condition once held. Only dialogue discovers evidence or enters a phase.
+fn could_choose(world: &WorldSpec, state: &GameState, matches: impl Fn(&Effect) -> bool) -> bool {
+    world
+        .dialogues
+        .iter()
+        .flat_map(|d| &d.nodes)
+        .flat_map(|n| &n.choices)
+        .filter(|c| c.effects.iter().any(&matches))
+        .any(|c| lasting(world, state, c.requires.as_ref()))
+}
+
+/// Known evidence was discovered by a choice that could have been taken;
+/// evidence is never forgotten, so nothing else could have made it known.
+fn evidence(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    ensure(
+        state.evidence.iter().all(|id| {
+            could_choose(
+                world,
+                state,
+                |e| matches!(e, Effect::DiscoverEvidence { evidence } if evidence == id),
+            )
+        }),
+        "known evidence could not have been discovered",
+    )
+}
+
+/// The phases reached are the authored ones up to the current, which is the
+/// first or one a choice that could have been taken enters.
+fn phases(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let authored = &world.world.phases;
+    let current = state.phases.last();
+    ensure(
+        state.phases.len() <= authored.len()
+            && state.phases.iter().zip(authored).all(|(a, b)| *a == b.id)
+            && state.phases.is_empty() == authored.is_empty()
+            && current.is_none_or(|current| {
+                state.phases.len() == 1
+                    || could_choose(
+                        world,
+                        state,
+                        |e| matches!(e, Effect::EnterPhase { phase } if phase == current),
+                    )
+            }),
+        "invalid story phase",
+    )
+}
+
+/// A recorded outcome is authored and its condition once held; without one,
+/// none holds, since the first command it held after would have recorded it.
+fn outcome(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    ensure(
+        match &state.outcome {
+            Some(id) => world
+                .world
+                .outcomes
+                .iter()
+                .find(|o| &o.id == id)
+                .is_some_and(|o| lasting(world, state, Some(&o.when))),
+            None => rules::outcomes(world, state).is_empty(),
+        },
+        "invalid route outcome",
     )
 }
 

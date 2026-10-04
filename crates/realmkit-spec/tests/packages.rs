@@ -300,3 +300,69 @@ fn packages_load_from_memory_as_from_a_directory() {
         );
     }
 }
+
+#[test]
+fn place_knowledge_and_features_are_checked() {
+    let flag = |f: &str| Condition::Flag { flag: f.into() };
+    // Knowledge of a place belongs to the map.
+    let mut world = demo();
+    world.locations[1].known_when = Some(flag("ruins_open"));
+    assert!(codes(&world).contains(&"map_disabled".to_string()));
+    let mut world = marches();
+    world.locations[1].known_when = Some(flag("missing"));
+    assert!(codes(&world).contains(&"missing_reference".to_string()));
+    // A feature is examined, so it has dialogue and neither fights nor moves.
+    let mut world = demo();
+    world
+        .characters
+        .iter_mut()
+        .find(|c| c.id == "elder")
+        .unwrap()
+        .kind = CharacterKind::Feature;
+    assert!(world.diagnostics().is_empty(), "{:?}", codes(&world));
+    wolf(&mut world).kind = CharacterKind::Feature;
+    assert!(codes(&world).contains(&"invalid_feature".to_string()));
+}
+
+#[test]
+fn a_place_known_by_a_passing_condition_draws_a_warning() {
+    let warnings = |w: &WorldSpec| -> Vec<String> {
+        w.diagnostics()
+            .into_iter()
+            .filter(|d| d.severity == Severity::Warning)
+            .map(|d| d.code)
+            .collect()
+    };
+    let flag = Condition::Flag {
+        flag: "letter_delivered".into(),
+    };
+    let mut world = marches();
+    // Lasting knowledge, even composed, warns of nothing.
+    world.locations[1].known_when = Some(Condition::Any {
+        of: vec![
+            flag.clone(),
+            Condition::Quest {
+                quest: world.quests[0].id.clone(),
+                status: QuestStatus::Completed,
+            },
+        ],
+    });
+    assert!(warnings(&world).is_empty(), "{:?}", warnings(&world));
+    // An active quest, an item or a `not` can stop holding.
+    for passing in [
+        Condition::Quest {
+            quest: world.quests[0].id.clone(),
+            status: QuestStatus::Active,
+        },
+        Condition::Not {
+            condition: Box::new(flag.clone()),
+        },
+        Condition::All {
+            of: vec![flag, Condition::Currency { amount: 1 }],
+        },
+    ] {
+        world.locations[1].known_when = Some(passing);
+        assert_eq!(warnings(&world), ["forgettable_place"]);
+        assert!(world.validate().is_ok());
+    }
+}

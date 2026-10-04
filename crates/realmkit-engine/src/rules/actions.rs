@@ -50,14 +50,21 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 .map(|id| available(Command::Engage((*id).clone()))),
         );
     }
-    actions.extend(location.exits.iter().map(|(direction, exit)| Action {
+    // An exit, like a road, to a place the player does not know of is not offered.
+    let exits = location.exits.iter();
+    let exits = exits.filter(|(_, exit)| known(world, state, &exit.destination));
+    actions.extend(exits.map(|(direction, exit)| Action {
         command: Command::Move(*direction),
         available: allowed(state, exit.requires.as_ref()),
     }));
     // Roads in authored order; a closed one is listed to explain itself.
+    // A road to a place the player does not know of is not offered at all.
     actions.extend(world.world.roads.iter().filter_map(|road| {
+        let to = road
+            .leads(&location.id)
+            .filter(|to| known(world, state, to))?;
         Some(Action {
-            command: Command::Travel(road.leads(&location.id)?.clone()),
+            command: Command::Travel(to.clone()),
             available: allowed(state, road.requires.as_ref()),
         })
     }));

@@ -1,11 +1,12 @@
 use crate::panels;
 use crossterm::style::Stylize;
 use realmkit_engine::{BattleOutcome, Engine, Event, Outcome};
-use realmkit_spec::{Direction, Id, Stat, TextTemplate};
+use realmkit_spec::{CharacterKind, Direction, Id, Stat, TextTemplate};
 use std::io::{self, Write};
 
 const CRITICAL: &str = "Critical hit!";
 const TECHNIQUE_XP: &str = "Technique XP";
+const EVIDENCE: &str = "New evidence";
 
 /// Single-pass interpolation: inserted values are data, never template syntax.
 fn interpolate(template: &TextTemplate, values: &[(&str, &str)]) -> io::Result<String> {
@@ -592,7 +593,11 @@ pub fn events(
                 let npc = world.character(npc).unwrap();
                 let dialogue = world.dialogue(npc.dialogue.as_ref().unwrap()).unwrap();
                 let node = dialogue.nodes.iter().find(|n| &n.id == node).unwrap();
-                writeln!(output, "{}: {}", npc.name, node.text)?;
+                // A feature does not speak: its lines describe what is seen.
+                match npc.kind {
+                    CharacterKind::Person => writeln!(output, "{}: {}", npc.name, node.text)?,
+                    CharacterKind::Feature => writeln!(output, "{}", node.text)?,
+                }
             }
             Event::QuestAccepted { quest } => {
                 writeln!(output, "{}", world.quest(quest).unwrap().introduction)?
@@ -602,6 +607,21 @@ pub fn events(
             }
             Event::QuestCompleted { quest } => {
                 writeln!(output, "{}", world.quest(quest).unwrap().completion)?
+            }
+            Event::EvidenceDiscovered { evidence } => writeln!(
+                output,
+                "{}: {}",
+                paint.good(EVIDENCE),
+                world.evidence(evidence).unwrap().name
+            )?,
+            Event::OutcomeReached { outcome } => {
+                let outcome = world.world.outcomes.iter().find(|o| &o.id == outcome);
+                let outcome = outcome.unwrap();
+                writeln!(output, "{}\n{}", paint.title(&outcome.name), outcome.text)?
+            }
+            Event::PhaseEntered { phase } => {
+                let phase = &world.world.phases[world.phase_index(phase).unwrap()];
+                writeln!(output, "{}", paint.title(&format!("— {} —", phase.name)))?
             }
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,

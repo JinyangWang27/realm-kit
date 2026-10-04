@@ -88,3 +88,39 @@ fn a_world_without_positions_has_no_map() {
     assert!(!offered(&engine).iter().any(|(c, _)| *c == Map));
     assert!(matches!(engine.execute(Map), Err(EngineError::NoMap)));
 }
+
+#[test]
+fn an_unknown_place_is_off_the_map_and_off_the_roads() {
+    let mut world = marches();
+    let keep = world
+        .locations
+        .iter_mut()
+        .find(|l| l.id == "hollin_keep")
+        .unwrap();
+    keep.known_when = Some(Condition::Flag {
+        flag: "letter_delivered".into(),
+    });
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    let view = engine.map_view().unwrap();
+    assert!(!view.places.iter().any(|p| p.location == "hollin_keep"));
+    assert!(!view
+        .roads
+        .iter()
+        .any(|r| r.between.contains(&"hollin_keep".to_string())));
+    assert_eq!(view.roads.len(), 2);
+    // A hidden road is no spoiler: not even offered as closed.
+    assert!(!offered(&engine)
+        .iter()
+        .any(|(c, _)| *c == Travel("hollin_keep".into())));
+    assert!(matches!(
+        engine.execute(Travel("hollin_keep".into())),
+        Err(EngineError::NoRoad(_))
+    ));
+    // Once the player hears of the keep, it is on the map and the road.
+    let mut snapshot = engine.snapshot();
+    snapshot.state.flags.insert("letter_delivered".into());
+    let mut engine = Engine::restore(&world, snapshot).unwrap();
+    assert_eq!(engine.map_view().unwrap().places.len(), 4);
+    assert!(offered(&engine).contains(&(Travel("hollin_keep".into()), true)));
+    engine.execute(Travel("hollin_keep".into())).unwrap();
+}

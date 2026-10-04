@@ -339,6 +339,17 @@ pub enum Event {
     StoryFlagSet {
         flag: Id,
     },
+    EvidenceDiscovered {
+        evidence: Id,
+    },
+    /// The route reached this authored outcome; play may go on.
+    OutcomeReached {
+        outcome: Id,
+    },
+    /// The story moved on to this phase.
+    PhaseEntered {
+        phase: Id,
+    },
     InventoryViewed,
     StatusViewed,
     QuestsViewed,
@@ -387,10 +398,10 @@ pub struct Action {
     pub available: bool,
 }
 
-/// What the player may know of the map: places, the roads and exits between
-/// them, and where the player is. Until the world tracks knowledge, every
-/// place is known; characters who move are left out, since a map would show
-/// where they are now, not where they were last seen.
+/// What the player may know of the map: the places they know of (where they
+/// are, and each place whose `known_when` holds), the roads and exits between
+/// those, and where the player is. Characters who move are left out, since a
+/// map would show where they are now, not where they were last seen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MapView {
     pub here: Id,
@@ -421,4 +432,25 @@ pub struct MapExit {
     pub from: Id,
     pub to: Id,
     pub direction: Direction,
+}
+
+/// What the player's journal shows: the story's phase, the quests the
+/// player knows of, the evidence discovered and the outcome reached.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Journal {
+    /// The current phase; `None` in a world without phases.
+    pub phase: Option<Id>,
+    /// Main quests, then side quests, each in authored order. An available
+    /// quest whose prerequisites do not hold yet is left out.
+    pub quests: Vec<JournalQuest>,
+    /// Known evidence, in authored order.
+    pub evidence: Vec<Id>,
+    pub outcome: Option<Id>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JournalQuest {
+    pub quest: Id,
+    pub main: bool,
+    pub status: QuestStatus,
 }

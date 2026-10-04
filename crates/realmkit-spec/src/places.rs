@@ -59,6 +59,11 @@ pub struct Location {
     /// Where the place is drawn; either every location has one or none does.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub map: Option<MapPoint>,
+    /// The condition for the player to know of this place, such as a clue
+    /// that points to it. Unknown places are left off the map and no road
+    /// leads there. Requires map positions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub known_when: Option<Condition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -70,11 +75,24 @@ pub struct Exit {
     pub blocked_text: String,
 }
 
+/// Whether a character is someone to talk to or something to examine.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CharacterKind {
+    #[default]
+    Person,
+    /// A thing in a place, such as an abandoned camp or wheel ruts: its
+    /// dialogue is what examining it shows. It cannot fight or move.
+    Feature,
+}
+
 /// Anyone in the world. Talking and fighting are optional components.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Character {
     pub id: Id,
+    #[serde(default, skip_serializing_if = "is_person")]
+    pub kind: CharacterKind,
     pub name: String,
     pub description: String,
     /// The condition for the character to be present where it is placed.
@@ -112,4 +130,8 @@ pub struct CombatProfile {
     /// Engaging any member brings in every present, undefeated member.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<Id>,
+}
+
+fn is_person(kind: &CharacterKind) -> bool {
+    *kind == CharacterKind::Person
 }

@@ -15,14 +15,14 @@ mod time;
 
 pub(super) use actions::actions;
 pub(super) use economy::{quote, stock_up, ware_price};
-pub(super) use map::map_view;
+pub(super) use map::{known, map_view};
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
 pub(super) use proficiency::{
     granted_points as granted_proficiency_points, rank, unspent_proficiency_points,
 };
 pub(super) use retinue::{leave, promote, prune};
 pub(super) use story::{
-    apply as apply_effects, choices, grant_items, grant_xp, progress, set_flag,
+    apply as apply_effects, choices, grant_items, grant_xp, journal, progress, set_flag,
 };
 
 /// Evaluates a condition against the state; pure, so it may run any number of times.
@@ -58,6 +58,8 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
             proficiency,
             rank: at_least,
         } => rank(state, *proficiency) >= *at_least,
+        Condition::Evidence { evidence } => state.evidence.contains(evidence),
+        Condition::Phase { phase } => state.phases.contains(phase),
         Condition::TimeOfDay { from, to } => state.time.is_some_and(|now| {
             let minute = now % realmkit_spec::MINUTES_PER_DAY;
             if from < to {
@@ -301,8 +303,26 @@ pub(super) fn execute(
                 events.push(Event::DialogueEnded);
             }
         }
+        // Validation proves outcomes exclude each other, so at most one holds.
+        if state.outcome.is_none() {
+            if let Some(reached) = outcomes(world, state).pop() {
+                state.outcome = Some(reached.clone());
+                events.push(Event::OutcomeReached { outcome: reached });
+            }
+        }
     }
     Ok(events)
+}
+
+/// The authored outcomes whose conditions hold now, in authored order.
+pub(super) fn outcomes(world: &WorldSpec, state: &GameState) -> Vec<Id> {
+    world
+        .world
+        .outcomes
+        .iter()
+        .filter(|o| holds(state, &o.when))
+        .map(|o| o.id.clone())
+        .collect()
 }
 
 fn move_to(
@@ -312,7 +332,11 @@ fn move_to(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let location = world.location(&state.player.location).unwrap();
-    let exit = location.exits.get(&direction).ok_or(EngineError::NoExit)?;
+    let exit = location
+        .exits
+        .get(&direction)
+        .filter(|exit| known(world, state, &exit.destination))
+        .ok_or(EngineError::NoExit)?;
     if !allowed(state, exit.requires.as_ref()) {
         return Err(EngineError::ExitLocked {
             location: location.id.clone(),

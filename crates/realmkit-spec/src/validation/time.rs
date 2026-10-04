@@ -170,7 +170,9 @@ fn event_effect(
         | Effect::PayCurrency { .. }
         | Effect::BuyWorkshop { .. }
         | Effect::SellWorkshop { .. }
-        | Effect::RaiseProficiency { .. } => issue(
+        | Effect::RaiseProficiency { .. }
+        | Effect::DiscoverEvidence { .. }
+        | Effect::EnterPhase { .. } => issue(
             out,
             owner,
             "invalid_effect",

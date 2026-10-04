@@ -44,6 +44,58 @@ pub(super) fn quests(out: &mut Vec<Diagnostic>, w: &WorldSpec, placed: &BTreeSet
         for flag in &quest.completion_flags {
             reference(out, &quest.id, "flag", flag, w.world.flags.contains(flag));
         }
+        condition(out, w, &quest.id, quest.requires.as_ref());
+        // The main story may branch on side stories, never wait on one.
+        if quest.main {
+            for side in prerequisites(w, quest).filter(|p| !p.main) {
+                issue(
+                    out,
+                    &quest.id,
+                    "main_requires_side",
+                    format!(
+                        "main quest {} cannot require side quest {}",
+                        quest.id, side.id
+                    ),
+                );
+            }
+        }
+    }
+    quest_cycles(out, w);
+}
+
+/// Quests `quest` cannot be taken up without having taken up first: those
+/// its condition requires past `available` on every branch.
+fn prerequisites<'w>(w: &'w WorldSpec, quest: &'w Quest) -> impl Iterator<Item = &'w Quest> {
+    w.quests.iter().filter(|other| {
+        quest.requires.as_ref().is_some_and(|c| {
+            c.requires(&|leaf| {
+                matches!(leaf, Condition::Quest { quest, status }
+                    if *quest == other.id && *status != QuestStatus::Available)
+            })
+        })
+    })
+}
+
+/// A quest that waits, through its prerequisites, on itself can never be
+/// taken up.
+fn quest_cycles(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    for quest in &w.quests {
+        let mut seen = BTreeSet::new();
+        let mut next: Vec<&Quest> = prerequisites(w, quest).collect();
+        while let Some(prior) = next.pop() {
+            if prior.id == quest.id {
+                issue(
+                    out,
+                    &quest.id,
+                    "quest_cycle",
+                    format!("{} waits on itself through its prerequisites", quest.id),
+                );
+                break;
+            }
+            if seen.insert(&prior.id) {
+                next.extend(prerequisites(w, prior));
+            }
+        }
     }
 }
 
@@ -151,6 +203,16 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
         Effect::RaiseProficiency { proficiency, ranks } => {
             economy::proficiency(out, w, owner, *proficiency, *ranks)
         }
+        Effect::EnterPhase { phase } => {
+            reference(out, owner, "phase", phase, w.phase_index(phase).is_some())
+        }
+        Effect::DiscoverEvidence { evidence } => reference(
+            out,
+            owner,
+            "evidence",
+            evidence,
+            w.evidence(evidence).is_some(),
+        ),
         Effect::GrantTechnique(grant) => {
             progression::technique_grant(out, w, owner, grant);
             // A choice can be taken again; teaching a rank is idempotent,
@@ -205,7 +267,9 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 | Effect::TakeItems { .. }
                 | Effect::PayCurrency { .. }
                 | Effect::BuyWorkshop { .. }
-                | Effect::SellWorkshop { .. } => issue(
+                | Effect::SellWorkshop { .. }
+                | Effect::DiscoverEvidence { .. }
+                | Effect::EnterPhase { .. } => issue(
                     out,
                     &question.id,
                     "invalid_effect",
@@ -237,6 +301,134 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 &w.world.id,
                 "start_overflow",
                 format!("the starting currency and the most the start answers grant come to {most}, past {CURRENCY_BOUND}"),
+            );
+        }
+    }
+}
+
+/// Evidence definitions have unique IDs, and a linked item exists.
+pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    ids(
+        out,
+        "evidence",
+        w.world.evidence.iter().map(|e| e.id.as_str()),
+    );
+    for evidence in &w.world.evidence {
+        if let Some(item) = &evidence.item {
+            reference(out, &evidence.id, "item", item, w.item(item).is_some());
+        }
+    }
+}
+
+/// A condition on evidence names defined evidence that some authored effect
+/// can discover; otherwise it could never hold.
+pub(super) fn evidence_known(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, id: &str) {
+    reference(out, owner, "evidence", id, w.evidence(id).is_some());
+    let discoverable = establishes(
+        w,
+        |e| matches!(e, Effect::DiscoverEvidence { evidence } if evidence == id),
+        |leaf| matches!(leaf, Condition::Evidence { evidence } if evidence == id),
+    );
+    if w.evidence(id).is_some() && !discoverable {
+        issue(
+            out,
+            owner,
+            "undiscoverable_evidence",
+            format!("no effect discovers {id}, so this condition can never hold"),
+        );
+    }
+}
+
+/// Whether some dialogue choice has an effect that `matches` without needing,
+/// on every branch of its condition, what that effect would establish. Only
+/// dialogue discovers evidence or enters phases.
+fn establishes(
+    w: &WorldSpec,
+    matches: impl Fn(&Effect) -> bool,
+    needs: impl Fn(&Condition) -> bool,
+) -> bool {
+    w.dialogues
+        .iter()
+        .flat_map(|d| &d.nodes)
+        .flat_map(|n| &n.choices)
+        .filter(|c| c.effects.iter().any(&matches))
+        .any(|c| !c.requires.as_ref().is_some_and(|r| r.requires(&needs)))
+}
+
+/// Phases have unique IDs, and every phase after the first is entered by
+/// some effect; otherwise the story could never reach it.
+pub(super) fn phases(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    ids(out, "phase", w.world.phases.iter().map(|p| p.id.as_str()));
+    for (index, phase) in w.world.phases.iter().enumerate().skip(1) {
+        // A choice that needs this phase or a later one cannot be what enters it.
+        let entered = establishes(
+            w,
+            |e| matches!(e, Effect::EnterPhase { phase: p } if *p == phase.id),
+            |leaf| {
+                matches!(leaf, Condition::Phase { phase: p }
+                    if w.phase_index(p).is_some_and(|i| i >= index))
+            },
+        );
+        if !entered {
+            issue(
+                out,
+                &phase.id,
+                "unreachable_phase",
+                format!("no effect enters phase {}", phase.id),
+            );
+        }
+    }
+}
+
+/// Outcomes have unique IDs and valid conditions, and none can hold at the
+/// start: each requires, on every branch, something no start provides. That
+/// is a quest taken up, evidence, a workshop, a phase after the first, or a
+/// flag no start answer sets.
+pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    ids(
+        out,
+        "outcome",
+        w.world.outcomes.iter().map(|o| o.id.as_str()),
+    );
+    let answered: BTreeSet<&Id> = w
+        .start_options()
+        .flat_map(|o| &o.effects)
+        .filter_map(|e| match e {
+            Effect::SetFlag { flag } => Some(flag),
+            _ => None,
+        })
+        .collect();
+    let never_at_start = |leaf: &Condition| match leaf {
+        Condition::Quest { status, .. } => *status != QuestStatus::Available,
+        Condition::Evidence { .. } | Condition::Workshop { .. } => true,
+        Condition::Phase { phase } => w.phase_index(phase).is_some_and(|i| i > 0),
+        Condition::Flag { flag } => !answered.contains(flag),
+        _ => false,
+    };
+    for (i, outcome) in w.world.outcomes.iter().enumerate() {
+        condition(out, w, &outcome.id, Some(&outcome.when));
+        // The engine records whichever outcome holds; were two to hold at
+        // once, the ending would turn on authored order, so each pair must
+        // provably exclude the other.
+        for other in w.world.outcomes[..i].iter() {
+            if !outcome.when.excludes(&other.when) {
+                issue(
+                    out,
+                    &outcome.id,
+                    "ambiguous_outcomes",
+                    format!(
+                        "{} and {} could hold at once; make one require a condition the other requires to fail",
+                        other.id, outcome.id
+                    ),
+                );
+            }
+        }
+        if !outcome.when.requires(&never_at_start) {
+            issue(
+                out,
+                &outcome.id,
+                "outcome_at_start",
+                "an outcome must require something no start provides: a quest taken up, evidence, a workshop, a later phase or a flag no start answer sets",
             );
         }
     }

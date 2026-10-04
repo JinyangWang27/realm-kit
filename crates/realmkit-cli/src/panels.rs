@@ -27,7 +27,9 @@ pub fn location(
         .roads
         .iter()
         .filter_map(|road| {
-            let to = world.location(road.leads(&location.id)?)?;
+            // A road to a place the player has not heard of is not shown.
+            let to = road.leads(&location.id).filter(|to| engine.knows(to))?;
+            let to = world.location(to)?;
             let mut notes = Vec::new();
             if road.minutes > 0 {
                 notes.push(duration(road.minutes));
@@ -44,9 +46,15 @@ pub fn location(
     if !roads.is_empty() {
         writeln!(output, "Roads: {}", roads.join(", "))?;
     }
+    // Exits to places the player has not heard of are not shown either.
+    let exits: Vec<_> = location
+        .exits
+        .iter()
+        .filter(|(_, exit)| engine.knows(&exit.destination))
+        .collect();
     // A place reached only by road has no compass exits to list.
-    if !location.exits.is_empty() || roads.is_empty() {
-        location_exits(output, engine, location)?;
+    if !exits.is_empty() || roads.is_empty() {
+        location_exits(output, engine, &exits)?;
     }
     for character in engine.present_here() {
         // A fighter shows its HP: current in a fight, full otherwise.
@@ -73,14 +81,14 @@ pub fn location(
 fn location_exits(
     output: &mut impl Write,
     engine: &Engine<'_>,
-    location: &realmkit_spec::Location,
+    exits: &[(&realmkit_spec::Direction, &realmkit_spec::Exit)],
 ) -> io::Result<()> {
     write!(output, "Exits:")?;
-    for (direction, exit) in &location.exits {
+    for (direction, exit) in exits {
         write!(
             output,
             " {}{}",
-            direction_name(*direction),
+            direction_name(**direction),
             if engine.allows(exit.requires.as_ref()) {
                 ""
             } else {
@@ -88,7 +96,7 @@ fn location_exits(
             }
         )?;
     }
-    if location.exits.is_empty() {
+    if exits.is_empty() {
         write!(output, " none")?;
     }
     writeln!(output)
@@ -348,17 +356,35 @@ fn holdings(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
     Ok(())
 }
 
-/// Every quest and its status.
+/// The journal: the story's phase, the quests the player knows of, and the
+/// evidence they have found.
 pub fn quests(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
     let world = engine.world();
-    let state = engine.state();
+    let journal = engine.journal();
+    if let Some(phase) = &journal.phase {
+        let phase = &world.world.phases[world.phase_index(phase).unwrap()];
+        writeln!(output, "{}: {}", paint.title("Chapter"), phase.name)?;
+    }
     writeln!(output, "{}", paint.title("Quests:"))?;
-    for quest in &world.quests {
+    for entry in &journal.quests {
+        let quest = world.quest(&entry.quest).unwrap();
+        let main = if entry.main { " — main" } else { "" };
         writeln!(
             output,
-            "  {} [{}]: {:?}",
-            quest.name, quest.id, state.quests[&quest.id]
+            "  {} [{}]: {:?}{main}",
+            quest.name, quest.id, entry.status
         )?;
+    }
+    if !journal.evidence.is_empty() {
+        writeln!(output, "{}", paint.title("Evidence:"))?;
+        for id in &journal.evidence {
+            let evidence = world.evidence(id).unwrap();
+            writeln!(output, "  {}: {}", evidence.name, evidence.description)?;
+        }
+    }
+    if let Some(id) = &journal.outcome {
+        let outcome = world.world.outcomes.iter().find(|o| &o.id == id).unwrap();
+        writeln!(output, "{}: {}", paint.title("Reached"), outcome.name)?;
     }
     Ok(())
 }

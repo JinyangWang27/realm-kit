@@ -18,7 +18,24 @@ pub(crate) fn choices<'a>(
         .choices
         .iter()
         .filter(|c| allowed(state, c.requires.as_ref()))
+        .filter(|c| !offers_locked_quest(world, state, c))
         .collect()
+}
+
+/// Whether taking the choice would be refused because a quest it accepts
+/// is not yet open. Earlier effects in its list count: completing one quest
+/// may open the next. Only choices accepting a gated quest are tried.
+// ponytail: tries the effects on a copy of the state each time choices are
+// listed; cache per node if worlds grow large.
+fn offers_locked_quest(world: &WorldSpec, state: &GameState, choice: &DialogueChoice) -> bool {
+    let gated = choice.effects.iter().any(|e| {
+        matches!(e, Effect::AcceptQuest { quest } if world.quest(quest).unwrap().requires.is_some())
+    });
+    gated
+        && matches!(
+            apply(world, &mut state.clone(), &choice.effects, &mut Vec::new()),
+            Err(EngineError::QuestLocked(_))
+        )
 }
 
 pub(crate) fn dialogue(
@@ -164,6 +181,9 @@ pub(crate) fn quest(
     if state.quests[id] != required {
         return Err(EngineError::QuestState(id.into()));
     }
+    if !complete && !allowed(state, quest.requires.as_ref()) {
+        return Err(EngineError::QuestLocked(id.into()));
+    }
     if complete {
         state.quests.insert(id.into(), QuestStatus::Completed);
         events.push(Event::QuestCompleted { quest: id.into() });
@@ -189,6 +209,20 @@ pub(crate) fn quest(
         }
     }
     Ok(())
+}
+
+/// Moves the story on to `phase`, passing any phases between; a phase
+/// already reached changes nothing.
+fn enter_phase(world: &WorldSpec, state: &mut GameState, phase: &str, events: &mut Vec<Event>) {
+    let index = world.phase_index(phase).unwrap();
+    if index < state.phases.len() {
+        return;
+    }
+    let passed = world.world.phases[state.phases.len()..=index].iter();
+    state.phases.extend(passed.map(|p| p.id.clone()));
+    events.push(Event::PhaseEntered {
+        phase: phase.into(),
+    });
 }
 
 /// Applies effects in authored order to the staged state. An error refuses
@@ -217,6 +251,14 @@ pub(crate) fn apply(
             }
             Effect::RaiseProficiency { proficiency, ranks } => {
                 proficiency::raise(world, state, *proficiency, *ranks, events)
+            }
+            Effect::EnterPhase { phase } => enter_phase(world, state, phase, events),
+            Effect::DiscoverEvidence { evidence } => {
+                if state.evidence.insert(evidence.clone()) {
+                    events.push(Event::EvidenceDiscovered {
+                        evidence: evidence.clone(),
+                    });
+                }
             }
         }
     }
@@ -300,4 +342,32 @@ pub(crate) fn choose(
         }
     }
     Ok(())
+}
+
+pub(crate) fn journal(world: &WorldSpec, state: &GameState) -> Journal {
+    let known = |q: &&Quest| {
+        state.quests[&q.id] != QuestStatus::Available || allowed(state, q.requires.as_ref())
+    };
+    let main = world.quests.iter().filter(|q| q.main);
+    let side = world.quests.iter().filter(|q| !q.main);
+    Journal {
+        phase: state.phases.last().cloned(),
+        quests: main
+            .chain(side)
+            .filter(known)
+            .map(|q| JournalQuest {
+                quest: q.id.clone(),
+                main: q.main,
+                status: state.quests[&q.id],
+            })
+            .collect(),
+        evidence: world
+            .world
+            .evidence
+            .iter()
+            .filter(|e| state.evidence.contains(&e.id))
+            .map(|e| e.id.clone())
+            .collect(),
+        outcome: state.outcome.clone(),
+    }
 }

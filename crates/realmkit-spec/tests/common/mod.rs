@@ -58,3 +58,11 @@ pub fn marches() -> WorldSpec {
     ))
     .unwrap()
 }
+
+pub fn caravan_trail() -> WorldSpec {
+    WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/caravan-trail"
+    ))
+    .unwrap()
+}

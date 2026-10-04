@@ -32,7 +32,7 @@ the borders. A later visit finds a new banner over a town the player once knew.
 No part of this needs a concrete source game. The scenario only pushes
 RealmKit's abstractions and tests.
 
-Astraea's Erdain is now the first intended full-game consumer close to this
+The original game's world is now the first intended full-game consumer close to this
 reference scenario. That makes the core political sandbox a prioritization tool,
 not a mandate to implement every feature listed below. For the representative
 world, factions/standing, companions/party travel, holdings, world agents and
@@ -943,6 +943,10 @@ of it the way a traveller would, not see everything at once.
 - **Whereabouts.** Where characters move, the player remembers each
   character's last known location. Seeing them refreshes it, and an authored
   `RevealWhereabouts` effect, such as paying a traveller, reveals it.
+- **Places.** Delivered (Format 17) in its smallest form: a place may author
+  `known_when`, and until it holds the map leaves it out and no road or exit
+  there is offered. It is derived from evidence and flags, so nothing new is saved;
+  places discovered by seeing them on a journey wait for this capability.
 - **Presentation.** Clients show only what the player knows. The engine still
   holds the whole state, so this is information disclosure
   ([Section 14](open-decisions.md#14-presentation-and-information-disclosure)),
