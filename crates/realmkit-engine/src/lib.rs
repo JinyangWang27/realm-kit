@@ -63,6 +63,8 @@ impl<'w> Engine<'w> {
                 .ok_or(EngineError::StartChoices)?;
             rules::apply_effects(world, &mut engine.state, &option.effects, &mut ignored)?;
         }
+        // A flag an answer set may open a breakthrough gate, as after any command.
+        techniques::promote(world, &mut engine.state, &mut ignored);
         engine.state.start_choices = choices.to_vec();
         // Vitals start at the maxima that techniques' passives give.
         if let Some(combat) = engine.state.combat.as_mut() {

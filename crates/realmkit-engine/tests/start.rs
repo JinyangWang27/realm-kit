@@ -86,7 +86,48 @@ fn saves_keep_the_answers_and_reject_forged_ones() {
     assert!(Engine::restore(&world, snapshot.clone()).is_err());
     snapshot.state.start_choices = vec!["apprentice".into()];
     snapshot.state.flags.remove("river_scholar");
+    // An answer's flags are never cleared, so claiming it without them fails.
+    assert!(Engine::restore(&world, snapshot.clone()).is_err());
+    snapshot.state.flags.insert("pen_borrowed".into());
     assert!(Engine::restore(&world, snapshot).is_ok());
+}
+
+#[test]
+fn an_answer_that_opens_a_breakthrough_gate_starts_past_it() {
+    let mut world = sect();
+    let mut grant = world.combat().unwrap().player_techniques[0].clone();
+    grant.xp = 30;
+    world
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .player_techniques
+        .clear();
+    world.world.start_questions = vec![StartQuestion {
+        id: "past".into(),
+        name: "Past".into(),
+        text: "What did you study?".into(),
+        options: vec![StartOption {
+            id: "scripture".into(),
+            text: "The breath scripture, to its third layer.".into(),
+            effects: vec![
+                Effect::GrantTechnique(grant),
+                Effect::SetFlag {
+                    flag: "scripture_found".into(),
+                },
+            ],
+        }],
+    }];
+    let engine = Engine::start(&world, 0, &["scripture".into()]).unwrap();
+    assert_eq!(combat(&engine).techniques["azure_breath"].rank, 3);
+    // The third layer's MP is there from the start, full.
+    let vitals = engine.player_vitals().unwrap();
+    assert_eq!(vitals.mp, engine.player_stats().unwrap().mp);
+    // A technique an answer taught must stay known in saves.
+    let mut snapshot = engine.snapshot();
+    snapshot.state.combat.as_mut().unwrap().techniques.clear();
+    assert!(Engine::restore(&world, snapshot).is_err());
 }
 
 #[test]

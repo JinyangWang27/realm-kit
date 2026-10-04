@@ -94,7 +94,58 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     )?;
     time(world, state)?;
     economy(world, state)?;
-    proficiencies(world, state)
+    proficiencies(world, state)?;
+    answered(world, state)
+}
+
+/// The options the saved answers chose; unknown ones are skipped, since
+/// `basics` rejects them.
+fn chosen<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w realmkit_spec::StartOption> {
+    world
+        .world
+        .start_questions
+        .iter()
+        .zip(&state.start_choices)
+        .filter_map(|(q, choice)| q.options.iter().find(|o| &o.id == choice))
+        .collect()
+}
+
+/// What the answers did before the first turn lasts: flags are never
+/// cleared, techniques never forgotten or lowered, and taught ranks never
+/// fall.
+fn answered(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let mut taught: BTreeMap<Proficiency, u32> = BTreeMap::new();
+    for effect in chosen(world, state).into_iter().flat_map(|o| &o.effects) {
+        match effect {
+            Effect::SetFlag { flag } => {
+                ensure(state.flags.contains(flag), "a start answer's flag is unset")?
+            }
+            Effect::GrantTechnique(grant) => ensure(
+                state
+                    .combat
+                    .as_ref()
+                    .and_then(|c| c.techniques.get(&grant.technique))
+                    .is_some_and(|learned| learned.rank >= grant.rank.unwrap_or(1)),
+                "a start answer's technique is not known",
+            )?,
+            Effect::RaiseProficiency { proficiency, ranks } => {
+                let sum = taught.entry(*proficiency).or_default();
+                *sum = sum.saturating_add(*ranks);
+            }
+            _ => {}
+        }
+    }
+    ensure(
+        taught.into_iter().all(|(proficiency, ranks)| {
+            let max = world.proficiency_max(proficiency).unwrap_or(0);
+            let held = state
+                .proficiencies
+                .get(&proficiency)
+                .map_or(0, |p| p.taught);
+            held >= ranks.min(max)
+        }),
+        "a start answer's proficiency rank is missing",
+    )
 }
 
 /// Only authored proficiencies, each gained and within its top rank, with
@@ -266,13 +317,7 @@ pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effe
         .iter()
         .filter(|e| e.schedule.at <= now)
         .flat_map(|e| &e.effects);
-    let start = world
-        .world
-        .start_questions
-        .iter()
-        .zip(&state.start_choices)
-        .filter_map(|(q, choice)| q.options.iter().find(|o| &o.id == choice))
-        .flat_map(|o| &o.effects);
+    let start = chosen(world, state).into_iter().flat_map(|o| &o.effects);
     start.chain(choices).chain(events).collect()
 }
 
