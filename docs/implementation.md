@@ -127,7 +127,7 @@ proves the complete single-player loop with authored content.
   the spread. `scripts/combat_sim/economy.py` mirrors all of it, and a
   world without these parts keeps its Format 14 numbers.
   `examples/marches` exercises them. Package and save format 15.
-- [x] Presentation seam and start choices (Astraea P0): locations may author
+- [x] Presentation seam and start choices (original-game P0): locations may author
   map positions and kinds, all or none; `Engine::map_view` returns the places,
   roads with travel minutes, one-way exits and the player's place, behind a
   `Map` panel; the CLI draws it as text, in a fixed 80 × 24 frame in line
@@ -140,24 +140,38 @@ proves the complete single-player loop with authored content.
   options' effects applied to the starting state and the answers saved.
   `examples/marches` has positions; `examples/quiet-archive` asks why the
   player came. Package and save format 16.
+- [x] MVP progression and investigation: evidence definitions,
+  optionally linked to an item, discovered by `discover_evidence` and read
+  by an `evidence` condition; story phases moved forward only by
+  `enter_phase`, with a `phase` condition; `main` quests and quest
+  `requires`, refused with `QuestLocked` until met; route outcomes recorded
+  once after the command that meets them, refusing ambiguity; places hidden
+  from the map and the roads until their `known_when` holds; characters of
+  kind `feature`, examined rather than talked to; and `Engine::journal`,
+  which the CLI's Quests panel prints. Validation rejects undiscoverable
+  evidence, unreachable phases, prerequisite cycles and main quests waiting
+  on side quests; saves check evidence, phases, prerequisites and the
+  outcome. `examples/caravan-trail` plays the MVP slice by combat,
+  bribery, intimidation or a survivor's testimony. Package and save format 17.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
 ## Next implementation priorities
 
-The open items are **not delivered** and do not change Format 16 by
-themselves. They mirror the Astraea-driven roadmap priority while keeping
+The open items are **not delivered** and do not change Format 17 by
+themselves. They mirror the original-game-driven roadmap priority while keeping
 every capability optional:
 
-- [x] Overland-map authored placement + engine map query (Format 16). Player
-  knowledge waits for knowledge and news; until then every place is known.
+- [x] Overland-map authored placement + engine map query (Format 16), with
+  places known by an authored condition (Format 17).
 - [x] Embeddable graphical-client seam, including a browser/WASM hosting proof
   without terminal or native-filesystem assumptions (Format 16).
 - [x] Start choices (Format 16).
-- [ ] First-class authored story-phase/main-side-questline/outcome
-  progression.
+- [x] First-class authored story-phase/main-side-questline/outcome
+  progression, as far as the original game's MVP uses it (Format 17). Failure,
+  deadlines and terminal outcomes wait for content that needs them.
 - [ ] Factions, war/peace and typed standing/relation tracks.
-- [ ] Remaining retinue needs used by the representative Erdain world:
+- [ ] Remaining retinue needs used by the representative sandbox world:
   companions, roster limit, provisions/morale and travel speed.
 - [ ] Holdings/sieges, then world agents and faction strategy; add only the
   politics/order pieces demonstrated by the fixture.

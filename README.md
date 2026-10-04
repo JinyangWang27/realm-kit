@@ -120,7 +120,8 @@ belongs to another package, revision or route, or holds impossible state.
 `Engine::start(&world, seed, &answers)` begins a world that asks start
 questions. Nothing assumes a terminal or a filesystem: a browser or desktop
 host loads a package from memory with `WorldSpec::from_files`, passes
-commands, events and the map view as JSON, and stores
+commands, events, the map view and the journal (`Engine::journal`) as JSON,
+and stores
 `SaveSnapshot::to_json` bytes wherever it likes; the engine builds for
 `wasm32-unknown-unknown`.
 Given the same world and command sequence, state and events are identical.
@@ -179,6 +180,18 @@ Soldiers who survive share the victory's XP and rise in level together,
 renamed as the world decides, and at the end of a line you choose their
 branch (`Upgrade ›`). In the marches, levies raised at Ashmere beat the fen
 outlaws beside the keep's men.
+Stories can be told in phases, with a main questline and side quests that
+wait for an earlier quest or a later phase, and investigations turn on
+evidence. Examining things (`Examine the cold camp`, or `examine cold_camp`)
+and talking to people reveals evidence (`New evidence: Wheel ruts`), which
+stays known for good and is not the same as carrying an item; places such
+as a hidden fork appear on the map, and their roads open, only once you
+have learned of them. The Quests panel is the journal: the chapter, your
+quests, main ones marked, the evidence you hold and the ending reached.
+`examples/caravan-trail` is an investigation slice: a caravan reaches
+Thornwick, another caravan goes missing, and its trail can be followed by
+fighting, paying or facing down bandits, or by finding a survivor, until
+three readings of an old stone ring open The Buried Road and you choose a lead.
 Damage is capped at remaining HP. Each fighting character is a unique,
 non-respawning instance; defeat rewards happen once. Levels use authored
 cumulative XP thresholds and fully restore HP and MP. Quests remember earlier defeats, so accepting

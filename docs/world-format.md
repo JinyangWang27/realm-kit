@@ -1,7 +1,11 @@
-# World package format 16
+# World package format 17
 
-Format 16 adds optional map positions, so a client can draw the places and
-roads, and start questions the player answers at New Game. Format 15
+Format 17 adds authored progression and investigation: evidence the player
+discovers, story phases, main quests and quest prerequisites, route
+outcomes, places the player must learn of before the map shows them, and
+features to examine rather than talk to. Format 16 added optional map
+positions, so a client can draw the places and roads, and start questions
+the player answers at New Game. Format 15
 completed the economy: markets that prosper or decline, merchants
 with limited stock and purses, villages that feed their market town,
 workshops the player owns, and the trading proficiency with proficiency
@@ -41,13 +45,15 @@ there is no migration. Convert them by hand:
   condition. A list of one condition becomes that condition; a longer list
   becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
   dialogue choice's `effect` becomes a one-element `effects` list.
-- **Formats 12–15** (M5a, M5b, M6a-1, consumables, troops, M6a-2): only
-  raise the number. Every economy part below `tick`, `proficiency_points`,
-  map positions and `start_questions` are optional.
+- **Formats 12–16** (M5a, M5b, M6a-1, consumables, troops, M6a-2, map and
+  start questions): only raise the number. Every economy part below `tick`,
+  `proficiency_points`, map positions, `start_questions`, `evidence`,
+  `phases`, `outcomes`, a quest's `main` and `requires`, a location's
+  `known_when` and a character's `kind` are optional.
 
-Format 16 represents one fixed player-controlled character and one playable
+Format 17 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 16 does not serialize a route collection
+stable logical route ID `default`; Format 17 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -63,10 +69,10 @@ differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 16 also requires item and quest tables because they serve the current demo.
+Format 17 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
-future formats should generalize quests into main and optional side questlines
-rather than remove them. A non-combat player route still has a main questline whose objectives may use
+quests marked `main` form the route's main questline and the rest are side
+quests. A non-combat player route still has a main questline whose objectives may use
 dialogue, exploration, investigation or other capabilities instead of combat. Investigation evidence is independent state and may optionally
 reference a physical entity/item without being stored "inside" inventory or
 inferred from possession.
@@ -75,9 +81,9 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events` and `start_questions` |
-| `locations.json` | Array of locations with descriptions, directional exits, placed character IDs and optional map positions |
-| `characters.json` | Array of characters with descriptions, availability conditions, and optional dialogue and combat profile |
+| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events`, `start_questions`, `evidence`, `phases` and `outcomes` |
+| `locations.json` | Array of locations with descriptions, directional exits, placed character IDs, optional map positions and when the player knows of them |
+| `characters.json` | Array of characters (people or features) with descriptions, availability conditions, and optional dialogue and combat profile |
 | `items.json` | Array of items with names and descriptions |
 | `quests.json` | Array of quests with giver, defeat or flag objective, prose, rewards and completion flags |
 | `dialogues.json` | Array of dialogue trees with nodes, choices, conditions and effects |
@@ -87,7 +93,7 @@ filesystem, such as a browser, hands the same six files to
 `WorldSpec::from_files` from memory; `PACKAGE_FILES` lists them. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
-Format 16 describes the current schema; incompatible changes require an explicit
+Format 17 describes the current schema; incompatible changes require an explicit
 version/migration decision.
 
 IDs use ASCII letters, digits, `_` and `-`, with uniqueness within each entity
@@ -100,7 +106,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 16 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 17 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -131,10 +137,20 @@ state. A location may give a `map` position for drawing an overland map:
   towards its destination.
 
 With positions, the engine offers a `Map` panel and answers a map query with
-every place, the roads with their travel minutes, the exits and the player's
-place. Until the world tracks what the player has learned, every place is
-known, and characters who move are not shown, since the map would reveal
-where they are now. Long roads can be split at waypoints (bridges, fords,
+the places the player knows of, the roads with their travel minutes and the
+exits between those places, and the player's place. A place is known while
+its optional `known_when` condition holds, and always while the player
+stands there:
+
+```json
+"known_when": { "kind": "evidence", "evidence": "wheel_ruts" }
+```
+
+An unknown place is off the map, and no road to it is offered or travelled
+(`NoRoad`), so a hidden branch is no spoiler; compass exits are unaffected.
+Knowledge is derived from conditions, usually evidence or flags, and is not
+saved. `known_when` needs map positions (`map_disabled`). Characters who
+move are not shown, since the map would reveal where they are now. Long roads can be split at waypoints (bridges, fords,
 camps) whose legs' minutes add up to the whole.
 
 Future formats may also group locations into Areas (for example a city, one
@@ -199,6 +215,11 @@ composition of others:
   2 }`) holds once the player's rank is at least `rank` (1 to the
   proficiency's `max`); see
   [Proficiencies](#proficiencies).
+- `evidence` (`{ "kind": "evidence", "evidence": "wheel_ruts" }`) holds once
+  the player has discovered that evidence; see [Evidence](#evidence).
+- `phase` (`{ "kind": "phase", "phase": "leads" }`) holds once the story
+  has reached that phase or a later one; see
+  [Story phases](#story-phases-main-quests-and-outcomes).
 - `all` holds when every condition in `of` does, `any` when at least one
   does, and `not` when its `condition` does not. `of` must not be empty.
 
@@ -612,6 +633,12 @@ repeatable. Other
 characters may appear at several locations. Combat profiles require the world's
 `combat` block.
 
+A character with `"kind": "feature"` is a thing rather than a person, such as
+an abandoned camp or a ring of stones. Examining it opens its dialogue, whose
+lines describe what is seen; clients offer "Examine" instead of "Talk to".
+A feature needs a dialogue and has no combat profile, army or movement
+(`invalid_feature`). `kind` defaults to `person`.
+
 ## Start questions
 
 `start_questions` in `world.json` are asked at New Game, before the first
@@ -654,14 +681,84 @@ an answer never skips or adds a question.
 Start questions shape the initial state; they are not identity editing, and
 nothing re-runs them once play begins.
 
-## Dialogue and quests
+## Evidence
 
-Format 16 has a single flat quest collection. The long-term model should retain
-quests as core story progression but organize them into a main questline plus
-optional side questlines. Questlines share world entities rather than owning
-private copies of NPCs or locations. Side quest availability should be gated by
-explicit main-story/story-phase conditions, and side outcomes may feed typed
-state into later main-quest conditions.
+`evidence` in `world.json` defines what the player can find out in an
+investigation: observations, testimony or physical clues.
+
+```json
+"evidence": [
+  {
+    "id": "displaced_cargo",
+    "name": "Displaced cargo",
+    "description": "The bandits' crates carry the lost wagons' seal.",
+    "item": "caravan_seal"
+  }
+]
+```
+
+- The `discover_evidence` effect makes evidence known for good, reported as
+  `EvidenceDiscovered`; discovering it again does nothing. The `evidence`
+  condition reads it.
+- `item` optionally links the evidence to a physical item. Carrying the item
+  does not make the evidence known, nor does knowing the evidence give the
+  item: possession and recognition are separate transitions.
+- Authored conditions decide what a combination of evidence supports, such as
+  two readings out of three under `any` of `all`s; there is no inference
+  engine.
+- A condition on evidence that no effect discovers is an error
+  (`undiscoverable_evidence`). Start answers and scheduled events cannot
+  discover evidence (`invalid_effect`).
+
+## Story phases, main quests and outcomes
+
+`phases` in `world.json` lists the story's phases in order. The first is
+current at the start; the `enter_phase` effect moves the story on to a later
+phase, passing any between, and is ignored for the current or an earlier
+one. A phase changes only through story effects: world time, waiting and
+resting never move it. Every phase after the first must be entered by some
+effect (`unreachable_phase`); start answers and events cannot enter phases.
+
+```json
+"phases": [
+  { "id": "road", "name": "The Road to Thornwick" },
+  { "id": "leads", "name": "The Buried Road" }
+]
+```
+
+A quest with `"main": true` belongs to the route's main questline; others are
+side quests. A quest's optional `requires` condition must hold to take it up
+(refused with `QuestLocked`), which is how quests chain and how side quests
+unlock in waves by phase. Validation rejects a quest that waits on itself
+through its prerequisites (`quest_cycle`) and a main quest that requires a side
+quest's progress on every branch (`main_requires_side`); a side quest may still
+be one alternative under `any`. Unchosen quests simply stay available: there
+is no failure for a lead not taken.
+
+`outcomes` are the route's authored endings:
+
+```json
+"outcomes": [
+  {
+    "id": "first_chapter",
+    "name": "The first chapter closes",
+    "text": "You have chosen your road.",
+    "when": { "kind": "flag", "flag": "lead_chosen" }
+  }
+]
+```
+
+After each command, if no outcome has been recorded, the outcome whose `when`
+now holds is recorded for good and reported as `OutcomeReached`; play goes on.
+Two holding at once refuse the command (`AmbiguousOutcome`), and a start whose
+answers already meet one is refused (`OutcomeAtStart`). Terminal and failure
+endings are not yet modelled.
+
+The journal (`Engine::journal`, the CLI's Quests panel) shows the current
+phase, main quests then side quests, leaving out available quests whose
+`requires` does not hold yet, the evidence known and the outcome reached.
+
+## Dialogue and quests
 
 Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 `text` and optional `choices`. Each choice has authored `text`, an optional
@@ -680,6 +777,8 @@ Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 { "kind": "buy_workshop", "workshop": "weavery" }
 { "kind": "sell_workshop", "workshop": "weavery" }
 { "kind": "raise_proficiency", "proficiency": "trading", "ranks": 1 }
+{ "kind": "discover_evidence", "evidence": "wheel_ruts" }
+{ "kind": "enter_phase", "phase": "lost_wagons" }
 ```
 
 Effects apply in authored order to the staged state, and the choice commits
@@ -717,7 +816,8 @@ questline. Accepting after the defeat or flag makes the quest ready immediately.
 `reward_techniques` lists technique grants (see [Techniques](#techniques)). Accept/complete actions require the available
 giver in the player's current location, whether invoked by dialogue or a direct
 command. Completion grants rewards once, sets flags, and emits stored completion
-prose. Dialogue visibility conditions are not additional quest prerequisites.
+prose. A quest's own `requires` is its prerequisite; a dialogue choice that
+accepts it should carry the same condition, or taking the choice is refused.
 
 ## Combat block, numeric rules and templates
 
@@ -1125,7 +1225,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 16 currently selects combat prose variants from the current
+Format 17 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -1289,8 +1389,10 @@ dialogue links/effects, declared flags,
 the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
 skill references, usable and affordable skills, loot quantities, fighter
-placement and template placeholders. `load()` reports a package whose
-`format_version` is not 15 as `SpecError::UnsupportedFormat` before parsing it.
+placement, template placeholders, evidence that can be discovered, phases
+that can be entered, quest prerequisite cycles and main quests waiting on side
+quests. `load()` reports a package whose
+`format_version` is not 17 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.
