@@ -413,3 +413,47 @@ fn a_save_cannot_have_asked_a_question_that_does_not_exist() {
     });
     assert!(Engine::restore(&world, snapshot).is_err());
 }
+
+#[test]
+fn back_stays_while_the_hub_lists_a_locked_question() {
+    let mut world = archive();
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    let hub = pell.nodes.iter_mut().find(|n| n.id == "questions").unwrap();
+    hub.choices[1].requires = Some(Condition::Flag {
+        flag: "vault_open".into(),
+    });
+    hub.choices[1].blocked_text = Some("She is not ready to say.".into());
+    let mut engine = reader(&world);
+    engine.execute(Talk("archivist".into())).unwrap();
+    engine.execute(ChooseDialogue(2)).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    // The locked question is still there to see, so back still leads back.
+    assert_eq!(listed(&engine), ["Let me ask something else."]);
+    engine.execute(ChooseDialogue(1)).unwrap();
+    let options = engine.dialogue_choices();
+    assert_eq!(options[0].text, "Why must it be so quiet?");
+    assert_eq!(
+        options[0].blocked.as_deref(),
+        Some("She is not ready to say.")
+    );
+    assert_eq!(options[1].text, "That is all. Thank you.");
+}
+
+#[test]
+fn a_save_cannot_have_asked_a_question_whose_quest_was_never_taken() {
+    // Asking once takes up a gated quest; the choice hides while the quest
+    // is locked, so it cannot be taken while the quest is still available.
+    let mut world = chained();
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    let hub = pell.nodes.iter_mut().find(|n| n.id == "questions").unwrap();
+    hub.choices[0].effects.push(Effect::AcceptQuest {
+        quest: "catalogue".into(),
+    });
+    let mut snapshot = reader(&world).snapshot();
+    snapshot.state.taken_choices.insert(ChoiceRef {
+        dialogue: "pell".into(),
+        node: "questions".into(),
+        choice: "founders".into(),
+    });
+    assert!(Engine::restore(&world, snapshot).is_err());
+}

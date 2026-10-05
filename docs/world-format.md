@@ -911,8 +911,9 @@ A choice may also carry:
   keeps them valid, while removing a taken choice's ID makes the save
   unloadable.
 - `back: true`: the choice returns to its `next` node, typically a hub of
-  questions. While that hub still offers a choice that leads on (one with a
-  `next`), the back choice is listed as authored. Once it offers only
+  questions. While that hub still lists a choice that leads on (one with a
+  `next`), even a locked one shown with its `blocked_text`, the back choice
+  is listed as authored. Once it offers only
   choices that end the conversation, the back choice is replaced by those
   choices, in their place in the list and with their own text and effects:
   "Back to the questions" becomes the hub's own "Leave" exactly when the last

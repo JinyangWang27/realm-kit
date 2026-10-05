@@ -67,12 +67,15 @@ pub(crate) fn choices<'a>(
 ) -> Vec<Listed<'a>> {
     let (dialogue, here) = speaking(world, npc, node);
     let mut listed = Vec::new();
+    // Shown as unavailable: not taken, and refused only by its condition.
+    let blocked = |node: &Id, choice: &DialogueChoice| {
+        choice.blocked_text.is_some()
+            && !allowed(state, choice.requires.as_ref())
+            && !taken(state, &dialogue.id, node, choice)
+    };
     for choice in &here.choices {
         if !open(world, state, &dialogue.id, &here.id, choice) {
-            let blocked = choice.blocked_text.is_some()
-                && !allowed(state, choice.requires.as_ref())
-                && !taken(state, &dialogue.id, &here.id, choice);
-            if blocked {
+            if blocked(&here.id, choice) {
                 listed.push(Listed {
                     node: &here.id,
                     choice,
@@ -98,7 +101,13 @@ pub(crate) fn choices<'a>(
             .iter()
             .filter(|c| open(world, state, &dialogue.id, &hub.id, c))
             .collect();
-        if offered.iter().any(|c| c.next.is_some()) {
+        // A locked question still listed at the hub is worth going back to.
+        let leads_on = hub
+            .choices
+            .iter()
+            .filter(|c| c.next.is_some())
+            .any(|c| offered.contains(&c) || blocked(&hub.id, c));
+        if leads_on {
             listed.push(Listed {
                 node: &here.id,
                 choice,

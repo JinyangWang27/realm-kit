@@ -867,7 +867,8 @@ fn outcome(world: &WorldSpec, state: &GameState) -> Result<(), String> {
 }
 
 /// Every ask-once choice taken exists and could have been chosen: its
-/// condition once held.
+/// condition once held, and the quests it takes up or completes moved on,
+/// since taking it applied its effects.
 fn taken_choices(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     ensure(
         state.taken_choices.iter().all(|r| {
@@ -875,7 +876,19 @@ fn taken_choices(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                 .dialogue(&r.dialogue)
                 .and_then(|d| d.nodes.iter().find(|n| n.id == r.node))
                 .and_then(|n| n.choices.iter().find(|c| c.id.as_ref() == Some(&r.choice)))
-                .is_some_and(|c| c.once && lasting(world, state, c.requires.as_ref()))
+                .is_some_and(|c| {
+                    c.once
+                        && lasting(world, state, c.requires.as_ref())
+                        && c.effects.iter().all(|e| match e {
+                            Effect::AcceptQuest { quest } => {
+                                state.quests[quest] != QuestStatus::Available
+                            }
+                            Effect::CompleteQuest { quest } => {
+                                state.quests[quest] == QuestStatus::Completed
+                            }
+                            _ => true,
+                        })
+                })
         }),
         "a choice asked once could not have been chosen",
     )
