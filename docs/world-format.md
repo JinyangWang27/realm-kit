@@ -1,7 +1,13 @@
-# World package format 18
+# World package format 19
 
-Format 18 lets evidence carry its source, the facts observed and
-interpretations that later knowledge unlocks. Format 17 added authored
+Format 19 adds authoring conveniences an investigation needs: an `at_least`
+condition ("any two of these"), evidence facts that become known over time,
+dialogue choices asked once, back choices that turn into leaving when a hub
+of questions is used up, unavailable choices shown with a reason, and
+language overlays. Saves now bind to a revision of the rules alone, so prose
+fixes and added languages keep them loadable. Format 18 let evidence carry
+its source, the facts observed and interpretations that later knowledge
+unlocks. Format 17 added authored
 progression and investigation: evidence the player
 discovers, story phases, main quests and quest prerequisites, route
 outcomes, places the player must learn of before the map shows them, and
@@ -47,16 +53,19 @@ there is no migration. Convert them by hand:
   condition. A list of one condition becomes that condition; a longer list
   becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
   dialogue choice's `effect` becomes a one-element `effects` list.
-- **Formats 12–17** (M5a, M5b, M6a-1, consumables, troops, M6a-2, map and
-  start questions, progression and investigation): only raise the number. Every economy part below `tick`,
+- **Formats 12–18** (M5a, M5b, M6a-1, consumables, troops, M6a-2, map and
+  start questions, progression and investigation, evidence readings): only
+  raise the number. A save made under Format 18 is not loaded, even for an
+  unchanged world: the revision it names now leaves out prose. Every economy part below `tick`,
   `proficiency_points`, map positions, `start_questions`, `evidence`,
   `phases`, `outcomes`, a quest's `main` and `requires`, a location's
-  `known_when`, a character's `kind`, and an evidence's `source`, `facts`
-  and `interpretations` are optional.
+  `known_when`, a character's `kind`, an evidence's `source`, `facts`
+  and `interpretations`, a fact's `when`, a choice's `id`, `once`, `back` and
+  `blocked_text`, and `translations` are optional.
 
-Format 18 represents one fixed player-controlled character and one playable
+Format 19 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 18 does not serialize a route collection
+stable logical route ID `default`; Format 19 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -72,7 +81,7 @@ differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 18 also requires item and quest tables because they serve the current demo.
+Format 19 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 quests marked `main` form the route's main questline and the rest are side
 quests. A non-combat player route still has a main questline whose objectives may use
@@ -84,19 +93,20 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events`, `start_questions`, `evidence`, `phases` and `outcomes` |
+| `world.json` | Format version, world ID/name/language and translations, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events`, `start_questions`, `evidence`, `phases` and `outcomes` |
 | `locations.json` | Array of locations with descriptions, directional exits, placed character IDs, optional map positions and when the player knows of them |
 | `characters.json` | Array of characters (people or features) with descriptions, availability conditions, and optional dialogue and combat profile |
 | `items.json` | Array of items with names and descriptions |
 | `quests.json` | Array of quests with giver, defeat or flag objective, prose, rewards and completion flags |
 | `dialogues.json` | Array of dialogue trees with nodes, choices, conditions and effects |
 
-Empty content tables are `[]`; files must still exist. A host without a
-filesystem, such as a browser, hands the same six files to
-`WorldSpec::from_files` from memory; `PACKAGE_FILES` lists them. Extra files such as
+Empty content tables are `[]`; files must still exist. A package with
+[translations](#translations) also holds `text/<tag>.json` for each. A host
+without a filesystem, such as a browser, hands the same six files, and any
+overlays, to `WorldSpec::from_files` from memory; `PACKAGE_FILES` lists the six. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
-Format 18 describes the current schema; incompatible changes require an explicit
+Format 19 describes the current schema; incompatible changes require an explicit
 version/migration decision.
 
 IDs use ASCII letters, digits, `_` and `-`, with uniqueness within each entity
@@ -1375,7 +1385,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 18 currently selects combat prose variants from the current
+Format 19 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful

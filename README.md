@@ -30,7 +30,14 @@ cargo install --path crates/realmkit-cli --locked
 realmkit play examples/demo-world/
 realmkit validate examples/demo-world/
 realmkit inspect examples/demo-world/
+realmkit play examples/quiet-archive/ --language zh-Hans
+realmkit text examples/quiet-archive/
 ```
+
+A world may come in several languages: `inspect` lists them, and
+`--language <tag>` plays in one. A save carries over from one language to
+another. `text` prints every piece of a world's text by key, the starting
+point for a translation. The CLI's own labels and help are in English.
 
 Building initially downloads Rust dependencies. Playing requires only the
 compiled `realmkit` binary and the world directory: no network, account, API key,
@@ -78,7 +85,10 @@ quit
 ```
 
 Choices and scene actions are numbered from one among the currently visible
-options. Normal menu play uses authored display names rather than requiring entity
+options. A choice you cannot take yet may still be listed, marked `[locked]`
+like a locked exit; choosing it says why (`You do not have two silver to
+offer.`). A question once asked leaves the list, and "back to the questions"
+becomes the way out once nothing is left to ask. Normal menu play uses authored display names rather than requiring entity
 IDs; typed commands such as `accept <quest-id>` and `complete <quest-id>` still
 use stable machine IDs.
 
@@ -190,6 +200,8 @@ have learned of them. The Quests panel is the journal: the chapter, your
 quests, main ones marked, the evidence you hold with how you read it now,
 and the ending reached. When something you learn changes how you read
 evidence you already hold, play says so (`Understanding changed — …`).
+Evidence can fill in as you go: new facts about something you already know
+arrive as `New fact — …` and join it in the journal.
 `examples/caravan-trail` is an investigation slice: a caravan reaches
 Thornwick, another caravan goes missing, and its trail can be followed by
 fighting, paying or facing down bandits, or by finding a survivor, until

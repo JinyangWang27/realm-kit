@@ -55,7 +55,8 @@ while being authored; validate before export. Other content can be constructed
 directly using `WorldSpec` types before opening a draft. Add further typed
 operations when an actual authoring workflow needs them.
 
-`export` validates and creates a **new** directory. It refuses existing paths,
+`export` validates and creates a **new** directory, with a `text/<tag>.json`
+for each language overlay in `WorldSpec::translations`. It refuses existing paths,
 including existing empty directories. The parent directory must exist. An I/O
 failure can leave a partial output directory; exports are not published
 atomically yet. Retry to a new path after resolving the error.
@@ -85,6 +86,17 @@ world fully satisfies this invariant.
 A language tag does not prove that prose obeys this rule; author review must
 check the text itself. Do not silently fall back to English or generic fantasy
 prose.
+
+A world authored in one language may carry overlays in others (Format 19; see
+[Translations](world-format.md#translations)). Author the package in its base
+language, take its keys from `WorldSpec::texts()` (or `realmkit text`), and add
+a complete overlay per language to `WorldSpec::translations` and its tag to
+`world.translations`. Validation reports missing and unused keys and checks
+each language's templates. Saves bind to the rules alone, so translating or
+correcting prose never strands a player's save; changing IDs, order, numbers,
+conditions or effects still does. Generate an overlay from the same source
+text as the base, not by translating the base, when the source exists in that
+language.
 
 ## Player entry mode
 
@@ -261,6 +273,25 @@ Generation should prefer side stories in this order:
 
 Track whether generated material is sourced, inferred or expanded so reviewers
 can distinguish adaptation from invention.
+
+## Investigation and conversation patterns
+
+Format 19 gives common authoring shapes their own fields, so a compiler or
+author need not expand them by hand:
+
+- **Any N of these.** `{ "kind": "at_least", "count": 2, "of": [...] }` in
+  place of every pair under `any` of `all`s. It may gate readings and facts
+  when everything under it lasts.
+- **Evidence that fills in.** Discover evidence at the first observation and
+  give later facts a `when` on what reveals them: the journal grows with
+  each step instead of waiting for a final conclusion choice.
+- **A hub of questions.** Give each question an `id` and `once: true`, and
+  each answer a `back: true` choice to the hub. Once the last question is
+  used, the back choice becomes the hub's own leaving, so no flags, `not`
+  conditions or rewriting are needed.
+- **An offer the player cannot take yet.** Give the choice `blocked_text`; it
+  stays in the list as unavailable with that reason, as a locked exit does,
+  so the player learns the price or the missing proof.
 
 ## Canon fidelity
 
