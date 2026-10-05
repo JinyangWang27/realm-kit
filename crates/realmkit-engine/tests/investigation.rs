@@ -4,7 +4,7 @@ mod common;
 
 use common::*;
 use realmkit_engine::{Command::*, *};
-use realmkit_spec::Direction::*;
+use realmkit_spec::{Condition, Direction::*, RouteOutcome};
 
 #[test]
 fn evidence_is_discovered_once_and_gates_what_follows() {
@@ -112,7 +112,16 @@ fn evidence_behind_a_choice_this_playthrough_never_had_is_refused() {
 
 #[test]
 fn later_knowledge_changes_the_reading_but_not_the_facts() {
-    let world = archive();
+    let mut world = archive();
+    // An outcome on the same flag shows the reading is reported first.
+    world.world.outcomes.push(RouteOutcome {
+        id: "vault_opened".into(),
+        name: "The vault opens".into(),
+        text: "The end.".into(),
+        when: Condition::Flag {
+            flag: "vault_open".into(),
+        },
+    });
     let mut engine = reader(&world);
     assert_eq!(engine.evidence_reading("stitched_map"), None);
     engine.execute(Talk("archivist".into())).unwrap();
@@ -131,17 +140,23 @@ fn later_knowledge_changes_the_reading_but_not_the_facts() {
     engine.execute(Move(South)).unwrap();
     engine.execute(Talk("archivist".into())).unwrap();
     let thanks = engine.execute(ChooseDialogue(1)).unwrap();
-    assert!(thanks.contains(&Event::EvidenceReinterpreted {
+    let reinterpreted = Event::EvidenceReinterpreted {
         evidence: "stitched_map".into(),
         reading: 1,
-    }));
+    };
+    let reached = Event::OutcomeReached {
+        outcome: "vault_opened".into(),
+    };
+    let position = |event: &Event| thanks.iter().position(|e| e == event).unwrap();
+    assert!(position(&reinterpreted) < position(&reached));
     assert_eq!(engine.evidence_reading("stitched_map"), Some(1));
     assert_eq!(world.evidence("stitched_map").unwrap().facts, facts);
     // Derived, so a reloaded save reads the same and says nothing new.
-    let mut reloaded = Engine::restore(&world, engine.snapshot()).unwrap();
+    let json = serde_json::to_string(&engine.snapshot()).unwrap();
+    let mut reloaded = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
     assert_eq!(reloaded.evidence_reading("stitched_map"), Some(1));
-    let look = reloaded.execute(Wait(1)).unwrap_or_default();
-    assert!(!look
+    let moved = reloaded.execute(Move(North)).unwrap();
+    assert!(!moved
         .iter()
         .any(|e| matches!(e, Event::EvidenceReinterpreted { .. })));
 }

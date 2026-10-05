@@ -903,7 +903,10 @@ Investigation evidence remains a separate authored identity/state. It may
 reference a physical definition or instance, but possession of that object does
 not automatically imply that its evidentiary significance has been discovered.
 As delivered (Format 17), an evidence definition may name an `item`; the
-`discover_evidence` effect is the only way evidence becomes known.
+`discover_evidence` effect is the only way evidence becomes known. Since Format
+18 it may also name its `source`, list its `facts` and author `interpretations`:
+the facts never change, and the current reading (derived, never saved) is the
+last whose `when` holds, a condition that once true stays true.
 
 ## 11. Save compatibility and package evolution
 
