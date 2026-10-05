@@ -153,7 +153,9 @@ A package's prose may come in more languages than its own. `translations` in
   which is where an overlay starts.
 - An overlay is complete (`missing_translation` for each key it lacks, or
   for a listed tag with no file) and exact (`unused_translation` for a key the
-  package does not have). A tag is ASCII letters, digits and `-`, differs from
+  package does not have, or for an overlay `translations` does not list).
+  Two texts may not share a key (`ambiguous_text_key`), as an element whose
+  `id` is a number could with another element's position. A tag is ASCII letters, digits and `-`, differs from
   `language`, and is listed once (`invalid_translation`).
 - Each language is validated with its text in place, so a malformed template
   or an empty name in one language is reported with the usual code and a
@@ -955,7 +957,9 @@ ones included, so `ChooseDialogue(n)` and `Engine::dialogue_choices` (each a
 `DialogueOption` with its text and, when unavailable, its `blocked` reason)
 always agree. Choosing an unavailable choice is refused with `ChoiceBlocked`
 and changes nothing. Omitting `next` ends the conversation. A node with no
-available choices displays its text and ends the conversation. Moving, attacking, using a skill or resting also closes
+listed choices displays its text and ends the conversation; one whose
+choices are all unavailable stays open so they can explain themselves, until
+the player moves on or talks to someone else. Moving, attacking, using a skill or resting also closes
 the conversation.
 
 A quest's `giver` must be a character with a dialogue. Its objective is one of:

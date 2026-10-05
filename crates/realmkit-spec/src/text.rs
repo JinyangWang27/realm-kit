@@ -2,6 +2,7 @@
 
 use crate::*;
 use serde_json::Value;
+use std::collections::BTreeSet;
 
 /// The fields that hold prose, wherever they appear. Every other string in a
 /// package is an ID, a tag or a reference, so it belongs to the rules.
@@ -27,8 +28,6 @@ const PROSE: [&str; 16] = [
 /// Calls `f` with the key and text of every prose string, depth first. A key
 /// is the JSON path joined by `.`: an array element with an `id` is named by
 /// it, any other by its index, so `dialogues.pell.nodes.greeting.choices.0.text`.
-// ponytail: an element ID made of digits could share a key with an index;
-// validate keys as unique if authors ever do that.
 fn visit(
     value: &mut Value,
     key: &mut Vec<String>,
@@ -94,6 +93,19 @@ impl WorldSpec {
             (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
         });
         format!("fnv1a64:{hash:016x}")
+    }
+
+    /// Keys two texts share, as when an element's ID is another's position;
+    /// validation rejects them, since one translation would land on both.
+    pub(crate) fn ambiguous_text_keys(&self) -> BTreeSet<String> {
+        let mut value = serde_json::to_value(self).expect("world specs always serialize");
+        let (mut seen, mut shared) = (BTreeSet::new(), BTreeSet::new());
+        visit(&mut value, &mut Vec::new(), false, &mut |key, _| {
+            if !seen.insert(key.clone()) {
+                shared.insert(key);
+            }
+        });
+        shared
     }
 
     /// Every player-facing text by its stable key, as a language overlay

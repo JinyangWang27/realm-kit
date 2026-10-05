@@ -11,7 +11,26 @@ pub fn language_tag(tag: &str) -> bool {
 /// Every listed overlay is another language, holds exactly the base prose
 /// keys, and reads as valid content with its text in place.
 pub(super) fn translations(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
+    // Duplicate IDs share keys too, and are reported as such.
+    let duplicates = out.iter().any(|d| d.code == "duplicate_id");
+    for key in w.ambiguous_text_keys().into_iter().filter(|_| !duplicates) {
+        issue(
+            out,
+            &w.world.id,
+            "ambiguous_text_key",
+            format!("two texts share the key {key}; give the element an ID that is not a number"),
+        );
+    }
     let tags = &w.world.translations;
+    // An overlay the package does not list would not load back.
+    for tag in w.translations.keys().filter(|t| !tags.contains(t)) {
+        issue(
+            out,
+            tag,
+            "unused_translation",
+            format!("an overlay for {tag} is not listed in translations"),
+        );
+    }
     if tags.is_empty() {
         return;
     }

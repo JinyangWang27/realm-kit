@@ -97,3 +97,35 @@ fn templates_are_checked_in_each_language() {
         "{diagnostics:?}"
     );
 }
+
+#[test]
+fn an_overlay_must_be_listed_and_keys_must_be_unambiguous() {
+    // An overlay the package does not list would never load back.
+    let mut world = archive();
+    world.translations.insert("fr".into(), world.texts());
+    assert_eq!(codes(&world), ["unused_translation"]);
+    // A choice whose ID is "1" and the un-IDed choice at position 1 would
+    // share a key, so one translation would land on both.
+    let mut world = archive();
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    pell.nodes[0].choices[0].id = Some("1".into());
+    assert_eq!(codes(&world), ["ambiguous_text_key"]);
+}
+
+#[test]
+fn a_listed_language_without_its_file_is_a_diagnostic() {
+    let dir = std::env::temp_dir().join(format!("realmkit-missing-overlay-{}", std::process::id()));
+    let source = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/quiet-archive");
+    std::fs::create_dir_all(&dir).unwrap();
+    for file in PACKAGE_FILES {
+        std::fs::copy(format!("{source}/{file}"), dir.join(file)).unwrap();
+    }
+    let error = WorldSpec::load(&dir).unwrap_err();
+    std::fs::remove_dir_all(&dir).unwrap();
+    let SpecError::Validation(diagnostics) = error else {
+        panic!("{error}");
+    };
+    assert!(diagnostics
+        .iter()
+        .any(|d| d.code == "missing_translation" && d.message.contains("text/zh-Hans.json")));
+}

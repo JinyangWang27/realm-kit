@@ -168,11 +168,17 @@ impl WorldSpec {
             translations: BTreeMap::new(),
         };
         // A tag names a file, so only a well-formed one is read; validation
-        // reports the rest.
+        // reports the rest, a missing file included.
         for tag in world.world.translations.clone() {
-            if validation::language_tag(&tag) {
-                let overlay = typed(file(&format!("text/{tag}.json"))?)?;
-                world.translations.insert(tag, overlay);
+            if !validation::language_tag(&tag) {
+                continue;
+            }
+            match file(&format!("text/{tag}.json")) {
+                Ok(read) => {
+                    world.translations.insert(tag, typed(read)?);
+                }
+                Err(SpecError::Io { source, .. }) if source.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
             }
         }
         world.validate()?;
