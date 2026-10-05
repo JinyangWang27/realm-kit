@@ -1,7 +1,13 @@
-# World package format 18
+# World package format 19
 
-Format 18 lets evidence carry its source, the facts observed and
-interpretations that later knowledge unlocks. Format 17 added authored
+Format 19 adds authoring conveniences an investigation needs: an `at_least`
+condition ("any two of these"), evidence facts that become known over time,
+dialogue choices asked once, back choices that turn into leaving when a hub
+of questions is used up, unavailable choices shown with a reason, and
+language overlays. Saves now bind to a revision of the rules alone, so prose
+fixes and added languages keep them loadable. Format 18 let evidence carry
+its source, the facts observed and interpretations that later knowledge
+unlocks. Format 17 added authored
 progression and investigation: evidence the player
 discovers, story phases, main quests and quest prerequisites, route
 outcomes, places the player must learn of before the map shows them, and
@@ -47,16 +53,19 @@ there is no migration. Convert them by hand:
   condition. A list of one condition becomes that condition; a longer list
   becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
   dialogue choice's `effect` becomes a one-element `effects` list.
-- **Formats 12–17** (M5a, M5b, M6a-1, consumables, troops, M6a-2, map and
-  start questions, progression and investigation): only raise the number. Every economy part below `tick`,
+- **Formats 12–18** (M5a, M5b, M6a-1, consumables, troops, M6a-2, map and
+  start questions, progression and investigation, evidence readings): only
+  raise the number. A save made under Format 18 is not loaded, even for an
+  unchanged world: the revision it names now leaves out prose. Every economy part below `tick`,
   `proficiency_points`, map positions, `start_questions`, `evidence`,
   `phases`, `outcomes`, a quest's `main` and `requires`, a location's
-  `known_when`, a character's `kind`, and an evidence's `source`, `facts`
-  and `interpretations` are optional.
+  `known_when`, a character's `kind`, an evidence's `source`, `facts`
+  and `interpretations`, a fact's `when`, a choice's `id`, `once`, `back` and
+  `blocked_text`, and `translations` are optional.
 
-Format 18 represents one fixed player-controlled character and one playable
+Format 19 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 18 does not serialize a route collection
+stable logical route ID `default`; Format 19 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -72,7 +81,7 @@ differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 18 also requires item and quest tables because they serve the current demo.
+Format 19 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 quests marked `main` form the route's main questline and the rest are side
 quests. A non-combat player route still has a main questline whose objectives may use
@@ -84,19 +93,20 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events`, `start_questions`, `evidence`, `phases` and `outcomes` |
+| `world.json` | Format version, world ID/name/language and translations, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events`, `start_questions`, `evidence`, `phases` and `outcomes` |
 | `locations.json` | Array of locations with descriptions, directional exits, placed character IDs, optional map positions and when the player knows of them |
 | `characters.json` | Array of characters (people or features) with descriptions, availability conditions, and optional dialogue and combat profile |
 | `items.json` | Array of items with names and descriptions |
 | `quests.json` | Array of quests with giver, defeat or flag objective, prose, rewards and completion flags |
 | `dialogues.json` | Array of dialogue trees with nodes, choices, conditions and effects |
 
-Empty content tables are `[]`; files must still exist. A host without a
-filesystem, such as a browser, hands the same six files to
-`WorldSpec::from_files` from memory; `PACKAGE_FILES` lists them. Extra files such as
+Empty content tables are `[]`; files must still exist. A package with
+[translations](#translations) also holds `text/<tag>.json` for each. A host
+without a filesystem, such as a browser, hands the same six files, and any
+overlays, to `WorldSpec::from_files` from memory; `PACKAGE_FILES` lists the six. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
-Format 18 describes the current schema; incompatible changes require an explicit
+Format 19 describes the current schema; incompatible changes require an explicit
 version/migration decision.
 
 IDs use ASCII letters, digits, `_` and `-`, with uniqueness within each entity
@@ -109,9 +119,54 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 18 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 19 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
+
+### Translations
+
+A package's prose may come in more languages than its own. `translations` in
+`world.json` lists their tags, and each has an overlay at `text/<tag>.json`:
+
+```json
+"language": "en",
+"translations": ["zh-Hans"]
+```
+
+```json
+{
+  "world.name": "寂静档案馆",
+  "locations.reading_room.name": "阅览室",
+  "dialogues.pell.nodes.greeting.choices.0.text": "出什么事了吗？",
+  "dialogues.pell.nodes.questions.choices.founders.text": "档案馆是谁建的？",
+  "world.evidence.stitched_map.facts.0": "地图在吸墨板下面，不在地图库里。"
+}
+```
+
+- Every prose field has a stable key: its JSON path in the package, joined by
+  `.`, where an element of a list is named by its `id` when it has one and by
+  its position otherwise. Prose fields are `name`, `description`, `text`,
+  `blocked_text`, `special_name`, `introduction`, `progress`, `completion`,
+  `source`, `facts`, `attack`, `hurt`, `victory`, `death`, `format` and
+  `clock`, wherever they appear; every other string is an ID or a rule.
+  `realmkit text <world-directory>` prints the package's own text by key,
+  which is where an overlay starts.
+- An overlay is complete (`missing_translation` for each key it lacks, or
+  for a listed tag with no file) and exact (`unused_translation` for a key the
+  package does not have, or for an overlay `translations` does not list).
+  Two texts may not share a key (`ambiguous_text_key`), as an element whose
+  `id` is a number could with another element's position. A tag is ASCII letters, digits and `-`, differs from
+  `language`, and is listed once (`invalid_translation`).
+- Each language is validated with its text in place, so a malformed template
+  or an empty name in one language is reported with the usual code and a
+  message starting `in <tag>:`.
+- A client picks the language when it loads the package
+  (`WorldSpec::in_language`; `realmkit play --language zh-Hans`). Saves bind to
+  a revision of the rules alone, which leaves out every prose field and the
+  language, so a save made in one language loads in another, and a prose fix
+  or an added language keeps saves loadable. How many facts, readings, prose
+  variants and choices there are, and whether a choice has blocked text, are
+  rules.
 
 ## Locations and conditions
 
@@ -198,6 +253,7 @@ composition of others:
 { "kind": "item", "item": "pen", "quantity": 1 }
 { "kind": "all", "of": [ ... ] }
 { "kind": "any", "of": [ ... ] }
+{ "kind": "at_least", "count": 2, "of": [ ... ] }
 { "kind": "not", "condition": { ... } }
 ```
 
@@ -228,6 +284,10 @@ composition of others:
   [Story phases](#story-phases-main-quests-and-outcomes).
 - `all` holds when every condition in `of` does, `any` when at least one
   does, and `not` when its `condition` does not. `of` must not be empty.
+- `at_least` holds when at least `count` of the conditions in `of` do, so
+  "any two of these four" needs no list of pairs. `count` must be at least 1
+  (`at_least_zero`) and at most the number of conditions (`at_least_exceeds`).
+  `count` 1 reads like `any`, and `count` equal to the length like `all`.
 
 All flags start unset. Dialogue `set_flag` effects and quest completion flags
 set them; flags are monotonic in this version. Evaluating a condition is pure:
@@ -701,7 +761,11 @@ investigation: observations, testimony or physical clues.
     "source": "The bandits' camp",
     "facts": [
       "The crates bear the lost wagons' seal.",
-      "They were found beyond the fork, with no wagons near."
+      "They were found beyond the fork, with no wagons near.",
+      {
+        "text": "The fork they lay past is paved with old stone.",
+        "when": { "kind": "evidence", "evidence": "impossible_fork" }
+      }
     ],
     "interpretations": [
       { "text": "The bandits robbed the wagons and are lying about it." },
@@ -722,7 +786,16 @@ investigation: observations, testimony or physical clues.
   does not make the evidence known, nor does knowing the evidence give the
   item: possession and recognition are separate transitions.
 - `source` names where the player learns it, and `facts` what was observed
-  or said; both are fixed prose. `interpretations` are ways of reading those
+  or said; both are fixed prose. A fact written as a bare string is known
+  from discovery; one written as `{ "text", "when" }` becomes known once the
+  evidence is known and its `when` holds, so evidence can be discovered at
+  the first observation and fill in as the investigation goes on. The known
+  facts are derived, never saved (`Engine::evidence_facts`, indices in
+  authored order). When a command reveals a fact of evidence already known,
+  the engine reports `EvidenceFactLearned` with its index, once; facts that
+  hold when the evidence is discovered arrive with `EvidenceDiscovered`. A
+  fact's `when` follows the reading rule below (`fleeting_fact`), so a fact
+  once known is never removed or rewritten. `interpretations` are ways of reading those
   facts, in the order understanding deepens. The current reading is the last
   whose optional `when` holds (`Engine::evidence_reading`); it is derived,
   never saved. When a command changes the reading of evidence already known,
@@ -730,10 +803,10 @@ investigation: observations, testimony or physical clues.
   evidence found by the same command reports only `EvidenceDiscovered`. The
   facts never change: only the player's understanding does.
 - A reading's `when` may use only evidence, flag and phase conditions under
-  `all` and `any`, never `not`, so an understanding once reached is never
+  `all`, `any` and `at_least`, never `not`, so an understanding once reached is never
   lost (`fleeting_interpretation`).
 - Authored conditions decide what a combination of evidence supports, such as
-  two readings out of three under `any` of `all`s; there is no inference
+  two readings out of three under `at_least`; there is no inference
   engine.
 - A condition on evidence that no effect discovers is an error
   (`undiscoverable_evidence`). Start answers and scheduled events cannot
@@ -829,9 +902,65 @@ use these three.
 A choice can be taken again while its condition holds, so a one-time gift
 pairs `grant_items` with `set_flag` under a `not` condition on that flag.
 
-Choices are filtered and then numbered contiguously from one. Omitting `next`
-ends the conversation. A node with no visible choices displays its text and
-ends the conversation. Moving, attacking, using a skill or resting also closes
+A choice may also carry:
+
+- `id`: names the choice within its node, unique there (`duplicate_id`).
+- `once: true`: once taken, the choice is never offered again, such as a
+  question asked. It needs an `id` (`once_without_id`): saves remember taken
+  choices by dialogue, node and choice ID, so reordering a node's choices
+  keeps them valid, while removing a taken choice's ID makes the save
+  unloadable.
+- `back: true`: the choice returns to its `next` node, typically a hub of
+  questions. While that hub still lists a choice that leads on (one with a
+  `next`), even a locked one shown with its `blocked_text`, the back choice
+  is listed as authored. Once it offers only
+  choices that end the conversation, the back choice is replaced by those
+  choices, in their place in the list and with their own text and effects:
+  "Back to the questions" becomes the hub's own "Leave" exactly when the last
+  question is used, and nothing that leaving does is lost. With no such
+  choice at the hub, the back choice disappears. A back choice needs a
+  `next` and has no effects of its own (`invalid_back`).
+
+```json
+{
+  "id": "questions",
+  "text": "Pell sets down her pen. 'Briefly.'",
+  "choices": [
+    { "id": "founders", "text": "Who built the archive?", "next": "founders", "once": true },
+    { "id": "quiet", "text": "Why must it be so quiet?", "next": "quiet", "once": true },
+    { "text": "That is all. Thank you." }
+  ]
+},
+{
+  "id": "founders",
+  "text": "'The river guilds.'",
+  "choices": [{ "text": "Let me ask something else.", "next": "questions", "back": true }]
+}
+```
+
+A choice whose `requires` fails is hidden, unless it has `blocked_text`: then
+it is listed as unavailable with that reason, the way a locked exit is, so a
+player with seven copper learns that the toll is eight. `blocked_text` needs a
+`requires` to explain (`unconditional_blocked_text`).
+
+```json
+{
+  "text": "Two silver for what you know.",
+  "next": "talks",
+  "requires": { "kind": "item", "item": "silver", "quantity": 2 },
+  "blocked_text": "You do not have two silver to offer.",
+  "effects": [{ "kind": "take_items", "items": [{ "item": "silver", "quantity": 2 }] }]
+}
+```
+
+Choices are filtered and then numbered contiguously from one, unavailable
+ones included, so `ChooseDialogue(n)` and `Engine::dialogue_choices` (each a
+`DialogueOption` with its text and, when unavailable, its `blocked` reason)
+always agree. Choosing an unavailable choice is refused with `ChoiceBlocked`
+and changes nothing. Omitting `next` ends the conversation. A node with no
+listed choices displays its text and ends the conversation; one whose
+choices are all unavailable stays open so they can explain themselves, until
+the player moves on or talks to someone else. Moving, attacking, using a skill or resting also closes
 the conversation.
 
 A quest's `giver` must be a character with a dialogue. Its objective is one of:
@@ -1261,7 +1390,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 18 currently selects combat prose variants from the current
+Format 19 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful

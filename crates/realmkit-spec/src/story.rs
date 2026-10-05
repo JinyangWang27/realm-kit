@@ -46,7 +46,7 @@ pub enum QuestStatus {
 }
 
 /// A pure query over the playthrough: typed leaf predicates composed with
-/// `all`, `any` and `not`. Evaluating one never changes anything.
+/// `all`, `any`, `at_least` and `not`. Evaluating one never changes anything.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Condition {
@@ -56,6 +56,11 @@ pub enum Condition {
     },
     /// At least one condition holds.
     Any {
+        of: Vec<Condition>,
+    },
+    /// At least `count` of the conditions hold, such as any two of four clues.
+    AtLeast {
+        count: usize,
         of: Vec<Condition>,
     },
     Not {
@@ -116,6 +121,12 @@ impl Condition {
         match self {
             Self::All { of } => of.iter().any(|c| c.requires(leaf)),
             Self::Any { of } => !of.is_empty() && of.iter().all(|c| c.requires(leaf)),
+            // Every `count` of them include one that requires `leaf` when more
+            // than `len - count` do.
+            Self::AtLeast { count, of } => {
+                let requiring = of.iter().filter(|c| c.requires(leaf)).count();
+                *count > 0 && requiring > of.len().saturating_sub(*count)
+            }
             _ => leaf(self),
         }
     }
@@ -151,7 +162,9 @@ impl Condition {
     /// Every leaf predicate, depth first.
     pub fn leaves(&self) -> Vec<&Condition> {
         match self {
-            Self::All { of } | Self::Any { of } => of.iter().flat_map(|c| c.leaves()).collect(),
+            Self::All { of } | Self::Any { of } | Self::AtLeast { of, .. } => {
+                of.iter().flat_map(|c| c.leaves()).collect()
+            }
             Self::Not { condition } => condition.leaves(),
             _ => vec![self],
         }
@@ -175,13 +188,29 @@ pub struct DialogueNode {
     pub choices: Vec<DialogueChoice>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct DialogueChoice {
+    /// Names the choice within its node, so saves can remember it however
+    /// the choices are ordered; required by `once`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<Id>,
     pub text: String,
     pub next: Option<Id>,
+    /// Once taken, never offered again, such as a question asked.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub once: bool,
+    /// Returns to `next`, such as a hub of questions, while it still offers
+    /// something besides ending the conversation; after that it is replaced
+    /// by the hub's own choices that end it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub back: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires: Option<Condition>,
+    /// Lists the choice as unavailable, with this reason, while `requires`
+    /// fails; without it the choice is hidden then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked_text: Option<String>,
     /// Applied in order; if one fails, the choice changes nothing.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub effects: Vec<Effect>,
@@ -264,10 +293,10 @@ pub struct EvidenceDefinition {
     /// Where the player learns it, such as a ledger or a witness.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub source: String,
-    /// What was observed or said. Later knowledge never changes these; it
-    /// changes only how they are read.
+    /// What was observed or said, each known once its `when` holds. Later
+    /// knowledge never changes or removes a fact; it changes only how they are read.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub facts: Vec<String>,
+    pub facts: Vec<Fact>,
     /// Ways of reading the facts, in the order understanding deepens. The
     /// current reading is the last whose `when` holds.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -276,6 +305,34 @@ pub struct EvidenceDefinition {
     /// does not make the evidence known, nor the reverse.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item: Option<Id>,
+}
+
+/// One fact of a piece of evidence: a bare string is known from discovery,
+/// and `{ text, when }` once `when` also holds.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged, deny_unknown_fields)]
+pub enum Fact {
+    Known(String),
+    /// Like an interpretation's `when`: only evidence, flags and phases,
+    /// never under `not`, so a fact once known stays known.
+    Gated {
+        text: String,
+        when: Condition,
+    },
+}
+
+impl Fact {
+    pub fn text(&self) -> &str {
+        match self {
+            Self::Known(text) | Self::Gated { text, .. } => text,
+        }
+    }
+    pub fn when(&self) -> Option<&Condition> {
+        match self {
+            Self::Known(_) => None,
+            Self::Gated { when, .. } => Some(when),
+        }
+    }
 }
 
 /// One way of reading a piece of evidence, available once `when` holds.

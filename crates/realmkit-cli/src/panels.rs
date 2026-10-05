@@ -380,6 +380,9 @@ pub fn quests(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
         for id in &journal.evidence {
             let evidence = world.evidence(id).unwrap();
             writeln!(output, "  {}: {}", evidence.name, evidence.description)?;
+            for fact in engine.evidence_facts(id) {
+                writeln!(output, "    · {}", evidence.facts[fact].text())?;
+            }
             if let Some(reading) = engine.evidence_reading(id) {
                 writeln!(output, "    {}", evidence.interpretations[reading].text)?;
             }

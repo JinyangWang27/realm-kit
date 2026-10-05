@@ -37,6 +37,7 @@ pub(super) fn check(
     evidence(world, state)?;
     phases(world, state)?;
     outcome(world, state)?;
+    taken_choices(world, state)?;
     dialogue(world, state)
 }
 
@@ -349,6 +350,13 @@ fn could_have_been(
         Condition::All { of } => of.iter().any(|c| could(c, false)),
         Condition::Any { of } if value => of.iter().any(|c| could(c, true)),
         Condition::Any { of } => of.iter().all(|c| could(c, false)),
+        // Some `count` could have held together, or enough failed that fewer did.
+        Condition::AtLeast { count, of } if value => {
+            of.iter().filter(|c| could(c, true)).count() >= *count
+        }
+        Condition::AtLeast { count, of } => {
+            of.iter().filter(|c| could(c, false)).count() > of.len() - count
+        }
         Condition::Not { condition } => could(condition, !value),
         Condition::Flag { .. }
         | Condition::Technique { .. }
@@ -855,6 +863,34 @@ fn outcome(world: &WorldSpec, state: &GameState) -> Result<(), String> {
             None => rules::outcomes(world, state).is_empty(),
         },
         "invalid route outcome",
+    )
+}
+
+/// Every ask-once choice taken exists and could have been chosen: its
+/// condition once held, and the quests it takes up or completes moved on,
+/// since taking it applied its effects.
+fn taken_choices(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    ensure(
+        state.taken_choices.iter().all(|r| {
+            world
+                .dialogue(&r.dialogue)
+                .and_then(|d| d.nodes.iter().find(|n| n.id == r.node))
+                .and_then(|n| n.choices.iter().find(|c| c.id.as_ref() == Some(&r.choice)))
+                .is_some_and(|c| {
+                    c.once
+                        && lasting(world, state, c.requires.as_ref())
+                        && c.effects.iter().all(|e| match e {
+                            Effect::AcceptQuest { quest } => {
+                                state.quests[quest] != QuestStatus::Available
+                            }
+                            Effect::CompleteQuest { quest } => {
+                                state.quests[quest] == QuestStatus::Completed
+                            }
+                            _ => true,
+                        })
+                })
+        }),
+        "a choice asked once could not have been chosen",
     )
 }
 

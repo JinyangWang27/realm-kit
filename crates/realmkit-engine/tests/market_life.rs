@@ -215,7 +215,7 @@ fn a_weavery_bought_from_maddoc_earns_at_the_weekly_settlement() {
     // Owning one hides the offer and shows the buy-back instead.
     engine.execute(Talk("maddoc".into())).unwrap();
     assert_eq!(
-        engine.dialogue_choices(),
+        texts(&engine),
         ["Take the weavery back. (75 silver)", "Just trading."]
     );
     assert!(engine.holds(&Condition::Workshop {
@@ -289,6 +289,7 @@ fn workshops_are_bought_in_towns_within_their_limit() {
                 effects: vec![Effect::BuyWorkshop {
                     workshop: "weavery".into(),
                 }],
+                ..Default::default()
             },
         );
     }
@@ -396,6 +397,7 @@ fn teaching() -> WorldSpec {
                 proficiency: Proficiency::Trading,
                 ranks: 2,
             }],
+            ..Default::default()
         },
     );
     world
@@ -423,7 +425,7 @@ fn an_effect_teaches_trading_and_a_condition_reads_it() {
         rank: 3
     }));
     engine.execute(Talk("wenna".into())).unwrap();
-    assert_eq!(engine.dialogue_choices()[0], "Tell me about the fen.");
+    assert_eq!(texts(&engine)[0], "Tell me about the fen.");
     // Like a technique grant, a lesson teaches only what fits under the top
     // rank: the second teaches one rank, and a third nothing, refusing nothing.
     let mut world = world.clone();

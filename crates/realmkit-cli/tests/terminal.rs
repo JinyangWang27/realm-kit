@@ -727,13 +727,17 @@ fn the_caravan_slice_plays_from_the_road_to_a_chosen_lead() {
         "— Thornwick —",
         "8 h later: Day 1, 18:00",
         "— The Lost Wagons —",
-        "New evidence: Wheel ruts",
+        "New evidence: Wheel ruts\n  · The ruts are deep and fresh.\n",
         "Rask goes down.",
+        // A fact that waited on the fork, then the reading it changes.
+        "New fact — Wheel ruts: At the fork the ruts roll onto old paving",
+        "Understanding changed — Wheel ruts: The wagons took a road",
         "Received: Broken caravan seal ×1",
         "New evidence: Displaced cargo",
         "Roads: Abandoned Camp (1 h 30 min), Bandit Ridge (1 h), The Stone Ring (2 h)",
         "Chapter: The Lost Wagons\nQuests:\n  The Road to Thornwick [road_to_thornwick]: Completed — main\n",
         "Evidence:\n  Wheel ruts: Deep ruts lead",
+        "    · They end at the ring's threshold, with no wheel mark beyond it.\n",
         "— The Buried Road —",
         "  Lead: The Northern Milestones [lead_milestones]: Available\n",
         "The first chapter closes\nYou have chosen your road.",
@@ -774,4 +778,93 @@ fn a_road_to_an_unknown_place_is_not_named() {
         after.contains("The Impossible Fork (1 h 30 min)"),
         "{after}"
     );
+}
+
+#[test]
+fn asked_questions_leave_the_list_and_back_becomes_leaving() {
+    let output = run(
+        &["play", ARCHIVE, "--line"],
+        "3\ntalk archivist\nchoose 2\nchoose 1\nchoose 1\nchoose 1\n",
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    let (_, last) = text.rsplit_once("'And so do I.'").unwrap();
+    assert!(
+        last.starts_with("\n\n  1. That is all. Thank you.\n"),
+        "{last}"
+    );
+    assert!(text.contains("\n  1. Why must it be so quiet?\n  2. That is all. Thank you.\n"));
+}
+
+#[test]
+fn a_bribe_without_the_silver_is_shown_locked_with_its_reason() {
+    // The scribe skips Moss's bales, so reaches Rask without silver.
+    let output = run(
+        &["play", CARAVAN, "--line", "--seed", "7"],
+        "3\ntalk iselt\nchoose 1\ntravel thornwick\nexamine city_gate\nchoose 1\ntalk iselt\nchoose 1\n\
+         talk dravin\nchoose 1\nrest\ntalk dravin\nchoose 1\nchoose 1\ntravel abandoned_camp\n\
+         travel bandit_ridge\ntalk rask\nchoose 1\n",
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    let locked =
+        "  1. Two silver for what you know about the Hadda caravan. [locked]\n  2. Walk away.\n";
+    let (before, after) = text
+        .split_once("> You do not have two silver to offer.\n")
+        .expect(&text);
+    assert!(before.ends_with(&format!("{locked}\n")), "{before}");
+    assert!(after.contains(locked), "{after}");
+}
+
+#[test]
+fn a_package_plays_in_another_language_and_saves_move_between_them() {
+    let dir = saves_dir("languages");
+    let english = run(
+        &["play", ARCHIVE, "--line", "--saves", &dir],
+        "3\ntalk archivist\nchoose 2\nsave\nquit\n",
+    );
+    assert!(String::from_utf8(english.stdout)
+        .unwrap()
+        .contains("'Briefly.'"));
+    // The save made in English resumes in Chinese, mid-conversation.
+    let chinese = run(
+        &[
+            "play",
+            ARCHIVE,
+            "--line",
+            "--saves",
+            &dir,
+            "--language",
+            "zh-Hans",
+        ],
+        "1\n",
+    );
+    let text = String::from_utf8(chinese.stdout).unwrap();
+    assert!(text.contains("Loaded save 2.\n\n阅览室\n"), "{text}");
+    assert!(
+        text.contains("档案员佩尔: 佩尔放下笔。“长话短说。”"),
+        "{text}"
+    );
+    assert!(text.contains("档案员佩尔: “河上的行会建的"), "{text}");
+    let unknown = run(&["play", ARCHIVE, "--line", "--language", "fr"], "");
+    assert!(!unknown.status.success());
+    assert!(String::from_utf8(unknown.stderr)
+        .unwrap()
+        .contains("language fr"));
+}
+
+#[test]
+fn text_lists_every_prose_key_an_overlay_needs() {
+    let output = run(&["text", ARCHIVE], "");
+    assert!(output.status.success());
+    let texts: std::collections::BTreeMap<String, String> =
+        serde_json::from_slice(&output.stdout).unwrap();
+    let overlay: std::collections::BTreeMap<String, String> = serde_json::from_str(
+        &std::fs::read_to_string(format!("{ARCHIVE}/text/zh-Hans.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(texts["world.name"], "The Quiet Archive");
+    assert!(texts.keys().eq(overlay.keys()));
+    let inspect = run(&["inspect", ARCHIVE], "");
+    assert!(String::from_utf8(inspect.stdout)
+        .unwrap()
+        .contains("Language: en, zh-Hans\n"));
 }

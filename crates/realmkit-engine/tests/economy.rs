@@ -274,17 +274,18 @@ fn currency_effects_and_conditions() {
                 },
                 Effect::PayCurrency { amount: 150 },
             ],
+            ..Default::default()
         },
     );
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
     engine.execute(Travel("ashmere".into())).unwrap();
     engine.execute(Talk("reeve".into())).unwrap();
     // 100 silver is not enough to see the toll.
-    assert_eq!(engine.dialogue_choices()[0], "I can carry a message.");
+    assert_eq!(texts(&engine)[0], "I can carry a message.");
     let mut rich = engine.snapshot();
     rich.state.economy.as_mut().unwrap().currency = 160;
     let mut rich = Engine::restore(&world, rich).unwrap();
-    assert_eq!(rich.dialogue_choices()[0], "Pay the causeway toll.");
+    assert_eq!(texts(&rich)[0], "Pay the causeway toll.");
     let events = rich.execute(ChooseDialogue(1)).unwrap();
     assert!(events.contains(&Event::CurrencyPaid { amount: 150 }));
     assert_eq!(currency(&rich), 10);

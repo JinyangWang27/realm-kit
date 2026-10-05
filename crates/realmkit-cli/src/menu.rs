@@ -657,7 +657,7 @@ fn missing(
 }
 
 /// The first unmet leaf that a failed condition needs, if it can be named:
-/// through `all` only, since `any` and `not` have no single reason.
+/// through `all` only, since `any`, `at_least` and `not` have no single reason.
 fn unmet<'c>(
     engine: &Engine<'_>,
     condition: &'c realmkit_spec::Condition,
@@ -665,7 +665,7 @@ fn unmet<'c>(
     use realmkit_spec::Condition;
     match condition {
         Condition::All { of } => unmet(engine, of.iter().find(|c| !engine.holds(c))?),
-        Condition::Any { .. } | Condition::Not { .. } => None,
+        Condition::Any { .. } | Condition::AtLeast { .. } | Condition::Not { .. } => None,
         leaf => Some(leaf),
     }
 }
@@ -741,9 +741,13 @@ impl Menu {
             let top = choices
                 .into_iter()
                 .enumerate()
-                .map(|(i, text)| Entry {
+                // Like a locked exit, choosing it explains why it cannot be taken.
+                .map(|(i, option)| Entry {
                     pick: Pick::Run(Command::ChooseDialogue(i + 1)),
-                    label: text.into(),
+                    label: match option.blocked {
+                        Some(_) => format!("{} {LOCKED}", option.text),
+                        None => option.text,
+                    },
                 })
                 .collect();
             (top, Vec::new())

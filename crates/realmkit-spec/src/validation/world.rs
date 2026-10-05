@@ -307,7 +307,9 @@ fn combat_profile(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, profile
 /// never go back, and neither do compositions of them alone.
 fn lasts(condition: &Condition) -> bool {
     match condition {
-        Condition::All { of } | Condition::Any { of } => of.iter().all(lasts),
+        Condition::All { of } | Condition::Any { of } | Condition::AtLeast { of, .. } => {
+            of.iter().all(lasts)
+        }
         Condition::Flag { .. }
         | Condition::Evidence { .. }
         | Condition::Phase { .. }

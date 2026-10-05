@@ -357,6 +357,7 @@
               "item": "silver",
               "quantity": 2
             },
+            "blocked_text": "You do not have two silver to offer.",
             "effects": [
               {
                 "kind": "take_items",
@@ -742,46 +743,20 @@
                   "status": "completed"
                 },
                 {
-                  "kind": "any",
+                  "kind": "at_least",
+                  "count": 2,
                   "of": [
                     {
-                      "kind": "all",
-                      "of": [
-                        {
-                          "kind": "evidence",
-                          "evidence": "priest_reading"
-                        },
-                        {
-                          "kind": "evidence",
-                          "evidence": "scholar_reading"
-                        }
-                      ]
+                      "kind": "evidence",
+                      "evidence": "priest_reading"
                     },
                     {
-                      "kind": "all",
-                      "of": [
-                        {
-                          "kind": "evidence",
-                          "evidence": "priest_reading"
-                        },
-                        {
-                          "kind": "evidence",
-                          "evidence": "veteran_reading"
-                        }
-                      ]
+                      "kind": "evidence",
+                      "evidence": "scholar_reading"
                     },
                     {
-                      "kind": "all",
-                      "of": [
-                        {
-                          "kind": "evidence",
-                          "evidence": "scholar_reading"
-                        },
-                        {
-                          "kind": "evidence",
-                          "evidence": "veteran_reading"
-                        }
-                      ]
+                      "kind": "evidence",
+                      "evidence": "veteran_reading"
                     }
                   ]
                 }

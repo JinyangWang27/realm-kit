@@ -160,12 +160,28 @@ proves the complete single-player loop with authored content.
   and a change to known evidence's reading is reported as
   `EvidenceReinterpreted`; the CLI journal prints it. The quiet archive's
   stitched map reads kinder once the vault opens. Package and save format 18.
+- [x] Authoring conveniences for the original game's first slice (Format 19):
+  an `at_least` condition (`at_least_zero`, `at_least_exceeds`), allowed
+  wherever `all` and `any` are, including readings; evidence facts gated by
+  a lasting `when` (`fleeting_fact`), derived by `Engine::evidence_facts` and
+  announced as `EvidenceFactLearned`; dialogue choices with an `id`, asked
+  `once` (saved as `GameState.taken_choices`, checked on load) or going
+  `back` to a hub until it offers only leaving (`once_without_id`,
+  `invalid_back`); unavailable choices listed with `blocked_text`
+  (`DialogueOption`, refused with `ChoiceBlocked`,
+  `unconditional_blocked_text`); and language overlays in `text/<tag>.json`
+  (`missing_translation`, `unused_translation`, `invalid_translation`,
+  `WorldSpec::in_language`, `realmkit play --language`, `realmkit text`).
+  Saves bind to a rules-only revision, so prose fixes and added languages
+  keep them loadable. `caravan-trail` shows the first, second and fourth;
+  `quiet-archive` asks a hub of questions and ships a Simplified Chinese
+  overlay.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
 ## Next implementation priorities
 
-The open items are **not delivered** and do not change Format 18 by
+The open items are **not delivered** and do not change Format 19 by
 themselves. They mirror the original-game-driven roadmap priority while keeping
 every capability optional:
 
@@ -207,8 +223,10 @@ and sets an authored flag that unlocks a ruins exit. Dialogue choices can requir
 flags or quest states. A lethal enemy response ends play; with saves on, the
 CLI restores the newest save. Level thresholds are cumulative.
 
-A package revision is a 64-bit FNV-1a digest of the package's canonical JSON, so
-any content edit makes older saves incompatible; there are no migrations yet.
+A package revision is a 64-bit FNV-1a digest of the package's canonical JSON
+with its prose emptied and its language left out (Format 19), so a rule edit
+makes older saves incompatible while prose fixes and added languages do not;
+there are no migrations yet.
 Loading checks the format version, package, revision and route, then the state
 invariants the rules maintain (known IDs, combat state present exactly when the
 world has combat, XP matching the level, vitals within their maximums, and an

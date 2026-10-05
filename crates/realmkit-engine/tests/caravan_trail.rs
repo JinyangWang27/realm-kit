@@ -170,7 +170,7 @@ fn the_start_choice_shapes_play_and_survives_saves() {
         &format!("{OPENING}; {CAMP}; travel bandit_ridge; talk rask"),
     );
     assert_eq!(
-        scribe.dialogue_choices(),
+        texts(&scribe),
         [
             "Two silver for what you know about the Hadda caravan.",
             "Walk away."
@@ -282,19 +282,19 @@ fn buried_road_needs_two_readings() {
         &format!("{OPENING}; {CAMP}; {FORK}; talk ennick; choose 1; {RING}"),
     );
     run(&mut engine, "talk ama; choose 1; talk tenko");
-    assert!(!engine
-        .dialogue_choices()
-        .contains(&"Where does all this lead?"));
+    assert!(!texts(&engine).contains(&"Where does all this lead?".into()));
     assert!(matches!(
         engine.execute(AcceptQuest("buried_road".into())),
         Err(EngineError::QuestLocked(_))
     ));
-    // Any second reading will do.
-    run(&mut engine, "choose 1; talk tenko");
-    assert_eq!(
-        engine.dialogue_choices(),
-        ["Where does all this lead?", "Good day."]
-    );
+    assert_eq!(engine.evidence_reading("strange_stonework"), Some(0));
+    // Any second reading will do, and two of three make the ring read anew.
+    let events = run(&mut engine, "choose 1; talk tenko");
+    assert!(events.contains(&Event::EvidenceReinterpreted {
+        evidence: "strange_stonework".into(),
+        reading: 1
+    }));
+    assert_eq!(texts(&engine), ["Where does all this lead?", "Good day."]);
 }
 
 #[test]
@@ -356,4 +356,70 @@ fn saves_at_the_camp_mid_fight_and_after_the_ending_resume_exactly() {
     }
     assert_eq!(engine.state(), straight.state());
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn a_bribe_the_player_cannot_afford_is_listed_with_its_reason() {
+    // Rask asks four silver here: the guard has only Moss's two, the
+    // merchant's child two more of their own.
+    let mut world = caravan_trail();
+    let rask = world.dialogues.iter_mut().find(|d| d.id == "rask").unwrap();
+    rask.nodes[0].choices[0].requires = Some(Condition::Item {
+        item: "silver".into(),
+        quantity: 4,
+    });
+    let to_rask = format!("{OPENING}; {CAMP}; travel bandit_ridge; talk rask");
+    let mut guard = start(&world, "caravan_guard");
+    run(&mut guard, &to_rask);
+    let reason = "You do not have two silver to offer.";
+    let options = guard.dialogue_choices();
+    assert_eq!(options[0].blocked.as_deref(), Some(reason));
+    assert_eq!(options[1].blocked, None);
+    // Numbering keeps the blocked choice, and taking it changes nothing.
+    let before = guard.state().clone();
+    assert!(matches!(
+        guard.execute(ChooseDialogue(1)),
+        Err(EngineError::ChoiceBlocked(1))
+    ));
+    assert_eq!(guard.state(), &before);
+    let events = guard.execute(ChooseDialogue(2)).unwrap();
+    assert!(events.contains(&Event::EvidenceDiscovered {
+        evidence: "bandit_testimony".into()
+    }));
+    // With the silver, the same choice is open.
+    let mut merchant = start(&world, "merchant_child");
+    run(&mut merchant, &to_rask);
+    assert_eq!(merchant.dialogue_choices()[0].blocked, None);
+    run(&mut merchant, "choose 1");
+    assert!(merchant.state().evidence.contains("bandit_testimony"));
+}
+
+#[test]
+fn a_node_of_only_blocked_choices_stays_open_to_explain_them() {
+    let mut world = caravan_trail();
+    let rask = world.dialogues.iter_mut().find(|d| d.id == "rask").unwrap();
+    rask.nodes[0].choices[0].requires = Some(Condition::Item {
+        item: "silver".into(),
+        quantity: 4,
+    });
+    rask.nodes[0].choices.truncate(1);
+    let mut scribe = start(&world, "temple_scribe");
+    let events = run(
+        &mut scribe,
+        &format!("{OPENING}; {CAMP}; travel bandit_ridge; talk rask"),
+    );
+    assert_ne!(events.last(), Some(&Event::DialogueEnded));
+    let reason = "You do not have two silver to offer.";
+    assert_eq!(
+        scribe.dialogue_choices()[0].blocked.as_deref(),
+        Some(reason)
+    );
+    assert!(matches!(
+        scribe.execute(ChooseDialogue(1)),
+        Err(EngineError::ChoiceBlocked(1))
+    ));
+    // The save holds the open conversation, and walking away closes it.
+    assert!(Engine::restore(&world, scribe.snapshot()).is_ok());
+    run(&mut scribe, "travel abandoned_camp");
+    assert!(scribe.dialogue_choices().is_empty());
 }

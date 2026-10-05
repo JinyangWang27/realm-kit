@@ -1,8 +1,9 @@
 {
-  "format_version": 18,
+  "format_version": 19,
   "id": "quiet_archive",
   "name": "The Quiet Archive",
   "language": "en",
+  "translations": ["zh-Hans"],
   "start": "reading_room",
   "player": "visitor",
   "flags": ["map_found", "vault_open", "pen_borrowed", "river_scholar", "apprentice"],

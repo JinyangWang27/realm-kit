@@ -11,7 +11,7 @@ fn choices(engine: &Engine<'_>) -> Vec<String> {
     engine
         .dialogue_choices()
         .into_iter()
-        .map(String::from)
+        .map(|c| c.text)
         .collect()
 }
 
@@ -196,6 +196,7 @@ fn an_item_that_effects_only_take_keeps_its_upper_bound_in_saves() {
                     quantity: 1,
                 }],
             }],
+            ..Default::default()
         },
     );
     let engine = reader(&world);
@@ -205,4 +206,37 @@ fn an_item_that_effects_only_take_keeps_its_upper_bound_in_saves() {
         Engine::restore(&world, forged),
         Err(EngineError::InvalidSave(_))
     ));
+}
+
+#[test]
+fn at_least_holds_from_its_count_of_conditions() {
+    let world = archive();
+    let mut engine = at_the_copyist(&world);
+    let flag = |flag: &str| Condition::Flag { flag: flag.into() };
+    let not = |c| Condition::Not {
+        condition: Box::new(c),
+    };
+    let of = vec![
+        flag("pen_borrowed"),
+        not(flag("vault_open")),
+        flag("map_found"),
+    ];
+    let at_least = |count| Condition::AtLeast {
+        count,
+        of: of.clone(),
+    };
+    // Only the `not` holds at first.
+    assert!(engine.holds(&at_least(1)));
+    assert!(!engine.holds(&at_least(2)));
+    engine.execute(ChooseDialogue(2)).unwrap();
+    assert!(engine.holds(&at_least(2)));
+    assert!(!engine.holds(&at_least(3)));
+    // Nested under `not`, `all` and `any` like any condition.
+    assert!(engine.holds(&not(at_least(3))));
+    assert!(!engine.holds(&Condition::All {
+        of: vec![at_least(2), at_least(3)]
+    }));
+    assert!(engine.holds(&Condition::Any {
+        of: vec![at_least(3), at_least(2)]
+    }));
 }

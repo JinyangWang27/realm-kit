@@ -112,6 +112,13 @@ impl WorldDraft {
         write_json(directory, "items.json", &self.world.items)?;
         write_json(directory, "quests.json", &self.world.quests)?;
         write_json(directory, "dialogues.json", &self.world.dialogues)?;
+        if !self.world.translations.is_empty() {
+            let text = directory.join("text");
+            std::fs::create_dir(&text).map_err(|source| SpecError::Io { path: text, source })?;
+        }
+        for (tag, overlay) in &self.world.translations {
+            write_json(directory, &format!("text/{tag}.json"), overlay)?;
+        }
         Ok(())
     }
 }

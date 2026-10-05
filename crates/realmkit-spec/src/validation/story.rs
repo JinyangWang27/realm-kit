@@ -162,7 +162,45 @@ pub(super) fn dialogues(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             &dialogue.start,
             dialogue.nodes.iter().any(|n| n.id == dialogue.start),
         );
+        for node in &dialogue.nodes {
+            ids(
+                out,
+                "dialogue choice",
+                node.choices.iter().filter_map(|c| c.id.as_deref()),
+            );
+        }
         for choice in dialogue.nodes.iter().flat_map(|n| &n.choices) {
+            if choice.once && choice.id.is_none() {
+                issue(
+                    out,
+                    &dialogue.id,
+                    "once_without_id",
+                    format!("an ask-once choice needs an id: {:?}", choice.text),
+                );
+            }
+            if choice.blocked_text.is_some() && choice.requires.is_none() {
+                issue(
+                    out,
+                    &dialogue.id,
+                    "unconditional_blocked_text",
+                    format!(
+                        "blocked text needs a condition to explain: {:?}",
+                        choice.text
+                    ),
+                );
+            }
+            // Going back changes nothing, so a used-up hub can stand in for it.
+            if choice.back && (choice.next.is_none() || !choice.effects.is_empty()) {
+                issue(
+                    out,
+                    &dialogue.id,
+                    "invalid_back",
+                    format!(
+                        "a back choice needs a next node and no effects: {:?}",
+                        choice.text
+                    ),
+                );
+            }
             if let Some(next) = &choice.next {
                 reference(
                     out,
@@ -307,7 +345,7 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 }
 
 /// Evidence definitions have unique IDs, a linked item exists, and every
-/// reading waits only on knowledge that is never lost.
+/// fact and reading waits only on knowledge that is never lost.
 pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     ids(
         out,
@@ -317,6 +355,17 @@ pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     for evidence in &w.world.evidence {
         if let Some(item) = &evidence.item {
             reference(out, &evidence.id, "item", item, w.item(item).is_some());
+        }
+        for when in evidence.facts.iter().filter_map(Fact::when) {
+            condition(out, w, &evidence.id, Some(when));
+            if !lasting(when) {
+                issue(
+                    out,
+                    &evidence.id,
+                    "fleeting_fact",
+                    "a fact may wait only on evidence, flags and phases, never under `not`, so that it is never lost again",
+                );
+            }
         }
         for reading in &evidence.interpretations {
             condition(out, w, &evidence.id, reading.when.as_ref());
@@ -335,7 +384,9 @@ pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 /// Whether a condition, once it holds, holds for the rest of the playthrough.
 fn lasting(condition: &Condition) -> bool {
     match condition {
-        Condition::All { of } | Condition::Any { of } => of.iter().all(lasting),
+        Condition::All { of } | Condition::Any { of } | Condition::AtLeast { of, .. } => {
+            of.iter().all(lasting)
+        }
         Condition::Evidence { .. } | Condition::Flag { .. } | Condition::Phase { .. } => true,
         _ => false,
     }

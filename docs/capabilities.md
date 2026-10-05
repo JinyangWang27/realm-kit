@@ -304,9 +304,9 @@ not which source characters exist.
 ## Suggested implementation order
 
 The implementation is already beyond the original investigation-first planning
-note: Format 18 includes world time, economy, troop recruitment, a first mass
+note: Format 19 includes world time, economy, troop recruitment, a first mass
 battle slice, and the investigation and progression slice the original game's MVP
-needs, with evidence readings that later knowledge changes. The next priorities are driven by the original game as RealmKit's first full
+needs, with evidence readings that later knowledge changes, facts that fill in, question hubs and language overlays. The next priorities are driven by the original game as RealmKit's first full
 original-game pressure test, while every capability remains optional.
 
 1. Deliver the **presentation seam** needed by the game: authored overland-map

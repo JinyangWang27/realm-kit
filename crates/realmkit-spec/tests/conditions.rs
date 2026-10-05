@@ -232,3 +232,50 @@ fn the_richest_start_answers_must_fit_the_currency_bound() {
         .push(question("legacy", vec![grant(1)]));
     assert_eq!(codes(&world), ["start_overflow"]);
 }
+
+#[test]
+fn at_least_needs_a_count_from_one_to_its_conditions() {
+    let mut world = archive();
+    choice(&mut world).requires = Some(Condition::AtLeast {
+        count: 0,
+        of: vec![flag("map_found")],
+    });
+    assert_eq!(codes(&world), ["at_least_zero"]);
+    let mut world = archive();
+    choice(&mut world).requires = Some(Condition::AtLeast {
+        count: 3,
+        of: vec![flag("map_found"), flag("vault_open")],
+    });
+    assert_eq!(codes(&world), ["at_least_exceeds"]);
+    // Its conditions are checked like any other's.
+    let mut world = archive();
+    choice(&mut world).requires = Some(Condition::AtLeast {
+        count: 1,
+        of: vec![flag("map_found"), flag("missing")],
+    });
+    assert_eq!(codes(&world), ["missing_reference"]);
+}
+
+#[test]
+fn at_least_requires_a_leaf_only_when_every_choice_of_count_includes_it() {
+    let two_of = |of: Vec<Condition>| Condition::AtLeast { count: 2, of };
+    let a = flag("map_found");
+    let is_a = |c: &Condition| *c == flag("map_found");
+    // Two of three: a pair without `a` always exists unless `a` is in two.
+    assert!(!two_of(vec![a.clone(), flag("b"), flag("c")]).requires(&is_a));
+    assert!(two_of(vec![a.clone(), a.clone(), flag("c")]).requires(&is_a));
+    // Two of two is `all`; one of two is `any`.
+    assert!(two_of(vec![a.clone(), flag("b")]).requires(&is_a));
+    let one_of = Condition::AtLeast {
+        count: 1,
+        of: vec![a.clone(), flag("b")],
+    };
+    assert!(!one_of.requires(&is_a));
+    assert_eq!(one_of.leaves().len(), 2);
+    // A condition that fails `a` excludes one that needs it in every pair.
+    let not_a = Condition::Not {
+        condition: Box::new(a.clone()),
+    };
+    assert!(two_of(vec![a.clone(), flag("b")]).excludes(&not_a));
+    assert!(!two_of(vec![a, flag("b"), flag("c")]).excludes(&not_a));
+}

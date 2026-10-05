@@ -12,7 +12,13 @@ pub fn demo() -> WorldSpec {
     .unwrap()
 }
 
+/// The archive in English alone, so tests may reshape it without
+/// keeping its Chinese overlay in step.
 pub fn archive() -> WorldSpec {
+    archive_in_all_languages().in_language("en").unwrap()
+}
+
+pub fn archive_in_all_languages() -> WorldSpec {
     WorldSpec::load(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../examples/quiet-archive"
@@ -115,4 +121,13 @@ pub fn caravan_trail() -> WorldSpec {
         "/../../examples/caravan-trail"
     ))
     .unwrap()
+}
+
+/// The text of each choice in the active conversation, as numbered.
+pub fn texts(engine: &Engine<'_>) -> Vec<String> {
+    engine
+        .dialogue_choices()
+        .into_iter()
+        .map(|c| c.text)
+        .collect()
 }

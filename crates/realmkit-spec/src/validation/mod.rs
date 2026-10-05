@@ -9,6 +9,7 @@ mod economy;
 mod equipment;
 mod progression;
 mod story;
+mod text;
 mod time;
 mod troops;
 mod world;
@@ -34,6 +35,8 @@ pub enum SpecError {
     UnsupportedFormat { found: Option<u64> },
     #[error("world validation failed: {0:?}")]
     Validation(Vec<Diagnostic>),
+    #[error("this world has no text in language {0}")]
+    UnknownLanguage(String),
     #[error("{path}: {source}")]
     Io {
         path: std::path::PathBuf,
@@ -67,8 +70,11 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     }
     troops::rules(&mut out, w);
     economy::proficiency_points(&mut out, w);
+    text::translations(&mut out, w);
     out
 }
+
+pub(crate) use text::language_tag;
 
 fn issue(out: &mut Vec<Diagnostic>, entity: &str, code: &str, message: impl Into<String>) {
     push(out, Severity::Error, entity, code, message.into());
@@ -136,6 +142,30 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
                     owner,
                     "invalid_condition",
                     "`all` and `any` need at least one condition",
+                );
+            }
+            for c in of {
+                condition(out, w, owner, Some(c));
+            }
+        }
+        Condition::AtLeast { count, of } => {
+            if *count == 0 {
+                issue(
+                    out,
+                    owner,
+                    "at_least_zero",
+                    "`at_least` needs a count of at least 1",
+                );
+            }
+            if *count > of.len() {
+                issue(
+                    out,
+                    owner,
+                    "at_least_exceeds",
+                    format!(
+                        "`at_least` asks for {count} of {} conditions, so it can never hold",
+                        of.len()
+                    ),
                 );
             }
             for c in of {

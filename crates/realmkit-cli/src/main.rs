@@ -17,7 +17,7 @@ mod render;
 mod saves;
 mod session;
 
-const USAGE: &str = "RealmKit — static worlds, deterministic adventures\n\n  realmkit play <world-directory> [--line] [--saves <directory>] [--seed <number>]\n  realmkit validate <world-directory>\n  realmkit inspect <world-directory>";
+const USAGE: &str = "RealmKit — static worlds, deterministic adventures\n\n  realmkit play <world-directory> [--line] [--saves <directory>] [--seed <number>] [--language <tag>]\n  realmkit validate <world-directory>\n  realmkit inspect <world-directory>\n  realmkit text <world-directory>    (every text by key, to start a translation)";
 
 fn main() {
     if let Err(error) = run() {
@@ -51,10 +51,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     let action = args[0].to_str().ok_or(USAGE)?;
-    if args.len() < 2 || !matches!(action, "play" | "validate" | "inspect") {
+    if args.len() < 2 || !matches!(action, "play" | "validate" | "inspect" | "text") {
         return Err(USAGE.into());
     }
-    let (mut line_mode, mut saves, mut seed) = (false, None, None);
+    let (mut line_mode, mut saves, mut seed, mut language) = (false, None, None, None);
     let mut options = args[2..].iter();
     while let Some(option) = options.next() {
         match option.to_str() {
@@ -66,14 +66,23 @@ fn run() -> Result<(), Box<dyn Error>> {
                 let value = options.next().and_then(|v| v.to_str()).ok_or(USAGE)?;
                 seed = Some(value.parse::<u64>().map_err(|_| USAGE)?)
             }
+            Some("--language") if action == "play" => {
+                language = Some(options.next().and_then(|v| v.to_str()).ok_or(USAGE)?)
+            }
             _ => return Err(USAGE.into()),
         }
     }
     let saves = saves.as_ref();
     let world = WorldSpec::load(Path::new(&args[1]))?;
+    // Saves bind to the rules, so a playthrough may change language between sessions.
+    let world = match language {
+        Some(tag) => world.in_language(tag)?,
+        None => world,
+    };
     match action {
         "validate" => writeln!(output, "{}: valid (format {})", world.world.name, world.world.format_version)?,
-        "inspect" => writeln!(output, "{} [{}]\nLanguage: {}\n{} locations, {} characters, {} items, {} quests, {} dialogues\nStart: {}", world.world.name, world.world.id, world.world.language, world.locations.len(), world.characters.len(), world.items.len(), world.quests.len(), world.dialogues.len(), world.world.start)?,
+        "text" => writeln!(output, "{}", serde_json::to_string_pretty(&world.texts())?)?,
+        "inspect" => writeln!(output, "{} [{}]\nLanguage: {}{}\n{} locations, {} characters, {} items, {} quests, {} dialogues\nStart: {}", world.world.name, world.world.id, world.world.language, world.world.translations.iter().map(|t| format!(", {t}")).collect::<String>(), world.locations.len(), world.characters.len(), world.items.len(), world.quests.len(), world.dialogues.len(), world.world.start)?,
         "play" if !line_mode && io::stdin().is_terminal() && output.is_terminal() => {
             // NO_COLOR (no-color.org) asks for plain text even in a terminal.
             let paint = render::Paint {

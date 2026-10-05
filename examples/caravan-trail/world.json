@@ -1,5 +1,5 @@
 {
-  "format_version": 18,
+  "format_version": 19,
   "id": "caravan_trail",
   "name": "The Caravan Trail",
   "language": "en",
@@ -81,7 +81,18 @@
       "name": "Wheel ruts",
       "description": "Deep ruts lead from the cold camp to a fork in the track that no map shows.",
       "source": "The cold camp",
-      "facts": ["The ruts are deep and fresh.", "They leave the trail to the east, where no map shows a track."],
+      "facts": [
+        "The ruts are deep and fresh.",
+        "They leave the trail to the east, where no map shows a track.",
+        {
+          "text": "At the fork the ruts roll onto old paving and run on east.",
+          "when": { "kind": "evidence", "evidence": "impossible_fork" }
+        },
+        {
+          "text": "They end at the ring's threshold, with no wheel mark beyond it.",
+          "when": { "kind": "evidence", "evidence": "strange_stonework" }
+        }
+      ],
       "interpretations": [
         { "text": "The wagons turned off the trail, perhaps to avoid the ridge." },
         { "when": { "kind": "evidence", "evidence": "impossible_fork" }, "text": "The wagons took a road that should not be there." }
@@ -111,7 +122,22 @@
     {
       "id": "strange_stonework",
       "name": "Strange stonework",
-      "description": "A low ring of fitted stones on the hill where the east road ends. The caravan's tracks stop at its threshold."
+      "description": "A low ring of fitted stones on the hill where the east road ends. The caravan's tracks stop at its threshold.",
+      "interpretations": [
+        { "text": "Someone built the ring, and the caravan went no further." },
+        {
+          "when": {
+            "kind": "at_least",
+            "count": 2,
+            "of": [
+              { "kind": "evidence", "evidence": "priest_reading" },
+              { "kind": "evidence", "evidence": "scholar_reading" },
+              { "kind": "evidence", "evidence": "veteran_reading" }
+            ]
+          },
+          "text": "Two accounts agree: the ring marks a road that hides itself."
+        }
+      ]
     },
     {
       "id": "priest_reading",

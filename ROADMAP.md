@@ -65,8 +65,12 @@ The current priority is:
    route outcomes; evidence as investigation state; places the player learns
    of before the map shows them; and features to examine.
    `examples/caravan-trail` plays an MVP-shaped slice from a caravan's
-   arrival through an investigation to a choice of leads. Still to come when
-   the original game's content needs them: failing, abandoned and deadline quests, terminal and
+   arrival through an investigation to a choice of leads. Format 19 adds what
+   authoring the original game's first slice asked for: `at_least`
+   conditions, evidence facts that fill in, ask-once and back dialogue
+   choices, unavailable choices with a reason, and language overlays with
+   saves bound to the rules alone. Still to come when the original game's
+   content needs them: failing, abandoned and deadline quests, terminal and
    failure outcomes, dialogue-by-role and conditional text.
 3. **P0 — political identity.** Factions and typed standing/relation tracks are
    required before the game world's states, martial schools and orders can be represented
@@ -134,7 +138,8 @@ they are not retroactively part of M1 acceptance.
 ## M2 — Continue an adventure across sessions · complete
 
 Delivered: engine `SaveSnapshot` export and all-or-nothing validated restore
-bound to package ID, content-digest revision and the `default` route; CLI
+bound to package ID, content-digest revision and the `default` route (since
+Format 19 a digest of the rules alone, leaving out prose and language); CLI
 `--saves <directory>` with atomic JSON files, a lineage index that forks when an
 older save is loaded, `save`/`load` commands, auto-saves at route start and
 quest completion, and newest-save recovery on death that reports invalid saves
@@ -1180,10 +1185,18 @@ dialogue in the opening town would otherwise duplicate content.
    outlives one encounter, as in the first bullet above. Unique authored
    characters keep their authored IDs and carry state such as wounds or
    captivity under them.
-5. **M5e — dialogue by role and text variants.** Authored roles whose
-   dialogues and topics every member shares, `Speaker` references in
-   conditions, effects and templates, line slots that each member fills, role
-   offer givers, and text fields with conditional variants.
+5. **M5e — dialogue by role, text variants and languages · languages
+   delivered** (Format 19). Authored roles whose dialogues and topics every
+   member shares, `Speaker` references in conditions, effects and templates,
+   line slots that each member fills, role offer givers, and text fields with
+   conditional variants are still proposed. Delivered: a package may carry
+   complete overlays of its prose in other languages (`text/<tag>.json`,
+   keyed by each field's JSON path), chosen when the package is loaded, and
+   saves bind to a revision of the rules alone, so they move between
+   languages and survive prose fixes. Also delivered in Format 19, from the
+   original game's dialogue: choices asked `once`, `back` choices that become
+   the hub's own leaving when its questions are used up, and `blocked_text`
+   that lists an unmet choice with its reason, the way a locked exit is.
 6. **M5f — start choices · delivered** (Format 16). A route's authored start
    questions at New Game, each option an ordered effect list applied to the
    initial state, with the chosen option IDs saved for display. Every
@@ -1198,7 +1211,11 @@ dialogue in the opening town would otherwise duplicate content.
    gates Pell's thanks on the stitched map. Format 18 adds each evidence's
    source, fixed facts and interpretations that later evidence, flags or
    phases unlock, reported as `EvidenceReinterpreted`: the evidence stays the
-   same while the player's understanding of it changes.
+   same while the player's understanding of it changes. Format 19 lets a fact
+   wait on a lasting `when`, so evidence found at the first observation fills
+   in as the investigation goes on (`EvidenceFactLearned`), and adds an
+   `at_least` condition, so "any two of these readings" needs no list of
+   pairs.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
 and tested paths to completion, can be saved/resumed, and include at least one
@@ -1461,7 +1478,8 @@ complete cross-project register remains in
    client shows which queries it needs.
 2. **Authored progression P0 · settled for the MVP** (Format 17): phases as
    an ordered list moved by effects, `main` and `requires` on quests, and
-   outcomes recorded once. Settle failure, deadlines and terminal outcomes
+   outcomes recorded once. Several languages settled in Format 19: one base
+   language plus complete overlays, and a rules-only save revision. Settle failure, deadlines and terminal outcomes
    when the original game's content beyond the MVP needs them.
 3. **Politics P0:** settle M6b faction membership/war-peace representation and
    standing-track scopes/thresholds before authoring the game world's political entities,

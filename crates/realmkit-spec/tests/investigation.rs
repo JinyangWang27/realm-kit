@@ -103,6 +103,61 @@ fn evidence_references_are_checked() {
             },
             "fleeting_interpretation",
         ),
+        // Facts, once known, stay known: the same rule as readings.
+        (
+            |w| {
+                w.world.evidence[0].facts.push(Fact::Gated {
+                    text: "Later.".into(),
+                    when: Condition::Not {
+                        condition: Box::new(Condition::Flag {
+                            flag: "vault_open".into(),
+                        }),
+                    },
+                })
+            },
+            "fleeting_fact",
+        ),
+        (
+            |w| {
+                w.world.evidence[0].facts.push(Fact::Gated {
+                    text: "Later.".into(),
+                    when: Condition::Quest {
+                        quest: "lost_map".into(),
+                        status: QuestStatus::Active,
+                    },
+                })
+            },
+            "fleeting_fact",
+        ),
+        (
+            |w| {
+                w.world.evidence[0].facts.push(Fact::Gated {
+                    text: "Later.".into(),
+                    when: Condition::Flag {
+                        flag: "missing".into(),
+                    },
+                })
+            },
+            "missing_reference",
+        ),
+        // `at_least` lasts only when everything under it does.
+        (
+            |w| {
+                w.world.evidence[0].interpretations[1].when = Some(Condition::AtLeast {
+                    count: 1,
+                    of: vec![
+                        Condition::Flag {
+                            flag: "vault_open".into(),
+                        },
+                        Condition::Item {
+                            item: "pen".into(),
+                            quantity: 1,
+                        },
+                    ],
+                })
+            },
+            "fleeting_interpretation",
+        ),
     ];
     for (change, code) in cases {
         let mut world = archive();
@@ -113,6 +168,15 @@ fn evidence_references_are_checked() {
             codes(&world)
         );
     }
+    // Over lasting leaves, `at_least` reads like `all` and `any`.
+    let mut world = archive();
+    world.world.evidence[0].interpretations[1].when = Some(Condition::AtLeast {
+        count: 2,
+        of: ["vault_open", "map_found", "pen_borrowed"]
+            .map(|flag| Condition::Flag { flag: flag.into() })
+            .into(),
+    });
+    assert_eq!(codes(&world), Vec::<String>::new());
     // A linked item that exists is fine: possession and evidence stay apart.
     let mut world = archive();
     world.world.evidence[0].item = Some("pen".into());
@@ -133,4 +197,22 @@ fn an_event_cannot_discover_evidence() {
     });
     world.world.events[0].effects.push(discover("tracks"));
     assert!(codes(&world).contains(&"invalid_effect".to_string()));
+}
+
+#[test]
+fn a_fact_is_a_bare_string_or_text_with_a_condition() {
+    let facts: Vec<Fact> = serde_json::from_str(
+        r#"["Seen.", { "text": "Later.", "when": { "kind": "flag", "flag": "a" } }]"#,
+    )
+    .unwrap();
+    assert_eq!(facts[0], Fact::Known("Seen.".into()));
+    assert_eq!(facts[1].text(), "Later.");
+    assert!(facts[1].when().is_some());
+    // Bare strings stay bare when written back.
+    assert_eq!(
+        serde_json::to_string(&facts[0]).unwrap(),
+        r#""Seen.""#.to_string()
+    );
+    let extra = r#"{ "text": "Later.", "when": { "kind": "flag", "flag": "a" }, "if": 1 }"#;
+    assert!(serde_json::from_str::<Fact>(extra).is_err());
 }

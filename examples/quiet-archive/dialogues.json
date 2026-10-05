@@ -45,6 +45,7 @@
             "next": "scholar",
             "requires": { "kind": "flag", "flag": "river_scholar" }
           },
+          { "text": "May I ask about the archive?", "next": "questions" },
           { "text": "Leave her to her work." }
         ]
       },
@@ -60,7 +61,26 @@
       { "id": "reminder", "text": "'Ask the copyist. He never returns anything on time.'" },
       { "id": "thanks", "text": "'Mending it,' she repeats, and almost smiles." },
       { "id": "vault", "text": "'Until every map is home, yes.' She touches the key at her belt." },
-      { "id": "scholar", "text": "Pell looks up at last. 'In the vault, every one of them. Or nearly.'" }
+      { "id": "scholar", "text": "Pell looks up at last. 'In the vault, every one of them. Or nearly.'" },
+      {
+        "id": "questions",
+        "text": "Pell sets down her pen. 'Briefly.'",
+        "choices": [
+          { "id": "founders", "text": "Who built the archive?", "next": "founders", "once": true },
+          { "id": "quiet", "text": "Why must it be so quiet?", "next": "quiet", "once": true },
+          { "text": "That is all. Thank you." }
+        ]
+      },
+      {
+        "id": "founders",
+        "text": "'The river guilds, when the river still paid for such things.'",
+        "choices": [{ "text": "Let me ask something else.", "next": "questions", "back": true }]
+      },
+      {
+        "id": "quiet",
+        "text": "'Paper listens,' Pell says. 'And so do I.'",
+        "choices": [{ "text": "Let me ask something else.", "next": "questions", "back": true }]
+      }
     ]
   },
   {

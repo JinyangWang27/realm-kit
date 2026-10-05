@@ -1,9 +1,9 @@
 //! Synchronous gameplay; no generation or presentation dependencies.
 
 use realmkit_spec::{
-    Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack, MapPoint,
-    Proficiency, Quest, QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat,
-    Stats, WorldSpec, BASIC_POWER,
+    Channel, Character, Condition, Dialogue, DialogueChoice, DialogueNode, Direction, Effect, Id,
+    ItemStack, MapPoint, Proficiency, Quest, QuestObjective, QuestStatus, Resource, Respec, Skill,
+    SpecError, Stat, Stats, WorldSpec, BASIC_POWER,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -176,6 +176,7 @@ impl<'w> Engine<'w> {
                     .map(|p| p.id.clone())
                     .collect(),
                 outcome: None,
+                taken_choices: BTreeSet::new(),
             },
         };
         // Merchants open with their stock at its targets, drawing nothing.
@@ -282,12 +283,14 @@ impl<'w> Engine<'w> {
         rules::actions(self.world, &self.state)
     }
 
-    /// Text of the choices in the active conversation; empty when none.
-    pub fn dialogue_choices(&self) -> Vec<&'w str> {
+    /// The choices in the active conversation, numbered from 1 as
+    /// `ChooseDialogue` takes them; empty when none. A choice listed with its
+    /// `blocked` reason is refused.
+    pub fn dialogue_choices(&self) -> Vec<DialogueOption> {
         self.state.dialogue.as_ref().map_or_else(Vec::new, |d| {
             rules::choices(self.world, &self.state, &d.npc, &d.node)
-                .into_iter()
-                .map(|c| c.text.as_str())
+                .iter()
+                .map(|c| c.option())
                 .collect()
         })
     }
@@ -332,6 +335,13 @@ impl<'w> Engine<'w> {
     /// unknown or has no interpretations.
     pub fn evidence_reading(&self, evidence: &str) -> Option<usize> {
         rules::reading(self.world, &self.state, evidence)
+    }
+
+    /// The facts of known evidence the player has learned, by index in
+    /// authored order: those whose `when` holds. Empty while the evidence is
+    /// unknown. Derived, never saved; a fact once known stays known.
+    pub fn evidence_facts(&self, evidence: &str) -> Vec<usize> {
+        rules::facts(self.world, &self.state, evidence)
     }
 
     /// Who is here now: present under their conditions and not defeated.

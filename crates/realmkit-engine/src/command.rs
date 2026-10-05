@@ -94,6 +94,16 @@ pub enum Command {
     Map,
 }
 
+/// A dialogue choice as the conversation offers it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DialogueOption {
+    pub text: String,
+    /// Why it cannot be taken now; `None` when it can.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Event {
@@ -321,10 +331,12 @@ pub enum Event {
         mp_restored: bool,
     },
     PlayerDied,
+    /// The choices are numbered as `ChooseDialogue` takes them, unavailable
+    /// ones included.
     Dialogue {
         npc: Id,
         node: Id,
-        choices: Vec<String>,
+        choices: Vec<DialogueOption>,
     },
     DialogueEnded,
     QuestAccepted {
@@ -341,6 +353,12 @@ pub enum Event {
     },
     EvidenceDiscovered {
         evidence: Id,
+    },
+    /// Something learned since revealed another fact of known evidence: its
+    /// fact `fact` (0-based) is now known, for good.
+    EvidenceFactLearned {
+        evidence: Id,
+        fact: usize,
     },
     /// Something learned since changed how known evidence reads: its
     /// current interpretation is now `reading` (0-based). The facts are as

@@ -29,16 +29,12 @@ fn evidence_is_discovered_once_and_gates_what_follows() {
     // Pell hears it only from someone who has seen the map.
     engine.execute(Move(South)).unwrap();
     engine.execute(Talk("archivist".into())).unwrap();
-    assert!(engine
-        .dialogue_choices()
-        .contains(&"The copyist has the map. He was only mending it."));
+    assert!(texts(&engine).contains(&"The copyist has the map. He was only mending it.".into()));
     let mut unseen = engine.snapshot();
     unseen.state.evidence.clear();
     let mut unseen = Engine::restore(&world, unseen).unwrap();
     unseen.execute(Talk("archivist".into())).unwrap();
-    assert!(!unseen
-        .dialogue_choices()
-        .contains(&"The copyist has the map. He was only mending it."));
+    assert!(!texts(&unseen).contains(&"The copyist has the map. He was only mending it.".into()));
 }
 
 #[test]
@@ -159,4 +155,63 @@ fn later_knowledge_changes_the_reading_but_not_the_facts() {
     assert!(!moved
         .iter()
         .any(|e| matches!(e, Event::EvidenceReinterpreted { .. })));
+}
+
+#[test]
+fn facts_fill_in_once_each_and_only_for_known_evidence() {
+    use realmkit_spec::Fact;
+    let mut world = archive();
+    let gated = |text: &str, flag: &str| Fact::Gated {
+        text: text.into(),
+        when: Condition::Flag { flag: flag.into() },
+    };
+    let facts = &mut world.world.evidence[0].facts;
+    facts.push(gated("The thread is the copyist's own.", "pen_borrowed"));
+    facts.push(gated("Pell knew all along.", "vault_open"));
+    let mut engine = reader(&world);
+    engine.execute(Talk("archivist".into())).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    engine.execute(Move(North)).unwrap();
+    // A fact's condition holding reveals nothing while the evidence is unknown.
+    engine.execute(Talk("copyist".into())).unwrap();
+    let borrowed = engine.execute(ChooseDialogue(2)).unwrap();
+    assert!(engine.evidence_facts("stitched_map").is_empty());
+    let learned = |events: &[Event]| {
+        events
+            .iter()
+            .filter(|e| matches!(e, Event::EvidenceFactLearned { .. }))
+            .count()
+    };
+    assert_eq!(learned(&borrowed), 0);
+    // Discovery brings every fact that holds by then, as part of discovering.
+    engine.execute(Talk("copyist".into())).unwrap();
+    let found = engine.execute(ChooseDialogue(1)).unwrap();
+    assert_eq!(engine.evidence_facts("stitched_map"), [0, 1, 2]);
+    assert_eq!(learned(&found), 0);
+    // A later one arrives on its own, once.
+    engine.execute(Move(South)).unwrap();
+    engine.execute(Talk("archivist".into())).unwrap();
+    let thanks = engine.execute(ChooseDialogue(1)).unwrap();
+    let fact = Event::EvidenceFactLearned {
+        evidence: "stitched_map".into(),
+        fact: 3,
+    };
+    assert_eq!(learned(&thanks), 1);
+    let position = |event: &Event| thanks.iter().position(|e| e == event).unwrap();
+    assert!(
+        position(&fact)
+            < position(&Event::EvidenceReinterpreted {
+                evidence: "stitched_map".into(),
+                reading: 1,
+            })
+    );
+    assert_eq!(engine.evidence_facts("stitched_map"), [0, 1, 2, 3]);
+    let later = engine.execute(Move(North)).unwrap();
+    assert_eq!(learned(&later), 0);
+    // Derived, never saved: a reloaded save knows the same facts.
+    let json = serde_json::to_string(&engine.snapshot()).unwrap();
+    let reloaded = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
+    assert_eq!(reloaded.evidence_facts("stitched_map"), [0, 1, 2, 3]);
+    assert!(!json.contains("fact"));
 }

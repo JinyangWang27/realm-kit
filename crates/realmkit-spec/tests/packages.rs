@@ -154,12 +154,76 @@ fn diagnostics_identify_entities_and_stable_codes_for_repair() {
 }
 
 #[test]
-fn revision_is_stable_for_equal_content_and_changes_with_any_edit() {
-    let world = demo();
-    assert_eq!(world.revision(), demo().revision());
-    let mut edited = demo();
-    edited.items[0].description.push('.');
-    assert_ne!(world.revision(), edited.revision());
+fn revision_covers_the_rules_and_leaves_out_prose_and_language() {
+    let world = caravan_trail();
+    assert_eq!(world.revision(), caravan_trail().revision());
+    type Change = fn(&mut WorldSpec);
+    let prose: Vec<Change> = vec![
+        |w| w.items[0].description.push('.'),
+        |w| w.world.language = "fr".into(),
+        |w| w.dialogues[0].nodes[0].choices[0].text = "Onward.".into(),
+        |w| w.world.evidence[1].source = "Found where none was written before.".into(),
+        |w| w.world.evidence[0].interpretations[0].text.push('!'),
+        |w| {
+            w.world.combat.as_mut().unwrap().narrative.attack[0] =
+                TextTemplate("{attacker} swings.".into())
+        },
+    ];
+    for (i, change) in prose.into_iter().enumerate() {
+        let mut edited = caravan_trail();
+        change(&mut edited);
+        assert_eq!(edited.revision(), world.revision(), "prose edit {i}");
+    }
+    let rules: Vec<Change> = vec![
+        |w| w.quests[0].reward_xp += 1,
+        |w| w.world.flags.push("another".into()),
+        |w| w.world.evidence[0].facts.push(Fact::Known("More.".into())),
+        |w| w.dialogues[0].nodes[0].choices[0].blocked_text = Some(String::new()),
+        |w| w.dialogues[0].nodes[0].choices[0].next = None,
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .narrative
+                .attack
+                .pop()
+                .map(drop)
+                .unwrap()
+        },
+    ];
+    for (i, change) in rules.into_iter().enumerate() {
+        let mut edited = caravan_trail();
+        change(&mut edited);
+        assert_ne!(edited.revision(), world.revision(), "rules edit {i}");
+    }
+}
+
+#[test]
+fn every_string_with_words_in_it_is_prose() {
+    // A prose field the revision missed would hold words but not count as text.
+    fn strings(value: &serde_json::Value, out: &mut Vec<String>) {
+        match value {
+            serde_json::Value::String(s) => out.push(s.clone()),
+            serde_json::Value::Array(v) => v.iter().for_each(|v| strings(v, out)),
+            serde_json::Value::Object(m) => m.values().for_each(|v| strings(v, out)),
+            _ => {}
+        }
+    }
+    for name in EXAMPLES {
+        let world = WorldSpec::load(format!(
+            "{}/../../examples/{name}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        let texts: std::collections::BTreeSet<String> = world.texts().into_values().collect();
+        let mut all = Vec::new();
+        strings(&serde_json::to_value(&world).unwrap(), &mut all);
+        for s in all.iter().filter(|s| s.contains(' ')) {
+            assert!(texts.contains(s), "{name}: {s:?} is not counted as prose");
+        }
+        assert!(texts.len() > 10, "{name}");
+    }
 }
 
 #[test]
@@ -366,3 +430,14 @@ fn a_place_known_by_a_passing_condition_draws_a_warning() {
         assert!(world.validate().is_ok());
     }
 }
+
+const EXAMPLES: [&str; 8] = [
+    "demo-world",
+    "quiet-archive",
+    "duel",
+    "arena",
+    "sect",
+    "smithy",
+    "marches",
+    "caravan-trail",
+];

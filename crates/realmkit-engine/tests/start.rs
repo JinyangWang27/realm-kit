@@ -26,9 +26,9 @@ fn an_answer_shapes_the_start_before_the_first_turn() {
     // Later conditions read the answer like any other state.
     engine.execute(Move(North)).unwrap();
     engine.execute(Talk("copyist".into())).unwrap();
-    let choices = engine.dialogue_choices();
-    assert!(choices.contains(&"I was apprenticed to a copyist too."));
-    assert!(!choices.contains(&"Could I borrow a pen?"));
+    let choices = texts(&engine);
+    assert!(choices.contains(&"I was apprenticed to a copyist too.".into()));
+    assert!(!choices.contains(&"Could I borrow a pen?".into()));
     // Another answer leaves the start as authored.
     let reader = reader(&world);
     assert!(reader.state().flags.is_empty());
