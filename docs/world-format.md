@@ -109,9 +109,52 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 18 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 19 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
+
+### Translations
+
+A package's prose may come in more languages than its own. `translations` in
+`world.json` lists their tags, and each has an overlay at `text/<tag>.json`:
+
+```json
+"language": "en",
+"translations": ["zh-Hans"]
+```
+
+```json
+{
+  "world.name": "寂静档案馆",
+  "locations.reading_room.name": "阅览室",
+  "dialogues.pell.nodes.greeting.choices.0.text": "出什么事了吗？",
+  "dialogues.pell.nodes.questions.choices.founders.text": "档案馆是谁建的？",
+  "world.evidence.stitched_map.facts.0": "地图在吸墨板下面，不在地图库里。"
+}
+```
+
+- Every prose field has a stable key: its JSON path in the package, joined by
+  `.`, where an element of a list is named by its `id` when it has one and by
+  its position otherwise. Prose fields are `name`, `description`, `text`,
+  `blocked_text`, `special_name`, `introduction`, `progress`, `completion`,
+  `source`, `facts`, `attack`, `hurt`, `victory`, `death`, `format` and
+  `clock`, wherever they appear; every other string is an ID or a rule.
+  `realmkit text <world-directory>` prints the package's own text by key,
+  which is where an overlay starts.
+- An overlay is complete (`missing_translation` for each key it lacks, or
+  for a listed tag with no file) and exact (`unused_translation` for a key the
+  package does not have). A tag is ASCII letters, digits and `-`, differs from
+  `language`, and is listed once (`invalid_translation`).
+- Each language is validated with its text in place, so a malformed template
+  or an empty name in one language is reported with the usual code and a
+  message starting `in <tag>:`.
+- A client picks the language when it loads the package
+  (`WorldSpec::in_language`; `realmkit play --language zh-Hans`). Saves bind to
+  a revision of the rules alone, which leaves out every prose field and the
+  language, so a save made in one language loads in another, and a prose fix
+  or an added language keeps saves loadable. How many facts, readings, prose
+  variants and choices there are, and whether a choice has blocked text, are
+  rules.
 
 ## Locations and conditions
 

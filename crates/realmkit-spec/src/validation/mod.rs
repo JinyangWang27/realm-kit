@@ -9,6 +9,7 @@ mod economy;
 mod equipment;
 mod progression;
 mod story;
+mod text;
 mod time;
 mod troops;
 mod world;
@@ -34,6 +35,8 @@ pub enum SpecError {
     UnsupportedFormat { found: Option<u64> },
     #[error("world validation failed: {0:?}")]
     Validation(Vec<Diagnostic>),
+    #[error("this world has no text in language {0}")]
+    UnknownLanguage(String),
     #[error("{path}: {source}")]
     Io {
         path: std::path::PathBuf,
@@ -67,8 +70,11 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     }
     troops::rules(&mut out, w);
     economy::proficiency_points(&mut out, w);
+    text::translations(&mut out, w);
     out
 }
+
+pub(crate) use text::language_tag;
 
 fn issue(out: &mut Vec<Diagnostic>, entity: &str, code: &str, message: impl Into<String>) {
     push(out, Severity::Error, entity, code, message.into());

@@ -86,7 +86,9 @@ impl WorldSpec {
     pub fn revision(&self) -> String {
         let mut value = serde_json::to_value(self).expect("world specs always serialize");
         strip(&mut value);
-        value["world"].as_object_mut().unwrap().remove("language");
+        let world = value["world"].as_object_mut().unwrap();
+        world.remove("language");
+        world.remove("translations");
         let bytes = serde_json::to_vec(&value).expect("values always serialize");
         let hash = bytes.iter().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
             (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
@@ -103,5 +105,42 @@ impl WorldSpec {
             texts.insert(key, text.clone());
         });
         texts
+    }
+
+    /// This world with its prose in `language`: itself for the base
+    /// language, or with that overlay laid over it. The copy carries no
+    /// overlays and has the same [`revision`](Self::revision), so saves move
+    /// freely between languages.
+    pub fn in_language(&self, language: &str) -> Result<WorldSpec, SpecError> {
+        if language == self.world.language {
+            let mut world = self.clone();
+            world.world.translations.clear();
+            world.translations.clear();
+            return Ok(world);
+        }
+        let overlay = self
+            .translations
+            .get(language)
+            .ok_or_else(|| SpecError::UnknownLanguage(language.into()))?;
+        Ok(self.translated(language, overlay))
+    }
+
+    /// The overlay laid over this world's prose, key by key; prose it lacks
+    /// stays as authored.
+    pub(crate) fn translated(
+        &self,
+        language: &str,
+        overlay: &BTreeMap<String, String>,
+    ) -> WorldSpec {
+        let mut value = serde_json::to_value(self).expect("world specs always serialize");
+        visit(&mut value, &mut Vec::new(), false, &mut |key, text| {
+            if let Some(translated) = overlay.get(&key) {
+                text.clone_from(translated);
+            }
+        });
+        let mut world: WorldSpec = serde_json::from_value(value).expect("only prose changed");
+        world.world.language = language.into();
+        world.world.translations.clear();
+        world
     }
 }

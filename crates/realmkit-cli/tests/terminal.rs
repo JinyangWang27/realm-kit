@@ -813,3 +813,58 @@ fn a_bribe_without_the_silver_is_shown_locked_with_its_reason() {
     assert!(before.ends_with(&format!("{locked}\n")), "{before}");
     assert!(after.contains(locked), "{after}");
 }
+
+#[test]
+fn a_package_plays_in_another_language_and_saves_move_between_them() {
+    let dir = saves_dir("languages");
+    let english = run(
+        &["play", ARCHIVE, "--line", "--saves", &dir],
+        "3\ntalk archivist\nchoose 2\nsave\nquit\n",
+    );
+    assert!(String::from_utf8(english.stdout)
+        .unwrap()
+        .contains("'Briefly.'"));
+    // The save made in English resumes in Chinese, mid-conversation.
+    let chinese = run(
+        &[
+            "play",
+            ARCHIVE,
+            "--line",
+            "--saves",
+            &dir,
+            "--language",
+            "zh-Hans",
+        ],
+        "1\n",
+    );
+    let text = String::from_utf8(chinese.stdout).unwrap();
+    assert!(text.contains("Loaded save 2.\n\n阅览室\n"), "{text}");
+    assert!(
+        text.contains("档案员佩尔: 佩尔放下笔。“长话短说。”"),
+        "{text}"
+    );
+    assert!(text.contains("档案员佩尔: “河上的行会建的"), "{text}");
+    let unknown = run(&["play", ARCHIVE, "--line", "--language", "fr"], "");
+    assert!(!unknown.status.success());
+    assert!(String::from_utf8(unknown.stderr)
+        .unwrap()
+        .contains("language fr"));
+}
+
+#[test]
+fn text_lists_every_prose_key_an_overlay_needs() {
+    let output = run(&["text", ARCHIVE], "");
+    assert!(output.status.success());
+    let texts: std::collections::BTreeMap<String, String> =
+        serde_json::from_slice(&output.stdout).unwrap();
+    let overlay: std::collections::BTreeMap<String, String> = serde_json::from_str(
+        &std::fs::read_to_string(format!("{ARCHIVE}/text/zh-Hans.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(texts["world.name"], "The Quiet Archive");
+    assert!(texts.keys().eq(overlay.keys()));
+    let inspect = run(&["inspect", ARCHIVE], "");
+    assert!(String::from_utf8(inspect.stdout)
+        .unwrap()
+        .contains("Language: en, zh-Hans\n"));
+}

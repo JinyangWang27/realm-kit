@@ -52,6 +52,10 @@ pub struct WorldSpec {
     pub items: Vec<Item>,
     pub quests: Vec<Quest>,
     pub dialogues: Vec<Dialogue>,
+    /// Each overlay `world.translations` lists, by language tag: every prose
+    /// key ([`WorldSpec::texts`]) to its text in that language.
+    #[serde(skip)]
+    pub translations: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -62,6 +66,9 @@ pub struct World {
     pub name: String,
     /// Language tag for authored player-facing content (for example "en" or "zh-Hans").
     pub language: String,
+    /// Other languages the prose comes in, each from `text/<tag>.json`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub translations: Vec<String>,
     pub start: Id,
     /// The player-controlled character.
     pub player: Id,
@@ -117,7 +124,9 @@ impl WorldSpec {
     }
 
     /// Loads a package from wherever `read` finds each of [`PACKAGE_FILES`],
-    /// such as memory or a browser fetch, so a host needs no filesystem.
+    /// and `text/<tag>.json` for each language `world.json` lists in
+    /// `translations`, such as memory or a browser fetch, so a host needs no
+    /// filesystem.
     pub fn from_files(read: impl FnMut(&str) -> io::Result<Vec<u8>>) -> Result<Self, SpecError> {
         Self::parse(Path::new(""), read)
     }
@@ -148,7 +157,7 @@ impl WorldSpec {
         if found != Some(FORMAT_VERSION.into()) {
             return Err(SpecError::UnsupportedFormat { found });
         }
-        let world = Self {
+        let mut world = Self {
             world: serde_json::from_value(header)
                 .map_err(|source| SpecError::Json { path, source })?,
             locations: typed(file("locations.json")?)?,
@@ -156,7 +165,16 @@ impl WorldSpec {
             items: typed(file("items.json")?)?,
             quests: typed(file("quests.json")?)?,
             dialogues: typed(file("dialogues.json")?)?,
+            translations: BTreeMap::new(),
         };
+        // A tag names a file, so only a well-formed one is read; validation
+        // reports the rest.
+        for tag in world.world.translations.clone() {
+            if validation::language_tag(&tag) {
+                let overlay = typed(file(&format!("text/{tag}.json"))?)?;
+                world.translations.insert(tag, overlay);
+            }
+        }
         world.validate()?;
         Ok(world)
     }

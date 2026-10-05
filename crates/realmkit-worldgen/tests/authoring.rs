@@ -120,6 +120,8 @@ fn exports_a_self_contained_package_and_refuses_to_overwrite() {
     assert!(!fs::read_to_string(destination.join("world.json"))
         .unwrap()
         .contains("combat"));
+    // Its language overlay travels with it.
+    assert!(destination.join("text/zh-Hans.json").exists());
     assert_eq!(WorldSpec::load(&destination).unwrap(), archive);
 }
 

@@ -24,10 +24,17 @@ pub fn demo() -> WorldSpec {
             "../../../../examples/demo-world/dialogues.json"
         ))
         .unwrap(),
+        translations: Default::default(),
     }
 }
 
+/// The archive in English alone, so tests may reshape it without
+/// keeping its Chinese overlay in step.
 pub fn archive() -> WorldSpec {
+    archive_in_all_languages().in_language("en").unwrap()
+}
+
+pub fn archive_in_all_languages() -> WorldSpec {
     WorldSpec::load(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../examples/quiet-archive"
