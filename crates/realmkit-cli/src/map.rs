@@ -3,7 +3,7 @@
 
 use crate::{
     menu::Key,
-    render::{duration, Paint},
+    render::{self, duration, Paint},
 };
 use crossterm::{
     cursor::MoveTo,
@@ -29,6 +29,8 @@ const SCREEN_LINES: u16 = 3;
 const KEYS_HINT: &str = "+/- zoom · arrows pan · 0 fit · c centre · Tab next place · Esc back";
 const YOU: char = '@';
 const ROAD: char = '·';
+/// Fills the cell a wide character's second column covers; never printed.
+const WIDE: char = '\0';
 const LEGEND_YOU: &str = "you";
 
 fn glyph(kind: PlaceKind) -> char {
@@ -120,7 +122,8 @@ fn extent(view: &MapView) -> ((f64, f64), (f64, f64)) {
 }
 
 /// What has been drawn: characters, and which cells a glyph or label holds
-/// (roads may be drawn over; glyphs and labels may not).
+/// (roads may be drawn over; glyphs and labels may not). A wide character
+/// fills two cells, the second holding [`WIDE`].
 struct Canvas {
     cells: Vec<Vec<char>>,
     taken: Vec<Vec<bool>>,
@@ -189,7 +192,7 @@ impl Canvas {
     /// Writes `text` from `start` on one row if every cell is in the window
     /// and free, keeping a free cell either side when `gap` is set.
     fn try_text(&mut self, text: &str, start: (i64, i64), gap: bool) -> bool {
-        let width = text.chars().count() as i64;
+        let width = render::width(text) as i64;
         let pad = i64::from(gap);
         let span = (start.0 - pad)..(start.0 + width + pad);
         let free = span.clone().all(|col| {
@@ -199,9 +202,14 @@ impl Canvas {
         if !free {
             return false;
         }
-        for (i, ch) in text.chars().enumerate() {
-            let (col, row) = self.inside((start.0 + i as i64, start.1)).unwrap();
-            self.cells[row][col] = ch;
+        let mut col = start.0;
+        for ch in text.chars() {
+            let (c, row) = self.inside((col, start.1)).unwrap();
+            self.cells[row][c] = ch;
+            if render::columns(ch) == 2 {
+                self.cells[row][c + 1] = WIDE;
+            }
+            col += render::columns(ch) as i64;
         }
         for col in span {
             if let Some((c, r)) = self.inside((col, start.1)) {
@@ -214,7 +222,10 @@ impl Canvas {
     fn lines(self) -> Vec<String> {
         self.cells
             .into_iter()
-            .map(|row| row.into_iter().collect::<String>().trim_end().to_string())
+            .map(|row| {
+                let text: String = row.into_iter().filter(|c| *c != WIDE).collect();
+                text.trim_end().to_string()
+            })
             .collect()
     }
 }
@@ -275,7 +286,7 @@ pub fn render(world: &WorldSpec, view: &MapView, viewport: &Viewport) -> Vec<Str
         if *hidden > 0 {
             label += &format!(" +{hidden}");
         }
-        let width = label.chars().count() as i64;
+        let width = render::width(&label) as i64;
         // Beside the glyph, a space apart; the space belongs to the label.
         let _ = canvas.try_text(&format!(" {label}"), (col + 1, *row), false)
             || canvas.try_text(&format!("{label} "), (col - 1 - width, *row), false)
@@ -291,7 +302,7 @@ pub fn render(world: &WorldSpec, view: &MapView, viewport: &Viewport) -> Vec<Str
                     continue;
                 };
                 let text = duration(road.minutes);
-                let width = text.chars().count() as i64;
+                let width = render::width(&text) as i64;
                 canvas.try_text(&text, (col as i64 - width / 2, row as i64), true);
             }
         }
@@ -463,6 +474,36 @@ mod tests {
     fn at(world: &mut WorldSpec, id: &str, x: u32, y: u32, kind: PlaceKind) {
         let location = world.locations.iter_mut().find(|l| l.id == id).unwrap();
         location.map = Some(MapPoint { x, y, kind });
+    }
+
+    #[test]
+    fn a_wide_character_takes_two_cells() {
+        let viewport = Viewport {
+            centre: (0.0, 0.0),
+            zoom: 0,
+            cols: 8,
+            rows: 1,
+        };
+        let mut canvas = Canvas::new(&viewport);
+        assert!(canvas.try_text("韦尔", (0, 0), false));
+        // Its second columns are taken, so nothing overlaps them.
+        assert!(!canvas.try_text("x", (3, 0), false));
+        assert!(canvas.try_text("x", (4, 0), false));
+        // Too wide for what is left of the row.
+        assert!(!canvas.try_text("集市", (5, 0), false));
+        assert_eq!(canvas.lines(), ["韦尔x"]);
+    }
+
+    #[test]
+    fn wide_place_names_keep_the_frame_width() {
+        let mut world = marches();
+        world
+            .locations
+            .iter_mut()
+            .for_each(|l| l.name = "韦尔集市".into());
+        let lines = frame(&world, &view(&world), None).unwrap();
+        assert!(lines.iter().any(|l| l.contains("O 韦尔集市")));
+        assert!(lines.iter().all(|l| render::width(l) <= LINE_COLS));
     }
 
     #[test]

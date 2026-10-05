@@ -3,7 +3,10 @@
 //! lines of the fight and the menu. When it ends, only the opening line and
 //! the final turn return to the normal scrollback.
 
-use crate::{menu::Menu, render::Paint};
+use crate::{
+    menu::Menu,
+    render::{self, Paint},
+};
 use crossterm::{
     cursor::MoveTo,
     queue,
@@ -117,11 +120,10 @@ fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Res
     let resources = world.combat().unwrap().resources;
     let rage = resources.rage_per_action > 0 || resources.rage_per_max_hp > 0;
     let (player, opponents) = encounter.participants.split_first().unwrap();
-    // ponytail: pads by character count; wide (CJK) names misalign until a width table is needed.
     let width = encounter
         .participants
         .iter()
-        .map(|p| name(&p.character).chars().count())
+        .map(|p| render::width(name(&p.character)))
         .max()
         .unwrap_or(0);
     for p in opponents.iter().chain([player]) {
@@ -130,7 +132,7 @@ fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Res
             None => engine.player_stats().unwrap(),
         };
         let label = name(&p.character);
-        let pad = " ".repeat(width - label.chars().count());
+        let pad = " ".repeat(width - render::width(label));
         let digits = max.hp.to_string().len();
         write!(
             output,
