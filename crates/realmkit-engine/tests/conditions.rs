@@ -11,7 +11,7 @@ fn choices(engine: &Engine<'_>) -> Vec<String> {
     engine
         .dialogue_choices()
         .into_iter()
-        .map(String::from)
+        .map(|c| c.text)
         .collect()
 }
 

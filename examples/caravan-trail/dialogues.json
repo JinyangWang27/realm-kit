@@ -357,6 +357,7 @@
               "item": "silver",
               "quantity": 2
             },
+            "blocked_text": "You do not have two silver to offer.",
             "effects": [
               {
                 "kind": "take_items",

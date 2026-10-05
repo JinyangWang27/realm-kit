@@ -29,16 +29,12 @@ fn evidence_is_discovered_once_and_gates_what_follows() {
     // Pell hears it only from someone who has seen the map.
     engine.execute(Move(South)).unwrap();
     engine.execute(Talk("archivist".into())).unwrap();
-    assert!(engine
-        .dialogue_choices()
-        .contains(&"The copyist has the map. He was only mending it."));
+    assert!(texts(&engine).contains(&"The copyist has the map. He was only mending it.".into()));
     let mut unseen = engine.snapshot();
     unseen.state.evidence.clear();
     let mut unseen = Engine::restore(&world, unseen).unwrap();
     unseen.execute(Talk("archivist".into())).unwrap();
-    assert!(!unseen
-        .dialogue_choices()
-        .contains(&"The copyist has the map. He was only mending it."));
+    assert!(!texts(&unseen).contains(&"The copyist has the map. He was only mending it.".into()));
 }
 
 #[test]

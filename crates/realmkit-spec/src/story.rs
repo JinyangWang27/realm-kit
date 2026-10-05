@@ -207,6 +207,10 @@ pub struct DialogueChoice {
     pub back: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires: Option<Condition>,
+    /// Lists the choice as unavailable, with this reason, while `requires`
+    /// fails; without it the choice is hidden then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked_text: Option<String>,
     /// Applied in order; if one fails, the choice changes nothing.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub effects: Vec<Effect>,

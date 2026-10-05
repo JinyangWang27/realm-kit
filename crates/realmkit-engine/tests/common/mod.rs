@@ -116,3 +116,12 @@ pub fn caravan_trail() -> WorldSpec {
     ))
     .unwrap()
 }
+
+/// The text of each choice in the active conversation, as numbered.
+pub fn texts(engine: &Engine<'_>) -> Vec<String> {
+    engine
+        .dialogue_choices()
+        .into_iter()
+        .map(|c| c.text)
+        .collect()
+}

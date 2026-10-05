@@ -301,7 +301,9 @@ pub(super) fn execute(
         // leave the conversation with no speaker or nothing to say: it ends.
         if let Some(open) = &state.dialogue {
             if !npc_here(world, state, &open.npc)
-                || choices(world, state, &open.npc, &open.node).is_empty()
+                || !choices(world, state, &open.npc, &open.node)
+                    .iter()
+                    .any(|c| c.available)
             {
                 state.dialogue = None;
                 events.push(Event::DialogueEnded);

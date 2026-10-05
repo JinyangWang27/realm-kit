@@ -882,9 +882,27 @@ A choice may also carry:
 }
 ```
 
-Choices are filtered and then numbered contiguously from one. Omitting `next`
-ends the conversation. A node with no visible choices displays its text and
-ends the conversation. Moving, attacking, using a skill or resting also closes
+A choice whose `requires` fails is hidden, unless it has `blocked_text`: then
+it is listed as unavailable with that reason, the way a locked exit is, so a
+player with seven copper learns that the toll is eight. `blocked_text` needs a
+`requires` to explain (`unconditional_blocked_text`).
+
+```json
+{
+  "text": "Two silver for what you know.",
+  "next": "talks",
+  "requires": { "kind": "item", "item": "silver", "quantity": 2 },
+  "blocked_text": "You do not have two silver to offer.",
+  "effects": [{ "kind": "take_items", "items": [{ "item": "silver", "quantity": 2 }] }]
+}
+```
+
+Choices are filtered and then numbered contiguously from one, unavailable
+ones included, so `ChooseDialogue(n)` and `Engine::dialogue_choices` (each a
+`DialogueOption` with its text and, when unavailable, its `blocked` reason)
+always agree. Choosing an unavailable choice is refused with `ChoiceBlocked`
+and changes nothing. Omitting `next` ends the conversation. A node with no
+available choices displays its text and ends the conversation. Moving, attacking, using a skill or resting also closes
 the conversation.
 
 A quest's `giver` must be a character with a dialogue. Its objective is one of:

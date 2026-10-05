@@ -7,6 +7,19 @@ use super::*;
 pub(crate) struct Listed<'a> {
     pub node: &'a Id,
     pub choice: &'a DialogueChoice,
+    /// False for a choice shown with its blocked text while its condition fails.
+    pub available: bool,
+}
+
+impl Listed<'_> {
+    pub fn option(&self) -> DialogueOption {
+        DialogueOption {
+            text: self.choice.text.clone(),
+            blocked: (!self.available)
+                .then(|| self.choice.blocked_text.clone())
+                .flatten(),
+        }
+    }
 }
 
 /// The dialogue `npc` speaks and its node `node`.
@@ -44,7 +57,8 @@ fn open(
 
 /// The choices offered at `node`, in authored order. A back choice stays
 /// while its hub offers something besides leaving; then it gives way to the
-/// hub's own choices that end the conversation.
+/// hub's own choices that end the conversation. A choice whose condition
+/// fails is listed as unavailable when it has blocked text.
 pub(crate) fn choices<'a>(
     world: &'a WorldSpec,
     state: &GameState,
@@ -55,6 +69,16 @@ pub(crate) fn choices<'a>(
     let mut listed = Vec::new();
     for choice in &here.choices {
         if !open(world, state, &dialogue.id, &here.id, choice) {
+            let blocked = choice.blocked_text.is_some()
+                && !allowed(state, choice.requires.as_ref())
+                && !taken(state, &dialogue.id, &here.id, choice);
+            if blocked {
+                listed.push(Listed {
+                    node: &here.id,
+                    choice,
+                    available: false,
+                });
+            }
             continue;
         }
         let hub = dialogue
@@ -65,6 +89,7 @@ pub(crate) fn choices<'a>(
             listed.push(Listed {
                 node: &here.id,
                 choice,
+                available: true,
             });
             continue;
         };
@@ -77,11 +102,13 @@ pub(crate) fn choices<'a>(
             listed.push(Listed {
                 node: &here.id,
                 choice,
+                available: true,
             });
         } else {
             listed.extend(offered.into_iter().map(|choice| Listed {
                 node: &hub.id,
                 choice,
+                available: true,
             }));
         }
     }
@@ -112,7 +139,7 @@ pub(crate) fn dialogue(
     events: &mut Vec<Event>,
 ) {
     let visible = choices(world, state, &npc, &node);
-    state.dialogue = if visible.is_empty() {
+    state.dialogue = if !visible.iter().any(|c| c.available) {
         None
     } else {
         Some(DialogueState {
@@ -123,7 +150,7 @@ pub(crate) fn dialogue(
     events.push(Event::Dialogue {
         npc,
         node,
-        choices: visible.iter().map(|c| c.choice.text.clone()).collect(),
+        choices: visible.iter().map(Listed::option).collect(),
     });
     if state.dialogue.is_none() {
         events.push(Event::DialogueEnded);
@@ -392,10 +419,17 @@ pub(crate) fn choose(
         return Err(EngineError::NotHere(active.npc));
     }
     let visible = choices(world, state, &active.npc, &active.node);
-    let Listed { node, choice } = number
+    let Listed {
+        node,
+        choice,
+        available,
+    } = number
         .checked_sub(1)
         .and_then(|i| visible.into_iter().nth(i))
         .ok_or(EngineError::InvalidChoice)?;
+    if !available {
+        return Err(EngineError::ChoiceBlocked(number));
+    }
     if choice.once {
         let (dialogue, _) = speaking(world, &active.npc, node);
         state.taken_choices.insert(ChoiceRef {

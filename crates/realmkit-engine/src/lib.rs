@@ -283,12 +283,14 @@ impl<'w> Engine<'w> {
         rules::actions(self.world, &self.state)
     }
 
-    /// Text of the choices in the active conversation; empty when none.
-    pub fn dialogue_choices(&self) -> Vec<&'w str> {
+    /// The choices in the active conversation, numbered from 1 as
+    /// `ChooseDialogue` takes them; empty when none. A choice listed with its
+    /// `blocked` reason is refused.
+    pub fn dialogue_choices(&self) -> Vec<DialogueOption> {
         self.state.dialogue.as_ref().map_or_else(Vec::new, |d| {
             rules::choices(self.world, &self.state, &d.npc, &d.node)
-                .into_iter()
-                .map(|c| c.choice.text.as_str())
+                .iter()
+                .map(|c| c.option())
                 .collect()
         })
     }

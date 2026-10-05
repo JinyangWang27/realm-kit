@@ -178,6 +178,17 @@ pub(super) fn dialogues(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                     format!("an ask-once choice needs an id: {:?}", choice.text),
                 );
             }
+            if choice.blocked_text.is_some() && choice.requires.is_none() {
+                issue(
+                    out,
+                    &dialogue.id,
+                    "unconditional_blocked_text",
+                    format!(
+                        "blocked text needs a condition to explain: {:?}",
+                        choice.text
+                    ),
+                );
+            }
             // Going back changes nothing, so a used-up hub can stand in for it.
             if choice.back && (choice.next.is_none() || !choice.effects.is_empty()) {
                 issue(

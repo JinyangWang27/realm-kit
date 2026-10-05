@@ -40,6 +40,11 @@ pub(crate) fn apply(
             let text = road.and_then(|r| r.blocked_text.as_deref());
             return writeln!(output, "{}", text.unwrap_or_default()).map(|()| false);
         }
+        Err(EngineError::ChoiceBlocked(number)) => {
+            let choices = engine.dialogue_choices();
+            let text = choices[number - 1].blocked.as_deref();
+            return writeln!(output, "{}", text.unwrap_or_default()).map(|()| false);
+        }
         Err(error) => return writeln!(output, "{error}").map(|()| false),
     };
     // Checkpoint before printing, so a closed terminal cannot lose the progress.

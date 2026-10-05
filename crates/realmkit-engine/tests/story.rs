@@ -319,11 +319,11 @@ fn a_choice_that_accepts_a_locked_quest_waits_for_it() {
     let offer = "Shall I catalogue the vault?";
     let mut engine = reader(&world);
     engine.execute(Talk("archivist".into())).unwrap();
-    assert!(!engine.dialogue_choices().contains(&offer));
+    assert!(!texts(&engine).contains(&offer.into()));
     // Once the map is home the catalogue opens, and Pell offers it.
     solve(&mut engine);
     engine.execute(Talk("archivist".into())).unwrap();
-    let choices = engine.dialogue_choices();
+    let choices = texts(&engine);
     let number = choices.iter().position(|c| *c == offer).unwrap() + 1;
     engine.execute(ChooseDialogue(number)).unwrap();
     assert_eq!(engine.state().quests["catalogue"], QuestStatus::Ready);
@@ -333,7 +333,7 @@ fn listed(engine: &Engine<'_>) -> Vec<String> {
     engine
         .dialogue_choices()
         .into_iter()
-        .map(String::from)
+        .map(|c| c.text)
         .collect()
 }
 

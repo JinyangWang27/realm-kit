@@ -122,6 +122,10 @@ pub enum EngineError {
     NoDialogue,
     #[error("choose one of the displayed options")]
     InvalidChoice,
+    /// The numbered choice is listed but its condition fails; clients show
+    /// its blocked text.
+    #[error("choice {0} is not available now")]
+    ChoiceBlocked(usize),
     #[error("quest cannot be accepted or completed in its current state: {0}")]
     QuestState(Id),
     #[error("unknown quest: {0}")]

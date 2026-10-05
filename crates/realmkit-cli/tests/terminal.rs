@@ -794,3 +794,22 @@ fn asked_questions_leave_the_list_and_back_becomes_leaving() {
     );
     assert!(text.contains("\n  1. Why must it be so quiet?\n  2. That is all. Thank you.\n"));
 }
+
+#[test]
+fn a_bribe_without_the_silver_is_shown_locked_with_its_reason() {
+    // The scribe skips Moss's bales, so reaches Rask without silver.
+    let output = run(
+        &["play", CARAVAN, "--line", "--seed", "7"],
+        "3\ntalk iselt\nchoose 1\ntravel thornwick\nexamine city_gate\nchoose 1\ntalk iselt\nchoose 1\n\
+         talk dravin\nchoose 1\nrest\ntalk dravin\nchoose 1\nchoose 1\ntravel abandoned_camp\n\
+         travel bandit_ridge\ntalk rask\nchoose 1\n",
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    let locked =
+        "  1. Two silver for what you know about the Hadda caravan. [locked]\n  2. Walk away.\n";
+    let (before, after) = text
+        .split_once("> You do not have two silver to offer.\n")
+        .expect(&text);
+    assert!(before.ends_with(&format!("{locked}\n")), "{before}");
+    assert!(after.contains(locked), "{after}");
+}

@@ -741,9 +741,13 @@ impl Menu {
             let top = choices
                 .into_iter()
                 .enumerate()
-                .map(|(i, text)| Entry {
+                // Like a locked exit, choosing it explains why it cannot be taken.
+                .map(|(i, option)| Entry {
                     pick: Pick::Run(Command::ChooseDialogue(i + 1)),
-                    label: text.into(),
+                    label: match option.blocked {
+                        Some(_) => format!("{} {LOCKED}", option.text),
+                        None => option.text,
+                    },
                 })
                 .collect();
             (top, Vec::new())

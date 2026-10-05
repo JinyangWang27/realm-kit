@@ -393,3 +393,17 @@ fn ask_once_and_back_choices_are_checked() {
         assert_eq!(codes(&world), [code]);
     }
 }
+
+#[test]
+fn blocked_text_needs_a_condition_to_explain() {
+    let mut world = archive();
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    let leave = pell.nodes[0].choices.last_mut().unwrap();
+    leave.blocked_text = Some("Not yet.".into());
+    assert_eq!(codes(&world), ["unconditional_blocked_text"]);
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    pell.nodes[0].choices.last_mut().unwrap().requires = Some(Condition::Flag {
+        flag: "map_found".into(),
+    });
+    assert!(world.diagnostics().is_empty());
+}
