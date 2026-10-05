@@ -103,6 +103,24 @@ fn evidence_references_are_checked() {
             },
             "fleeting_interpretation",
         ),
+        // `at_least` lasts only when everything under it does.
+        (
+            |w| {
+                w.world.evidence[0].interpretations[1].when = Some(Condition::AtLeast {
+                    count: 1,
+                    of: vec![
+                        Condition::Flag {
+                            flag: "vault_open".into(),
+                        },
+                        Condition::Item {
+                            item: "pen".into(),
+                            quantity: 1,
+                        },
+                    ],
+                })
+            },
+            "fleeting_interpretation",
+        ),
     ];
     for (change, code) in cases {
         let mut world = archive();
@@ -113,6 +131,15 @@ fn evidence_references_are_checked() {
             codes(&world)
         );
     }
+    // Over lasting leaves, `at_least` reads like `all` and `any`.
+    let mut world = archive();
+    world.world.evidence[0].interpretations[1].when = Some(Condition::AtLeast {
+        count: 2,
+        of: ["vault_open", "map_found", "pen_borrowed"]
+            .map(|flag| Condition::Flag { flag: flag.into() })
+            .into(),
+    });
+    assert_eq!(codes(&world), Vec::<String>::new());
     // A linked item that exists is fine: possession and evidence stay apart.
     let mut world = archive();
     world.world.evidence[0].item = Some("pen".into());

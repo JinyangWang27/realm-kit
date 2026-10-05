@@ -46,7 +46,7 @@ pub enum QuestStatus {
 }
 
 /// A pure query over the playthrough: typed leaf predicates composed with
-/// `all`, `any` and `not`. Evaluating one never changes anything.
+/// `all`, `any`, `at_least` and `not`. Evaluating one never changes anything.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Condition {
@@ -56,6 +56,11 @@ pub enum Condition {
     },
     /// At least one condition holds.
     Any {
+        of: Vec<Condition>,
+    },
+    /// At least `count` of the conditions hold, such as any two of four clues.
+    AtLeast {
+        count: usize,
         of: Vec<Condition>,
     },
     Not {
@@ -116,6 +121,12 @@ impl Condition {
         match self {
             Self::All { of } => of.iter().any(|c| c.requires(leaf)),
             Self::Any { of } => !of.is_empty() && of.iter().all(|c| c.requires(leaf)),
+            // Every `count` of them include one that requires `leaf` when more
+            // than `len - count` do.
+            Self::AtLeast { count, of } => {
+                let requiring = of.iter().filter(|c| c.requires(leaf)).count();
+                *count > 0 && requiring > of.len().saturating_sub(*count)
+            }
             _ => leaf(self),
         }
     }
@@ -151,7 +162,9 @@ impl Condition {
     /// Every leaf predicate, depth first.
     pub fn leaves(&self) -> Vec<&Condition> {
         match self {
-            Self::All { of } | Self::Any { of } => of.iter().flat_map(|c| c.leaves()).collect(),
+            Self::All { of } | Self::Any { of } | Self::AtLeast { of, .. } => {
+                of.iter().flat_map(|c| c.leaves()).collect()
+            }
             Self::Not { condition } => condition.leaves(),
             _ => vec![self],
         }

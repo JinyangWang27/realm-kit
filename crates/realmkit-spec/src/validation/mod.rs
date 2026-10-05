@@ -142,6 +142,30 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
                 condition(out, w, owner, Some(c));
             }
         }
+        Condition::AtLeast { count, of } => {
+            if *count == 0 {
+                issue(
+                    out,
+                    owner,
+                    "at_least_zero",
+                    "`at_least` needs a count of at least 1",
+                );
+            }
+            if *count > of.len() {
+                issue(
+                    out,
+                    owner,
+                    "at_least_exceeds",
+                    format!(
+                        "`at_least` asks for {count} of {} conditions, so it can never hold",
+                        of.len()
+                    ),
+                );
+            }
+            for c in of {
+                condition(out, w, owner, Some(c));
+            }
+        }
         Condition::Not { condition: inner } => condition(out, w, owner, Some(inner)),
         Condition::Flag { flag } => {
             reference(out, owner, "flag", flag, w.world.flags.contains(flag))

@@ -349,6 +349,13 @@ fn could_have_been(
         Condition::All { of } => of.iter().any(|c| could(c, false)),
         Condition::Any { of } if value => of.iter().any(|c| could(c, true)),
         Condition::Any { of } => of.iter().all(|c| could(c, false)),
+        // Some `count` could have held together, or enough failed that fewer did.
+        Condition::AtLeast { count, of } if value => {
+            of.iter().filter(|c| could(c, true)).count() >= *count
+        }
+        Condition::AtLeast { count, of } => {
+            of.iter().filter(|c| could(c, false)).count() > of.len() - count
+        }
         Condition::Not { condition } => could(condition, !value),
         Condition::Flag { .. }
         | Condition::Technique { .. }

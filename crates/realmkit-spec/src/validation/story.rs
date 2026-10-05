@@ -335,7 +335,9 @@ pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 /// Whether a condition, once it holds, holds for the rest of the playthrough.
 fn lasting(condition: &Condition) -> bool {
     match condition {
-        Condition::All { of } | Condition::Any { of } => of.iter().all(lasting),
+        Condition::All { of } | Condition::Any { of } | Condition::AtLeast { of, .. } => {
+            of.iter().all(lasting)
+        }
         Condition::Evidence { .. } | Condition::Flag { .. } | Condition::Phase { .. } => true,
         _ => false,
     }

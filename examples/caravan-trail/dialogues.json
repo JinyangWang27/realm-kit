@@ -742,46 +742,20 @@
                   "status": "completed"
                 },
                 {
-                  "kind": "any",
+                  "kind": "at_least",
+                  "count": 2,
                   "of": [
                     {
-                      "kind": "all",
-                      "of": [
-                        {
-                          "kind": "evidence",
-                          "evidence": "priest_reading"
-                        },
-                        {
-                          "kind": "evidence",
-                          "evidence": "scholar_reading"
-                        }
-                      ]
+                      "kind": "evidence",
+                      "evidence": "priest_reading"
                     },
                     {
-                      "kind": "all",
-                      "of": [
-                        {
-                          "kind": "evidence",
-                          "evidence": "priest_reading"
-                        },
-                        {
-                          "kind": "evidence",
-                          "evidence": "veteran_reading"
-                        }
-                      ]
+                      "kind": "evidence",
+                      "evidence": "scholar_reading"
                     },
                     {
-                      "kind": "all",
-                      "of": [
-                        {
-                          "kind": "evidence",
-                          "evidence": "scholar_reading"
-                        },
-                        {
-                          "kind": "evidence",
-                          "evidence": "veteran_reading"
-                        }
-                      ]
+                      "kind": "evidence",
+                      "evidence": "veteran_reading"
                     }
                   ]
                 }

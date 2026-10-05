@@ -289,8 +289,13 @@ fn buried_road_needs_two_readings() {
         engine.execute(AcceptQuest("buried_road".into())),
         Err(EngineError::QuestLocked(_))
     ));
-    // Any second reading will do.
-    run(&mut engine, "choose 1; talk tenko");
+    assert_eq!(engine.evidence_reading("strange_stonework"), Some(0));
+    // Any second reading will do, and two of three make the ring read anew.
+    let events = run(&mut engine, "choose 1; talk tenko");
+    assert!(events.contains(&Event::EvidenceReinterpreted {
+        evidence: "strange_stonework".into(),
+        reading: 1
+    }));
     assert_eq!(
         engine.dialogue_choices(),
         ["Where does all this lead?", "Good day."]

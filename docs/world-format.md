@@ -198,6 +198,7 @@ composition of others:
 { "kind": "item", "item": "pen", "quantity": 1 }
 { "kind": "all", "of": [ ... ] }
 { "kind": "any", "of": [ ... ] }
+{ "kind": "at_least", "count": 2, "of": [ ... ] }
 { "kind": "not", "condition": { ... } }
 ```
 
@@ -228,6 +229,10 @@ composition of others:
   [Story phases](#story-phases-main-quests-and-outcomes).
 - `all` holds when every condition in `of` does, `any` when at least one
   does, and `not` when its `condition` does not. `of` must not be empty.
+- `at_least` holds when at least `count` of the conditions in `of` do, so
+  "any two of these four" needs no list of pairs. `count` must be at least 1
+  (`at_least_zero`) and at most the number of conditions (`at_least_exceeds`).
+  `count` 1 reads like `any`, and `count` equal to the length like `all`.
 
 All flags start unset. Dialogue `set_flag` effects and quest completion flags
 set them; flags are monotonic in this version. Evaluating a condition is pure:
@@ -730,10 +735,10 @@ investigation: observations, testimony or physical clues.
   evidence found by the same command reports only `EvidenceDiscovered`. The
   facts never change: only the player's understanding does.
 - A reading's `when` may use only evidence, flag and phase conditions under
-  `all` and `any`, never `not`, so an understanding once reached is never
+  `all`, `any` and `at_least`, never `not`, so an understanding once reached is never
   lost (`fleeting_interpretation`).
 - Authored conditions decide what a combination of evidence supports, such as
-  two readings out of three under `any` of `all`s; there is no inference
+  two readings out of three under `at_least`; there is no inference
   engine.
 - A condition on evidence that no effect discovers is an error
   (`undiscoverable_evidence`). Start answers and scheduled events cannot

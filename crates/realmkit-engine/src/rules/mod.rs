@@ -31,6 +31,7 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
     match condition {
         Condition::All { of } => of.iter().all(|c| holds(state, c)),
         Condition::Any { of } => of.iter().any(|c| holds(state, c)),
+        Condition::AtLeast { count, of } => of.iter().filter(|c| holds(state, c)).count() >= *count,
         Condition::Not { condition } => !holds(state, condition),
         Condition::Flag { flag } => state.flags.contains(flag),
         Condition::Quest { quest, status } => state.quests.get(quest) == Some(status),
