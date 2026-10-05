@@ -304,7 +304,7 @@ not which source characters exist.
 ## Suggested implementation order
 
 The implementation is already beyond the original investigation-first planning
-note: Format 19 includes world time, economy, troop recruitment, a first mass
+note: the format includes world time, economy, troop recruitment, a first mass
 battle slice, and the investigation and progression slice the original game's MVP
 needs, with evidence readings that later knowledge changes, facts that fill in, question hubs and language overlays. The next priorities are driven by the original game as RealmKit's first full
 original-game pressure test, while every capability remains optional.
@@ -312,10 +312,10 @@ original-game pressure test, while every capability remains optional.
 1. Deliver the **presentation seam** needed by the game: authored overland-map
    placement plus a player-knowledge-aware map query, and prove that the core can
    be embedded by a browser/native graphical host without terminal/filesystem
-   assumptions. *Delivered (Formats 16–17).*
+   assumptions. *Delivered.*
 2. Deliver **authored start/progression** needed by the opening: start choices,
    first-class story phases/main and side questlines/outcomes and evidence
-   *(delivered for the MVP, Format 17, in `examples/caravan-trail`)*, then
+   *(delivered for the MVP, in `examples/caravan-trail`)*, then
    dialogue-by-role/text variants when the opening town's real content would otherwise
    duplicate prose.
 3. Deliver **factions and standing** so political states, schools and orders can

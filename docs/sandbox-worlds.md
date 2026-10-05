@@ -460,7 +460,7 @@ they do, without scripting each character.
 - **Roster.** The player's roster holds, per troop definition, a count of
   healthy troops, a count of wounded troops and an XP pool: troops are
   fungible, not instances. All three are saved.
-- **Allies before factions** (delivered, Format 14). Until factions exist,
+- **Allies before factions** (delivered). Until factions exist,
   an army with a `joins` condition is an ally: never engaged, it fights on
   the player's side in any battle where it is present while the condition
   holds. Faction membership and war will derive that condition.
@@ -491,7 +491,7 @@ they do, without scripting each character.
   for example after lost renown, nobody leaves; recruiting is refused until the
   roster is back under it. Agent party templates author their own fixed limits,
   and a validation bound caps every roster.
-- **Levels and upgrades** (delivered, Format 14). A troop definition is a
+- **Levels and upgrades** (delivered). A troop definition is a
   line of levels, each with its own stats, and optionally a new name and
   wage, so a soldier grows stronger every level and is renamed only where
   the world says. The roster keeps one squad per line and level with a
@@ -943,7 +943,7 @@ of it the way a traveller would, not see everything at once.
 - **Whereabouts.** Where characters move, the player remembers each
   character's last known location. Seeing them refreshes it, and an authored
   `RevealWhereabouts` effect, such as paying a traveller, reveals it.
-- **Places.** Delivered (Format 17) in its smallest form: a place may author
+- **Places.** Delivered in its smallest form: a place may author
   `known_when`, and until it holds the map leaves it out and no road or exit
   there is offered. It is derived from evidence and flags, so nothing new is saved;
   places discovered by seeing them on a journey wait for this capability.
@@ -976,7 +976,7 @@ overland travel.
   player's location and moving characters where they were last seen. Until [knowledge and news](#knowledge-and-news)
   exists, the player knows every place and moving characters are left out,
   since the map would show where they are now. The client never decides what
-  is hidden. Delivered in Format 16 with every part of this section except
+  is hidden. Delivered with every part of this section except
   travel to a place.
 - **Viewport.** The terminal client draws a window onto the world, not the
   whole world squeezed into the terminal width. The view has a centre and a

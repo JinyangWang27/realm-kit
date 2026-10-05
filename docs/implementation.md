@@ -23,25 +23,24 @@ proves the complete single-player loop with authored content.
   `default` route. The CLI stores them in a `--saves` directory with a lineage
   index, auto-saves at route start and quest completion, and restores the newest
   save on death.
-- [x] Optional combat (M3a): package Format 2 merges NPCs and monsters into one
+- [x] Optional combat (M3a): the package merges NPCs and monsters into one
   character list with optional dialogue and combat components, names the player
   as a character, and moves levels and combat prose into an optional `combat`
   block. Combat state is `GameState.combat`, absent without combat. Quests can
-  complete on a flag. Format 1 packages and saves are rejected, not migrated.
+  complete on a flag.
   The combat-free `examples/quiet-archive` fixture proves the path.
 - [x] Stats, damage and skills (M3b): seven stats per level and combat profile,
   a world-named special channel, two-channel damage with no scale constant,
   skills with flat MP costs and unlock levels, opponents answering with their
   strongest affordable skill, and resting at safe locations. Saves hold only
-  current vitals, XP and level. The combat block's new shape makes this package
-  Format 3; older packages are rejected, not migrated. `examples/duel`
+  current vitals, XP and level. `examples/duel`
   exercises a mage build.
 - [x] Encounters (M3c-1): `Engage` starts a fight on a paused initiative
   timeline where speed sets turn frequency; MP regenerates over encounter time
   and rage builds from acting and being hit; opponents use their strongest
   affordable skill. The player's vitals live in one place at a time
   (`Stance::Exploring` or `Stance::Fighting`), encounters save and resume
-  exactly, and results match `scripts/combat_sim`. Package and save format 4.
+  exactly, and results match `scripts/combat_sim`.
 - [x] Grinding (M3c-2): authored groups bring packs into one encounter,
   repeatable groups can be fought again, `Flee` escapes at the player's next
   turn unless forbidden, yielding groups end fights alive with victory or
@@ -56,35 +55,35 @@ proves the complete single-player loop with authored content.
 - [x] Stat points (M4a): levels grant points that the player allocates to the
   stats a world accepts, within caps, with an optional refund at safe places.
   Effective stats (level table + allocation) are derived by one function every
-  rule uses and never saved. Package and save format 7.
+  rule uses and never saved.
 - [x] Technique ranks (M4b): techniques with author-named ranks, skills and
   passive bonuses per rank, trained by use (with falloff) and by a small share
   of victory XP, taught by dialogue effects and quest rewards, and held by
   breakthrough gates. The core art's rank is shown as the realm.
-  `examples/sect` exercises it. Package and save format 8.
+  `examples/sect` exercises it.
 - [x] Equipment (M4c): wearable items in authored slots with bonuses, speed
   penalties, weapon basic-attack overrides and damage modifiers (multiplying,
   immunity wins, clamped to 1/10–10). Every piece is an individual saved
   instance; equip swaps out whatever held its slots, with a before → after
-  preview from the engine. Package and save format 9.
+  preview from the engine.
 - [x] Forging and improvement (M4d): locations offer stations; recipes,
   hidden until known and gated by requirements such as a Smithing technique
   rank, forge new pieces from counted materials; improvement tiers replace a
   piece's bonuses (and speed penalty) one tier at a time. Checks precede any
   change, results are guaranteed, and crafting trains its technique.
-  `examples/smithy` exercises it. Package and save format 10.
+  `examples/smithy` exercises it.
 - [x] Enchanting (M4e): enchantments fit pieces by slot and add passive
   stat bonuses on top of the piece's tier, laid once per piece at a station
   for a catalyst, known and gated like recipes, and kept through
   improvement. `examples/smithy` now plays forge → equip → improve → enchant
-  → save/load. Package and save format 11.
+  → save/load.
 - [x] Condition trees and effect lists (M5a): `requires` and `known_when` are
   one optional condition composed with `all`, `any` and `not` over typed
   leaves, now including carried counted items; dialogue choices apply an
   ordered `effects` list, including `grant_items` and `take_items`, that
   commits or fails as a whole. Saves judge a condition by whether it could
   once have held, and items that effects hand over are loose in the
-  inventory check. Package and save format 12.
+  inventory check.
 - [x] World time, roads and schedules (M5b): an optional clock in minutes
   that only travel, waiting and resting move; undirected roads with travel
   minutes and conditions beside compass exits; one-shot and recurring events
@@ -92,22 +91,20 @@ proves the complete single-player loop with authored content.
   schedule, drawn from their own `world` random stream; and a time-of-day
   condition. Occurrences resolve in chronological, then schedule, order, and
   saves keep only the minute and each mover's location. `examples/marches`
-  exercises it. Package and save format 12.
+  exercises it.
 - [x] Economy core (M6a): currency with a world-language format, goods,
   producer kinds and markets whose price index per good follows production
   and demand on a scheduled four-phase price tick drawn from its own
   `market` stream, linked markets that converge, merchants who must be
   present, buying and selling with a spread and per-unit index steps, and
   currency conditions and effects. `scripts/combat_sim/economy.py` mirrors
-  the tick and the trade prices, and engine tests pin its numbers. Package
-  and save format 12.
+  the tick and the trade prices, and engine tests pin its numbers.
 - [x] Consumables and wares (M4, part of M6a-2): items may restore HP and
   MP when used, capped at the maxima and refused when they would restore
   nothing; in an encounter a use is the player's turn, one basic action
   long. Markets may sell wares at a fixed price, buy-only and unlimited,
   equipment arriving as pieces. No new saved state; saves accept used-up
   consumables and freely bought wares. `examples/arena` exercises both.
-  Package and save format 13.
 - [x] Troops and mass battles (M6c-1, M6d-1): troop lines whose soldiers
   level up in squads sharing XP, renamed where authored, with branch
   upgrades; recruiting from refilling pools; wages, desertion and recovery
@@ -116,7 +113,7 @@ proves the complete single-player loop with authored content.
   The round rule draws from its own `battle` stream and mirrors
   `scripts/combat_sim/battle.py`, whose numbers engine tests pin. Saves hold
   squads and pools, and a battle between rounds. `examples/marches`
-  exercises it. Package and save format 14.
+  exercises it.
 - [x] Economy completion (M6a-2): markets prosper or decline one point a
   day towards an ideal their scarcities lower, and prosperity scales
   demand and merchants' stock; merchants hold stock and a purse, restocked
@@ -125,8 +122,8 @@ proves the complete single-player loop with authored content.
   dialogue settle weekly at local prices; and the trading proficiency,
   trained with points from the level table or taught by effects, narrows
   the spread. `scripts/combat_sim/economy.py` mirrors all of it, and a
-  world without these parts keeps its Format 14 numbers.
-  `examples/marches` exercises them. Package and save format 15.
+  world without these parts keeps its earlier numbers.
+  `examples/marches` exercises them.
 - [x] Presentation seam and start choices (original-game P0): locations may author
   map positions and kinds, all or none; `Engine::map_view` returns the places,
   roads with travel minutes, one-way exits and the player's place, behind a
@@ -139,7 +136,7 @@ proves the complete single-player loop with authored content.
   `wasm32-unknown-unknown`. Start questions are answered at New Game, their
   options' effects applied to the starting state and the answers saved.
   `examples/marches` has positions; `examples/quiet-archive` asks why the
-  player came. Package and save format 16.
+  player came.
 - [x] MVP progression and investigation: evidence definitions,
   optionally linked to an item, discovered by `discover_evidence` and read
   by an `evidence` condition; story phases moved forward only by
@@ -152,15 +149,15 @@ proves the complete single-player loop with authored content.
   evidence, unreachable phases, prerequisite cycles and main quests waiting
   on side quests; saves check evidence, phases, prerequisites and the
   outcome. `examples/caravan-trail` plays the MVP slice by combat,
-  bribery, intimidation or a survivor's testimony. Package and save format 17.
+  bribery, intimidation or a survivor's testimony.
 - [x] Evidence readings: an evidence definition may give its `source`, the
   `facts` observed and `interpretations` unlocked by evidence, flags or
   phases (`fleeting_interpretation` refuses anything that could revert).
   The current reading is derived (`Engine::evidence_reading`), never saved,
   and a change to known evidence's reading is reported as
   `EvidenceReinterpreted`; the CLI journal prints it. The quiet archive's
-  stitched map reads kinder once the vault opens. Package and save format 18.
-- [x] Authoring conveniences for the original game's first slice (Format 19):
+  stitched map reads kinder once the vault opens.
+- [x] Authoring conveniences for the original game's first slice:
   an `at_least` condition (`at_least_zero`, `at_least_exceeds`), allowed
   wherever `all` and `any` are, including readings; evidence facts gated by
   a lasting `when` (`fleeting_fact`), derived by `Engine::evidence_facts` and
@@ -181,17 +178,17 @@ proves the complete single-player loop with authored content.
 
 ## Next implementation priorities
 
-The open items are **not delivered** and do not change Format 19 by
+The open items are **not delivered** and do not change the format by
 themselves. They mirror the original-game-driven roadmap priority while keeping
 every capability optional:
 
-- [x] Overland-map authored placement + engine map query (Format 16), with
-  places known by an authored condition (Format 17).
+- [x] Overland-map authored placement + engine map query, with
+  places known by an authored condition.
 - [x] Embeddable graphical-client seam, including a browser/WASM hosting proof
-  without terminal or native-filesystem assumptions (Format 16).
-- [x] Start choices (Format 16).
+  without terminal or native-filesystem assumptions.
+- [x] Start choices.
 - [x] First-class authored story-phase/main-side-questline/outcome
-  progression, as far as the original game's MVP uses it (Format 17). Failure,
+  progression, as far as the original game's MVP uses it. Failure,
   deadlines and terminal outcomes wait for content that needs them.
 - [ ] Factions, war/peace and typed standing/relation tracks.
 - [ ] Remaining retinue needs used by the representative sandbox world:
@@ -224,7 +221,7 @@ flags or quest states. A lethal enemy response ends play; with saves on, the
 CLI restores the newest save. Level thresholds are cumulative.
 
 A package revision is a 64-bit FNV-1a digest of the package's canonical JSON
-with its prose emptied and its language left out (Format 19), so a rule edit
+with its prose emptied and its language left out, so a rule edit
 makes older saves incompatible while prose fixes and added languages do not;
 there are no migrations yet.
 Loading checks the format version, package, revision and route, then the state

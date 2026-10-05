@@ -284,7 +284,7 @@ exclusive outcome conditions where the available analyzers can prove them.
 Runtime ambiguity checking remains the deterministic backstop for reachable
 overlaps that static/bounded analysis does not prove.
 
-**Delivered subset (Format 17).** `outcomes` with a `when` condition, checked
+**Delivered subset.** `outcomes` with a `when` condition, checked
 after every non-panel command against the staged state; one match is recorded
 with `OutcomeReached` in the same transition. Rather than a runtime
 ambiguity error, which a scheduled event or an unlucky order of play could
@@ -478,7 +478,7 @@ Decisions:
 - `PlayerState` remains mutable state intrinsic to the controlled character;
   run-wide story/world state belongs to `GameState` or typed state beneath it.
 
-Shared `Character` definitions are already delivered. Format 16's remaining
+Shared `Character` definitions are already delivered. The remaining
 limitation is the single fixed `world.player` binding for the implicit `default`
 route. When a concrete multi-route package arrives, add a small route-level
 `PlayerSpec` binding to the same shared Character rather than duplicating a
@@ -551,11 +551,10 @@ Decisions:
   deterministic behavior; higher-level validation/simulation can diagnose bad
   content when concrete cases justify it.
 
-Format 12 (M5a) delivers the condition tree and effect lists: every
+M5a delivered the condition tree and effect lists: every
 `requires` and `known_when` is one optional condition composed with `all`,
 `any` and `not`, and a dialogue choice carries an ordered `effects` list that
-commits or fails as a whole. Format 11's implicitly conjunctive lists are
-rejected, not migrated.
+commits or fails as a whole.
 
 ## 7. Randomness and reproducibility
 
@@ -712,7 +711,7 @@ transitions, normally main-quest milestones.
 Exploration, side content, ordinary dialogue, menu use and real-world thinking do
 not implicitly advance canonical chronology.
 
-**Delivered (Format 17).** A world lists its `phases` in order; the first is
+**Delivered.** A world lists its `phases` in order; the first is
 current at the start and only the `enter_phase` effect moves the story on,
 never back, passing any phases between. A `phase` condition holds from that
 phase onwards, which gates side quests in waves. Saves keep the phases
@@ -902,7 +901,7 @@ it.
 Investigation evidence remains a separate authored identity/state. It may
 reference a physical definition or instance, but possession of that object does
 not automatically imply that its evidentiary significance has been discovered.
-As delivered (Format 17), an evidence definition may name an `item`; the
+As delivered, an evidence definition may name an `item`; the
 `discover_evidence` effect is the only way evidence becomes known. Since Format
 18 it may also name its `source`, list its `facts` and author `interpretations`:
 the facts never change, and the current reading (derived, never saved) is the
@@ -952,7 +951,12 @@ save.package_revision == loaded package.revision
 save.player_route_id  exists
 ```
 
-A revision mismatch is rejected rather than guessed compatible. Package revisions
+A revision mismatch is rejected rather than guessed compatible. The format
+version is a stability promise, not a change counter: during active
+development it stays put while the format grows, since parsing and the
+revision already reject what no longer fits, and it rises only for a change
+that older content would survive yet behave differently under, or for a
+release others depend on (see [Versions](world-format.md#versions)). Package revisions
 may add, remove or change authored content freely; old saves remain valid against
 the exact revision they were created with unless an explicit future migration is
 provided.
@@ -961,7 +965,7 @@ The exact representation of `package_revision` (content digest, export revision,
 author version, etc.) is an implementation choice. Semantically, gameplay content
 that RealmKit treats as a different revision must have a different revision ID.
 
-**Decided (Format 19):** the revision covers the rules only. It is a digest of
+**Decided:** the revision covers the rules only. It is a digest of
 the package with every prose field emptied (optional prose fields dropped), and
 with the language tag and the list of translations left out. IDs, numbers,
 conditions, effects, the order and number of choices, facts, readings and
@@ -1300,11 +1304,11 @@ For overland worlds, the [overland map](sandbox-worlds.md#overland-map) proposal
 applies this: authored display positions, an engine map-view query, and a
 client-owned viewport with zoom and panning.
 
-**Original-game priority · delivered (Format 16).** Locations author optional
+**Original-game priority · delivered.** Locations author optional
 positions (`x` east, `y` south, within `MAP_BOUND`) and a closed kind (town,
 castle, village, waypoint), all or none and never two on one spot.
 Coordinates carry no movement semantics. The engine's map query returns the
-places the player knows of: since Format 17 a place may author a `known_when`
+places the player knows of: a place may author a `known_when`
 condition, usually on evidence or a flag, and until it holds the place, its
 roads and its exits are off the map and no road or exit there is offered or
 taken.
@@ -1317,9 +1321,9 @@ generic scene graph remain undefined.
 
 ### Client integration surface
 
-**Decided for original-game P0 (Format 16).** Packages load from memory through
+**Decided for original-game P0.** Packages load from memory through
 `WorldSpec::from_files`; `Command`, `Event`, `Action`, the map view and
-(Format 17) the journal view (phase, known quests, evidence, outcome) are
+the journal view (phase, known quests, evidence, outcome) are
 serializable; `SaveSnapshot` reads and writes JSON bytes, checking the save
 format first; and `realmkit-engine` builds for `wasm32-unknown-unknown`
 without an adapter crate. The rest of this section stays the rule for what
@@ -1365,7 +1369,7 @@ Missing fixed-interface translations for the package language must not silently
 fall back to English in normal source-backed play. Exact locale-file serialization
 is deferred until localization implementation.
 
-Package prose may come in several languages (Format 19): a base language plus
+Package prose may come in several languages: a base language plus
 complete overlays, chosen when the package is loaded; see Several languages in
 [Section 18](#18-living-sandbox-worlds). The reference CLI's own fixed strings
 are still English only; a client that ships several languages owns those.
@@ -1625,7 +1629,7 @@ needs to be confirmed:
   `{ when, text }` variants ending in an unconditional one; the first that
   holds is shown. Evaluation is pure, so displaying text never draws or
   mutates. Still open: whether combat prose variants move to the same rule.
-- **Several languages (M5e) · decided (Format 19).** A package keeps one base
+- **Several languages (M5e) · decided.** A package keeps one base
   language and may carry overlays for others: `translations` in `world.json`
   lists language tags, and each tag's `text/<tag>.json` maps every prose
   field's stable key (its JSON path, with array elements named by their IDs)
@@ -1640,7 +1644,7 @@ needs to be confirmed:
   at New Game; each option applies an ordered effect list to the initial state,
   and the save keeps only the resulting state plus the chosen option IDs. This
   is authored initial state, not runtime identity editing, so it stays within
-  the original-character rules above. **Decided and delivered (Format 16):**
+  the original-character rules above. **Decided and delivered:**
   every question is asked, in order, and no option skips or adds one; options
   may set flags, grant items, currency and techniques (XP included) and raise
   proficiencies; their events are not shown, only the state they produce.
@@ -1661,7 +1665,7 @@ needs to be confirmed:
   and optionally capped by an authored stat; each proficiency is personal or
   party, and a party proficiency uses the best rank in the retinue; items can
   teach a rank through study over world time or grant a bonus while carried.
-  As delivered in M6a-2 (Format 15): proficiencies are a closed engine
+  As delivered in M6a-2: proficiencies are a closed engine
   set, so far `trading`, each defined by the block of the capability that
   uses it (`economy.trading`, with a name, a top rank and its narrowing);
   level entries grant shared `proficiency_points`; a save keeps each
@@ -1688,7 +1692,7 @@ needs to be confirmed:
   draws stay, from their own `market` stream; phase 1 clamps to the bounds so
   later phases work on valid indices; and warm-up rounds are an authoring
   choice, run by `scripts/combat_sim economy --prices`, never by the engine.
-  M6a-2 (Format 15) added prosperity, which moves one point a day towards
+  M6a-2 added prosperity, which moves one point a day towards
   its ideal and scales a market kind's demand linearly between authored
   percentages at 0 and 100; merchants' stock and purse, redrawn on a
   restock schedule from their own `stock` stream and limiting trade both
@@ -1699,7 +1703,7 @@ needs to be confirmed:
 - **Standing tracks (M6b).** Proposed: each track is authored with bounds,
   named thresholds and a scope: global, per faction or per character. There is
   no fixed list of tracks such as renown or honour.
-- **Mass-battle formula (M6d).** Decided as delivered in Format 14, without
+- **Mass-battle formula (M6d).** Decided as delivered, without
   ground, leadership, individuals other than the player, or a champion duel:
   troops fight as stacks of counts,
   and the player, companions and leaders as stacks of one with their own HP,
@@ -1726,7 +1730,7 @@ needs to be confirmed:
   (proposed) or a fixed engine set; defaults for frontage, the morale factor,
   the rout threshold and the hold percentage; and whether a champion duel can
   end a battle outright.
-- **Battle modes (M6d).** Decided as delivered in Format 14 (a round
+- **Battle modes (M6d).** Decided as delivered (a round
   summary shows strength, losses and morale per side): when the player's party joins a battle, the
   player chooses autoresolve or command. A commanded battle is a third stance
   beside exploring and fighting that holds every individual's HP and MP, and a
@@ -1781,7 +1785,7 @@ needs to be confirmed:
   ordinary main-questline quests; only the top rung is the route's completed,
   non-terminal outcome, because a playthrough records at most one outcome
   ([Section 3](#3-outcomes-failure-and-replay)).
-- **Retinue XP (M6c).** Decided as delivered in Format 14: the roster saves
+- **Retinue XP (M6c).** Decided as delivered: the roster saves
   an XP pool per line and level, and soldiers level up within their line by
   that pool, renamed where the world authors a new name, instead of paying
   for each upgrade step. Battles add to it and recruits add none. Every
