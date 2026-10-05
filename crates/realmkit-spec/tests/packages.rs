@@ -329,9 +329,15 @@ fn older_packages_are_rejected_clearly() {
         let error = WorldSpec::load(&temp).unwrap_err();
         std::fs::remove_dir_all(&temp).unwrap();
         assert!(matches!(error, SpecError::UnsupportedFormat { found: Some(v) } if v == version));
-        assert!(error
-            .to_string()
-            .contains("older packages are not migrated"));
+        // It points at the version policy, not at conversion steps that no
+        // longer exist.
+        let message = error.to_string();
+        assert!(message.contains("older packages are not migrated"));
+        assert!(
+            message.contains("docs/world-format.md#versions"),
+            "{message}"
+        );
+        assert!(!message.contains("convert"), "{message}");
     }
 }
 

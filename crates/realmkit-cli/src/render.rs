@@ -12,14 +12,14 @@ const FACT: &str = "New fact";
 
 /// The terminal columns a character takes: two for East Asian wide and
 /// fullwidth characters, such as CJK, one otherwise.
-// ponytail: the main wide ranges only, not the full Unicode width table;
-// take a width crate if another script misaligns.
+// ponytail: CJK and fullwidth ranges only. Emoji count one per scalar, as
+// before, since a modifier or joined sequence shows as one wide glyph; take
+// a grapheme and width crate if emoji names must align.
 pub fn columns(c: char) -> usize {
     let wide = matches!(u32::from(c),
         0x1100..=0x115F | 0x2E80..=0x303E | 0x3041..=0x33FF | 0x3400..=0x4DBF
         | 0x4E00..=0x9FFF | 0xA000..=0xA4CF | 0xAC00..=0xD7A3 | 0xF900..=0xFAFF
-        | 0xFE30..=0xFE4F | 0xFF00..=0xFF60 | 0xFFE0..=0xFFE6 | 0x1F300..=0x1F64F
-        | 0x1F900..=0x1F9FF | 0x20000..=0x3FFFD);
+        | 0xFE30..=0xFE4F | 0xFF00..=0xFF60 | 0xFFE0..=0xFFE6 | 0x20000..=0x3FFFD);
     1 + usize::from(wide)
 }
 
@@ -731,6 +731,9 @@ mod tests {
         assert_eq!(width("档案员佩尔"), 10);
         assert_eq!(width("佩尔 2"), 6);
         assert_eq!(width("ｘ"), 2);
+        // Emoji keep their count per scalar, so a modified one is not
+        // measured as two wide characters.
+        assert_eq!(width("👩🏽"), 2);
     }
 
     #[test]

@@ -12,6 +12,8 @@ combat and other genre mechanics as source-grounded capabilities.
 `format_version` in `world.json` and `save_format_version` in a save share
 one number (`FORMAT_VERSION` and `SAVE_FORMAT_VERSION`). A package or save of
 another version is rejected with a message naming it; there is no migration.
+To bring an older package up to date, edit it against this guide until
+`realmkit validate` accepts it; old saves cannot be carried over.
 While the format is in active development the number stays put: new optional
 fields, new condition, effect and event kinds, and other growth that leaves
 older content valid land without a bump. Two other checks already reject what

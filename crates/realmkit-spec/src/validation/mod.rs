@@ -31,7 +31,7 @@ pub struct Diagnostic {
 
 #[derive(Debug, thiserror::Error)]
 pub enum SpecError {
-    #[error("unsupported package format {}: this RealmKit reads Format {FORMAT_VERSION} only; older packages are not migrated, so convert the package to Format {FORMAT_VERSION} (see docs/world-format.md)", found.map_or("(missing)".into(), |v| v.to_string()))]
+    #[error("unsupported package format {}: this RealmKit reads Format {FORMAT_VERSION} only, and older packages are not migrated (see docs/world-format.md#versions)", found.map_or("(missing)".into(), |v| v.to_string()))]
     UnsupportedFormat { found: Option<u64> },
     #[error("world validation failed: {0:?}")]
     Validation(Vec<Diagnostic>),
