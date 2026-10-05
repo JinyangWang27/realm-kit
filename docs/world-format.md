@@ -706,7 +706,11 @@ investigation: observations, testimony or physical clues.
     "source": "The bandits' camp",
     "facts": [
       "The crates bear the lost wagons' seal.",
-      "They were found beyond the fork, with no wagons near."
+      "They were found beyond the fork, with no wagons near.",
+      {
+        "text": "The fork they lay past is paved with old stone.",
+        "when": { "kind": "evidence", "evidence": "impossible_fork" }
+      }
     ],
     "interpretations": [
       { "text": "The bandits robbed the wagons and are lying about it." },
@@ -727,7 +731,16 @@ investigation: observations, testimony or physical clues.
   does not make the evidence known, nor does knowing the evidence give the
   item: possession and recognition are separate transitions.
 - `source` names where the player learns it, and `facts` what was observed
-  or said; both are fixed prose. `interpretations` are ways of reading those
+  or said; both are fixed prose. A fact written as a bare string is known
+  from discovery; one written as `{ "text", "when" }` becomes known once the
+  evidence is known and its `when` holds, so evidence can be discovered at
+  the first observation and fill in as the investigation goes on. The known
+  facts are derived, never saved (`Engine::evidence_facts`, indices in
+  authored order). When a command reveals a fact of evidence already known,
+  the engine reports `EvidenceFactLearned` with its index, once; facts that
+  hold when the evidence is discovered arrive with `EvidenceDiscovered`. A
+  fact's `when` follows the reading rule below (`fleeting_fact`), so a fact
+  once known is never removed or rewritten. `interpretations` are ways of reading those
   facts, in the order understanding deepens. The current reading is the last
   whose optional `when` holds (`Engine::evidence_reading`); it is derived,
   never saved. When a command changes the reading of evidence already known,

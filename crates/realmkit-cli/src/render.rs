@@ -8,6 +8,7 @@ const CRITICAL: &str = "Critical hit!";
 const TECHNIQUE_XP: &str = "Technique XP";
 const EVIDENCE: &str = "New evidence";
 const REINTERPRETED: &str = "Understanding changed";
+const FACT: &str = "New fact";
 
 /// Single-pass interpolation: inserted values are data, never template syntax.
 fn interpolate(template: &TextTemplate, values: &[(&str, &str)]) -> io::Result<String> {
@@ -609,12 +610,24 @@ pub fn events(
             Event::QuestCompleted { quest } => {
                 writeln!(output, "{}", world.quest(quest).unwrap().completion)?
             }
-            Event::EvidenceDiscovered { evidence } => writeln!(
-                output,
-                "{}: {}",
-                paint.good(EVIDENCE),
-                world.evidence(evidence).unwrap().name
-            )?,
+            // With the facts known from the start; later ones arrive as their own events.
+            Event::EvidenceDiscovered { evidence: id } => {
+                let evidence = world.evidence(id).unwrap();
+                writeln!(output, "{}: {}", paint.good(EVIDENCE), evidence.name)?;
+                for fact in engine.evidence_facts(id) {
+                    writeln!(output, "  · {}", evidence.facts[fact].text())?;
+                }
+            }
+            Event::EvidenceFactLearned { evidence, fact } => {
+                let evidence = world.evidence(evidence).unwrap();
+                writeln!(
+                    output,
+                    "{} — {}: {}",
+                    paint.good(FACT),
+                    evidence.name,
+                    evidence.facts[*fact].text()
+                )?
+            }
             Event::EvidenceReinterpreted { evidence, reading } => {
                 let evidence = world.evidence(evidence).unwrap();
                 writeln!(

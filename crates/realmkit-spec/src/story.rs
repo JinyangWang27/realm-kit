@@ -277,10 +277,10 @@ pub struct EvidenceDefinition {
     /// Where the player learns it, such as a ledger or a witness.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub source: String,
-    /// What was observed or said. Later knowledge never changes these; it
-    /// changes only how they are read.
+    /// What was observed or said, each known once its `when` holds. Later
+    /// knowledge never changes or removes a fact; it changes only how they are read.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub facts: Vec<String>,
+    pub facts: Vec<Fact>,
     /// Ways of reading the facts, in the order understanding deepens. The
     /// current reading is the last whose `when` holds.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -289,6 +289,34 @@ pub struct EvidenceDefinition {
     /// does not make the evidence known, nor the reverse.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item: Option<Id>,
+}
+
+/// One fact of a piece of evidence: a bare string is known from discovery,
+/// and `{ text, when }` once `when` also holds.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged, deny_unknown_fields)]
+pub enum Fact {
+    Known(String),
+    /// Like an interpretation's `when`: only evidence, flags and phases,
+    /// never under `not`, so a fact once known stays known.
+    Gated {
+        text: String,
+        when: Condition,
+    },
+}
+
+impl Fact {
+    pub fn text(&self) -> &str {
+        match self {
+            Self::Known(text) | Self::Gated { text, .. } => text,
+        }
+    }
+    pub fn when(&self) -> Option<&Condition> {
+        match self {
+            Self::Known(_) => None,
+            Self::Gated { when, .. } => Some(when),
+        }
+    }
 }
 
 /// One way of reading a piece of evidence, available once `when` holds.

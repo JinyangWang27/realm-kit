@@ -22,8 +22,8 @@ pub(super) use proficiency::{
 };
 pub(super) use retinue::{leave, promote, prune};
 pub(super) use story::{
-    apply as apply_effects, choices, grant_items, grant_xp, journal, progress, reading, readings,
-    set_flag,
+    apply as apply_effects, choices, facts, grant_items, grant_xp, journal, progress, reading,
+    readings, set_flag,
 };
 
 /// Evaluates a condition against the state; pure, so it may run any number of times.
@@ -309,15 +309,22 @@ pub(super) fn execute(
         }
         // Evidence found by this command reports itself as discovered.
         let before = readings_before.unwrap_or_default();
-        for (evidence, reading) in readings(world, state) {
-            let known_before = before.iter().find(|(id, _)| *id == evidence);
-            if let (Some((_, was)), Some(now)) = (known_before, reading) {
-                if *was != Some(now) {
-                    events.push(Event::EvidenceReinterpreted {
-                        evidence: evidence.clone(),
-                        reading: now,
-                    });
-                }
+        for now in readings(world, state) {
+            let Some(was) = before.iter().find(|u| u.evidence == now.evidence) else {
+                continue;
+            };
+            // Facts are never lost, so the new ones are those not known before.
+            for fact in now.facts.iter().filter(|f| !was.facts.contains(f)) {
+                events.push(Event::EvidenceFactLearned {
+                    evidence: now.evidence.clone(),
+                    fact: *fact,
+                });
+            }
+            if let Some(reading) = now.reading.filter(|r| was.reading != Some(*r)) {
+                events.push(Event::EvidenceReinterpreted {
+                    evidence: now.evidence.clone(),
+                    reading,
+                });
             }
         }
         // Validation proves outcomes exclude each other, so at most one holds.

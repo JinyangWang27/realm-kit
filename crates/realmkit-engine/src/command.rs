@@ -342,6 +342,12 @@ pub enum Event {
     EvidenceDiscovered {
         evidence: Id,
     },
+    /// Something learned since revealed another fact of known evidence: its
+    /// fact `fact` (0-based) is now known, for good.
+    EvidenceFactLearned {
+        evidence: Id,
+        fact: usize,
+    },
     /// Something learned since changed how known evidence reads: its
     /// current interpretation is now `reading` (0-based). The facts are as
     /// they were.

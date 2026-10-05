@@ -357,17 +357,37 @@ pub(crate) fn reading(world: &WorldSpec, state: &GameState, evidence: &str) -> O
         .rposition(|i| allowed(state, i.when.as_ref()))
 }
 
-/// Each known evidence, in authored order, with its current reading.
-pub(crate) fn readings<'w>(
-    world: &'w WorldSpec,
-    state: &GameState,
-) -> Vec<(&'w Id, Option<usize>)> {
+/// The facts of evidence the player knows, by index: those whose `when`
+/// holds, or none while the evidence is unknown.
+pub(crate) fn facts(world: &WorldSpec, state: &GameState, evidence: &str) -> Vec<usize> {
+    if !state.evidence.contains(evidence) {
+        return Vec::new();
+    }
+    let facts = world.evidence(evidence).map_or(&[][..], |e| &e.facts);
+    (0..facts.len())
+        .filter(|i| allowed(state, facts[*i].when()))
+        .collect()
+}
+
+/// What the player understands of one known evidence: its reading and facts.
+pub(crate) struct Understanding<'w> {
+    pub evidence: &'w Id,
+    pub reading: Option<usize>,
+    pub facts: Vec<usize>,
+}
+
+/// Each known evidence, in authored order, with its reading and facts.
+pub(crate) fn readings<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<Understanding<'w>> {
     world
         .world
         .evidence
         .iter()
         .filter(|e| state.evidence.contains(&e.id))
-        .map(|e| (&e.id, reading(world, state, &e.id)))
+        .map(|e| Understanding {
+            evidence: &e.id,
+            reading: reading(world, state, &e.id),
+            facts: facts(world, state, &e.id),
+        })
         .collect()
 }
 

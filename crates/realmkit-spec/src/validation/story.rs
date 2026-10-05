@@ -307,7 +307,7 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 }
 
 /// Evidence definitions have unique IDs, a linked item exists, and every
-/// reading waits only on knowledge that is never lost.
+/// fact and reading waits only on knowledge that is never lost.
 pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     ids(
         out,
@@ -317,6 +317,17 @@ pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     for evidence in &w.world.evidence {
         if let Some(item) = &evidence.item {
             reference(out, &evidence.id, "item", item, w.item(item).is_some());
+        }
+        for when in evidence.facts.iter().filter_map(Fact::when) {
+            condition(out, w, &evidence.id, Some(when));
+            if !lasting(when) {
+                issue(
+                    out,
+                    &evidence.id,
+                    "fleeting_fact",
+                    "a fact may wait only on evidence, flags and phases, never under `not`, so that it is never lost again",
+                );
+            }
         }
         for reading in &evidence.interpretations {
             condition(out, w, &evidence.id, reading.when.as_ref());

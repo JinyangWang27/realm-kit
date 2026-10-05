@@ -334,6 +334,13 @@ impl<'w> Engine<'w> {
         rules::reading(self.world, &self.state, evidence)
     }
 
+    /// The facts of known evidence the player has learned, by index in
+    /// authored order: those whose `when` holds. Empty while the evidence is
+    /// unknown. Derived, never saved; a fact once known stays known.
+    pub fn evidence_facts(&self, evidence: &str) -> Vec<usize> {
+        rules::facts(self.world, &self.state, evidence)
+    }
+
     /// Who is here now: present under their conditions and not defeated.
     pub fn present_here(&self) -> Vec<&'w Character> {
         rules::present_here(self.world, &self.state)
