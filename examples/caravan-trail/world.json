@@ -1,5 +1,5 @@
 {
-  "format_version": 17,
+  "format_version": 18,
   "id": "caravan_trail",
   "name": "The Caravan Trail",
   "language": "en",
@@ -79,7 +79,13 @@
     {
       "id": "wheel_ruts",
       "name": "Wheel ruts",
-      "description": "Deep ruts lead from the cold camp to a fork in the track that no map shows."
+      "description": "Deep ruts lead from the cold camp to a fork in the track that no map shows.",
+      "source": "The cold camp",
+      "facts": ["The ruts are deep and fresh.", "They leave the trail to the east, where no map shows a track."],
+      "interpretations": [
+        { "text": "The wagons turned off the trail, perhaps to avoid the ridge." },
+        { "when": { "kind": "evidence", "evidence": "impossible_fork" }, "text": "The wagons took a road that should not be there." }
+      ]
     },
     {
       "id": "displaced_cargo",

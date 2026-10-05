@@ -7,6 +7,7 @@ use std::io::{self, Write};
 const CRITICAL: &str = "Critical hit!";
 const TECHNIQUE_XP: &str = "Technique XP";
 const EVIDENCE: &str = "New evidence";
+const REINTERPRETED: &str = "Understanding changed";
 
 /// Single-pass interpolation: inserted values are data, never template syntax.
 fn interpolate(template: &TextTemplate, values: &[(&str, &str)]) -> io::Result<String> {
@@ -614,6 +615,16 @@ pub fn events(
                 paint.good(EVIDENCE),
                 world.evidence(evidence).unwrap().name
             )?,
+            Event::EvidenceReinterpreted { evidence, reading } => {
+                let evidence = world.evidence(evidence).unwrap();
+                writeln!(
+                    output,
+                    "{} — {}: {}",
+                    paint.good(REINTERPRETED),
+                    evidence.name,
+                    evidence.interpretations[*reading].text
+                )?
+            }
             Event::OutcomeReached { outcome } => {
                 let outcome = world.world.outcomes.iter().find(|o| &o.id == outcome);
                 let outcome = outcome.unwrap();

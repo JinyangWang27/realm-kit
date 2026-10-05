@@ -1,6 +1,8 @@
-# World package format 17
+# World package format 18
 
-Format 17 adds authored progression and investigation: evidence the player
+Format 18 lets evidence carry its source, the facts observed and
+interpretations that later knowledge unlocks. Format 17 added authored
+progression and investigation: evidence the player
 discovers, story phases, main quests and quest prerequisites, route
 outcomes, places the player must learn of before the map shows them, and
 features to examine rather than talk to. Format 16 added optional map
@@ -45,15 +47,16 @@ there is no migration. Convert them by hand:
   condition. A list of one condition becomes that condition; a longer list
   becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
   dialogue choice's `effect` becomes a one-element `effects` list.
-- **Formats 12–16** (M5a, M5b, M6a-1, consumables, troops, M6a-2, map and
-  start questions): only raise the number. Every economy part below `tick`,
+- **Formats 12–17** (M5a, M5b, M6a-1, consumables, troops, M6a-2, map and
+  start questions, progression and investigation): only raise the number. Every economy part below `tick`,
   `proficiency_points`, map positions, `start_questions`, `evidence`,
   `phases`, `outcomes`, a quest's `main` and `requires`, a location's
-  `known_when` and a character's `kind` are optional.
+  `known_when`, a character's `kind`, and an evidence's `source`, `facts`
+  and `interpretations` are optional.
 
-Format 17 represents one fixed player-controlled character and one playable
+Format 18 represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 17 does not serialize a route collection
+stable logical route ID `default`; Format 18 does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -69,7 +72,7 @@ differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 17 also requires item and quest tables because they serve the current demo.
+Format 18 also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 quests marked `main` form the route's main questline and the rest are side
 quests. A non-combat player route still has a main questline whose objectives may use
@@ -93,7 +96,7 @@ filesystem, such as a browser, hands the same six files to
 `WorldSpec::from_files` from memory; `PACKAGE_FILES` lists them. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
-Format 17 describes the current schema; incompatible changes require an explicit
+Format 18 describes the current schema; incompatible changes require an explicit
 version/migration decision.
 
 IDs use ASCII letters, digits, `_` and `-`, with uniqueness within each entity
@@ -106,7 +109,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 17 does not yet carry
+machine-facing and may remain language-neutral ASCII. Format 18 does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -695,6 +698,18 @@ investigation: observations, testimony or physical clues.
     "id": "displaced_cargo",
     "name": "Displaced cargo",
     "description": "The bandits' crates carry the lost wagons' seal.",
+    "source": "The bandits' camp",
+    "facts": [
+      "The crates bear the lost wagons' seal.",
+      "They were found beyond the fork, with no wagons near."
+    ],
+    "interpretations": [
+      { "text": "The bandits robbed the wagons and are lying about it." },
+      {
+        "when": { "kind": "evidence", "evidence": "impossible_fork" },
+        "text": "The cargo went where the wagons went, by no road anyone knows."
+      }
+    ],
     "item": "caravan_seal"
   }
 ]
@@ -706,6 +721,17 @@ investigation: observations, testimony or physical clues.
 - `item` optionally links the evidence to a physical item. Carrying the item
   does not make the evidence known, nor does knowing the evidence give the
   item: possession and recognition are separate transitions.
+- `source` names where the player learns it, and `facts` what was observed
+  or said; both are fixed prose. `interpretations` are ways of reading those
+  facts, in the order understanding deepens. The current reading is the last
+  whose optional `when` holds (`Engine::evidence_reading`); it is derived,
+  never saved. When a command changes the reading of evidence already known,
+  the engine reports `EvidenceReinterpreted` with the new reading's index;
+  evidence found by the same command reports only `EvidenceDiscovered`. The
+  facts never change: only the player's understanding does.
+- A reading's `when` may use only evidence, flag and phase conditions under
+  `all` and `any`, never `not`, so an understanding once reached is never
+  lost (`fleeting_interpretation`).
 - Authored conditions decide what a combination of evidence supports, such as
   two readings out of three under `any` of `all`s; there is no inference
   engine.
@@ -1235,7 +1261,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 17 currently selects combat prose variants from the current
+Format 18 currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful
@@ -1402,7 +1428,7 @@ skill references, usable and affordable skills, loot quantities, fighter
 placement, template placeholders, evidence that can be discovered, phases
 that can be entered, quest prerequisite cycles and main quests waiting on side
 quests. `load()` reports a package whose
-`format_version` is not 17 as `SpecError::UnsupportedFormat` before parsing it.
+`format_version` is not 18 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.

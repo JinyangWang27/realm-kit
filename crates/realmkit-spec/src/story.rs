@@ -261,10 +261,33 @@ pub struct EvidenceDefinition {
     pub id: Id,
     pub name: String,
     pub description: String,
+    /// Where the player learns it, such as a ledger or a witness.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub source: String,
+    /// What was observed or said. Later knowledge never changes these; it
+    /// changes only how they are read.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub facts: Vec<String>,
+    /// Ways of reading the facts, in the order understanding deepens. The
+    /// current reading is the last whose `when` holds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub interpretations: Vec<Interpretation>,
     /// The physical item this evidence concerns, if any. Carrying the item
     /// does not make the evidence known, nor the reverse.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item: Option<Id>,
+}
+
+/// One way of reading a piece of evidence, available once `when` holds.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Interpretation {
+    /// Absent means from the moment the evidence is known. Only evidence,
+    /// flags and phases may appear, never under `not`, so a reading once
+    /// reached is never lost.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<Condition>,
+    pub text: String,
 }
 
 /// A question the route asks at New Game, before the first turn, such as the

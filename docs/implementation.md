@@ -153,12 +153,19 @@ proves the complete single-player loop with authored content.
   on side quests; saves check evidence, phases, prerequisites and the
   outcome. `examples/caravan-trail` plays the MVP slice by combat,
   bribery, intimidation or a survivor's testimony. Package and save format 17.
+- [x] Evidence readings: an evidence definition may give its `source`, the
+  `facts` observed and `interpretations` unlocked by evidence, flags or
+  phases (`fleeting_interpretation` refuses anything that could revert).
+  The current reading is derived (`Engine::evidence_reading`), never saved,
+  and a change to known evidence's reading is reported as
+  `EvidenceReinterpreted`; the CLI journal prints it. The quiet archive's
+  stitched map reads kinder once the vault opens. Package and save format 18.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
 ## Next implementation priorities
 
-The open items are **not delivered** and do not change Format 17 by
+The open items are **not delivered** and do not change Format 18 by
 themselves. They mirror the original-game-driven roadmap priority while keeping
 every capability optional:
 

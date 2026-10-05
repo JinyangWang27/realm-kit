@@ -1,5 +1,5 @@
 {
-  "format_version": 17,
+  "format_version": 18,
   "id": "quiet_archive",
   "name": "The Quiet Archive",
   "language": "en",
@@ -34,7 +34,13 @@
     {
       "id": "stitched_map",
       "name": "The stitched map",
-      "description": "The river map lies under the copyist's blotter, its torn edge newly mended."
+      "description": "The river map lies under the copyist's blotter, its torn edge newly mended.",
+      "source": "The copyist, in the stacks",
+      "facts": ["The map was under the blotter, not in the vault.", "Its torn edge has been mended with new thread."],
+      "interpretations": [
+        { "text": "The copyist took the map and hid it." },
+        { "when": { "kind": "flag", "flag": "vault_open" }, "text": "Pell trusts him: he took it only to mend it." }
+      ]
     }
   ]
 }

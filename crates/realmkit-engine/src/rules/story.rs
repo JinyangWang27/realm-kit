@@ -344,6 +344,33 @@ pub(crate) fn choose(
     Ok(())
 }
 
+/// The current interpretation of known evidence: the last whose `when`
+/// holds, or none when the evidence is unknown or has no interpretations.
+pub(crate) fn reading(world: &WorldSpec, state: &GameState, evidence: &str) -> Option<usize> {
+    if !state.evidence.contains(evidence) {
+        return None;
+    }
+    world
+        .evidence(evidence)?
+        .interpretations
+        .iter()
+        .rposition(|i| allowed(state, i.when.as_ref()))
+}
+
+/// Each known evidence, in authored order, with its current reading.
+pub(crate) fn readings<'w>(
+    world: &'w WorldSpec,
+    state: &GameState,
+) -> Vec<(&'w Id, Option<usize>)> {
+    world
+        .world
+        .evidence
+        .iter()
+        .filter(|e| state.evidence.contains(&e.id))
+        .map(|e| (&e.id, reading(world, state, &e.id)))
+        .collect()
+}
+
 pub(crate) fn journal(world: &WorldSpec, state: &GameState) -> Journal {
     let known = |q: &&Quest| {
         state.quests[&q.id] != QuestStatus::Available || allowed(state, q.requires.as_ref())

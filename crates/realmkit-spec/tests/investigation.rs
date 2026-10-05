@@ -21,7 +21,10 @@ fn confession(w: &mut WorldSpec) -> &mut DialogueChoice {
 fn the_archive_authors_evidence_and_roundtrips() {
     let world = archive();
     assert!(world.diagnostics().is_empty());
-    assert_eq!(world.evidence("stitched_map").unwrap().item, None);
+    let map = world.evidence("stitched_map").unwrap();
+    assert_eq!(map.item, None);
+    assert_eq!(map.facts.len(), 2);
+    assert_eq!(map.interpretations[0].when, None);
     let json = serde_json::to_string(&world.world).unwrap();
     assert_eq!(serde_json::from_str::<World>(&json).unwrap(), world.world);
 }
@@ -70,6 +73,36 @@ fn evidence_references_are_checked() {
             },
             "invalid_effect",
         ),
+        // A reading waits on something that exists.
+        (
+            |w| {
+                w.world.evidence[0].interpretations[1].when = Some(Condition::Flag {
+                    flag: "missing".into(),
+                })
+            },
+            "missing_reference",
+        ),
+        // Readings move only forward: a pen returned, or a `not`, could take
+        // an understanding away again.
+        (
+            |w| {
+                w.world.evidence[0].interpretations[1].when = Some(Condition::Item {
+                    item: "pen".into(),
+                    quantity: 1,
+                })
+            },
+            "fleeting_interpretation",
+        ),
+        (
+            |w| {
+                w.world.evidence[0].interpretations[1].when = Some(Condition::Not {
+                    condition: Box::new(Condition::Flag {
+                        flag: "pen_borrowed".into(),
+                    }),
+                })
+            },
+            "fleeting_interpretation",
+        ),
     ];
     for (change, code) in cases {
         let mut world = archive();
@@ -93,6 +126,9 @@ fn an_event_cannot_discover_evidence() {
         id: "tracks".into(),
         name: "Tracks".into(),
         description: "Hoofprints.".into(),
+        source: String::new(),
+        facts: Vec::new(),
+        interpretations: Vec::new(),
         item: None,
     });
     world.world.events[0].effects.push(discover("tracks"));

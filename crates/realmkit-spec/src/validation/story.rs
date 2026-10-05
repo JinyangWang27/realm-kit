@@ -306,7 +306,8 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     }
 }
 
-/// Evidence definitions have unique IDs, and a linked item exists.
+/// Evidence definitions have unique IDs, a linked item exists, and every
+/// reading waits only on knowledge that is never lost.
 pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     ids(
         out,
@@ -317,6 +318,26 @@ pub(super) fn evidence(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
         if let Some(item) = &evidence.item {
             reference(out, &evidence.id, "item", item, w.item(item).is_some());
         }
+        for reading in &evidence.interpretations {
+            condition(out, w, &evidence.id, reading.when.as_ref());
+            if reading.when.as_ref().is_some_and(|c| !lasting(c)) {
+                issue(
+                    out,
+                    &evidence.id,
+                    "fleeting_interpretation",
+                    "an interpretation may wait only on evidence, flags and phases, never under `not`, so that it is never lost again",
+                );
+            }
+        }
+    }
+}
+
+/// Whether a condition, once it holds, holds for the rest of the playthrough.
+fn lasting(condition: &Condition) -> bool {
+    match condition {
+        Condition::All { of } | Condition::Any { of } => of.iter().all(lasting),
+        Condition::Evidence { .. } | Condition::Flag { .. } | Condition::Phase { .. } => true,
+        _ => false,
     }
 }
 

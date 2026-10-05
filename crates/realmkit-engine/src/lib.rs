@@ -327,6 +327,13 @@ impl<'w> Engine<'w> {
         rules::journal(self.world, &self.state)
     }
 
+    /// How the player currently reads known evidence: the index of its last
+    /// interpretation whose condition holds. `None` while the evidence is
+    /// unknown or has no interpretations.
+    pub fn evidence_reading(&self, evidence: &str) -> Option<usize> {
+        rules::reading(self.world, &self.state, evidence)
+    }
+
     /// Who is here now: present under their conditions and not defeated.
     pub fn present_here(&self) -> Vec<&'w Character> {
         rules::present_here(self.world, &self.state)
