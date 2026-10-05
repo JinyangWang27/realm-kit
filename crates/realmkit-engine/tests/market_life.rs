@@ -12,20 +12,6 @@ fn wallet<'e>(engine: &'e Engine<'_>) -> &'e EconomyState {
     engine.state().economy.as_ref().unwrap()
 }
 
-fn buy(good: &str, quantity: u64) -> Command {
-    Buy {
-        good: good.into(),
-        quantity,
-    }
-}
-
-fn sell(good: &str, quantity: u64) -> Command {
-    Sell {
-        good: good.into(),
-        quantity,
-    }
-}
-
 const MARKETS: [&str; 3] = ["greyford", "ashmere", "vellmarket"];
 const GOODS: [&str; 4] = ["grain", "wool", "cloth", "eels"];
 

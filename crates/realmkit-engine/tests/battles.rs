@@ -7,17 +7,6 @@ use common::*;
 use realmkit_engine::{Command::*, *};
 use realmkit_spec::*;
 
-fn squad(engine: &Engine<'_>, line: &str, level: usize) -> Option<Squad> {
-    engine
-        .state()
-        .retinue
-        .as_ref()?
-        .roster
-        .get(line)?
-        .get(&level)
-        .copied()
-}
-
 fn healthy(healthy: u64) -> Squad {
     Squad {
         healthy,

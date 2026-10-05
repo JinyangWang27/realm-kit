@@ -329,14 +329,6 @@ fn a_choice_that_accepts_a_locked_quest_waits_for_it() {
     assert_eq!(engine.state().quests["catalogue"], QuestStatus::Ready);
 }
 
-fn listed(engine: &Engine<'_>) -> Vec<String> {
-    engine
-        .dialogue_choices()
-        .into_iter()
-        .map(|c| c.text)
-        .collect()
-}
-
 #[test]
 fn a_hub_of_ask_once_questions_is_used_up_and_back_turns_into_leaving() {
     let mut world = archive();
@@ -354,16 +346,16 @@ fn a_hub_of_ask_once_questions_is_used_up_and_back_turns_into_leaving() {
         "Why must it be so quiet?",
         "That is all. Thank you.",
     ];
-    assert_eq!(listed(&engine), all);
+    assert_eq!(texts(&engine), all);
     engine.execute(ChooseDialogue(1)).unwrap();
     // A question remains, so back leads back to the hub, without the asked one.
-    assert_eq!(listed(&engine), ["Let me ask something else."]);
+    assert_eq!(texts(&engine), ["Let me ask something else."]);
     engine.execute(ChooseDialogue(1)).unwrap();
-    assert_eq!(listed(&engine), all[1..]);
+    assert_eq!(texts(&engine), all[1..]);
     let saved = engine.snapshot();
     engine.execute(ChooseDialogue(1)).unwrap();
     // The last question is used: back is now the hub's own leaving.
-    assert_eq!(listed(&engine), ["That is all. Thank you."]);
+    assert_eq!(texts(&engine), ["That is all. Thank you."]);
     let events = engine.execute(ChooseDialogue(1)).unwrap();
     assert!(events.contains(&Event::StoryFlagSet {
         flag: "map_found".into()
@@ -373,10 +365,10 @@ fn a_hub_of_ask_once_questions_is_used_up_and_back_turns_into_leaving() {
     // Coming back finds nothing left to ask.
     engine.execute(Talk("archivist".into())).unwrap();
     engine.execute(ChooseDialogue(2)).unwrap();
-    assert_eq!(listed(&engine), ["That is all. Thank you."]);
+    assert_eq!(texts(&engine), ["That is all. Thank you."]);
     // Saves keep what was asked, by IDs.
     let restored = Engine::restore(&world, saved.clone()).unwrap();
-    assert_eq!(listed(&restored), all[1..]);
+    assert_eq!(texts(&restored), all[1..]);
     let json = String::from_utf8(saved.to_json()).unwrap();
     assert!(json.contains(r#""choice": "founders""#), "{json}");
 }
@@ -428,7 +420,7 @@ fn back_stays_while_the_hub_lists_a_locked_question() {
     engine.execute(ChooseDialogue(2)).unwrap();
     engine.execute(ChooseDialogue(1)).unwrap();
     // The locked question is still there to see, so back still leads back.
-    assert_eq!(listed(&engine), ["Let me ask something else."]);
+    assert_eq!(texts(&engine), ["Let me ask something else."]);
     engine.execute(ChooseDialogue(1)).unwrap();
     let options = engine.dialogue_choices();
     assert_eq!(options[0].text, "Why must it be so quiet?");

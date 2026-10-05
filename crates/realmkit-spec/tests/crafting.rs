@@ -5,14 +5,6 @@ mod common;
 use common::*;
 use realmkit_spec::*;
 
-fn smithy() -> WorldSpec {
-    WorldSpec::load(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../examples/smithy"
-    ))
-    .unwrap()
-}
-
 fn recipe<'w>(w: &'w mut WorldSpec, id: &str) -> &'w mut Recipe {
     let combat = w.world.combat.as_mut().unwrap();
     combat.recipes.iter_mut().find(|r| r.id == id).unwrap()

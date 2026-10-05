@@ -7,14 +7,6 @@ use common::*;
 use realmkit_engine::{Command::*, *};
 use realmkit_spec::{Direction::*, *};
 
-fn choices(engine: &Engine<'_>) -> Vec<String> {
-    engine
-        .dialogue_choices()
-        .into_iter()
-        .map(|c| c.text)
-        .collect()
-}
-
 fn at_the_copyist(world: &WorldSpec) -> Engine<'_> {
     let mut engine = reader(world);
     engine.execute(Move(North)).unwrap();
@@ -27,7 +19,7 @@ fn a_not_condition_hides_a_choice_once_its_effects_have_run() {
     let world = archive();
     let mut engine = at_the_copyist(&world);
     assert_eq!(
-        choices(&engine),
+        texts(&engine),
         [
             "Have you seen the river map?",
             "Could I borrow a pen?",
@@ -54,7 +46,7 @@ fn a_not_condition_hides_a_choice_once_its_effects_have_run() {
     engine.execute(Talk("copyist".into())).unwrap();
     // Borrowed once, so only returning it is offered; the item condition holds.
     assert_eq!(
-        choices(&engine),
+        texts(&engine),
         [
             "Have you seen the river map?",
             "Here is your pen back.",
@@ -68,7 +60,7 @@ fn a_not_condition_hides_a_choice_once_its_effects_have_run() {
     }));
     assert!(!engine.state().player.inventory.contains_key("pen"));
     engine.execute(Talk("copyist".into())).unwrap();
-    assert_eq!(choices(&engine).len(), 2);
+    assert_eq!(texts(&engine).len(), 2);
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }
 
@@ -78,21 +70,21 @@ fn an_any_condition_holds_while_one_branch_does() {
     let mut engine = reader(&world);
     let question = "Is the vault always locked?".to_string();
     engine.execute(Talk("archivist".into())).unwrap();
-    assert!(!choices(&engine).contains(&question));
+    assert!(!texts(&engine).contains(&question));
     engine.execute(ChooseDialogue(1)).unwrap();
     engine.execute(ChooseDialogue(1)).unwrap();
     engine.execute(Talk("archivist".into())).unwrap();
-    assert!(choices(&engine).contains(&question));
+    assert!(texts(&engine).contains(&question));
     // Ready is the other branch.
     engine.execute(Move(North)).unwrap();
     engine.execute(Talk("copyist".into())).unwrap();
     engine.execute(ChooseDialogue(1)).unwrap();
     engine.execute(Move(South)).unwrap();
     engine.execute(Talk("archivist".into())).unwrap();
-    assert!(choices(&engine).contains(&question));
+    assert!(texts(&engine).contains(&question));
     engine.execute(ChooseDialogue(1)).unwrap();
     engine.execute(Talk("archivist".into())).unwrap();
-    assert!(!choices(&engine).contains(&question));
+    assert!(!texts(&engine).contains(&question));
 }
 
 #[test]
