@@ -159,6 +159,15 @@ pub struct DialogueState {
     pub node: Id,
 }
 
+/// A dialogue choice by IDs, which survive reordering its node's choices.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChoiceRef {
+    pub dialogue: Id,
+    pub node: Id,
+    pub choice: Id,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GameState {
@@ -198,6 +207,9 @@ pub struct GameState {
     /// The route outcome reached, for good; at most one per playthrough.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outcome: Option<Id>,
+    /// Ask-once dialogue choices the player has taken, never offered again.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub taken_choices: BTreeSet<ChoiceRef>,
 }
 
 /// A proficiency's rank, split by where it came from: points the player

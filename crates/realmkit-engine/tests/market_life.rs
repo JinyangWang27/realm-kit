@@ -289,6 +289,7 @@ fn workshops_are_bought_in_towns_within_their_limit() {
                 effects: vec![Effect::BuyWorkshop {
                     workshop: "weavery".into(),
                 }],
+                ..Default::default()
             },
         );
     }
@@ -396,6 +397,7 @@ fn teaching() -> WorldSpec {
                 proficiency: Proficiency::Trading,
                 ranks: 2,
             }],
+            ..Default::default()
         },
     );
     world

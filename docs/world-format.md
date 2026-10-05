@@ -847,6 +847,41 @@ use these three.
 A choice can be taken again while its condition holds, so a one-time gift
 pairs `grant_items` with `set_flag` under a `not` condition on that flag.
 
+A choice may also carry:
+
+- `id`: names the choice within its node, unique there (`duplicate_id`).
+- `once: true`: once taken, the choice is never offered again, such as a
+  question asked. It needs an `id` (`once_without_id`): saves remember taken
+  choices by dialogue, node and choice ID, so reordering a node's choices
+  keeps them valid, while removing a taken choice's ID makes the save
+  unloadable.
+- `back: true`: the choice returns to its `next` node, typically a hub of
+  questions. While that hub still offers a choice that leads on (one with a
+  `next`), the back choice is listed as authored. Once it offers only
+  choices that end the conversation, the back choice is replaced by those
+  choices, in their place in the list and with their own text and effects:
+  "Back to the questions" becomes the hub's own "Leave" exactly when the last
+  question is used, and nothing that leaving does is lost. With no such
+  choice at the hub, the back choice disappears. A back choice needs a
+  `next` and has no effects of its own (`invalid_back`).
+
+```json
+{
+  "id": "questions",
+  "text": "Pell sets down her pen. 'Briefly.'",
+  "choices": [
+    { "id": "founders", "text": "Who built the archive?", "next": "founders", "once": true },
+    { "id": "quiet", "text": "Why must it be so quiet?", "next": "quiet", "once": true },
+    { "text": "That is all. Thank you." }
+  ]
+},
+{
+  "id": "founders",
+  "text": "'The river guilds.'",
+  "choices": [{ "text": "Let me ask something else.", "next": "questions", "back": true }]
+}
+```
+
 Choices are filtered and then numbered contiguously from one. Omitting `next`
 ends the conversation. A node with no visible choices displays its text and
 ends the conversation. Moving, attacking, using a skill or resting also closes

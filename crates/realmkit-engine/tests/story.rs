@@ -314,6 +314,7 @@ fn a_choice_that_accepts_a_locked_quest_waits_for_it() {
         effects: vec![Effect::AcceptQuest {
             quest: "catalogue".into(),
         }],
+        ..Default::default()
     });
     let offer = "Shall I catalogue the vault?";
     let mut engine = reader(&world);
@@ -326,4 +327,89 @@ fn a_choice_that_accepts_a_locked_quest_waits_for_it() {
     let number = choices.iter().position(|c| *c == offer).unwrap() + 1;
     engine.execute(ChooseDialogue(number)).unwrap();
     assert_eq!(engine.state().quests["catalogue"], QuestStatus::Ready);
+}
+
+fn listed(engine: &Engine<'_>) -> Vec<String> {
+    engine
+        .dialogue_choices()
+        .into_iter()
+        .map(String::from)
+        .collect()
+}
+
+#[test]
+fn a_hub_of_ask_once_questions_is_used_up_and_back_turns_into_leaving() {
+    let mut world = archive();
+    // Leaving the hub marks the visit, to show the stand-in keeps its effects.
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    let hub = pell.nodes.iter_mut().find(|n| n.id == "questions").unwrap();
+    hub.choices[2].effects.push(Effect::SetFlag {
+        flag: "map_found".into(),
+    });
+    let mut engine = reader(&world);
+    engine.execute(Talk("archivist".into())).unwrap();
+    engine.execute(ChooseDialogue(2)).unwrap();
+    let all = [
+        "Who built the archive?",
+        "Why must it be so quiet?",
+        "That is all. Thank you.",
+    ];
+    assert_eq!(listed(&engine), all);
+    engine.execute(ChooseDialogue(1)).unwrap();
+    // A question remains, so back leads back to the hub, without the asked one.
+    assert_eq!(listed(&engine), ["Let me ask something else."]);
+    engine.execute(ChooseDialogue(1)).unwrap();
+    assert_eq!(listed(&engine), all[1..]);
+    let saved = engine.snapshot();
+    engine.execute(ChooseDialogue(1)).unwrap();
+    // The last question is used: back is now the hub's own leaving.
+    assert_eq!(listed(&engine), ["That is all. Thank you."]);
+    let events = engine.execute(ChooseDialogue(1)).unwrap();
+    assert!(events.contains(&Event::StoryFlagSet {
+        flag: "map_found".into()
+    }));
+    assert_eq!(events.last(), Some(&Event::DialogueEnded));
+    assert_eq!(engine.state().taken_choices.len(), 2);
+    // Coming back finds nothing left to ask.
+    engine.execute(Talk("archivist".into())).unwrap();
+    engine.execute(ChooseDialogue(2)).unwrap();
+    assert_eq!(listed(&engine), ["That is all. Thank you."]);
+    // Saves keep what was asked, by IDs.
+    let restored = Engine::restore(&world, saved.clone()).unwrap();
+    assert_eq!(listed(&restored), all[1..]);
+    let json = String::from_utf8(saved.to_json()).unwrap();
+    assert!(json.contains(r#""choice": "founders""#), "{json}");
+}
+
+#[test]
+fn a_save_cannot_have_asked_a_question_that_does_not_exist() {
+    let world = archive();
+    let mut snapshot = reader(&world).snapshot();
+    let asked = |dialogue: &str, node: &str, choice: &str| {
+        let mut snapshot = snapshot.clone();
+        snapshot.state.taken_choices.insert(ChoiceRef {
+            dialogue: dialogue.into(),
+            node: node.into(),
+            choice: choice.into(),
+        });
+        Engine::restore(&world, snapshot).is_ok()
+    };
+    assert!(asked("pell", "questions", "founders"));
+    assert!(!asked("pell", "questions", "nope"));
+    assert!(!asked("pell", "greeting", "founders"));
+    assert!(!asked("copyist", "questions", "founders"));
+    // Only a choice whose condition once held can have been taken.
+    let mut world = archive();
+    let pell = world.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+    let hub = pell.nodes.iter_mut().find(|n| n.id == "questions").unwrap();
+    hub.choices[0].requires = Some(Condition::Flag {
+        flag: "vault_open".into(),
+    });
+    snapshot.package_revision = world.revision();
+    snapshot.state.taken_choices.insert(ChoiceRef {
+        dialogue: "pell".into(),
+        node: "questions".into(),
+        choice: "founders".into(),
+    });
+    assert!(Engine::restore(&world, snapshot).is_err());
 }

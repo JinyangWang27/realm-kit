@@ -1,9 +1,9 @@
 //! Synchronous gameplay; no generation or presentation dependencies.
 
 use realmkit_spec::{
-    Channel, Character, Condition, DialogueChoice, Direction, Effect, Id, ItemStack, MapPoint,
-    Proficiency, Quest, QuestObjective, QuestStatus, Resource, Respec, Skill, SpecError, Stat,
-    Stats, WorldSpec, BASIC_POWER,
+    Channel, Character, Condition, Dialogue, DialogueChoice, DialogueNode, Direction, Effect, Id,
+    ItemStack, MapPoint, Proficiency, Quest, QuestObjective, QuestStatus, Resource, Respec, Skill,
+    SpecError, Stat, Stats, WorldSpec, BASIC_POWER,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -176,6 +176,7 @@ impl<'w> Engine<'w> {
                     .map(|p| p.id.clone())
                     .collect(),
                 outcome: None,
+                taken_choices: BTreeSet::new(),
             },
         };
         // Merchants open with their stock at its targets, drawing nothing.
@@ -287,7 +288,7 @@ impl<'w> Engine<'w> {
         self.state.dialogue.as_ref().map_or_else(Vec::new, |d| {
             rules::choices(self.world, &self.state, &d.npc, &d.node)
                 .into_iter()
-                .map(|c| c.text.as_str())
+                .map(|c| c.choice.text.as_str())
                 .collect()
         })
     }

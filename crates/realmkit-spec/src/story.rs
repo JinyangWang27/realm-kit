@@ -188,11 +188,23 @@ pub struct DialogueNode {
     pub choices: Vec<DialogueChoice>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct DialogueChoice {
+    /// Names the choice within its node, so saves can remember it however
+    /// the choices are ordered; required by `once`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<Id>,
     pub text: String,
     pub next: Option<Id>,
+    /// Once taken, never offered again, such as a question asked.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub once: bool,
+    /// Returns to `next`, such as a hub of questions, while it still offers
+    /// something besides ending the conversation; after that it is replaced
+    /// by the hub's own choices that end it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub back: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires: Option<Condition>,
     /// Applied in order; if one fails, the choice changes nothing.

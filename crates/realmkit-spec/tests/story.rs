@@ -355,3 +355,41 @@ fn a_choice_cannot_establish_what_it_needs() {
     });
     assert!(world.diagnostics().is_empty(), "{:?}", codes(&world));
 }
+
+#[test]
+fn ask_once_and_back_choices_are_checked() {
+    type Change = fn(&mut WorldSpec);
+    fn hub(w: &mut WorldSpec) -> &mut DialogueNode {
+        let pell = w.dialogues.iter_mut().find(|d| d.id == "pell").unwrap();
+        pell.nodes.iter_mut().find(|n| n.id == "questions").unwrap()
+    }
+    let cases: Vec<(Change, &str)> = vec![
+        (|w| hub(w).choices[0].id = None, "once_without_id"),
+        (
+            |w| hub(w).choices[1].id = Some("founders".into()),
+            "duplicate_id",
+        ),
+        (
+            |w| {
+                hub(w).choices[2].back = true;
+            },
+            "invalid_back",
+        ),
+        (
+            |w| {
+                let back = &mut hub(w).choices[2];
+                back.back = true;
+                back.next = Some("questions".into());
+                back.effects.push(Effect::SetFlag {
+                    flag: "map_found".into(),
+                });
+            },
+            "invalid_back",
+        ),
+    ];
+    for (change, code) in cases {
+        let mut world = archive();
+        change(&mut world);
+        assert_eq!(codes(&world), [code]);
+    }
+}

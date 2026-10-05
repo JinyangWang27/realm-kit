@@ -196,6 +196,7 @@ fn an_item_that_effects_only_take_keeps_its_upper_bound_in_saves() {
                     quantity: 1,
                 }],
             }],
+            ..Default::default()
         },
     );
     let engine = reader(&world);

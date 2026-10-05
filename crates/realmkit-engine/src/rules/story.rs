@@ -2,24 +2,90 @@
 
 use super::*;
 
+/// A choice as a conversation lists it, with the node it belongs to: the
+/// current one, or the hub a used-up back choice gives way to.
+pub(crate) struct Listed<'a> {
+    pub node: &'a Id,
+    pub choice: &'a DialogueChoice,
+}
+
+/// The dialogue `npc` speaks and its node `node`.
+fn speaking<'a>(world: &'a WorldSpec, npc: &str, node: &str) -> (&'a Dialogue, &'a DialogueNode) {
+    let dialogue = world
+        .dialogue(world.character(npc).unwrap().dialogue.as_ref().unwrap())
+        .unwrap();
+    (
+        dialogue,
+        dialogue.nodes.iter().find(|n| n.id == node).unwrap(),
+    )
+}
+
+/// Whether an ask-once choice has been taken.
+fn taken(state: &GameState, dialogue: &Id, node: &Id, choice: &DialogueChoice) -> bool {
+    choice.once
+        && state.taken_choices.iter().any(|r| {
+            r.dialogue == *dialogue && r.node == *node && Some(&r.choice) == choice.id.as_ref()
+        })
+}
+
+/// Whether the choice can be offered now: its condition holds, it was not
+/// asked once already, and no quest it accepts is locked.
+fn open(
+    world: &WorldSpec,
+    state: &GameState,
+    dialogue: &Id,
+    node: &Id,
+    choice: &DialogueChoice,
+) -> bool {
+    allowed(state, choice.requires.as_ref())
+        && !taken(state, dialogue, node, choice)
+        && !offers_locked_quest(world, state, choice)
+}
+
+/// The choices offered at `node`, in authored order. A back choice stays
+/// while its hub offers something besides leaving; then it gives way to the
+/// hub's own choices that end the conversation.
 pub(crate) fn choices<'a>(
     world: &'a WorldSpec,
     state: &GameState,
     npc: &str,
     node: &str,
-) -> Vec<&'a DialogueChoice> {
-    world
-        .dialogue(world.character(npc).unwrap().dialogue.as_ref().unwrap())
-        .unwrap()
-        .nodes
-        .iter()
-        .find(|n| n.id == node)
-        .unwrap()
-        .choices
-        .iter()
-        .filter(|c| allowed(state, c.requires.as_ref()))
-        .filter(|c| !offers_locked_quest(world, state, c))
-        .collect()
+) -> Vec<Listed<'a>> {
+    let (dialogue, here) = speaking(world, npc, node);
+    let mut listed = Vec::new();
+    for choice in &here.choices {
+        if !open(world, state, &dialogue.id, &here.id, choice) {
+            continue;
+        }
+        let hub = dialogue
+            .nodes
+            .iter()
+            .find(|n| choice.back && n.id == *choice.next.as_ref().unwrap());
+        let Some(hub) = hub else {
+            listed.push(Listed {
+                node: &here.id,
+                choice,
+            });
+            continue;
+        };
+        let offered: Vec<&DialogueChoice> = hub
+            .choices
+            .iter()
+            .filter(|c| open(world, state, &dialogue.id, &hub.id, c))
+            .collect();
+        if offered.iter().any(|c| c.next.is_some()) {
+            listed.push(Listed {
+                node: &here.id,
+                choice,
+            });
+        } else {
+            listed.extend(offered.into_iter().map(|choice| Listed {
+                node: &hub.id,
+                choice,
+            }));
+        }
+    }
+    listed
 }
 
 /// Whether taking the choice would be refused because a quest it accepts
@@ -57,7 +123,7 @@ pub(crate) fn dialogue(
     events.push(Event::Dialogue {
         npc,
         node,
-        choices: visible.iter().map(|c| c.text.clone()).collect(),
+        choices: visible.iter().map(|c| c.choice.text.clone()).collect(),
     });
     if state.dialogue.is_none() {
         events.push(Event::DialogueEnded);
@@ -326,10 +392,18 @@ pub(crate) fn choose(
         return Err(EngineError::NotHere(active.npc));
     }
     let visible = choices(world, state, &active.npc, &active.node);
-    let choice = number
+    let Listed { node, choice } = number
         .checked_sub(1)
-        .and_then(|i| visible.get(i))
+        .and_then(|i| visible.into_iter().nth(i))
         .ok_or(EngineError::InvalidChoice)?;
+    if choice.once {
+        let (dialogue, _) = speaking(world, &active.npc, node);
+        state.taken_choices.insert(ChoiceRef {
+            dialogue: dialogue.id.clone(),
+            node: node.clone(),
+            choice: choice.id.clone().unwrap(),
+        });
+    }
     apply(world, state, &choice.effects, events)?;
     // An effect can make the speaker unavailable; the conversation ends then.
     match &choice.next {

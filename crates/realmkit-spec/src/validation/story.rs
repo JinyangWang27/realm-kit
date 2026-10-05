@@ -162,7 +162,34 @@ pub(super) fn dialogues(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             &dialogue.start,
             dialogue.nodes.iter().any(|n| n.id == dialogue.start),
         );
+        for node in &dialogue.nodes {
+            ids(
+                out,
+                "dialogue choice",
+                node.choices.iter().filter_map(|c| c.id.as_deref()),
+            );
+        }
         for choice in dialogue.nodes.iter().flat_map(|n| &n.choices) {
+            if choice.once && choice.id.is_none() {
+                issue(
+                    out,
+                    &dialogue.id,
+                    "once_without_id",
+                    format!("an ask-once choice needs an id: {:?}", choice.text),
+                );
+            }
+            // Going back changes nothing, so a used-up hub can stand in for it.
+            if choice.back && (choice.next.is_none() || !choice.effects.is_empty()) {
+                issue(
+                    out,
+                    &dialogue.id,
+                    "invalid_back",
+                    format!(
+                        "a back choice needs a next node and no effects: {:?}",
+                        choice.text
+                    ),
+                );
+            }
             if let Some(next) = &choice.next {
                 reference(
                     out,

@@ -450,6 +450,7 @@ fn a_choice_that_makes_the_speaker_unavailable_ends_the_conversation() {
         next: None,
         requires: None,
         effects: Vec::new(),
+        ..Default::default()
     });
     let mut engine = Engine::new(&world).unwrap();
     accept(&mut engine);

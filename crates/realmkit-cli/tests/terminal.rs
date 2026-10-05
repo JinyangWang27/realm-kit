@@ -779,3 +779,18 @@ fn a_road_to_an_unknown_place_is_not_named() {
         "{after}"
     );
 }
+
+#[test]
+fn asked_questions_leave_the_list_and_back_becomes_leaving() {
+    let output = run(
+        &["play", ARCHIVE, "--line"],
+        "3\ntalk archivist\nchoose 2\nchoose 1\nchoose 1\nchoose 1\n",
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    let (_, last) = text.rsplit_once("'And so do I.'").unwrap();
+    assert!(
+        last.starts_with("\n\n  1. That is all. Thank you.\n"),
+        "{last}"
+    );
+    assert!(text.contains("\n  1. Why must it be so quiet?\n  2. That is all. Thank you.\n"));
+}

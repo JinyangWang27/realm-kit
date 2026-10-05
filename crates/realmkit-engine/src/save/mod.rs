@@ -37,6 +37,7 @@ pub(super) fn check(
     evidence(world, state)?;
     phases(world, state)?;
     outcome(world, state)?;
+    taken_choices(world, state)?;
     dialogue(world, state)
 }
 
@@ -862,6 +863,21 @@ fn outcome(world: &WorldSpec, state: &GameState) -> Result<(), String> {
             None => rules::outcomes(world, state).is_empty(),
         },
         "invalid route outcome",
+    )
+}
+
+/// Every ask-once choice taken exists and could have been chosen: its
+/// condition once held.
+fn taken_choices(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    ensure(
+        state.taken_choices.iter().all(|r| {
+            world
+                .dialogue(&r.dialogue)
+                .and_then(|d| d.nodes.iter().find(|n| n.id == r.node))
+                .and_then(|n| n.choices.iter().find(|c| c.id.as_ref() == Some(&r.choice)))
+                .is_some_and(|c| c.once && lasting(world, state, c.requires.as_ref()))
+        }),
+        "a choice asked once could not have been chosen",
     )
 }
 

@@ -274,6 +274,7 @@ fn currency_effects_and_conditions() {
                 },
                 Effect::PayCurrency { amount: 150 },
             ],
+            ..Default::default()
         },
     );
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
