@@ -223,10 +223,7 @@ impl<'w> Engine<'w> {
     }
     /// The active encounter, if any.
     pub fn encounter(&self) -> Option<&Encounter> {
-        match &self.state.combat.as_ref()?.stance {
-            Stance::Fighting(encounter) => Some(encounter),
-            Stance::Exploring(_) | Stance::Battle(_) => None,
-        }
+        rules::fighting(&self.state)
     }
     /// The battle the player is leading, if any.
     pub fn battle(&self) -> Option<&BattleState> {
