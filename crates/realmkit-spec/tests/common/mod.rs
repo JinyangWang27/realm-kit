@@ -73,3 +73,11 @@ pub fn caravan_trail() -> WorldSpec {
     ))
     .unwrap()
 }
+
+pub fn smithy() -> WorldSpec {
+    WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/smithy"
+    ))
+    .unwrap()
+}

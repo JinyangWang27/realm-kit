@@ -19,22 +19,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .economy import MASK, splitmix64
+from .economy import MASK, Stream
 from .model import ratio_damage
 
 DOMAIN_BATTLE = 0x6261_7474_6C65  # "battle" in ASCII, as in the engine's rng.rs
 ORDERS = ("charge", "hold", "flank", "retreat")
-
-
-@dataclass
-class Stream:
-    """The engine's `battle` random stream."""
-
-    state: int
-
-    def below(self, n: int) -> int:
-        self.state, value = splitmix64(self.state)
-        return (value * n) >> 64
 
 
 @dataclass

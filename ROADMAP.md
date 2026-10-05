@@ -53,20 +53,20 @@ original game's requirement with the smallest reusable typed boundary.
 
 The current priority is:
 
-1. **P0 — player-facing presentation seam · delivered** (Format 16). The
+1. **P0 — player-facing presentation seam · delivered**. The
    overland-map data/query for a continent-scale world, and proof that the
    spec/engine can be hosted by a graphical client without terminal or
    filesystem assumptions. The target product client is text-first and
    graphical; React/Tauri/web details stay outside the engine. Keep
    `realmkit-cli` as the reference/debug client.
 2. **P0 — authored opening, progression and investigation · MVP slice
-   delivered** (Format 17). Route start choices for an ordinary-background
-   opening (Format 16); story phases, main quests, quest prerequisites and
+   delivered**. Route start choices for an ordinary-background
+   opening; story phases, main quests, quest prerequisites and
    route outcomes; evidence as investigation state; places the player learns
    of before the map shows them; and features to examine.
    `examples/caravan-trail` plays an MVP-shaped slice from a caravan's
-   arrival through an investigation to a choice of leads. Format 19 adds what
-   authoring the original game's first slice asked for: `at_least`
+   arrival through an investigation to a choice of leads. Authoring the
+   original game's first slice then added `at_least`
    conditions, evidence facts that fill in, ask-once and back dialogue
    choices, unavailable choices with a reason, and language overlays with
    saves bound to the rules alone. Still to come when the original game's
@@ -138,8 +138,8 @@ they are not retroactively part of M1 acceptance.
 ## M2 — Continue an adventure across sessions · complete
 
 Delivered: engine `SaveSnapshot` export and all-or-nothing validated restore
-bound to package ID, content-digest revision and the `default` route (since
-Format 19 a digest of the rules alone, leaving out prose and language); CLI
+bound to package ID, content-digest revision and the `default` route (now a
+digest of the rules alone, leaving out prose and language); CLI
 `--saves <directory>` with atomic JSON files, a lineage index that forks when an
 older save is loaded, `save`/`load` commands, auto-saves at route start and
 quest completion, and newest-save recovery on death that reports invalid saves
@@ -294,7 +294,7 @@ authored level with the player's realm rank instead, or has no falloff.
 Each slice ships and is tested on its own. M3a depends on none of the open
 balance decisions.
 
-1. **M3a — combat becomes optional (Format 2) · delivered.** Merge `npcs.json` and
+1. **M3a — combat becomes optional · delivered.** Merge `npcs.json` and
    `monsters.json` into one character list whose dialogue and combat profile are
    optional components, matching the glossary's shared Character model. The
    player-controlled character becomes an entry in that list, named by the world
@@ -493,7 +493,7 @@ lie between starting and final values. Stats are not stored in 8 bits, so a cap 
   Basic attacks are free and available from level 1, since they are the fallback
   action; other skills unlock at level 1 or later; authored stats are checked
   before any rounding; and per-level stats never fall as levels rise, as the
-  Format 1 level table already requires.
+  level table already requires.
 - **Speed cap.** A required world-level parameter because it governs scheduling.
   The starting candidate is 200 with baseline 100.
 - **Other stat caps.** None in M3: the level table is authored, so authors already
@@ -961,7 +961,7 @@ every package.
   immunity wins (zero damage); the combined multiplier is kept within 1/10 to
   10. Each armour piece authors a flat speed penalty; penalties add up and
   apply before the speed cap, and effective speed never drops below 1.
-  **Consumables** (Format 13): an item restores HP and MP when used,
+  **Consumables**: an item restores HP and MP when used,
   exploring or as a fight turn. Cooldowns and status effects wait for a
   skill that needs them.
 - Define durations in terms of the chosen combat clock; do not casually mix
@@ -1065,20 +1065,20 @@ milestones. They change how play reads, never the engine or its rules.
    last six lines of the fight (the latest turn marked) and the menu. When
    it ends, scrollback keeps only the opening line and the final turn. Line
    mode and pipes keep the full log.
-6. **Overland map** · delivered, **original-game P0** (Format 16). A map of
+6. **Overland map** · delivered, **original-game P0**. A map of
    places and roads drawn from authored display positions, with zoom,
    panning and labels that make room for each other, and a fixed view in
    line mode ([Overland map](docs/sandbox-worlds.md#overland-map)). Unlike
    the items above, it needs a package field for positions and an engine
-   query, so it bumps the format. As delivered: characters who move are left
+   query. As delivered: characters who move are left
    out until knowledge and news exists; travel to a chosen place waits for
-   travel speed and world agents. Format 17 adds `known_when`: a place stays
+   travel speed and world agents. `known_when` keeps a place
    off the map, and off the roads, until the player learns of it.
-7. **Embeddable client surface** · delivered, **original-game P0** (Format 16).
+7. **Embeddable client surface** · delivered, **original-game P0**.
    The engine stays presentation-agnostic; a non-terminal host loads a
    package from memory (`WorldSpec::from_files`), inspects views and actions,
    executes typed commands and imports/exports snapshots as JSON bytes, with
-   commands, events, actions, the map view and (Format 17) the journal
+   commands, events, actions, the map view and the journal
    serializable, and
    `realmkit-engine` builds for `wasm32-unknown-unknown`. No adapter crate:
    the React/Tauri application and its wasm-bindgen or IPC glue belong
@@ -1100,7 +1100,7 @@ milestones. They change how play reads, never the engine or its rules.
 - Expand authored dialogue and branches, with consistent NPC availability and
   understandable journal entries.
 - Make Inventory genuinely optional in runtime/spec/presentation rather than
-  retaining Format 1 placeholders. An inventory-free world has no inventory state,
+  retaining placeholders. An inventory-free world has no inventory state,
   no Inventory command/action/panel, and no required inventory/item definitions
   merely to satisfy the engine.
 - Add source-specific capabilities only with a representative world. For example,
@@ -1147,7 +1147,7 @@ dialogue in the opening town would otherwise duplicate content.
    and a dialogue choice carries an ordered list of `effects` in place of one
    optional `effect`, applied atomically. Numeric predicates stay
    domain-typed, as [decided](docs/open-decisions.md#6-conditions-and-effects).
-   As delivered (Format 12): an `item` predicate for carried counted items and
+   As delivered: an `item` predicate for carried counted items and
    `grant_items`/`take_items` effects arrive with it, and
    `examples/quiet-archive` uses `any`, `not` and multi-effect choices.
 2. **M5b — world time, travel and recurring schedules.** Optional World Time
@@ -1155,7 +1155,7 @@ dialogue in the opening town would otherwise duplicate content.
    the six compass directions; wait and rest actions that consume time; and
    recurring schedules that the dispatch cursor expands lazily, one due
    occurrence at a time; and characters who move among authored locations on
-   a schedule, drawn from a `world` RNG domain. **Delivered** (Format 12):
+   a schedule, drawn from a `world` RNG domain. **Delivered**:
    undirected roads with minutes, conditions and blocked text, mixable with
    compass exits; `wait` with an authored menu step and `rest` with an
    authored duration; one-shot and recurring authored events whose effects
@@ -1167,8 +1167,8 @@ dialogue in the opening town would otherwise duplicate content.
    clock entered or left its `time_of_day` hours, and a market that opens
    or closes with its merchant, change silently; report them as movers'
    arrivals are reported.
-3. **M5c — authored progression and quest lifecycle · partly delivered**
-   (Format 17): story phases moved only by `enter_phase`, `main` quests,
+3. **M5c — authored progression and quest lifecycle · partly
+   delivered**: story phases moved only by `enter_phase`, `main` quests,
    quest `requires` for chains and phase-gated waves, and route outcomes
    recorded once (completion only, non-terminal); validation rejects
    prerequisite cycles, main quests waiting on side quests and phases
@@ -1186,35 +1186,35 @@ dialogue in the opening town would otherwise duplicate content.
    characters keep their authored IDs and carry state such as wounds or
    captivity under them.
 5. **M5e — dialogue by role, text variants and languages · languages
-   delivered** (Format 19). Authored roles whose dialogues and topics every
+   delivered**. Authored roles whose dialogues and topics every
    member shares, `Speaker` references in conditions, effects and templates,
    line slots that each member fills, role offer givers, and text fields with
    conditional variants are still proposed. Delivered: a package may carry
    complete overlays of its prose in other languages (`text/<tag>.json`,
    keyed by each field's JSON path), chosen when the package is loaded, and
    saves bind to a revision of the rules alone, so they move between
-   languages and survive prose fixes. Also delivered in Format 19, from the
-   original game's dialogue: choices asked `once`, `back` choices that become
+   languages and survive prose fixes. Also delivered, from the original
+   game's dialogue: choices asked `once`, `back` choices that become
    the hub's own leaving when its questions are used up, and `blocked_text`
    that lists an unmet choice with its reason, the way a locked exit is.
-6. **M5f — start choices · delivered** (Format 16). A route's authored start
+6. **M5f — start choices · delivered**. A route's authored start
    questions at New Game, each option an ordered effect list applied to the
    initial state, with the chosen option IDs saved for display. Every
    question is asked, in order; an answer never skips or adds one.
    `examples/quiet-archive` asks why the player came.
-7. **Investigation slice · delivered** (Format 17). Evidence definitions,
+7. **Investigation slice · delivered**. Evidence definitions,
    optionally linked to an item; `discover_evidence` and an `evidence`
    condition; `EvidenceDiscovered`; evidence in saves and the journal.
    Authored conditions decide what evidence supports; there are no
    deductions, contradictions or accusations yet. `examples/caravan-trail`
    reaches its conclusion by several evidence paths, and the quiet archive
-   gates Pell's thanks on the stitched map. Format 18 adds each evidence's
+   gates Pell's thanks on the stitched map. Each evidence may also give its
    source, fixed facts and interpretations that later evidence, flags or
    phases unlock, reported as `EvidenceReinterpreted`: the evidence stays the
-   same while the player's understanding of it changes. Format 19 lets a fact
-   wait on a lasting `when`, so evidence found at the first observation fills
-   in as the investigation goes on (`EvidenceFactLearned`), and adds an
-   `at_least` condition, so "any two of these readings" needs no list of
+   same while the player's understanding of it changes. A fact may wait on a
+   lasting `when`, so evidence found at the first observation fills
+   in as the investigation goes on (`EvidenceFactLearned`), and an
+   `at_least` condition means "any two of these readings" needs no list of
    pairs.
 
 **Done when:** longer hand-authored fixtures demonstrate branching progression
@@ -1257,15 +1257,15 @@ original-game fixture actually uses them.
    arrives here too: points per level, personal or party proficiencies, and
    study from items over world time. The price tick is mirrored in
    `scripts/combat_sim` before tests pin its numbers. Delivered in two parts.
-   **M6a-1 · delivered** (Format 12): currency, goods, producer kinds,
+   **M6a-1 · delivered**: currency, goods, producer kinds,
    town and village markets with authored starting indices, the four-phase
    price tick on its own `market` stream, links, merchants who must be
    present, buying and selling with a spread, per-unit index steps and an
    engine-computed preview, and currency conditions and effects;
    `scripts/combat_sim/economy.py` mirrors the tick and computes warm-up
    prices for authors; `examples/marches` trades. Wares, items a market
-   sells at a fixed price, arrived early with consumables (Format 13).
-   **M6a-2 · delivered** (Format 15): prosperity that drifts daily towards
+   sells at a fixed price, arrived early with consumables.
+   **M6a-2 · delivered**: prosperity that drifts daily towards
    an ideal lowered by scarcity and scales demand and stock; merchants'
    stock and purse, restocked from their own `stock` stream, limiting
    trade both ways; villages that feed their market town; workshops bought
@@ -1304,7 +1304,7 @@ original-game fixture actually uses them.
    captivity as a setback rather than an ending. Holding prisons arrive with
    M6e. Victories grant XP, standing and a loot pool drawn from authored loot
    tables; defeats may inflict authored lasting injuries.
-   **M6c-1 and M6d-1 · delivered** (Format 14): troop classes and lines
+   **M6c-1 and M6d-1 · delivered**: troop classes and lines
    whose soldiers level up in squads, renamed where authored, with branch
    upgrades from a line's last level; recruiting from pools that refill;
    an upkeep schedule for wages, desertion when unpaid and recovery of the
@@ -1471,14 +1471,14 @@ Resolve decisions immediately before the original game's slice that consumes the
 complete cross-project register remains in
 [docs/open-decisions.md](docs/open-decisions.md).
 
-1. **Presentation P0 · settled** (Formats 16–17): placement and kinds as
+1. **Presentation P0 · settled**: placement and kinds as
    authored positions, places known by an authored `known_when` condition,
    and the host boundary as in-memory loading, serializable commands, events,
    map and journal views, and JSON snapshots. Revisit only when the real
    client shows which queries it needs.
-2. **Authored progression P0 · settled for the MVP** (Format 17): phases as
+2. **Authored progression P0 · settled for the MVP**: phases as
    an ordered list moved by effects, `main` and `requires` on quests, and
-   outcomes recorded once. Several languages settled in Format 19: one base
+   outcomes recorded once. Several languages are settled too: one base
    language plus complete overlays, and a rules-only save revision. Settle failure, deadlines and terminal outcomes
    when the original game's content beyond the MVP needs them.
 3. **Politics P0:** settle M6b faction membership/war-peace representation and

@@ -131,3 +131,36 @@ pub fn texts(engine: &Engine<'_>) -> Vec<String> {
         .map(|c| c.text)
         .collect()
 }
+
+pub fn sect() -> WorldSpec {
+    WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect")).unwrap()
+}
+
+pub fn squad(engine: &Engine<'_>, line: &str, level: usize) -> Option<Squad> {
+    engine
+        .state()
+        .retinue
+        .as_ref()?
+        .roster
+        .get(line)?
+        .get(&level)
+        .copied()
+}
+
+pub fn currency(engine: &Engine<'_>) -> u64 {
+    engine.state().economy.as_ref().unwrap().currency
+}
+
+pub fn buy(good: &str, quantity: u64) -> Command {
+    Buy {
+        good: good.into(),
+        quantity,
+    }
+}
+
+pub fn sell(good: &str, quantity: u64) -> Command {
+    Sell {
+        good: good.into(),
+        quantity,
+    }
+}

@@ -7,23 +7,8 @@ use common::*;
 use realmkit_engine::{Command::*, *};
 use realmkit_spec::*;
 
-fn squad(engine: &Engine<'_>, line: &str, level: usize) -> Option<Squad> {
-    engine
-        .state()
-        .retinue
-        .as_ref()?
-        .roster
-        .get(line)?
-        .get(&level)
-        .copied()
-}
-
 fn pool(engine: &Engine<'_>) -> u64 {
     engine.state().retinue.as_ref().unwrap().pools["ashmere"]["levy"]
-}
-
-fn currency(engine: &Engine<'_>) -> u64 {
-    engine.state().economy.as_ref().unwrap().currency
 }
 
 fn recruit(line: &str, quantity: u64) -> Command {

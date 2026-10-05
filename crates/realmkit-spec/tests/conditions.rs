@@ -107,14 +107,6 @@ fn every_leaf_of_a_tree_is_checked_and_compositions_are_not_empty() {
     }
 }
 
-fn smithy() -> WorldSpec {
-    WorldSpec::load(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../examples/smithy"
-    ))
-    .unwrap()
-}
-
 #[test]
 fn equipment_cannot_be_counted_or_taken() {
     let mut world = smithy();

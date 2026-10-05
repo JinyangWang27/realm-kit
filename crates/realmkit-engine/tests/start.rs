@@ -10,10 +10,6 @@ fn answer<'w>(world: &'w WorldSpec, choice: &str) -> Engine<'w> {
     Engine::start(world, 0, &[choice.into()]).unwrap()
 }
 
-fn sect() -> WorldSpec {
-    WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect")).unwrap()
-}
-
 #[test]
 fn an_answer_shapes_the_start_before_the_first_turn() {
     let world = archive();

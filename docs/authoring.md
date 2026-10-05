@@ -87,7 +87,7 @@ A language tag does not prove that prose obeys this rule; author review must
 check the text itself. Do not silently fall back to English or generic fantasy
 prose.
 
-A world authored in one language may carry overlays in others (Format 19; see
+A world authored in one language may carry overlays in others (see
 [Translations](world-format.md#translations)). Author the package in its base
 language, take its keys from `WorldSpec::texts()` (or `realmkit text`), and add
 a complete overlay per language to `WorldSpec::translations` and its tag to
@@ -142,7 +142,7 @@ shared world / canon timeline
 Do not introduce a dedicated runtime `Campaign` abstraction merely to express
 this before a concrete multi-route package needs one. For now, treat "route" as
 the conceptual unit for an independently playable player-controlled entry and
-storyline. The current Format 16 still supports one fixed implicit `default`
+storyline. The current format still supports one fixed implicit `default`
 route, with its player binding stored as `world.player`; a serialized route
 collection and `PlayerSpec` arrive only when a concrete multi-route package needs
 them. Multiple simultaneously controlled characters remain a separate future
@@ -276,7 +276,7 @@ can distinguish adaptation from invention.
 
 ## Investigation and conversation patterns
 
-Format 19 gives common authoring shapes their own fields, so a compiler or
+The format gives common authoring shapes their own fields, so a compiler or
 author need not expand them by hand:
 
 - **Any N of these.** `{ "kind": "at_least", "count": 2, "of": [...] }` in

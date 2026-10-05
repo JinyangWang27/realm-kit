@@ -11,10 +11,6 @@ fn index(engine: &Engine<'_>, market: &str, good: &str) -> u32 {
     engine.state().economy.as_ref().unwrap().prices[market][good]
 }
 
-fn currency(engine: &Engine<'_>) -> u64 {
-    engine.state().economy.as_ref().unwrap().currency
-}
-
 /// The marches without merchants' stock, so only currency limits trade.
 fn unlimited() -> WorldSpec {
     let mut world = marches();
@@ -32,20 +28,6 @@ fn best_trader(state: &mut GameState) {
         taught: 0,
     };
     state.proficiencies.insert(Proficiency::Trading, trained);
-}
-
-fn buy(good: &str, quantity: u64) -> Command {
-    Buy {
-        good: good.into(),
-        quantity,
-    }
-}
-
-fn sell(good: &str, quantity: u64) -> Command {
-    Sell {
-        good: good.into(),
-        quantity,
-    }
 }
 
 /// Every index at every market after `ticks` daily price ticks from the start.

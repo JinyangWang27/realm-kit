@@ -32,7 +32,7 @@ A person/entity that exists in the shared world regardless of who controls it in
 a particular route. Canonical and original playable characters should use the
 same shared character model as non-player-controlled characters.
 
-Format 16 already stores people and creatures as shared `Character` definitions
+The format already stores people and creatures as shared `Character` definitions
 with stable identity, name/description and optional dialogue/combat components.
 Richer authored identity such as origin/background or canonical metadata should
 extend that shared definition only when a real world needs it; do not reintroduce
@@ -59,7 +59,7 @@ The planned static route-level binding that identifies which shared `Character`
 the human controls. It should not duplicate intrinsic character identity or absorb
 mutable route/capability state.
 
-This type does not exist as a distinct serialized object in Format 16. The
+This type does not exist as a distinct serialized object in the current format. The
 implicit `default` route instead uses `world.player` as its fixed control binding.
 A future multi-route format should introduce the small route-level binding rather
 than duplicate the shared `Character`; it remains the static counterpart to the

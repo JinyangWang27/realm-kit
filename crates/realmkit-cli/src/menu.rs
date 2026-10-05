@@ -303,11 +303,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 .location(&here.exits[direction].destination)
                 .unwrap()
                 .name,
-            if action.available {
-                String::new()
-            } else {
-                format!(" {LOCKED}")
-            }
+            locked(action.available)
         ),
         // "Travel to Ashmere — 2 h", or "[locked]" like an exit.
         Command::Travel(to) => {
@@ -320,11 +316,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 } else {
                     String::new()
                 },
-                if action.available {
-                    String::new()
-                } else {
-                    format!(" {LOCKED}")
-                }
+                locked(action.available)
             )
         }
         // Like a locked exit, choosing it explains why it cannot be used.
@@ -656,6 +648,15 @@ fn missing(
     }
 }
 
+/// " [locked]" after what cannot be used now, as a locked exit is shown.
+fn locked(available: bool) -> String {
+    if available {
+        String::new()
+    } else {
+        format!(" {LOCKED}")
+    }
+}
+
 /// The first unmet leaf that a failed condition needs, if it can be named:
 /// through `all` only, since `any`, `at_least` and `not` have no single reason.
 fn unmet<'c>(
@@ -744,10 +745,7 @@ impl Menu {
                 // Like a locked exit, choosing it explains why it cannot be taken.
                 .map(|(i, option)| Entry {
                     pick: Pick::Run(Command::ChooseDialogue(i + 1)),
-                    label: match option.blocked {
-                        Some(_) => format!("{} {LOCKED}", option.text),
-                        None => option.text,
-                    },
+                    label: format!("{}{}", option.text, locked(option.blocked.is_none())),
                 })
                 .collect();
             (top, Vec::new())
@@ -927,6 +925,54 @@ mod tests {
         .unwrap()
     }
 
+    fn smithy() -> WorldSpec {
+        WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/smithy"
+        ))
+        .unwrap()
+    }
+
+    /// The smithy after Bran's errand, two beetles and a forged iron sword,
+    /// standing at the forge.
+    fn forged_sword(world: &WorldSpec) -> Engine<'_> {
+        let mut engine = Engine::new(world).unwrap();
+        for command in [
+            Command::Talk("bran".into()),
+            Command::ChooseDialogue(1),
+            Command::ChooseDialogue(1),
+            Command::Move(Direction::Down),
+        ] {
+            engine.execute(command).unwrap();
+        }
+        for _ in 0..2 {
+            engine.execute(Command::Engage("beetle".into())).unwrap();
+            while engine.encounter().is_some() {
+                engine.execute(Command::Attack("beetle".into())).unwrap();
+            }
+        }
+        for command in [
+            Command::Move(Direction::Up),
+            Command::Move(Direction::East),
+            Command::Forge("iron_sword".into()),
+        ] {
+            engine.execute(command).unwrap();
+        }
+        engine
+    }
+
+    /// The labels of the submenu `group` opens.
+    fn submenu(engine: &Engine<'_>, group: &str) -> Vec<String> {
+        let mut menu = Menu::new(engine, false, None);
+        let at = menu
+            .entries()
+            .iter()
+            .position(|e| e.label == group)
+            .unwrap_or_else(|| panic!("no {group}"));
+        menu.choose(at + 1);
+        menu.entries().iter().map(|e| e.label.clone()).collect()
+    }
+
     #[test]
     fn an_exit_to_an_unknown_place_is_neither_offered_nor_listed() {
         let mut world = demo();
@@ -1094,41 +1140,12 @@ mod tests {
 
     #[test]
     fn an_improvement_previews_the_piece_even_before_it_is_affordable() {
-        let world = WorldSpec::load(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/smithy"
-        ))
-        .unwrap();
-        let mut engine = Engine::new(&world).unwrap();
-        for command in [
-            Command::Talk("bran".into()),
-            Command::ChooseDialogue(1),
-            Command::ChooseDialogue(1),
-            Command::Move(Direction::Down),
-        ] {
-            engine.execute(command).unwrap();
-        }
-        for _ in 0..2 {
-            engine.execute(Command::Engage("beetle".into())).unwrap();
-            while engine.encounter().is_some() {
-                engine.execute(Command::Attack("beetle".into())).unwrap();
-            }
-        }
-        engine.execute(Command::Move(Direction::Up)).unwrap();
-        engine.execute(Command::Move(Direction::East)).unwrap();
-        engine.execute(Command::Forge("iron_sword".into())).unwrap();
-        let mut menu = Menu::new(&engine, false, None);
-        let smithing = menu
-            .entries()
-            .iter()
-            .position(|e| e.label == "Smithing ›")
-            .unwrap();
-        menu.choose(smithing + 1);
-        let labels: Vec<_> = menu.entries().iter().map(|e| e.label.as_str()).collect();
+        let world = smithy();
+        let labels = submenu(&forged_sword(&world), "Smithing ›");
         // The piece's own change, shown although an Apprentice with no ingot
         // cannot make it yet.
         assert!(labels.contains(
-            &"Improve #1 Iron sword → Fine Iron sword (Attack +4 → +6) — 1 Iron ingot [needs Journeyman Smithing]"
+            &"Improve #1 Iron sword → Fine Iron sword (Attack +4 → +6) — 1 Iron ingot [needs Journeyman Smithing]".into()
         ), "{labels:?}");
     }
 
@@ -1137,17 +1154,7 @@ mod tests {
         let world =
             WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/arena")).unwrap();
         let mut engine = Engine::new(&world).unwrap();
-        let open = |engine: &Engine<'_>, group: &str| -> Vec<String> {
-            let mut menu = Menu::new(engine, false, None);
-            let at = menu
-                .entries()
-                .iter()
-                .position(|e| e.label == group)
-                .unwrap_or_else(|| panic!("no {group}"));
-            menu.choose(at + 1);
-            menu.entries().iter().map(|e| e.label.clone()).collect()
-        };
-        let market = open(&engine, "Market ›");
+        let market = submenu(&engine, "Market ›");
         assert!(
             market.contains(&"Buy Healing draught — 8 marks".into()),
             "{market:?}"
@@ -1163,7 +1170,7 @@ mod tests {
             })
             .unwrap();
         // At full health a draught would do nothing, and says so.
-        let usable = open(&engine, "Use item ›");
+        let usable = submenu(&engine, "Use item ›");
         assert_eq!(
             usable,
             ["Healing draught ×1 — +30 HP [nothing to restore]", "Back"]
@@ -1179,18 +1186,8 @@ mod tests {
         .unwrap();
         let mut engine = Engine::new(&world).unwrap();
         engine.execute(Command::Travel("ashmere".into())).unwrap();
-        let open = |engine: &Engine<'_>, group: &str| -> Vec<String> {
-            let mut menu = Menu::new(engine, false, None);
-            let at = menu
-                .entries()
-                .iter()
-                .position(|e| e.label == group)
-                .unwrap_or_else(|| panic!("no {group}"));
-            menu.choose(at + 1);
-            menu.entries().iter().map(|e| e.label.clone()).collect()
-        };
         assert_eq!(
-            open(&engine, "Recruit ›"),
+            submenu(&engine, "Recruit ›"),
             ["Recruit Levy — 10 silver (8 left)", "Back"]
         );
         engine
@@ -1200,7 +1197,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            open(&engine, "Recruit ›"),
+            submenu(&engine, "Recruit ›"),
             ["Recruit Levy — 10 silver (0 left) [none left]", "Back"]
         );
         // Spearmen can turn bowmen or, for more than is left, riders.
@@ -1210,7 +1207,7 @@ mod tests {
         roster.entry("levy".into()).or_default().insert(3, levies);
         let engine = Engine::restore(&world, snapshot).unwrap();
         assert_eq!(
-            open(&engine, "Upgrade ›"),
+            submenu(&engine, "Upgrade ›"),
             [
                 "Spearman → Bowman — 20 silver",
                 "Spearman → Rider — 40 silver [cannot afford]",
@@ -1221,33 +1218,11 @@ mod tests {
 
     #[test]
     fn an_enchantment_label_leaves_out_zero_bonuses() {
-        let mut world = WorldSpec::load(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../examples/smithy"
-        ))
-        .unwrap();
+        let mut world = smithy();
         let combat = world.world.combat.as_mut().unwrap();
         combat.enchantments[0].bonuses.insert(Stat::Pdef, 0);
-        let mut engine = Engine::new(&world).unwrap();
-        let steps = [
-            Command::Talk("bran".into()),
-            Command::ChooseDialogue(1),
-            Command::ChooseDialogue(1),
-            Command::Move(Direction::Down),
-        ];
-        for command in steps {
-            engine.execute(command).unwrap();
-        }
-        for _ in 0..2 {
-            engine.execute(Command::Engage("beetle".into())).unwrap();
-            while engine.encounter().is_some() {
-                engine.execute(Command::Attack("beetle".into())).unwrap();
-            }
-        }
+        let mut engine = forged_sword(&world);
         for command in [
-            Command::Move(Direction::Up),
-            Command::Move(Direction::East),
-            Command::Forge("iron_sword".into()),
             Command::Move(Direction::West),
             Command::Move(Direction::North),
             Command::Talk("maud".into()),
@@ -1256,14 +1231,7 @@ mod tests {
         ] {
             engine.execute(command).unwrap();
         }
-        let mut menu = Menu::new(&engine, false, None);
-        let enchanting = menu
-            .entries()
-            .iter()
-            .position(|e| e.label == "Enchanting ›")
-            .unwrap();
-        menu.choose(enchanting + 1);
-        let label = &menu.entries()[0].label;
+        let label = &submenu(&engine, "Enchanting ›")[0];
         assert!(label.contains("(Attack +2)"), "{label}");
     }
 }

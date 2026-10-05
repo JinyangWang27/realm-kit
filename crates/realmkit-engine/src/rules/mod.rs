@@ -111,7 +111,7 @@ pub(super) fn defeated(state: &GameState, id: &str) -> bool {
         .is_some_and(|c| c.defeated.contains(id))
 }
 
-fn fighting(state: &GameState) -> Option<&Encounter> {
+pub(super) fn fighting(state: &GameState) -> Option<&Encounter> {
     match &state.combat.as_ref()?.stance {
         Stance::Fighting(encounter) => Some(encounter),
         Stance::Exploring(_) | Stance::Battle(_) => None,

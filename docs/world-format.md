@@ -1,71 +1,31 @@
-# World package format 19
+# World package format
 
-Format 19 adds authoring conveniences an investigation needs: an `at_least`
-condition ("any two of these"), evidence facts that become known over time,
-dialogue choices asked once, back choices that turn into leaving when a hub
-of questions is used up, unavailable choices shown with a reason, and
-language overlays. Saves now bind to a revision of the rules alone, so prose
-fixes and added languages keep them loadable. Format 18 let evidence carry
-its source, the facts observed and interpretations that later knowledge
-unlocks. Format 17 added authored
-progression and investigation: evidence the player
-discovers, story phases, main quests and quest prerequisites, route
-outcomes, places the player must learn of before the map shows them, and
-features to examine rather than talk to. Format 16 added optional map
-positions, so a client can draw the places and roads, and start questions
-the player answers at New Game. Format 15
-completed the economy: markets that prosper or decline, merchants
-with limited stock and purses, villages that feed their market town,
-workshops the player owns, and the trading proficiency with proficiency
-points from the level table. Format 14 added troops, who are recruited, level up in squads and draw
-wages, and mass battles against authored armies, with allies who join.
-Format 13 added consumable items that restore HP and MP, and wares that
-markets sell at fixed prices. Format 12 composed conditions with `all`,
-`any` and `not`, gave dialogue choices ordered effect lists, and added
-optional world time with roads, scheduled events and characters who move,
-and an optional economy of currency and markets whose prices follow
-production. Combat stays optional. The level table and combat prose live in an
+This guide describes the current package format, `"format_version": 19`.
+Combat stays optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
 should not insert dummy combat content into non-combat worlds. The roadmap treats
 combat and other genre mechanics as source-grounded capabilities.
 
-Older packages are rejected when loading with a message naming their format;
-there is no migration. Convert them by hand:
+### Versions
 
-- **Format 1** (separate `npcs.json`, `monsters.json` and `narrative.json`, a
-  `player_name`): merge NPCs and monsters into `characters.json`, add a player
-  character, and move `levels` and the narrative into `world.json`'s `combat`
-  block, then apply the Format 2 steps.
-- **Format 2** (M3a; `hp` and `attack` on level entries and combat profiles):
-  replace them with a seven-stat `stats` object and add `special_name` to the
-  combat block, then apply the Format 3 steps.
-- **Format 3** (M3b; no timeline): add a `timeline` to the combat block, and
-  `resources` if skills should regenerate MP or build rage in fights, then
-  apply the Format 4 steps.
-- **Format 4** (M3c-1): give each opponent whose skills unlock above level 1 a
-  `level`, since opponents now use only skills unlocked at their level;
-  `groups` are optional. Then apply the Formats 5–10 step.
-- **Formats 5–10** (M3c-2, M3d, M4a, M4b, M4c, M4d): only raise the number;
-  `crit`, `stat_points`, techniques, equipment, recipes, tiers and
-  enchantments are optional. Then apply the Format 11 steps.
-- **Format 11** (M4e): every `requires` and `known_when` list becomes one
-  condition. A list of one condition becomes that condition; a longer list
-  becomes `{ "kind": "all", "of": [...] }`; an empty list is left out. A
-  dialogue choice's `effect` becomes a one-element `effects` list.
-- **Formats 12–18** (M5a, M5b, M6a-1, consumables, troops, M6a-2, map and
-  start questions, progression and investigation, evidence readings): only
-  raise the number. A save made under Format 18 is not loaded, even for an
-  unchanged world: the revision it names now leaves out prose. Every economy part below `tick`,
-  `proficiency_points`, map positions, `start_questions`, `evidence`,
-  `phases`, `outcomes`, a quest's `main` and `requires`, a location's
-  `known_when`, a character's `kind`, an evidence's `source`, `facts`
-  and `interpretations`, a fact's `when`, a choice's `id`, `once`, `back` and
-  `blocked_text`, and `translations` are optional.
+`format_version` in `world.json` and `save_format_version` in a save share
+one number (`FORMAT_VERSION` and `SAVE_FORMAT_VERSION`). A package or save of
+another version is rejected with a message naming it; there is no migration.
+To bring an older package up to date, edit it against this guide until
+`realmkit validate` accepts it; old saves cannot be carried over.
+While the format is in active development the number stays put: new optional
+fields, new condition, effect and event kinds, and other growth that leaves
+older content valid land without a bump. Two other checks already reject what
+no longer fits: unknown or missing fields fail to parse, and a save names the
+[rules revision](#translations) of its package, so any rule edit refuses it.
+The number rises only when an older package or save would still load and then
+behave differently without either check noticing, or when a release that
+others depend on fixes the format.
 
-Format 19 represents one fixed player-controlled character and one playable
+The format represents one fixed player-controlled character and one playable
 route. For persistence/API identity, RealmKit exposes this implicit route under the
-stable logical route ID `default`; Format 19 does not serialize a route collection
+stable logical route ID `default`; the format does not serialize a route collection
 or route field. Future formats may package a canonical route, an
 original-character route, or both over the same shared world and canonical
 timeline. When both are
@@ -81,7 +41,7 @@ differs by route.
 In an original-character route, the canonical protagonist remains in the package
 as a canonical world character/NPC rather than being replaced by the player.
 
-Format 19 also requires item and quest tables because they serve the current demo.
+The format also requires item and quest tables because they serve the current demo.
 Inventory is not a long-term universal requirement, but quest progression is:
 quests marked `main` form the route's main questline and the rest are side
 quests. A non-combat player route still has a main questline whose objectives may use
@@ -106,8 +66,6 @@ without a filesystem, such as a browser, hands the same six files, and any
 overlays, to `WorldSpec::from_files` from memory; `PACKAGE_FILES` lists the six. Extra files such as
 author notes or future provenance sidecars are ignored by the runtime loader.
 Unknown fields inside the defined JSON structures are rejected to catch typos.
-Format 19 describes the current schema; incompatible changes require an explicit
-version/migration decision.
 
 IDs use ASCII letters, digits, `_` and `-`, with uniqueness within each entity
 table and within each dialogue's node list. IDs are machine handles; displayed
@@ -119,7 +77,7 @@ The package language is also the presentation language for play. A client loadin
 a source-backed world must display its own fixed labels, help, prompts, status
 messages and player-visible errors in that language rather than falling back to
 English. Stable schema keys, IDs, enum values and typed-command aliases are
-machine-facing and may remain language-neutral ASCII. Format 19 does not yet carry
+machine-facing and may remain language-neutral ASCII. The format does not yet carry
 client locale strings; the M0 CLI therefore only fully satisfies this requirement
 for English worlds.
 
@@ -1390,7 +1348,7 @@ unbalanced placeholders are validation errors; brace escaping is not supported
 in templates yet. Plain prose fields are not interpolated. Substitution is
 single-pass: a name containing `{damage}` remains a literal name.
 
-Format 19 currently selects combat prose variants from the current
+The engine currently selects combat prose variants from the current
 `state.turn % variant_count` value using the turn before the attack. Failed
 commands do not advance `state.turn`, and presentation-only inspection commands
 (`look`, inventory, status and quests) also do not advance it. Other successful

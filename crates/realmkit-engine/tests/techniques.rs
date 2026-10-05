@@ -6,10 +6,6 @@ use common::*;
 use realmkit_engine::{Command::*, *};
 use realmkit_spec::{Direction::*, *};
 
-fn sect() -> WorldSpec {
-    WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/sect")).unwrap()
-}
-
 fn learned(engine: &Engine<'_>, technique: &str) -> Option<TechniqueState> {
     combat(engine).techniques.get(technique).copied()
 }
