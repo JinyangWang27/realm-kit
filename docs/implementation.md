@@ -207,8 +207,10 @@ and sets an authored flag that unlocks a ruins exit. Dialogue choices can requir
 flags or quest states. A lethal enemy response ends play; with saves on, the
 CLI restores the newest save. Level thresholds are cumulative.
 
-A package revision is a 64-bit FNV-1a digest of the package's canonical JSON, so
-any content edit makes older saves incompatible; there are no migrations yet.
+A package revision is a 64-bit FNV-1a digest of the package's canonical JSON
+with its prose emptied and its language left out (Format 19), so a rule edit
+makes older saves incompatible while prose fixes and added languages do not;
+there are no migrations yet.
 Loading checks the format version, package, revision and route, then the state
 invariants the rules maintain (known IDs, combat state present exactly when the
 world has combat, XP matching the level, vitals within their maximums, and an

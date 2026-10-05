@@ -428,8 +428,11 @@ fn mismatched_or_corrupt_saves_are_rejected() {
             "corruption {i} was accepted"
         );
     }
+    // Saves bind to the rules: a prose fix keeps them, a rule change does not.
     let mut edited = demo();
     edited.items[0].description.push('.');
+    assert!(Engine::restore(&edited, good.clone()).is_ok());
+    edited.quests[0].reward_xp += 1;
     assert!(Engine::restore(&edited, good.clone()).is_err());
     let mut json: serde_json::Value = serde_json::to_value(&good).unwrap();
     json["state"]["surprise"] = true.into();

@@ -15,6 +15,7 @@ mod places;
 mod stats;
 mod story;
 mod techniques;
+mod text;
 mod time;
 mod troops;
 mod validation;
@@ -172,18 +173,6 @@ impl WorldSpec {
     /// Collect all content errors for an author/validate/repair loop.
     pub fn diagnostics(&self) -> Vec<Diagnostic> {
         validation::diagnostics(self)
-    }
-
-    /// Identifies this exact content. Saves bind to it, so any edit makes older
-    /// saves incompatible until a migration exists.
-    // ponytail: 64-bit FNV-1a over canonical JSON detects edits, not tampering;
-    // switch to SHA-256 if revisions must be adversarially unique.
-    pub fn revision(&self) -> String {
-        let bytes = serde_json::to_vec(self).expect("world specs always serialize");
-        let hash = bytes.iter().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
-            (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
-        });
-        format!("fnv1a64:{hash:016x}")
     }
 
     // ponytail: linear lookup suits small authored worlds; index IDs if profiling warrants it.

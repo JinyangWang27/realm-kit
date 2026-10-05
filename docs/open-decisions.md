@@ -961,6 +961,15 @@ The exact representation of `package_revision` (content digest, export revision,
 author version, etc.) is an implementation choice. Semantically, gameplay content
 that RealmKit treats as a different revision must have a different revision ID.
 
+**Decided (Format 19):** the revision covers the rules only. It is a digest of
+the package with every prose field emptied (optional prose fields dropped), and
+with the language tag and the list of translations left out. IDs, numbers,
+conditions, effects, the order and number of choices, facts, readings and
+prose variants, and whether a choice has blocked text all count; the words do
+not. A typo fix, reworded dialogue or an added language keeps saves loadable;
+any rule edit still rejects them. There is no separate text revision, since
+nothing yet needs to tell two texts of the same rules apart.
+
 ### Save contents
 
 Saves contain mutable state and stable references to authored definitions; they do
@@ -1356,6 +1365,11 @@ Missing fixed-interface translations for the package language must not silently
 fall back to English in normal source-backed play. Exact locale-file serialization
 is deferred until localization implementation.
 
+Package prose may come in several languages (Format 19): a base language plus
+complete overlays, chosen when the package is loaded; see Several languages in
+[Section 18](#18-living-sandbox-worlds). The reference CLI's own fixed strings
+are still English only; a client that ships several languages owns those.
+
 ### Accessibility
 
 Presentation must not make gameplay semantics depend on one visual/input mode:
@@ -1611,11 +1625,17 @@ needs to be confirmed:
   `{ when, text }` variants ending in an unconditional one; the first that
   holds is shown. Evaluation is pure, so displaying text never draws or
   mutates. Still open: whether combat prose variants move to the same rule.
-- **Several languages (M5e).** Proposed: a package keeps exactly one language.
-  A source that carries several produces one package per language from the
-  same authoring data, with identical IDs. Still open: a save is bound to the
-  package revision, which includes text, so it cannot move between language
-  packages; decide whether the revision should hash rules and text separately.
+- **Several languages (M5e) · decided (Format 19).** A package keeps one base
+  language and may carry overlays for others: `translations` in `world.json`
+  lists language tags, and each tag's `text/<tag>.json` maps every prose
+  field's stable key (its JSON path, with array elements named by their IDs)
+  to that language's text. An overlay must be complete and exact, and its
+  templates are checked in its own language. Saves bind to a revision over the
+  rules alone ([Initial compatibility policy](#initial-compatibility-policy)),
+  so a save moves freely between languages and survives prose fixes. A client
+  picks the language when it loads the package (`WorldSpec::in_language`).
+  This replaces the earlier proposal of one package per language, whose saves
+  could not move between them.
 - **Start choices (M5f).** Proposed: a route may author start questions shown
   at New Game; each option applies an ordered effect list to the initial state,
   and the save keeps only the resulting state plus the chosen option IDs. This
