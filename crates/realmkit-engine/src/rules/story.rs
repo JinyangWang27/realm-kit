@@ -139,7 +139,8 @@ pub(crate) fn dialogue(
     events: &mut Vec<Event>,
 ) {
     let visible = choices(world, state, &npc, &node);
-    state.dialogue = if !visible.iter().any(|c| c.available) {
+    // Locked choices keep it open, so they can say why; moving on closes it.
+    state.dialogue = if visible.is_empty() {
         None
     } else {
         Some(DialogueState {

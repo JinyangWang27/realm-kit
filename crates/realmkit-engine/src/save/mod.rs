@@ -894,9 +894,7 @@ fn dialogue(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     ensure(
         node_exists
             && rules::npc_here(world, state, &dialogue.npc)
-            && rules::choices(world, state, &dialogue.npc, &dialogue.node)
-                .iter()
-                .any(|c| c.available),
+            && !rules::choices(world, state, &dialogue.npc, &dialogue.node).is_empty(),
         "invalid conversation state",
     )
 }

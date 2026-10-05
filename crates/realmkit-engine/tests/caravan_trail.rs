@@ -395,7 +395,7 @@ fn a_bribe_the_player_cannot_afford_is_listed_with_its_reason() {
 }
 
 #[test]
-fn a_conversation_with_only_blocked_choices_ends() {
+fn a_node_of_only_blocked_choices_stays_open_to_explain_them() {
     let mut world = caravan_trail();
     let rask = world.dialogues.iter_mut().find(|d| d.id == "rask").unwrap();
     rask.nodes[0].choices[0].requires = Some(Condition::Item {
@@ -408,6 +408,18 @@ fn a_conversation_with_only_blocked_choices_ends() {
         &mut scribe,
         &format!("{OPENING}; {CAMP}; travel bandit_ridge; talk rask"),
     );
-    assert_eq!(events.last(), Some(&Event::DialogueEnded));
+    assert_ne!(events.last(), Some(&Event::DialogueEnded));
+    let reason = "You do not have two silver to offer.";
+    assert_eq!(
+        scribe.dialogue_choices()[0].blocked.as_deref(),
+        Some(reason)
+    );
+    assert!(matches!(
+        scribe.execute(ChooseDialogue(1)),
+        Err(EngineError::ChoiceBlocked(1))
+    ));
+    // The save holds the open conversation, and walking away closes it.
+    assert!(Engine::restore(&world, scribe.snapshot()).is_ok());
+    run(&mut scribe, "travel abandoned_camp");
     assert!(scribe.dialogue_choices().is_empty());
 }
