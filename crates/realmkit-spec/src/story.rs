@@ -156,7 +156,7 @@ impl Condition {
                 .collect();
             b.requires(&|c| {
                 required.iter().any(|l| match (c, l) {
-                    (Self::Not { condition }, _) => **condition == **l,
+                    (Self::Not { condition }, _) => condition.same(l),
                     (
                         Self::Quest { quest, status },
                         Self::Quest {
@@ -169,6 +169,17 @@ impl Condition {
             })
         };
         refutes(self, other) || refutes(other, self)
+    }
+
+    /// Whether two conditions always agree: equal, or wars between the same
+    /// two factions named in either order.
+    fn same(&self, other: &Condition) -> bool {
+        match (self, other) {
+            (Self::AtWar { factions: a }, Self::AtWar { factions: b }) => {
+                faction_pair(a) == faction_pair(b)
+            }
+            _ => self == other,
+        }
     }
 
     /// Every leaf predicate, depth first.

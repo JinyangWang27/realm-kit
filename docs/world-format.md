@@ -979,9 +979,11 @@ other requires under `not`, or the two must require different statuses of
 one quest. So at most one ever holds, whatever order things happen in. No outcome may
 hold at the start: each `when` must require, on every branch, something no
 start provides, such as a quest taken up, evidence, a workshop, a phase after
-the first, a flag no start answer sets, standing above the authored start
-plus the most each start question's answers could add, or a war between
-factions that start at peace (`outcome_at_start`). Terminal and failure
+the first, a flag no start answer sets, standing beyond what the authored
+start and the start answers could give (above the most, or under `not`,
+below the least), or a war or peace the start does not have
+(`outcome_at_start`). A war between two factions and its negation exclude
+each other whichever order names the pair. Terminal and failure
 endings are not yet modelled.
 
 The journal (`Engine::journal`, the CLI's Quests panel) shows the current

@@ -205,45 +205,77 @@ pub(super) fn change(
     }
 }
 
-/// Whether a standing or war condition is false at every possible start.
-/// Start answers may raise standing, so the most a start gives is the
-/// authored start plus, for each question, its most generous option's
-/// gains; they never change diplomacy.
+/// Whether a standing or war condition, or its negation, is false at every
+/// possible start. Start answers may move standing but never diplomacy.
 pub(super) fn never_at_start(w: &WorldSpec, leaf: &Condition) -> bool {
+    let started_at_war = |factions: &[Id; 2]| {
+        w.world
+            .diplomacy
+            .iter()
+            .flat_map(|d| &d.at_war)
+            .any(|p| faction_pair(p) == faction_pair(factions))
+    };
     match leaf {
         Condition::Standing {
             track,
             faction,
             at_least,
-        } => w.standing_track(track).is_some_and(|t| {
-            let gains = |o: &StartOption| -> i64 {
-                o.effects
-                    .iter()
-                    .filter_map(|e| match e {
-                        Effect::ChangeStanding {
-                            track: k,
-                            faction: f,
-                            by,
-                        } if k == track && f == faction => Some(i64::from((*by).max(0))),
-                        _ => None,
-                    })
-                    .sum()
-            };
-            let raised: i64 = w
-                .world
-                .start_questions
-                .iter()
-                .map(|q| q.options.iter().map(gains).max().unwrap_or(0))
-                .sum();
-            let most = (i64::from(t.start(faction.as_deref())) + raised).min(i64::from(t.max));
-            i64::from(*at_least) > most
-        }),
-        Condition::AtWar { factions } => !w
-            .world
-            .diplomacy
-            .iter()
-            .flat_map(|d| &d.at_war)
-            .any(|p| faction_pair(p) == faction_pair(factions)),
+        } => start_range(w, track, faction.as_ref()).is_some_and(|(_, most)| *at_least > most),
+        Condition::AtWar { factions } => !started_at_war(factions),
+        Condition::Not { condition } => match &**condition {
+            Condition::Standing {
+                track,
+                faction,
+                at_least,
+            } => {
+                start_range(w, track, faction.as_ref()).is_some_and(|(least, _)| least >= *at_least)
+            }
+            Condition::AtWar { factions } => started_at_war(factions),
+            _ => false,
+        },
         _ => false,
     }
+}
+
+/// The lowest and highest value a track may hold at the start: the authored
+/// start moved, for each start question, by its harshest or most generous
+/// option, and kept within the bounds. Clamping along the way can only
+/// narrow the range, so the range is safe either way.
+fn start_range(w: &WorldSpec, track: &str, faction: Option<&Id>) -> Option<(i32, i32)> {
+    let t = w.standing_track(track)?;
+    let moved = |o: &StartOption, sign: i32| -> i64 {
+        o.effects
+            .iter()
+            .filter_map(|e| match e {
+                Effect::ChangeStanding {
+                    track: k,
+                    faction: f,
+                    by,
+                } if k == track && f.as_ref() == faction && by.signum() == sign => {
+                    Some(i64::from(*by))
+                }
+                _ => None,
+            })
+            .sum()
+    };
+    let per_question = |sign: i32| -> i64 {
+        w.world
+            .start_questions
+            .iter()
+            .map(|q| {
+                let options = q.options.iter().map(|o| moved(o, sign));
+                if sign > 0 {
+                    options.max().unwrap_or(0)
+                } else {
+                    options.min().unwrap_or(0)
+                }
+            })
+            .sum()
+    };
+    let start = i64::from(t.start(faction.map(Id::as_str)));
+    let clamp = |v: i64| v.clamp(i64::from(t.min), i64::from(t.max)) as i32;
+    Some((
+        clamp(start + per_question(-1)),
+        clamp(start + per_question(1)),
+    ))
 }

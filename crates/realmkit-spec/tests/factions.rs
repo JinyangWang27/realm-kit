@@ -340,3 +340,64 @@ fn an_outcome_may_wait_on_standing_or_war_no_start_gives() {
     assert_eq!(codes_with(&mut world, favour(30)), ["outcome_at_start"]);
     assert_eq!(codes_with(&mut world, favour(31)), Vec::<String>::new());
 }
+
+#[test]
+fn an_outcome_may_wait_on_a_peace_or_a_fall_no_start_has() {
+    let ending = |id: &str, when: Condition| RouteOutcome {
+        id: id.into(),
+        name: "An ending".into(),
+        text: "It ends.".into(),
+        when,
+    };
+    let not = |c: Condition| Condition::Not {
+        condition: Box::new(c),
+    };
+    let at_war = |a: &str, b: &str| Condition::AtWar {
+        factions: pair(a, b),
+    };
+    let fen_favour = |at_least| Condition::Standing {
+        track: "favour".into(),
+        faction: Some("fen".into()),
+        at_least,
+    };
+    let codes_with = |outcomes: Vec<RouteOutcome>| {
+        let mut world = marches();
+        world.world.outcomes = outcomes;
+        codes(&world)
+    };
+    let none = Vec::<String>::new();
+    // The keep and the fen start at war, so peace between them is an ending;
+    // the guild and the fen start at peace, so it is not.
+    assert_eq!(
+        codes_with(vec![ending("peace", not(at_war("fen", "keep")))]),
+        none
+    );
+    assert_eq!(
+        codes_with(vec![ending("peace", not(at_war("guild", "fen")))]),
+        ["outcome_at_start"]
+    );
+    // The fen's favour starts at -40: falling below -40 is an ending, below -39 is not.
+    assert_eq!(codes_with(vec![ending("fall", not(fen_favour(-40)))]), none);
+    assert_eq!(
+        codes_with(vec![ending("fall", not(fen_favour(-39)))]),
+        ["outcome_at_start"]
+    );
+    // A war and its peace exclude each other, whichever order names the pair.
+    let favour = Condition::Standing {
+        track: "favour".into(),
+        faction: Some("keep".into()),
+        at_least: 1,
+    };
+    assert_eq!(
+        codes_with(vec![
+            ending("war", at_war("fen", "guild")),
+            ending(
+                "peace",
+                Condition::All {
+                    of: vec![not(at_war("guild", "fen")), favour],
+                }
+            ),
+        ]),
+        none
+    );
+}
