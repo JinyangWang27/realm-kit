@@ -156,7 +156,7 @@ impl Condition {
                 .collect();
             b.requires(&|c| {
                 required.iter().any(|l| match (c, l) {
-                    (Self::Not { condition }, _) => condition.same(l),
+                    (Self::Not { condition }, _) => l.implies(condition),
                     (
                         Self::Quest { quest, status },
                         Self::Quest {
@@ -171,13 +171,26 @@ impl Condition {
         refutes(self, other) || refutes(other, self)
     }
 
-    /// Whether two conditions always agree: equal, or wars between the same
-    /// two factions named in either order.
-    fn same(&self, other: &Condition) -> bool {
+    /// Whether `other` holds whenever this does: they are equal, name the
+    /// same war in either order, or ask for at least as much standing on the
+    /// same track and faction.
+    fn implies(&self, other: &Condition) -> bool {
         match (self, other) {
             (Self::AtWar { factions: a }, Self::AtWar { factions: b }) => {
                 faction_pair(a) == faction_pair(b)
             }
+            (
+                Self::Standing {
+                    track,
+                    faction,
+                    at_least,
+                },
+                Self::Standing {
+                    track: t,
+                    faction: f,
+                    at_least: least,
+                },
+            ) => track == t && faction == f && at_least >= least,
             _ => self == other,
         }
     }

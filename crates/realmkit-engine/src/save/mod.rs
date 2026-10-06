@@ -1003,23 +1003,42 @@ fn diplomacy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
             _ => false,
         })
     };
-    // A war or peace a certain event made holds while every effect that
-    // could have touched the pair agrees with it.
     let direction = |e: &Effect| match e {
         Effect::DeclareWar { factions } => Some((realmkit_spec::faction_pair(factions), true)),
         Effect::MakePeace { factions } => Some((realmkit_spec::faction_pair(factions), false)),
         _ => None,
     };
-    let settled = certain_events(world, state)
-        .into_iter()
+    let certain = certain_events(world, state);
+    let one_shot: Vec<([Id; 2], bool)> = certain
+        .iter()
+        .filter(|e| e.schedule.every.is_none())
+        .flat_map(|e| &e.effects)
+        .filter_map(direction)
+        .collect();
+    let settled = certain
+        .iter()
         .flat_map(|e| &e.effects)
         .filter_map(direction)
         .all(|(pair, war)| {
-            let agreed = fired
+            let touching: Vec<bool> = fired
                 .iter()
                 .filter_map(|e| direction(e))
-                .all(|(other, w)| other != pair || w == war);
-            !agreed || state.at_war.contains(&pair) == war
+                .filter(|(other, _)| *other == pair)
+                .map(|(_, w)| w)
+                .collect();
+            let ordered: Vec<bool> = one_shot
+                .iter()
+                .filter(|(other, _)| *other == pair)
+                .map(|(_, w)| *w)
+                .collect();
+            let now = state.at_war.contains(&pair);
+            // Only certain one-shot events touch the pair: the last decides.
+            if touching.len() == ordered.len() {
+                return ordered.last().is_none_or(|last| now == *last);
+            }
+            // Otherwise a war or peace holds while every effect that could
+            // have touched the pair agrees with it.
+            !touching.iter().all(|w| *w == war) || now == war
         });
     ensure(
         settled

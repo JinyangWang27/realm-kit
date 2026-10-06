@@ -401,3 +401,35 @@ fn an_outcome_may_wait_on_a_peace_or_a_fall_no_start_has() {
         none
     );
 }
+
+#[test]
+fn higher_standing_excludes_falling_below_a_lower_one() {
+    let favour = |at_least| Condition::Standing {
+        track: "favour".into(),
+        faction: Some("keep".into()),
+        at_least,
+    };
+    let ending = |id: &str, when| RouteOutcome {
+        id: id.into(),
+        name: "An ending".into(),
+        text: "It ends.".into(),
+        when,
+    };
+    let mut world = marches();
+    world.world.outcomes = vec![
+        ending("honoured", favour(10)),
+        ending(
+            "disgraced",
+            Condition::Not {
+                condition: Box::new(favour(-5)),
+            },
+        ),
+    ];
+    assert_eq!(codes(&world), Vec::<String>::new());
+    // Below 10 and at least -5 can hold together.
+    world.world.outcomes[0].when = Condition::Not {
+        condition: Box::new(favour(10)),
+    };
+    world.world.outcomes[1].when = favour(-5);
+    assert!(codes(&world).contains(&"ambiguous_outcomes".to_string()));
+}

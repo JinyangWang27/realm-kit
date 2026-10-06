@@ -983,7 +983,9 @@ the first, a flag no start answer sets, standing beyond what the authored
 start and the start answers could give (above the most, or under `not`,
 below the least), or a war or peace the start does not have
 (`outcome_at_start`). A war between two factions and its negation exclude
-each other whichever order names the pair. Terminal and failure
+each other whichever order names the pair, and so do standing of at least
+one value and, under `not`, standing of at least a lower one on the same
+track and faction. Terminal and failure
 endings are not yet modelled.
 
 The journal (`Engine::journal`, the CLI's Quests panel) shows the current

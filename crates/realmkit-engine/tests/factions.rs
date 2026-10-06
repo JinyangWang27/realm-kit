@@ -555,3 +555,45 @@ fn a_choice_that_could_never_be_taken_explains_nothing() {
     assert!(!fame(true));
     assert!(fame(false));
 }
+
+#[test]
+fn certain_wars_and_peaces_replay_in_order() {
+    // The keep and the guild go to war at 10:00 and make peace at 11:40,
+    // and nothing else touches them.
+    let mut world = marches();
+    for (id, at, effect) in [
+        (
+            "feud",
+            600,
+            Effect::DeclareWar {
+                factions: pair("keep", "guild"),
+            },
+        ),
+        (
+            "truce",
+            700,
+            Effect::MakePeace {
+                factions: pair("guild", "keep"),
+            },
+        ),
+    ] {
+        world.world.events.push(WorldEvent {
+            id: id.into(),
+            schedule: Schedule { at, every: None },
+            requires: None,
+            effects: vec![effect],
+        });
+    }
+    assert_eq!(world.diagnostics(), []);
+    let engine = Engine::new(&world).unwrap();
+    let restored = |time: u64, war: bool| {
+        let mut snapshot = engine.snapshot();
+        snapshot.state.time = Some(time);
+        if war {
+            snapshot.state.at_war.insert(pair("guild", "keep"));
+        }
+        Engine::restore(&world, snapshot).is_ok()
+    };
+    assert!(restored(650, true) && !restored(650, false));
+    assert!(restored(700, false) && !restored(700, true));
+}
