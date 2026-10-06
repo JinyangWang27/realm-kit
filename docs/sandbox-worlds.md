@@ -415,16 +415,26 @@ prices: the engine derives every price from them.
 
 ### Factions and standing
 
-- **Relationship to the core.** Factions already exist as world entities
-  ([Section 1](open-decisions.md#1-minimum-universal-world-core)). This
-  capability adds mutable state to them.
-- **Diplomacy.** A war/peace relation between each pair of factions. It starts
-  as authored and changes only through effects: `DeclareWar` and `MakePeace`.
+Delivered as a foundation, each part optional ([World format](world-format.md#factions-diplomacy-and-standing)):
+
+- **Relationship to the core.** Factions are world entities
+  ([Section 1](open-decisions.md#1-minimum-universal-world-core)) with an
+  ID and a name, and characters may belong to one. A world may author
+  factions with neither diplomacy nor standing; they then carry no state.
+- **Diplomacy.** A war/peace relation between each unordered pair of
+  factions. It starts as authored and changes only through effects:
+  `declare_war` and `make_peace`.
 - **Standing.** Authored standing tracks, each a bounded integer with named
-  thresholds. A world might author renown (global), honour (global), standing
-  with each faction, and relation with each lord. There is no universal list of
-  tracks.
-- **Conditions and effects.** `StandingAtLeast`, `AtWar`; `ChangeStanding`.
+  thresholds, global or held with each faction. A world might author renown
+  (global), honour (global) and favour with each faction. There is no
+  universal list of tracks. Changes clamp to the bounds. Relation with each
+  lord, a per-character scope, is still proposed.
+- **Conditions and effects.** `standing` (at least a value) and `at_war`;
+  `change_standing`, `declare_war` and `make_peace`.
+- **Later.** Faction strategy (M6g), membership ranks, offices, vassalage
+  and orders (M6h), holdings and armies owned by factions (M6e, M6f), and
+  alliances or truces build on these without making a faction their
+  container.
 
 ### Personalities
 

@@ -228,11 +228,26 @@ The existence of an entity in the fiction does not require its corresponding
 mechanical capability. For example, factions can exist as world entities without
 a faction/reputation system.
 
+## Faction
+
+An authored political entity, such as a kingdom, clan or guild, with an ID
+and a name. Characters may belong to one. A faction is not a container: it
+owns no holdings or armies and has no strategy, offices or members' ranks of
+its own; later capabilities refer to it instead.
+
+## Diplomacy
+
+Whether each unordered pair of factions is at war or at peace. A world that
+authors it lists the pairs at war at the start; effects declare war and make
+peace afterwards. There are no alliances, truces or war scores.
+
 ## Standing
 
-Proposed for M6. An authored, bounded integer track with named thresholds,
-scoped globally, per faction or per character, such as renown or a lord's
-relation with the player. Conditions read it and effects change it.
+An authored, bounded integer track with named thresholds, global or held
+with each faction, such as renown or favour at a court. There are no
+built-in tracks. Conditions read it; effects change it, clamped to its
+bounds. Per-character tracks, such as a lord's relation with the player,
+are still proposed.
 
 ## Market
 

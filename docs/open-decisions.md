@@ -1761,9 +1761,22 @@ needs to be confirmed:
   settlement at local prices with no spread; and the trading proficiency.
   Each part is its own optional block, which settles the
   "own block or optional fields" question below for the economy.
-- **Standing tracks (M6b).** Proposed: each track is authored with bounds,
-  named thresholds and a scope: global, per faction or per character. There is
-  no fixed list of tracks such as renown or honour.
+- **Factions, diplomacy and standing tracks (M6b) · decided as delivered
+  for global and faction scopes.** Factions are authored entities with an ID
+  and a name, and a character may name one; they hold no holdings, armies,
+  strategy, offices or membership ranks. Factions, diplomacy and standing
+  are separate optional parts, so factions alone add no state. Diplomacy is
+  war or peace per unordered pair, saved as the pairs at war in one
+  canonical order; it starts as authored (`at_war`, the rest at peace) and
+  changes only through `declare_war` and `make_peace`, which change nothing
+  when the pair is already so. Each standing track is authored with bounds,
+  a start (per faction where needed) and named thresholds for
+  presentation, and a scope: global or per faction. There is no fixed list
+  of tracks such as renown or honour. A change clamps to the bounds and
+  never refuses, so an effect list does not fail for reaching a limit.
+  Still open: per-character tracks (with companions or courtship),
+  alliances, truces, war weariness and whether thresholds should be
+  referable from conditions by name.
 - **Mass-battle formula (M6d).** Decided as delivered, without
   ground, leadership, individuals other than the player, or a champion duel:
   troops fight as stacks of counts,
@@ -1964,7 +1977,8 @@ as the current full-game pressure test:
 2. M5: start choices plus explicit story-phase/main-side
    questline/outcome progression; dialogue roles/text variants when the opening
    content needs them.
-3. M6b: factions, war/peace and standing tracks.
+3. M6b: personalities and reactions to deeds, now that factions, war/peace
+   and standing tracks are delivered.
 4. Remaining M6c: companions, roster limit, provisions/morale and travel speed.
 5. M6e-M6h: holdings, world agents, faction strategy and only the politics/order
    pieces used by the representative sandbox world.

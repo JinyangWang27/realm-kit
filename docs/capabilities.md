@@ -320,6 +320,9 @@ original-game pressure test, while every capability remains optional.
    duplicate prose.
 3. Deliver **factions and standing** so political states, schools and orders can
    affect gameplay through typed conditions/effects rather than flags alone.
+   *Delivered as a foundation in `examples/marches`: factions, war/peace and
+   global or per-faction standing tracks; personalities and reactions to
+   deeds come next.*
 4. Complete only the **retinue** pieces needed by the first representative sandbox
    party: companions, roster limit, provisions/morale and travel speed.
 5. Add **holdings/sieges, world agents and faction strategy** in that order,

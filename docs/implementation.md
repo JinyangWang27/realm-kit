@@ -195,6 +195,20 @@ proves the complete single-player loop with authored content.
   keep them loadable. `caravan-trail` shows the first, second and fourth;
   `quiet-archive` asks a hub of questions and ships a Simplified Chinese
   overlay.
+- [x] Factions, diplomacy and standing (M6b foundation): authored
+  factions with translatable names, an optional character `faction`, an
+  optional `diplomacy` block whose `at_war` pairs start at war and every
+  other pair at peace, and authored standing tracks, global or per faction,
+  bounded, with starting values and named thresholds. `standing` and
+  `at_war` conditions; `change_standing` (clamped to the bounds),
+  `declare_war` and `make_peace` (idempotent) effects in dialogue and
+  events, and `change_standing` in start answers; `StandingChanged`,
+  `WarDeclared` and `PeaceMade` events. Saves keep every standing value
+  and the pairs at war in canonical order, checked against the track
+  bounds and against effects that could have fired. Each part is
+  optional: factions alone add no state. The CLI shows affiliations,
+  standing and wars. `examples/marches` has three factions, renown and
+  favour, a war the thaw starts and a peace the steward can make.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
@@ -212,7 +226,8 @@ every capability optional:
 - [x] First-class authored story-phase/main-side-questline/outcome
   progression, as far as the original game's MVP uses it. Failure,
   deadlines and terminal outcomes wait for content that needs them.
-- [ ] Factions, war/peace and typed standing/relation tracks.
+- [x] Factions, war/peace and typed standing tracks, global and per
+  faction. Per-character relation tracks wait for companions or courtship.
 - [ ] Remaining retinue needs used by the representative sandbox world:
   companions, roster limit, provisions/morale and travel speed.
 - [ ] Holdings/sieges, then world agents and faction strategy; add only the
