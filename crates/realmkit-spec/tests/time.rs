@@ -148,6 +148,7 @@ fn time_content_is_checked_with_stable_codes() {
         clock: TextTemplate("Day {day}".into()),
         wait: None,
         rest: Some(60),
+        calendar: None,
     });
     assert!(codes(&archive).contains(&"combat_disabled".to_string()));
     // A start past the bound also leaves every schedule before it.
@@ -224,4 +225,131 @@ fn map_positions_are_checked_with_stable_codes() {
         l.map = None;
     }
     assert!(codes(&unmapped).is_empty());
+}
+
+fn date(year: i32, month: u8, day: u8) -> GregorianDate {
+    GregorianDate { year, month, day }
+}
+
+fn from(epoch: GregorianDate) -> Calendar {
+    Calendar { epoch }
+}
+
+#[test]
+fn a_calendar_dates_each_minute_from_its_epoch() {
+    let days = |n: u64| n * MINUTES_PER_DAY;
+    let cases = [
+        // Minute 0 is the epoch's midnight; the day turns at 1,440.
+        (date(742, 1, 1), 0, date(742, 1, 1)),
+        (date(742, 1, 1), 480, date(742, 1, 1)),
+        (date(742, 1, 1), days(1) - 1, date(742, 1, 1)),
+        (date(742, 1, 1), days(1), date(742, 1, 2)),
+        (date(742, 1, 1), days(30), date(742, 1, 31)),
+        (date(742, 1, 1), days(31), date(742, 2, 1)),
+        // 742 is a common year, 744 a leap year.
+        (date(742, 1, 1), days(58), date(742, 2, 28)),
+        (date(742, 1, 1), days(59), date(742, 3, 1)),
+        (date(744, 2, 28), days(1), date(744, 2, 29)),
+        (date(744, 2, 28), days(2), date(744, 3, 1)),
+        // A century is common unless it divides by 400.
+        (date(1900, 2, 28), days(1), date(1900, 3, 1)),
+        (date(2000, 2, 28), days(1), date(2000, 2, 29)),
+        (date(742, 4, 30), days(1), date(742, 5, 1)),
+        (date(742, 12, 31), days(1) + 480, date(743, 1, 1)),
+        (date(-1, 12, 31), days(1), date(0, 1, 1)),
+    ];
+    for (index, (epoch, minute, expected)) in cases.into_iter().enumerate() {
+        assert_eq!(from(epoch).date(minute), Some(expected), "case {index}");
+    }
+}
+
+#[test]
+fn a_calendar_finds_the_next_day_and_month_boundaries() {
+    let calendar = from(date(742, 1, 1));
+    let days = |n: u64| n * MINUTES_PER_DAY;
+    assert_eq!(calendar.next_day(480), Some(days(1)));
+    assert_eq!(calendar.next_day(days(1)), Some(days(2)));
+    assert_eq!(calendar.next_month(480), Some(days(31)));
+    assert_eq!(calendar.next_month(days(31) - 1), Some(days(31)));
+    // Strictly after: a boundary is not its own next one.
+    assert_eq!(calendar.next_month(days(31)), Some(days(31 + 28)));
+    // December rolls into January of the next year.
+    let december = from(date(742, 12, 15));
+    assert_eq!(december.next_month(0), Some(days(17)));
+    assert_eq!(december.date(days(17)), Some(date(743, 1, 1)));
+    // A step from 08:00 on the first to 100 days later crosses three month
+    // boundaries, found one after another.
+    let (start, end) = (480, 480 + days(100));
+    let crossed: Vec<_> =
+        std::iter::successors(calendar.next_month(start), |&m| calendar.next_month(m))
+            .take_while(|&m| m <= end)
+            .collect();
+    assert_eq!(crossed, [days(31), days(59), days(90)]);
+    assert_eq!(calendar.date(crossed[2]), Some(date(742, 4, 1)));
+}
+
+#[test]
+fn a_clock_shows_the_date_only_with_a_calendar_and_day_keeps_counting() {
+    let mut time: WorldTime =
+        serde_json::from_str(r#"{ "start": 480, "clock": "Day {day}, {hour}:{minute}" }"#).unwrap();
+    let minute = 2 * MINUTES_PER_DAY + 485;
+    let plain = [("day", "3"), ("hour", "08"), ("minute", "05")].map(|(k, v)| (k, v.to_string()));
+    assert_eq!(clock_values(&time, minute), plain);
+    time.calendar = Some(from(date(742, 1, 31)));
+    let dated: Vec<_> = plain
+        .into_iter()
+        .chain(
+            [("year", "742"), ("month", "02"), ("day_of_month", "02")]
+                .map(|(k, v)| (k, v.to_string())),
+        )
+        .collect();
+    assert_eq!(clock_values(&time, minute), dated);
+}
+
+#[test]
+fn a_calendar_is_checked_with_stable_codes_and_belongs_to_the_rules() {
+    let calendar = r#"{ "start": 480, "clock": "{year}-{month}-{day_of_month} {hour}:{minute}",
+        "calendar": { "epoch": { "year": 742, "month": 1, "day": 1 } } }"#;
+    let time: WorldTime = serde_json::from_str(calendar).unwrap();
+    assert_eq!(time.calendar, Some(from(date(742, 1, 1))));
+    assert!(serde_json::from_str::<WorldTime>(
+        &calendar.replace("\"day\": 1", "\"day\": 1, \"era\": 1")
+    )
+    .is_err());
+    let dated = |epoch: GregorianDate| {
+        let mut world = marches();
+        let mut time = time.clone();
+        time.calendar = Some(from(epoch));
+        world.world.time = Some(time);
+        world
+    };
+    for epoch in [
+        date(744, 2, 29),
+        date(2000, 2, 29),
+        date(-9999, 1, 1),
+        date(8000, 1, 1),
+    ] {
+        assert!(codes(&dated(epoch)).is_empty(), "{epoch:?}");
+    }
+    for epoch in [
+        date(742, 0, 1),
+        date(742, 13, 1),
+        date(742, 1, 0),
+        date(742, 4, 31),
+        date(742, 2, 29),
+        date(1900, 2, 29),
+        // Minute 1,000,000,000 would fall after 9999.
+        date(8100, 1, 1),
+    ] {
+        assert_eq!(codes(&dated(epoch)), ["invalid_calendar"], "{epoch:?}");
+    }
+    let mut world = dated(date(742, 1, 1));
+    world.world.time.as_mut().unwrap().calendar = None;
+    assert_eq!(codes(&world), ["calendar_disabled"]);
+    world.world.time.as_mut().unwrap().clock.0 = "{day_of_week}".into();
+    assert_eq!(codes(&world), ["invalid_template"]);
+    // The epoch is a rule, so moving it changes the revision.
+    let revision = dated(date(742, 1, 1)).revision();
+    assert_ne!(dated(date(742, 1, 2)).revision(), revision);
+    assert_ne!(marches().revision(), revision);
 }

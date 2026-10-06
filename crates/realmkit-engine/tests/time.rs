@@ -254,6 +254,7 @@ fn resting_takes_the_authored_time_in_a_world_with_a_clock() {
         clock: TextTemplate("Day {day}, {hour}:{minute}".into()),
         wait: None,
         rest: Some(480),
+        calendar: None,
     });
     let mut engine = Engine::new(&world).unwrap();
     let events = engine.execute(Rest).unwrap();
@@ -405,6 +406,7 @@ fn a_save_cannot_know_what_a_future_event_teaches() {
         clock: TextTemplate("{day} {hour}:{minute}".into()),
         wait: Some(60),
         rest: None,
+        calendar: None,
     });
     world.world.events.push(WorldEvent {
         id: "lesson".into(),
@@ -536,4 +538,45 @@ fn a_save_keeps_a_mover_where_it_was_placed_until_its_first_move() {
     // After her first move at 06:00 on day 2, Ashmere is a place she may be.
     early.state.time = Some(1_800);
     assert!(Engine::restore(&world, early).is_ok());
+}
+
+#[test]
+fn a_calendar_date_follows_the_saved_minute_alone() {
+    let mut world = marches();
+    let time = world.world.time.as_mut().unwrap();
+    let epoch = GregorianDate {
+        year: 742,
+        month: 1,
+        day: 31,
+    };
+    time.calendar = Some(Calendar { epoch });
+    let calendar = time.calendar.unwrap();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    let before = now(&engine);
+    assert_eq!(calendar.date(before), Some(epoch));
+    // One longest wait, from January 31st, crosses into February and March.
+    engine.execute(Wait(DURATION_BOUND)).unwrap();
+    let after = now(&engine);
+    let crossed: Vec<_> =
+        std::iter::successors(calendar.next_month(before), |&m| calendar.next_month(m))
+            .take_while(|&m| m <= after)
+            .filter_map(|m| calendar.date(m))
+            .collect();
+    let first = |month| GregorianDate {
+        year: 742,
+        month,
+        day: 1,
+    };
+    assert_eq!(crossed, [first(2), first(3)]);
+    let expected = GregorianDate {
+        year: 742,
+        month: 3,
+        day: 2,
+    };
+    assert_eq!(calendar.date(after), Some(expected));
+    // The save holds the minute, not the date, and gives the same date back.
+    let json = serde_json::to_string(&engine.snapshot()).unwrap();
+    assert!(!json.contains("calendar") && !json.contains("year"));
+    let resumed = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
+    assert_eq!(calendar.date(now(&resumed)), Some(expected));
 }
