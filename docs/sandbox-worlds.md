@@ -190,8 +190,8 @@ M5 slices.
    character ID, not a second identity. This follows
    [Section 10](open-decisions.md#10-definitions-instances-and-identity), and
    instances for combatant copies are already planned for M5.
-6. **Sandbox routes.** A route still owns exactly one main questline, and a
-   playthrough records at most one outcome
+6. **Sandbox routes** (outcomes delivered in M5c). A route still owns
+   exactly one main questline, and a playthrough records at most one outcome
    ([Section 3](open-decisions.md#3-outcomes-failure-and-replay)). In a sandbox,
    the main questline is a ladder of ambitions: quests such as "hold a fief"
    and "found an order" are ordinary quest progression. Only the top rung, such
@@ -232,7 +232,7 @@ M5 slices.
    condition holds is shown. Choosing a variant reads state only, so it draws
    no randomness and changes nothing. Templates keep their single-pass
    substitution: there is no conditional syntax inside a string.
-9. **Start choices.** A sandbox player usually begins by answering a few
+9. **Start choices** (delivered in M5f). A sandbox player usually begins by answering a few
    questions about their past: a noble's child, a merchant's apprentice, a
    deserter. A route may author a short sequence of start questions shown at
    New Game, before the first turn. Each option applies an ordered list of
@@ -488,10 +488,11 @@ they do, without scripting each character.
 - **Roster.** The player's roster holds, per troop definition, a count of
   healthy troops, a count of wounded troops and an XP pool: troops are
   fungible, not instances. All three are saved.
-- **Allies before factions** (delivered). Until factions exist,
-  an army with a `joins` condition is an ally: never engaged, it fights on
-  the player's side in any battle where it is present while the condition
-  holds. Faction membership and war will derive that condition.
+- **Allies by condition** (delivered). An army with a `joins` condition
+  is an ally: never engaged, it fights on the player's side in any battle
+  where it is present while the condition holds. Factions now exist, and the
+  condition may test them (`at_war`, `standing`); faction membership may
+  derive it later.
 - **Wounded troops.** Wounded troops do not fight, still draw wages and count
   towards the size limit. On each upkeep tick an authored share recovers, more
   at a location that authors rest or healing, and the retinue's surgery

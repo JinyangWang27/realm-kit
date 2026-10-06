@@ -1707,8 +1707,9 @@ needs to be confirmed:
   is authored initial state, not runtime identity editing, so it stays within
   the original-character rules above. **Decided and delivered:**
   every question is asked, in order, and no option skips or adds one; options
-  may set flags, grant items, currency and techniques (XP included) and raise
-  proficiencies; their events are not shown, only the state they produce.
+  may set flags, grant items, currency and techniques (XP included), raise
+  proficiencies and change standing; their events are not shown, only the
+  state they produce.
 - **Characters who move (M5b) · decided.** A character may author a set of
   locations and a recurring schedule; each occurrence moves it to one of them,
   uniformly drawn from a `world` RNG domain, possibly where it already is or
@@ -1817,15 +1818,15 @@ needs to be confirmed:
   autoresolve exactly. Agent battles always autoresolve. Still open: how much
   each round's summary shows (proposed: strength, losses and morale per side,
   not per stack).
-- **Overland map (presentation).** Proposed: locations may author integer
-  display positions and a kind from a closed list, all or none per world; the
+- **Overland map (presentation) · decided as delivered.** Locations may
+  author integer display positions up to `MAP_BOUND` and a kind from a
+  closed list (town, castle, village, waypoint), all or none per world; the
   engine answers one map-view query that respects player knowledge; the
-  terminal client owns the viewport, zoom, panning and label placement, and
-  line mode prints a fixed 80 × 24 view
-  ([Overland map](sandbox-worlds.md#overland-map)). Authors densify long roads
-  with waypoint locations rather than any free movement. Still open: the
-  closed list of kinds, the coordinate bound, whether the map is a panel in
-  play or a screen of its own, and whether positions belong to areas
+  terminal client owns the viewport, zoom, panning and label placement, as
+  a `Map` panel and a screen of its own, and line mode prints a fixed 80 × 24
+  view ([Overland map](sandbox-worlds.md#overland-map)). Authors densify long
+  roads with waypoint locations rather than any free movement. Still open:
+  whether positions belong to areas
   ([Spatial presentation](#spatial-presentation)) or to the world as one area.
 - **Agent policies (M6f).** Proposed: a closed enum (patrol, raid, escort,
   besiege, follow, trade, return home), chosen by authored priority rules over typed
@@ -1909,10 +1910,11 @@ needs to be confirmed:
   IDs that an authored `ReportDeed` effect reports, such as a tournament win or a broken promise.
   Companion friction takes effect in the transition that lowers the relation,
   with no tick. Still open: whether any world needs traits that change.
-- **Wounded, provisions and morale (M6c, M6d).** Proposed: the roster saves a
-  healthy and a wounded count per troop type; battle losses split into killed
-  and wounded by an authored share that surgery raises; an authored share of the
-  wounded recovers on each upkeep tick. Provisions are a value on trade goods,
+- **Wounded, provisions and morale (M6c, M6d).** Decided as delivered: the
+  roster saves a healthy and a wounded count per squad; battle losses split
+  into killed and wounded by an authored share; an authored share of the
+  wounded recovers on each upkeep tick. Proposed: surgery raises the wounded
+  share. Provisions are a value on trade goods,
   eaten per head, prisoners included. Morale is one bounded integer per retinue;
   low morale lowers battle strength and causes desertion. Wages, provisions,
   recovery, morale drift and desertion run in that fixed order on the retinue's
@@ -1929,9 +1931,10 @@ needs to be confirmed:
   duration take at least one minute; roads without one take no time. Agent
   parties use the same rule. Where equipment exists, a worn mount's authored
   travel speed replaces the base for its wearer, and the slowest counts.
-- **Recruit pools (M6c).** Proposed: each recruiting location saves a count per
-  troop definition that recruiting consumes and an authored schedule refills,
-  scaled by prosperity and gated by standing where those exist.
+- **Recruit pools (M6c).** Decided as delivered: each recruiting location
+  saves a count per troop line that recruiting consumes and an authored
+  schedule refills by a fixed amount, up to an authored size. Proposed:
+  refills scaled by prosperity and gated by standing where those exist.
 - **Knowledge and news (M6f).** Proposed: a closed set of notable world events
   is reported after the command that crossed it, either at once or on arrival
   at a town as the world authors, and kept in a bounded saved journal. The

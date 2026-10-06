@@ -72,9 +72,11 @@ The current priority is:
    saves bound to the rules alone. Still to come when the original game's
    content needs them: failing, abandoned and deadline quests, terminal and
    failure outcomes, dialogue-by-role and conditional text.
-3. **P0 — political identity.** Factions and typed standing/relation tracks are
-   required before the game world's states, martial schools and orders can be represented
-   as gameplay rather than lore-only labels.
+3. **P0 — political identity · foundation delivered**. Factions, war and
+   peace, and standing tracks, global or per faction (M6b-1), let the game
+   world's states, martial schools and orders be gameplay rather than
+   lore-only labels. Still to come when content needs them: per-character
+   relation, personalities and reactions to deeds, and membership ranks.
 4. **P1 — living sandbox world.** Finish the retinue pieces the original game needs
    (especially companions, provisions/morale and travel speed), then holdings and
    sieges, world agents, faction strategy, and the minimum politics/order

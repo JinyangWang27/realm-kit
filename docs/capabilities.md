@@ -304,8 +304,9 @@ not which source characters exist.
 ## Suggested implementation order
 
 The implementation is already beyond the original investigation-first planning
-note: the format includes world time, economy, troop recruitment, a first mass
-battle slice, and the investigation and progression slice the original game's MVP
+note: the format includes world time with a calendar, economy and banking,
+troop recruitment, a first mass battle slice, factions with war, peace and
+standing, and the investigation and progression slice the original game's MVP
 needs, with evidence readings that later knowledge changes, facts that fill in, question hubs and language overlays. The next priorities are driven by the original game as RealmKit's first full
 original-game pressure test, while every capability remains optional.
 

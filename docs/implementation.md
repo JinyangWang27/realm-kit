@@ -263,10 +263,12 @@ with its prose emptied and its language left out, so a rule edit
 makes older saves incompatible while prose fixes and added languages do not;
 there are no migrations yet.
 Loading checks the format version, package, revision and route, then the state
-invariants the rules maintain (known IDs, combat state present exactly when the
-world has combat, XP matching the level, vitals within their maximums, and an
-encounter whose participants, times and remainders the rules could produce,
-quest states matching defeats and flags, a valid conversation). The CLI writes each save to a new
+invariants the rules maintain (known IDs, each capability's state present
+exactly when the world authors it, XP matching the level, vitals within their
+maximums, an encounter or battle the rules could produce, quest states
+matching defeats, flags and prerequisites, the economy, roster and bank
+within their bounds, evidence, phases, outcome, standing and wars that some
+effect could explain, and a valid conversation). The CLI writes each save to a new
 file, then updates `lineage.json`; both writes go to a temporary file first and
 are then renamed into place.
 

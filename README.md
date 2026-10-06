@@ -287,9 +287,10 @@ terms are defined in the [glossary](docs/glossary.md). Unresolved design questio
 and their decision points are tracked in the
 [open-decisions register](docs/open-decisions.md).
 
-This is a playable scaffold, not a complete RPG system. Equipment, skills/MP,
-multi-target kill counts, encounters, independent dungeon instances,
-faction strategy and membership, TUI, multiplayer, and source compilation are deferred. The crypt is
+This is a playable scaffold, not a complete RPG system. Multi-target kill
+counts, independent dungeon instances, companions, holdings, world agents,
+faction strategy and membership, multiplayer, and source compilation are
+deferred. The crypt is
 an ordinary graph location. No empty crates or placeholder runtime systems
 are created for those features.
 
