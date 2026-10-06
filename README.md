@@ -179,12 +179,19 @@ proficiency: spend the points levels give you (`Proficiencies ›`, or
 `train trading`) to narrow the spread. You can also buy a workshop from the
 right merchant, such as Maddoc's weavery in Vellmarket. It turns wool into
 cloth and pays or costs you its margin every week.
+A world with a calendar may keep a bank. At a branch (`Bank — 40 silver ›`,
+or `deposit 50`, `withdraw 20`) you leave money in one account that every
+branch shares, and it is not carried. At the end of each calendar month the
+bank pays interest on the month's average daily balance (`The month ends:
+March 742.`, `Bank interest: …`). Your soldiers' wages come out of the bank
+first, then your purse.
 Some markets also sell wares at a fixed price, gear included, and some items
 can be used: the arena's quartermaster sells a healing draught that you
 drink from `Use item ›` (or `use healing_draught`), even mid-fight, where
 drinking takes your turn.
 Worlds with troops let you raise soldiers where they are recruited
-(`Recruit ›`, or `recruit levy 6`), pay their wages, and lead them against
+(`Recruit ›`, or `recruit levy 6`), pay their wages, daily or, where the
+world says so, at each month end for whoever is serving then, and lead them against
 armies (`engage outlaws`). Each round you charge, hold the line, flank with
 riders or retreat, or autoresolve the rest; nearby allies may join you.
 Soldiers who survive share the victory's XP and rise in level together,

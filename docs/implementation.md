@@ -130,6 +130,20 @@ proves the complete single-player loop with authored content.
   the spread. `scripts/combat_sim/economy.py` mirrors all of it, and a
   world without these parts keeps its earlier numbers.
   `examples/marches` exercises them.
+- [x] Banking and month-end payroll (M6a/M6c on the M5b calendar): one
+  optional bank whose branches take deposits and pay withdrawals of
+  carried currency, at once and atomically; a midnight due first in the
+  existing dispatcher closes each day at the bank's balance and, on the
+  first of a month, credits interest in basis points on the ended month's
+  average daily close over all its calendar days, then pays monthly
+  payroll for the roster standing then, with no proration. Wages are one
+  operation, all or nothing from the bank then carried currency with the
+  same desertion when unmet, that upkeep payroll calls on its schedule and
+  monthly payroll at the month end; upkeep still mends the wounded. Saves
+  keep the balance and the month's sum of closes, checked against the
+  days closed so far. Worlds without a bank or monthly payroll behave
+  exactly as before. `examples/marches` banks in Greyford and
+  Vellmarket; engine tests cover monthly payroll.
 - [x] Presentation seam and start choices (original-game P0): locations may author
   map positions and kinds, all or none; `Engine::map_view` returns the places,
   roads with travel minutes, one-way exits and the player's place, behind a

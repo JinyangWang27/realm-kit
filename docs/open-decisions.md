@@ -736,9 +736,9 @@ elapsed minutes; the Gregorian position is derived from the epoch and the minute
 never saved, so there is one time source of truth. Calendar support is optional.
 The spec derives the date and the next day and month boundaries after a minute,
 so a host and later capabilities read the same result. True month boundaries
-are meant for later banking interest, monthly payroll, salaries and holding
-settlement, which find every boundary a step crosses by repeating the
-next-month lookup; none of them exists yet. Time zones, daylight saving, locale
+serve banking interest and monthly payroll, which settle at the first
+midnight of each month; salaries and holding settlement are meant to join
+the same month-end settlement later. Time zones, daylight saving, locale
 calendars and custom calendars stay out.
 
 World time advances only through explicit authored/capability actions such as
@@ -1611,14 +1611,43 @@ needs to be confirmed:
   lazily, one due occurrence at a time. Nothing about a schedule is saved:
   its next occurrence follows from the saved minute. Ties at one minute go in
   schedule order (authored events, then movers; later capabilities append
-  their own schedules after these). Effects cannot start or stop a schedule;
+  their own schedules after these), except that midnight in a world with a
+  bank or monthly payroll goes first, so a day closes and a month settles
+  before anything else at that minute. Effects cannot start or stop a schedule;
   an occurrence's authored condition decides whether it does anything.
 - **Gregorian calendar (M5b) · decided.** `time.calendar.epoch` authors the
   Gregorian date at minute 0. Dates come from the minute through the `time`
   crate and are never saved; `{day}` keeps its elapsed-day meaning and the
   clock gains `{year}`, `{month}` and `{day_of_month}`. Validation keeps the
-  whole minute range inside the library's years. Scheduling on calendar
-  boundaries waits for the capability that needs it.
+  whole minute range inside the library's years. Banking and monthly
+  payroll are the first capabilities to settle on calendar boundaries,
+  through one midnight occurrence in the existing dispatcher rather than a
+  calendar scheduler.
+- **Banking and month-end settlement (M6a, M6c on M5b) · decided.** One
+  optional bank per world (`economy.banking`): an account apart from the
+  carried currency, reached at authored branches, with deposits and
+  withdrawals that take no time. Interest is a monthly rate in basis points
+  on the average of the Gregorian month's daily closing balances over all
+  its calendar days, rounded down once; not a 30-day month, a minimum
+  balance or the closing balance alone. Saves keep the balance and the
+  month's sum of closes; the days that sum covers follow from the date.
+  Each midnight closes the day before anything else at its minute; on the
+  first of a month the ended month's interest is credited, then monthly
+  payroll is paid, and the sum restarts, so nothing at the new month's
+  midnight reaches back into the old month. Later monthly credits and
+  debits join this settlement. Deferred: loans, debt, credit, several
+  banks or currencies, solvency, public treasuries and confiscation, office
+  salaries, mercenary stipends, companion retainers, holding income, and
+  defeat or robbery taking carried cash.
+- **Monthly payroll (M6c) · decided.** `troops.payroll` is `upkeep` (the
+  default, unchanged) or `monthly`. Monthly wages are a snapshot of the
+  roster at the month-end settlement, each soldier's wage at their level,
+  with no proration and no recruitment dates. Wages, whenever due, are all
+  or nothing from the bank first and then carried cash; when both fall
+  short nothing is paid, the shortfall is reported and upkeep's
+  `desert_percent` applies, so monthly payroll needs an upkeep block. There
+  are no arrears. Upkeep keeps mending the wounded on its own schedule;
+  provisions and morale will stay there too.
 - **Exits beyond compass directions (M5b) · decided.** Roads are an undirected
   list in `world.json`, each with an ASCII ID, two ends and optional travel
   minutes, condition and blocked text; at most one road joins a pair, so

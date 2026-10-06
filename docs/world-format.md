@@ -364,8 +364,10 @@ the road, and the destination shows who is there on arrival.
 
 When time passes, every occurrence it crosses happens in chronological order,
 with the clock at that occurrence's minute. Occurrences at the same minute go
-in schedule order: events in authored order, movers in character order, then
-the economy's price tick.
+in schedule order: midnight in a world with a bank or monthly wages (the
+day's bank close and any month-end settlement, see [Banking](#banking)),
+events in authored order, movers in character order, the economy's
+schedules, the troops' upkeep, then recruiting pools refilling.
 Because every first occurrence is after `start`, nothing is due when play
 begins, and an occurrence can never schedule another at its own minute. Saves
 keep the minute and each mover's location; the next occurrence of every
@@ -501,9 +503,9 @@ index bounds that contain 1,000 within 1 to 100,000.
 The parts below are each optional and independent: a world authors only the
 blocks it wants, and without one there is no state, menu entry or event for
 it. Prosperity, stock and workshops each need the time block and run on
-their own schedule. When several fall due at the same minute, they go in
-this order: the price tick, prosperity, restocking, then workshop
-settlement.
+their own schedule, and banking needs a calendar. When several fall due at
+the same minute, they go in this order: a bank's midnight, the price tick,
+prosperity, restocking, then workshop settlement.
 
 ### Villages and their town
 
@@ -610,6 +612,54 @@ Validation:
 - The limit is 1 to 100 (`invalid_limit`).
 - `resale` is at most `price` (`invalid_resale`), so buying and selling
   back never pays.
+
+### Banking
+
+A world with a calendar may keep one bank:
+
+```json
+"banking": { "branches": ["greyford", "vellmarket"], "monthly_interest_basis_points": 25 }
+```
+
+- **Carried cash and the bank.** The player's currency is what they carry,
+  as before. The bank account is held apart: it is not carried, and it
+  starts at zero. There is one account, reached at every branch.
+- **Branches.** `deposit <amount>` moves carried currency into the bank
+  and `withdraw <amount>` takes it out, only at a branch, at once and
+  without passing time. Zero, more than is there or a total past the
+  currency bound on either side is refused, and changes nothing. A branch
+  offers depositing all that is carried and withdrawing the whole balance.
+- **Interest** is paid into the bank at each Gregorian month end, on the
+  average of that month's daily closing balances:
+  `sum of the closes × monthly_interest_basis_points ÷ (days in the month ×
+  10,000)`, rounded down once, and credited up to the currency bound, with
+  any rest reported as forgone. Each calendar day closes at the balance
+  held at its last minute, so only a day's end counts however much moves
+  that day, and a day before any deposit closes at nothing. The divisor is
+  every day of the month: 28 to 31.
+- **Midnight comes first.** Every midnight the day closes before anything
+  else due at that minute. On the first of a month the month before then
+  settles: its interest is credited, then [monthly wages](#troops-and-battles) are
+  paid, and the month's sum starts again. A deposit, event or anything
+  else at the new month's midnight belongs to the new month and cannot
+  change the old one's closes. Events report `MonthEnded` (the month that
+  ended), `InterestCredited` (the average, the interest and anything
+  forgone) and then the wages.
+- **Saves** keep the balance and the sum of this month's closes so far;
+  how many days that covers follows from the date. A save is refused with
+  a bank in a world without one, a balance past the currency bound, or a
+  sum larger than the days closed this month could hold.
+
+Validation:
+
+- Banking needs world time with a calendar (`time_disabled`,
+  `calendar_disabled`).
+- There is at least one branch, each a real location, named once
+  (`invalid_banking`, `missing_reference`, `duplicate_id`).
+- `monthly_interest_basis_points` is a hundredth of a percent a month, 0
+  to 10,000 (`invalid_banking`); 25 is 0.25%.
+- Only one bank exists. Loans, debt, other currencies and banks of rival
+  powers are not part of the format.
 
 ### Proficiencies
 
@@ -1434,11 +1484,28 @@ fight authored armies.
 - **The roster limit** counts healthy and wounded soldiers, not the player
   (1 to 10,000, `invalid_limit`).
 - **Upkeep** (needs world time) pays every soldier's wage at once on its
-  schedule, or, when the currency does not cover it, pays nothing and loses
+  schedule, or, when the money does not cover it, pays nothing and loses
   `desert_percent` of each squad (at least one, the healthy first). Then
   `recover_percent` of each squad's wounded mend, rounded up. Resting at a
   safe place mends them all. Wages without upkeep draw a warning
   (`unused_wages`).
+- **Paying wages.** Wages are all or nothing: from the
+  [bank](#banking) first, where the world has one, then from carried
+  currency. When both together fall short, nothing is paid,
+  `WagesUnpaid` reports the bill and what was there, and the desertions
+  follow. There is no partial pay and no arrears.
+- **Monthly payroll.** `"payroll": "monthly"` moves wages from the upkeep
+  schedule to each Gregorian month end, while upkeep keeps mending the
+  wounded on its own schedule and lends its `desert_percent`. It needs a
+  calendar (`calendar_disabled`) and an `upkeep` block (`invalid_payroll`).
+  The bill is the roster standing at the settlement, each soldier's wage
+  at their current level, with no proration: a soldier recruited the last
+  evening of a month costs a whole month, one lost before the month end
+  costs nothing, and one recruited at the new month's midnight is first
+  paid a month later. Interest is credited before wages, so it can help
+  pay them. Recruiting prices and upgrade costs are paid at once, as
+  before. Without `payroll`, or with `"upkeep"`, wages fall due on the
+  upkeep schedule exactly as before.
 
 A location may offer recruits, each line from a pool that starts full and
 refills on a schedule (needs world time):
