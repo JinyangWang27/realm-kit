@@ -25,10 +25,11 @@ pub(super) fn check(
     header(world, snapshot)?;
     let state = &snapshot.state;
     basics(world, state)?;
-    // Before anything evaluates conditions, which read every track.
+    quests(world, fresh, state)?;
+    // Before anything evaluates standing conditions, which read every
+    // track; after quests, which reachability reads.
     standing(world, state)?;
     diplomacy(world, state)?;
-    quests(world, fresh, state)?;
     let progress = Progress::of(world, state)?;
     // The roster first: a battle's check sums its bounded squads.
     retinue::check(world, state)?;
@@ -342,6 +343,28 @@ pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effe
         .events
         .iter()
         .filter(|e| e.schedule.at <= now)
+        .flat_map(|e| &e.effects);
+    let start = chosen(world, state).into_iter().flat_map(|o| &o.effects);
+    start.chain(choices).chain(events).collect()
+}
+
+/// The effects of [`fired`] whose transition could have happened: the
+/// chosen start options', and those of dialogue choices and due events
+/// whose conditions could once have held.
+fn reachable<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effect> {
+    let now = state.time.unwrap_or(0);
+    let choices = world
+        .dialogues
+        .iter()
+        .flat_map(|d| &d.nodes)
+        .flat_map(|n| &n.choices)
+        .filter(|c| lasting(world, state, c.requires.as_ref()))
+        .flat_map(|c| &c.effects);
+    let events = world
+        .world
+        .events
+        .iter()
+        .filter(|e| e.schedule.at <= now && lasting(world, state, e.requires.as_ref()))
         .flat_map(|e| &e.effects);
     let start = chosen(world, state).into_iter().flat_map(|o| &o.effects);
     start.chain(choices).chain(events).collect()
@@ -893,7 +916,7 @@ fn phases(world: &WorldSpec, state: &GameState) -> Result<(), String> {
 /// Every authored track has a value for its scope, within its bounds, and
 /// one off its start only where an effect that could have fired changes it.
 fn standing(world: &WorldSpec, state: &GameState) -> Result<(), String> {
-    let fired = fired(world, state);
+    let fired = reachable(world, state);
     let changes = |track: &Id, faction: Option<&Id>| {
         fired.iter().any(|e| {
             matches!(e, Effect::ChangeStanding { track: t, faction: f, .. }
@@ -961,7 +984,7 @@ fn standing(world: &WorldSpec, state: &GameState) -> Result<(), String> {
 /// each pair differs from its authored start only where an effect that could
 /// have fired declares that war or makes that peace.
 fn diplomacy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
-    let fired = fired(world, state);
+    let fired = reachable(world, state);
     let start: BTreeSet<[Id; 2]> = world
         .world
         .diplomacy

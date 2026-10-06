@@ -491,3 +491,67 @@ fn a_save_keeps_the_war_a_certain_event_declared() {
     snapshot.state.at_war.remove(&pair("fen", "guild"));
     assert!(Engine::restore(&world, snapshot).is_ok());
 }
+
+/// The marches with a steward choice applying `effects` that no save could
+/// have taken: it needs a flag nothing sets.
+fn unreachable(effects: Vec<Effect>) -> WorldSpec {
+    let mut world = marches();
+    world.world.flags.push("never".into());
+    let steward = world.dialogues.iter_mut().find(|d| d.id == "steward");
+    steward.unwrap().nodes[0].choices.push(DialogueChoice {
+        text: TEST.into(),
+        requires: Some(Condition::Flag {
+            flag: "never".into(),
+        }),
+        effects,
+        ..Default::default()
+    });
+    world
+}
+
+#[test]
+fn a_choice_that_could_never_be_taken_explains_nothing() {
+    // It would undo the thaw's war, but it could not have been taken.
+    let world = unreachable(vec![Effect::MakePeace {
+        factions: pair("fen", "guild"),
+    }]);
+    assert_eq!(world.diagnostics(), []);
+    let mut snapshot = Engine::new(&world).unwrap().snapshot();
+    snapshot.state.time = Some(2_280);
+    snapshot.state.flags.insert("thaw".into());
+    assert!(Engine::restore(&world, snapshot.clone()).is_err());
+    snapshot.state.at_war.insert(pair("fen", "guild"));
+    assert!(Engine::restore(&world, snapshot.clone()).is_ok());
+    // Nor can it explain fame that nothing reachable gives; the same choice
+    // without its gate could.
+    let fame = |gated: bool| {
+        let mut world = unreachable(vec![change("fame", None, 5)]);
+        world.world.standing.push(StandingTrack {
+            id: "fame".into(),
+            name: "Fame".into(),
+            scope: StandingScope::Global,
+            min: 0,
+            max: 10,
+            start: 0,
+            starts: Default::default(),
+            thresholds: vec![],
+        });
+        if !gated {
+            let steward = world.dialogues.iter_mut().find(|d| d.id == "steward");
+            steward.unwrap().nodes[0]
+                .choices
+                .last_mut()
+                .unwrap()
+                .requires = None;
+        }
+        assert_eq!(world.diagnostics(), []);
+        let mut snapshot = Engine::new(&world).unwrap().snapshot();
+        snapshot
+            .state
+            .standing
+            .insert("fame".into(), Standing::Global(5));
+        Engine::restore(&world, snapshot).is_ok()
+    };
+    assert!(!fame(true));
+    assert!(fame(false));
+}
