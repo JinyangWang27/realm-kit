@@ -111,6 +111,18 @@ pub enum Condition {
     Phase {
         phase: Id,
     },
+    /// The player's standing on `track`, with `faction` on a faction
+    /// track, is at least `at_least`.
+    Standing {
+        track: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        faction: Option<Id>,
+        at_least: i32,
+    },
+    /// The two factions are at war, in either order.
+    AtWar {
+        factions: [Id; 2],
+    },
 }
 
 impl Condition {
@@ -268,6 +280,22 @@ pub enum Effect {
     /// changes nothing.
     EnterPhase {
         phase: Id,
+    },
+    /// Moves the player's standing on `track` by `by`, with `faction` on a
+    /// faction track, clamped to the track's bounds.
+    ChangeStanding {
+        track: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        faction: Option<Id>,
+        by: i32,
+    },
+    /// The two factions go to war; already at war changes nothing.
+    DeclareWar {
+        factions: [Id; 2],
+    },
+    /// The two factions make peace; already at peace changes nothing.
+    MakePeace {
+        factions: [Id; 2],
     },
 }
 

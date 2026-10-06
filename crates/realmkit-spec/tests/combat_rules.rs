@@ -161,6 +161,7 @@ fn groups_and_profile_levels_are_validated() {
                 combat: None,
                 moves: None,
                 army: None,
+                faction: None,
             });
             w.dialogues.push(Dialogue {
                 id: "orders".into(),

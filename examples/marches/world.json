@@ -44,7 +44,10 @@
     {
       "id": "thaw",
       "schedule": { "at": 2280 },
-      "effects": [{ "kind": "set_flag", "flag": "thaw" }]
+      "effects": [
+        { "kind": "set_flag", "flag": "thaw" },
+        { "kind": "declare_war", "factions": ["fen", "guild"] }
+      ]
     }
   ],
   "economy": {
@@ -200,5 +203,35 @@
     "flank_percent": 130,
     "pursuit_class": "riders",
     "player_xp_percent": 30
-  }
+  },
+  "factions": [
+    { "id": "keep", "name": "Hollin Keep" },
+    { "id": "fen", "name": "the fen bands" },
+    { "id": "guild", "name": "the Vellmarket wool guild" }
+  ],
+  "diplomacy": { "at_war": [["keep", "fen"]] },
+  "standing": [
+    {
+      "id": "renown",
+      "name": "Renown",
+      "min": 0,
+      "max": 1000,
+      "thresholds": [{ "at": 10, "name": "Known on the fen roads" }, { "at": 100, "name": "Famed in the marches" }]
+    },
+    {
+      "id": "favour",
+      "name": "Favour",
+      "scope": "faction",
+      "min": -100,
+      "max": 100,
+      "starts": { "fen": -40 },
+      "thresholds": [
+        { "at": -100, "name": "Hated" },
+        { "at": -40, "name": "Distrusted" },
+        { "at": -10, "name": "Neutral" },
+        { "at": 20, "name": "Trusted" },
+        { "at": 60, "name": "Honoured" }
+      ]
+    }
+  ]
 }

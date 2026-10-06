@@ -25,6 +25,9 @@ pub(super) fn check(
     header(world, snapshot)?;
     let state = &snapshot.state;
     basics(world, state)?;
+    // Before anything evaluates conditions, which read every track.
+    standing(world, state)?;
+    diplomacy(world, state)?;
     quests(world, fresh, state)?;
     let progress = Progress::of(world, state)?;
     // The roster first: a battle's check sums its bounded squads.
@@ -787,8 +790,8 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
             _ => None,
         })
         .collect();
-    // An unconditional event that only sets flags cannot fail, so once its
-    // first minute has come, its flags are set.
+    // An unconditional event that only sets flags and changes diplomacy
+    // cannot fail, so once its first minute has come, its flags are set.
     let now = state.time.unwrap_or(0);
     let mut required = world
         .world
@@ -796,9 +799,12 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
         .iter()
         .filter(|e| e.requires.is_none() && e.schedule.at <= now)
         .filter(|e| {
-            e.effects
-                .iter()
-                .all(|f| matches!(f, Effect::SetFlag { .. }))
+            e.effects.iter().all(|f| {
+                matches!(
+                    f,
+                    Effect::SetFlag { .. } | Effect::DeclareWar { .. } | Effect::MakePeace { .. }
+                )
+            })
         })
         .flat_map(|e| &e.effects)
         .filter_map(|e| match e {
@@ -865,6 +871,78 @@ fn phases(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                     )
             }),
         "invalid story phase",
+    )
+}
+
+/// Every authored track has a value for its scope, within its bounds, and
+/// one off its start only where an effect that could have fired changes it.
+fn standing(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let fired = fired(world, state);
+    let changes = |track: &Id, faction: Option<&Id>| {
+        fired.iter().any(|e| {
+            matches!(e, Effect::ChangeStanding { track: t, faction: f, .. }
+                if t == track && f.as_ref() == faction)
+        })
+    };
+    ensure(
+        state.standing.len() == world.world.standing.len()
+            && world.world.standing.iter().all(|track| {
+                let valid = |faction: Option<&Id>, value: i32| {
+                    (track.min..=track.max).contains(&value)
+                        && (value == track.start(faction.map(Id::as_str))
+                            || changes(&track.id, faction))
+                };
+                match (
+                    state.standing.get(&track.id),
+                    rules::initial_standing(world, track),
+                ) {
+                    (Some(Standing::Global(value)), Standing::Global(_)) => valid(None, *value),
+                    (Some(Standing::Factions(values)), Standing::Factions(start)) => {
+                        values.keys().eq(start.keys())
+                            && values.iter().all(|(f, value)| valid(Some(f), *value))
+                    }
+                    _ => false,
+                }
+            }),
+        "standing does not match the world",
+    )
+}
+
+/// Pairs at war are different, authored factions in canonical order, and
+/// each pair differs from its authored start only where an effect that could
+/// have fired declares that war or makes that peace.
+fn diplomacy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let fired = fired(world, state);
+    let start: BTreeSet<[Id; 2]> = world
+        .world
+        .diplomacy
+        .iter()
+        .flat_map(|d| &d.at_war)
+        .map(realmkit_spec::faction_pair)
+        .collect();
+    let moved = |pair: &[Id; 2], war: bool| {
+        fired.iter().any(|e| match e {
+            Effect::DeclareWar { factions } if war => {
+                realmkit_spec::faction_pair(factions) == *pair
+            }
+            Effect::MakePeace { factions } if !war => {
+                realmkit_spec::faction_pair(factions) == *pair
+            }
+            _ => false,
+        })
+    };
+    ensure(
+        (world.world.diplomacy.is_some() || state.at_war.is_empty())
+            && state.at_war.iter().all(|pair| {
+                *pair == realmkit_spec::faction_pair(pair)
+                    && pair[0] != pair[1]
+                    && pair.iter().all(|f| world.faction(f).is_some())
+            })
+            && state
+                .at_war
+                .symmetric_difference(&start)
+                .all(|pair| moved(pair, state.at_war.contains(pair))),
+        "diplomacy does not match the world",
     )
 }
 

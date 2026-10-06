@@ -1,9 +1,10 @@
 //! Panels: views of the current state that spend no time.
 
 use crate::render::{
-    clock, direction_name, duration, money, piece_name, stat_name, workshop_name, Paint,
+    clock, direction_name, duration, faction_name, faction_pair, money, piece_name, standing_value,
+    stat_name, workshop_name, Paint,
 };
-use realmkit_engine::Engine;
+use realmkit_engine::{Engine, Standing};
 use realmkit_spec::{Proficiency, Stat};
 use std::io::{self, Write};
 
@@ -64,14 +65,24 @@ pub fn location(
         let hp = fighting
             .map(|p| p.hp)
             .or(character.combat.as_ref().map(|c| c.stats.hp));
-        match hp {
-            Some(0) => {}
-            Some(hp) => writeln!(
+        if hp == Some(0) {
+            continue;
+        }
+        let notes: Vec<String> = character
+            .faction
+            .iter()
+            .map(|f| faction_name(world, f).to_owned())
+            .chain(hp.map(|hp| format!("HP {hp}")))
+            .collect();
+        match notes.is_empty() {
+            true => writeln!(output, "{} — {}", character.name, character.description)?,
+            false => writeln!(
                 output,
-                "{} (HP {hp}) — {}",
-                character.name, character.description
+                "{} ({}) — {}",
+                character.name,
+                notes.join(", "),
+                character.description
             )?,
-            None => writeln!(output, "{} — {}", character.name, character.description)?,
         }
     }
     Ok(())
@@ -321,7 +332,7 @@ pub fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
     holdings(output, engine)
 }
 
-/// Proficiency ranks with points waiting, then the player's workshops.
+/// Proficiency ranks with points waiting, the player's workshops, then standing.
 fn holdings(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
     let world = engine.world();
     let ranks: Vec<String> = Proficiency::ALL
@@ -341,7 +352,7 @@ fn holdings(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
         }
     }
     let Some(wallet) = &engine.state().economy else {
-        return Ok(());
+        return standing(output, engine);
     };
     let owned: Vec<String> = wallet
         .workshops
@@ -356,6 +367,37 @@ fn holdings(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
         .collect();
     if !owned.is_empty() {
         writeln!(output, "  Workshops: {}", owned.join(", "))?;
+    }
+    standing(output, engine)
+}
+
+/// The player's standing on each track, then the wars being fought.
+fn standing(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
+    let world = engine.world();
+    let state = engine.state();
+    for track in &world.world.standing {
+        match &state.standing[&track.id] {
+            Standing::Global(value) => {
+                writeln!(output, "  {} {}", track.name, standing_value(track, *value))?
+            }
+            Standing::Factions(values) => {
+                let shown: Vec<String> = world
+                    .world
+                    .factions
+                    .iter()
+                    .map(|f| format!("{} {}", f.name, standing_value(track, values[&f.id])))
+                    .collect();
+                writeln!(output, "  {}: {}", track.name, shown.join(" · "))?
+            }
+        }
+    }
+    if !state.at_war.is_empty() {
+        let wars: Vec<String> = state
+            .at_war
+            .iter()
+            .map(|pair| faction_pair(world, pair))
+            .collect();
+        writeln!(output, "  At war: {}", wars.join("; "))?;
     }
     Ok(())
 }

@@ -251,6 +251,12 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
             evidence,
             w.evidence(evidence).is_some(),
         ),
+        Effect::ChangeStanding { track, faction, by } => {
+            factions::change(out, w, owner, track, faction.as_ref(), *by)
+        }
+        Effect::DeclareWar { factions: pair } | Effect::MakePeace { factions: pair } => {
+            factions::pair(out, w, owner, pair)
+        }
         Effect::GrantTechnique(grant) => {
             progression::technique_grant(out, w, owner, grant);
             // A choice can be taken again; teaching a rank is idempotent,
@@ -295,7 +301,8 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 Effect::SetFlag { .. }
                 | Effect::GrantItems { .. }
                 | Effect::GrantCurrency { .. }
-                | Effect::RaiseProficiency { .. } => self::effect(out, w, &question.id, effect),
+                | Effect::RaiseProficiency { .. }
+                | Effect::ChangeStanding { .. } => self::effect(out, w, &question.id, effect),
                 // Answered once, so a grant may carry XP like a quest reward.
                 Effect::GrantTechnique(grant) => {
                     progression::technique_grant(out, w, &question.id, grant)
@@ -307,11 +314,13 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 | Effect::BuyWorkshop { .. }
                 | Effect::SellWorkshop { .. }
                 | Effect::DiscoverEvidence { .. }
-                | Effect::EnterPhase { .. } => issue(
+                | Effect::EnterPhase { .. }
+                | Effect::DeclareWar { .. }
+                | Effect::MakePeace { .. } => issue(
                     out,
                     &question.id,
                     "invalid_effect",
-                    "a start option may set flags, grant items or currency, teach techniques and raise proficiencies",
+                    "a start option may set flags, grant items or currency, teach techniques, raise proficiencies and change standing",
                 ),
             }
         }

@@ -191,9 +191,12 @@ fn event_effect(
     recurs: bool,
 ) {
     match effect {
-        Effect::SetFlag { .. } | Effect::GrantItems { .. } | Effect::GrantCurrency { .. } => {
-            story::effect(out, w, owner, effect)
-        }
+        Effect::SetFlag { .. }
+        | Effect::GrantItems { .. }
+        | Effect::GrantCurrency { .. }
+        | Effect::ChangeStanding { .. }
+        | Effect::DeclareWar { .. }
+        | Effect::MakePeace { .. } => story::effect(out, w, owner, effect),
         // A one-shot event happens once, so it may grant XP like a quest.
         Effect::GrantTechnique(grant) => {
             progression::technique_grant(out, w, owner, grant);
@@ -218,7 +221,7 @@ fn event_effect(
             out,
             owner,
             "invalid_effect",
-            "an event may set flags, grant items or currency and teach techniques",
+            "an event may set flags, grant items or currency, teach techniques, change standing and declare war or make peace",
         ),
     }
 }

@@ -11,7 +11,8 @@
     "name": "Steward Brannoc",
     "description": "He holds the keep while its lord rides the border.",
     "requires": { "kind": "time_of_day", "from": 480, "to": 1200 },
-    "dialogue": "steward"
+    "dialogue": "steward",
+    "faction": "keep"
   },
   {
     "id": "hild",
@@ -23,7 +24,8 @@
     "id": "maddoc",
     "name": "Maddoc the wool factor",
     "description": "He weighs every bale twice and trusts neither weighing.",
-    "dialogue": "maddoc"
+    "dialogue": "maddoc",
+    "faction": "guild"
   },
   {
     "id": "wenna",
@@ -36,6 +38,8 @@
     "id": "outlaws",
     "name": "The fen outlaws",
     "description": "Reed-cutters turned robbers, camped where the causeway meets the dry ground.",
+    "faction": "fen",
+    "requires": { "kind": "at_war", "factions": ["keep", "fen"] },
     "army": {
       "troops": [
         { "line": "outlaws", "count": 8 },
@@ -51,6 +55,7 @@
     "id": "warden",
     "name": "Warden Cadoc",
     "description": "The keep's men in green, sent down the fen road as the steward promised.",
+    "faction": "keep",
     "requires": { "kind": "flag", "flag": "letter_delivered" },
     "army": {
       "troops": [{ "line": "keep_guard", "count": 6 }],
