@@ -356,6 +356,11 @@ pub(crate) fn apply(
                 proficiency::raise(world, state, *proficiency, *ranks, events)
             }
             Effect::EnterPhase { phase } => enter_phase(world, state, phase, events),
+            Effect::ChangeStanding { track, faction, by } => {
+                factions::change(world, state, track, faction.as_ref(), *by, events)?
+            }
+            Effect::DeclareWar { factions: pair } => factions::diplomacy(state, pair, true, events),
+            Effect::MakePeace { factions: pair } => factions::diplomacy(state, pair, false, events),
             Effect::DiscoverEvidence { evidence } => {
                 if state.evidence.insert(evidence.clone()) {
                     events.push(Event::EvidenceDiscovered {

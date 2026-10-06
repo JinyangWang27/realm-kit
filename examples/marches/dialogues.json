@@ -22,7 +22,8 @@
             "requires": { "kind": "quest", "quest": "carry_letter", "status": "ready" },
             "effects": [
               { "kind": "complete_quest", "quest": "carry_letter" },
-              { "kind": "grant_currency", "amount": 60 }
+              { "kind": "grant_currency", "amount": 60 },
+              { "kind": "change_standing", "track": "renown", "by": 10 }
             ]
           },
           {
@@ -52,13 +53,31 @@
             "requires": { "kind": "item", "item": "sealed_letter", "quantity": 1 },
             "effects": [
               { "kind": "take_items", "items": [{ "item": "sealed_letter", "quantity": 1 }] },
-              { "kind": "set_flag", "flag": "letter_delivered" }
+              { "kind": "set_flag", "flag": "letter_delivered" },
+              { "kind": "change_standing", "track": "favour", "faction": "keep", "by": 20 }
+            ]
+          },
+          {
+            "text": "Let me carry terms to the fen camps.",
+            "next": "terms",
+            "requires": {
+              "kind": "all",
+              "of": [
+                { "kind": "at_war", "factions": ["keep", "fen"] },
+                { "kind": "standing", "track": "favour", "faction": "keep", "at_least": 20 }
+              ]
+            },
+            "effects": [
+              { "kind": "make_peace", "factions": ["keep", "fen"] },
+              { "kind": "change_standing", "track": "favour", "faction": "fen", "by": 30 },
+              { "kind": "change_standing", "track": "renown", "by": 15 }
             ]
           },
           { "text": "Nothing that will not keep." }
         ]
       },
-      { "id": "read", "text": "He breaks the seal and reads twice. 'The fen road. Tell her I will send men when it drains.'" }
+      { "id": "read", "text": "He breaks the seal and reads twice. 'The fen road. Tell her I will send men when it drains.'" },
+      { "id": "terms", "text": "He writes quickly and seals it with the keep's holly. 'Grazing on the dry ground, and no more tolls on the causeway. If they keep to it, so will we.'" }
     ]
   },
   {
@@ -94,7 +113,10 @@
                 { "kind": "currency", "amount": 150 }
               ]
             },
-            "effects": [{ "kind": "buy_workshop", "workshop": "weavery" }]
+            "effects": [
+              { "kind": "buy_workshop", "workshop": "weavery" },
+              { "kind": "change_standing", "track": "favour", "faction": "guild", "by": 10 }
+            ]
           },
           {
             "text": "Take the weavery back. (75 silver)",

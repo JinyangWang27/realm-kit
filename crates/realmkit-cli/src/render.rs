@@ -181,6 +181,33 @@ pub fn clock(world: &realmkit_spec::WorldSpec, minute: u64) -> Option<String> {
     interpolate(&time.clock, &values).ok()
 }
 
+/// What a track measures: "Renown", or "Favour with Hollin Keep".
+fn standing_name(world: &realmkit_spec::WorldSpec, track: &str, faction: Option<&str>) -> String {
+    let name = &world.standing_track(track).unwrap().name;
+    match faction {
+        Some(faction) => format!("{name} with {}", faction_name(world, faction)),
+        None => name.clone(),
+    }
+}
+
+/// A value with the name of the threshold it has reached, if any: "25
+/// (Known)", or "3".
+pub fn standing_value(track: &realmkit_spec::StandingTrack, value: i32) -> String {
+    match track.label(value) {
+        Some(label) => format!("{value} ({label})"),
+        None => value.to_string(),
+    }
+}
+
+pub fn faction_name<'w>(world: &'w realmkit_spec::WorldSpec, faction: &str) -> &'w str {
+    &world.faction(faction).unwrap().name
+}
+
+/// "Hollin Keep and the fen bands".
+pub fn faction_pair(world: &realmkit_spec::WorldSpec, [a, b]: &[Id; 2]) -> String {
+    format!("{} and {}", faction_name(world, a), faction_name(world, b))
+}
+
 pub fn direction_name(direction: Direction) -> &'static str {
     match direction {
         Direction::North => "north",
@@ -728,6 +755,34 @@ pub fn events(
                 let phase = &world.world.phases[world.phase_index(phase).unwrap()];
                 writeln!(output, "{}", paint.title(&format!("— {} —", phase.name)))?
             }
+            Event::StandingChanged {
+                track,
+                faction,
+                by,
+                value,
+            } => {
+                let change = format!("{by:+}");
+                let change = match *by > 0 {
+                    true => paint.good(&change),
+                    false => paint.bad(&change),
+                };
+                let now = match world.standing_track(track).unwrap().label(*value) {
+                    Some(label) => format!("now {value}, {label}"),
+                    None => format!("now {value}"),
+                };
+                let name = standing_name(world, track, faction.as_deref());
+                writeln!(output, "{name} {change} ({now})")?
+            }
+            Event::WarDeclared { factions } => writeln!(
+                output,
+                "{}",
+                paint.bad(&format!("War: {}.", faction_pair(world, factions)))
+            )?,
+            Event::PeaceMade { factions } => writeln!(
+                output,
+                "{}",
+                paint.good(&format!("Peace: {}.", faction_pair(world, factions)))
+            )?,
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,
             Event::QuestsViewed => panels::quests(output, engine, paint)?,

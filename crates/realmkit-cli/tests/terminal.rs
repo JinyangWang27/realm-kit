@@ -668,6 +668,13 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         "Inventory:\n  119 silver · 0 silver in the bank\n",
         "  Trade 1/3 · 1 proficiency point to spend\n  Workshops: Weavery in Vellmarket\n",
         "Market at Vellmarket:\n  Prosperity 40\n",
+        // Factions: who serves whom, standing earned, and a war the thaw starts.
+        "Steward Brannoc (Hollin Keep) — ",
+        "The fen outlaws (the fen bands) — ",
+        "Favour with Hollin Keep +20 (now 20, Trusted)\n",
+        "Renown +10 (now 10, Known on the fen roads)\n",
+        "War: the fen bands and the Vellmarket wool guild.\n",
+        "  Renown 10 (Known on the fen roads)\n  Favour: Hollin Keep 20 (Trusted) · the fen bands -40 (Distrusted) · the Vellmarket wool guild 10 (Neutral)\n  At war: the fen bands and the Vellmarket wool guild; the fen bands and Hollin Keep\n",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }

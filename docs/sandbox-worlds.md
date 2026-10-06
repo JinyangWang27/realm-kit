@@ -190,8 +190,8 @@ M5 slices.
    character ID, not a second identity. This follows
    [Section 10](open-decisions.md#10-definitions-instances-and-identity), and
    instances for combatant copies are already planned for M5.
-6. **Sandbox routes.** A route still owns exactly one main questline, and a
-   playthrough records at most one outcome
+6. **Sandbox routes** (outcomes delivered in M5c). A route still owns
+   exactly one main questline, and a playthrough records at most one outcome
    ([Section 3](open-decisions.md#3-outcomes-failure-and-replay)). In a sandbox,
    the main questline is a ladder of ambitions: quests such as "hold a fief"
    and "found an order" are ordinary quest progression. Only the top rung, such
@@ -232,7 +232,7 @@ M5 slices.
    condition holds is shown. Choosing a variant reads state only, so it draws
    no randomness and changes nothing. Templates keep their single-pass
    substitution: there is no conditional syntax inside a string.
-9. **Start choices.** A sandbox player usually begins by answering a few
+9. **Start choices** (delivered in M5f). A sandbox player usually begins by answering a few
    questions about their past: a noble's child, a merchant's apprentice, a
    deserter. A route may author a short sequence of start questions shown at
    New Game, before the first turn. Each option applies an ordered list of
@@ -415,16 +415,26 @@ prices: the engine derives every price from them.
 
 ### Factions and standing
 
-- **Relationship to the core.** Factions already exist as world entities
-  ([Section 1](open-decisions.md#1-minimum-universal-world-core)). This
-  capability adds mutable state to them.
-- **Diplomacy.** A war/peace relation between each pair of factions. It starts
-  as authored and changes only through effects: `DeclareWar` and `MakePeace`.
+Delivered as a foundation, each part optional ([World format](world-format.md#factions-diplomacy-and-standing)):
+
+- **Relationship to the core.** Factions are world entities
+  ([Section 1](open-decisions.md#1-minimum-universal-world-core)) with an
+  ID and a name, and characters may belong to one. A world may author
+  factions with neither diplomacy nor standing; they then carry no state.
+- **Diplomacy.** A war/peace relation between each unordered pair of
+  factions. It starts as authored and changes only through effects:
+  `declare_war` and `make_peace`.
 - **Standing.** Authored standing tracks, each a bounded integer with named
-  thresholds. A world might author renown (global), honour (global), standing
-  with each faction, and relation with each lord. There is no universal list of
-  tracks.
-- **Conditions and effects.** `StandingAtLeast`, `AtWar`; `ChangeStanding`.
+  thresholds, global or held with each faction. A world might author renown
+  (global), honour (global) and favour with each faction. There is no
+  universal list of tracks. Changes clamp to the bounds. Relation with each
+  lord, a per-character scope, is still proposed.
+- **Conditions and effects.** `standing` (at least a value) and `at_war`;
+  `change_standing`, `declare_war` and `make_peace`.
+- **Later.** Faction strategy (M6g), membership ranks, offices, vassalage
+  and orders (M6h), holdings and armies owned by factions (M6e, M6f), and
+  alliances or truces build on these without making a faction their
+  container.
 
 ### Personalities
 
@@ -478,10 +488,11 @@ they do, without scripting each character.
 - **Roster.** The player's roster holds, per troop definition, a count of
   healthy troops, a count of wounded troops and an XP pool: troops are
   fungible, not instances. All three are saved.
-- **Allies before factions** (delivered). Until factions exist,
-  an army with a `joins` condition is an ally: never engaged, it fights on
-  the player's side in any battle where it is present while the condition
-  holds. Faction membership and war will derive that condition.
+- **Allies by condition** (delivered). An army with a `joins` condition
+  is an ally: never engaged, it fights on the player's side in any battle
+  where it is present while the condition holds. Factions now exist, and the
+  condition may test them (`at_war`, `standing`); faction membership may
+  derive it later.
 - **Wounded troops.** Wounded troops do not fight, still draw wages and count
   towards the size limit. On each upkeep tick an authored share recovers, more
   at a location that authors rest or healing, and the retinue's surgery

@@ -499,15 +499,22 @@ fn time_passing_says_whether_anything_noticeable_happened_meanwhile() {
             _ => None,
         })
     };
-    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
-    assert_eq!(passed(&travel(&mut engine, "ashmere")), Some(false));
-    // Travelling over the thaw at 14:00 on day 2 only sets a flag.
-    engine.execute(Wait(2_220 - 600)).unwrap();
-    let events = travel(&mut engine, "greyford");
-    assert!(events.contains(&Event::StoryFlagSet {
-        flag: "thaw".into()
-    }));
-    assert_eq!(passed(&events), Some(false));
+    // Travelling over the thaw at 14:00 on day 2 sets a flag, and the war
+    // it starts is news.
+    let over_the_thaw = |world: &WorldSpec| {
+        let mut engine = Engine::new_with_seed(world, 7).unwrap();
+        assert_eq!(passed(&travel(&mut engine, "ashmere")), Some(false));
+        engine.execute(Wait(2_220 - 600)).unwrap();
+        let events = travel(&mut engine, "greyford");
+        assert!(events.contains(&Event::StoryFlagSet {
+            flag: "thaw".into()
+        }));
+        passed(&events)
+    };
+    assert_eq!(over_the_thaw(&world), Some(true));
+    // Setting the flag alone is not.
+    world.world.events[0].effects.truncate(1);
+    assert_eq!(over_the_thaw(&world), Some(false));
     // A purse found on the road is something to see.
     world.world.events.push(WorldEvent {
         id: "purse".into(),

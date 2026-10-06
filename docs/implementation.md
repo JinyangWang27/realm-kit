@@ -195,6 +195,21 @@ proves the complete single-player loop with authored content.
   keep them loadable. `caravan-trail` shows the first, second and fourth;
   `quiet-archive` asks a hub of questions and ships a Simplified Chinese
   overlay.
+- [x] Factions, diplomacy and standing (M6b foundation): authored
+  factions with translatable names, an optional character `faction`, an
+  optional `diplomacy` block whose `at_war` pairs start at war and every
+  other pair at peace, and authored standing tracks, global or per faction,
+  bounded, with starting values and named thresholds. `standing` and
+  `at_war` conditions; `change_standing` (clamped to the bounds),
+  `declare_war` and `make_peace` (idempotent) effects in dialogue and
+  events, and `change_standing` in start answers; `StandingChanged`,
+  `WarDeclared` and `PeaceMade` events. Saves keep every standing value
+  and the pairs at war in canonical order. Since both move freely, a save
+  is checked for their shape only: scopes, factions, bounds and canonical
+  pairs, with the package revision binding the rules. Each part is
+  optional: factions alone add no state. The CLI shows affiliations,
+  standing and wars. `examples/marches` has three factions, renown and
+  favour, a war the thaw starts and a peace the steward can make.
 - [x] Documentation and verification: explain content/rules and deferred scope;
   run formatting, workspace tests, Clippy, and an independent engine/CLI build.
 
@@ -212,7 +227,8 @@ every capability optional:
 - [x] First-class authored story-phase/main-side-questline/outcome
   progression, as far as the original game's MVP uses it. Failure,
   deadlines and terminal outcomes wait for content that needs them.
-- [ ] Factions, war/peace and typed standing/relation tracks.
+- [x] Factions, war/peace and typed standing tracks, global and per
+  faction. Per-character relation tracks wait for companions or courtship.
 - [ ] Remaining retinue needs used by the representative sandbox world:
   companions, roster limit, provisions/morale and travel speed.
 - [ ] Holdings/sieges, then world agents and faction strategy; add only the
@@ -231,8 +247,9 @@ The package uses fixed JSON filenames, with world metadata (including the
 optional combat block), locations, characters, items, quests and dialogues in
 separate files. IDs are
 explicit strings, exits are directed, and every reference is validated on load.
-Unknown fields and unsupported versions fail early. The format implements only
-the MVP domains, with extensions requiring an explicit format/version decision.
+Unknown fields and unsupported versions fail early. The format grows by optional
+fields and new kinds without a version change; the version rises only under
+the [Versions](world-format.md#versions) rule.
 
 Combat is optional. Where a world has it, damage comes from the two-channel
 formula in `realmkit-engine::damage`, with checked integer arithmetic and one
@@ -247,10 +264,12 @@ with its prose emptied and its language left out, so a rule edit
 makes older saves incompatible while prose fixes and added languages do not;
 there are no migrations yet.
 Loading checks the format version, package, revision and route, then the state
-invariants the rules maintain (known IDs, combat state present exactly when the
-world has combat, XP matching the level, vitals within their maximums, and an
-encounter whose participants, times and remainders the rules could produce,
-quest states matching defeats and flags, a valid conversation). The CLI writes each save to a new
+invariants the rules maintain (known IDs, each capability's state present
+exactly when the world authors it, XP matching the level, vitals within their
+maximums, an encounter or battle the rules could produce, quest states
+matching defeats, flags and prerequisites, the economy, roster and bank
+within their bounds, evidence, phases and outcome that the recorded progress
+explains, standing and wars of the right shape, and a valid conversation). The CLI writes each save to a new
 file, then updates `lineage.json`; both writes go to a temporary file first and
 are then renamed into place.
 

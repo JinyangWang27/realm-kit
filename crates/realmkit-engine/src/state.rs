@@ -210,6 +210,40 @@ pub struct GameState {
     /// Ask-once dialogue choices the player has taken, never offered again.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub taken_choices: BTreeSet<ChoiceRef>,
+    /// The player's value on every authored standing track.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub standing: BTreeMap<Id, Standing>,
+    /// Pairs of factions at war, each in [`realmkit_spec::faction_pair`]
+    /// order; every other pair is at peace. Only worlds with diplomacy have any.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub at_war: BTreeSet<[Id; 2]>,
+}
+
+/// A track's value: one for a global track, one per faction for a faction track.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum Standing {
+    Global(i32),
+    Factions(BTreeMap<Id, i32>),
+}
+
+impl Standing {
+    /// The value, with `faction` on a faction track; `None` for a scope or
+    /// faction the track does not have.
+    pub fn get(&self, faction: Option<&str>) -> Option<i32> {
+        match (self, faction) {
+            (Self::Global(value), None) => Some(*value),
+            (Self::Factions(values), Some(faction)) => values.get(faction).copied(),
+            _ => None,
+        }
+    }
+    pub(crate) fn get_mut(&mut self, faction: Option<&str>) -> Option<&mut i32> {
+        match (self, faction) {
+            (Self::Global(value), None) => Some(value),
+            (Self::Factions(values), Some(faction)) => values.get_mut(faction),
+            _ => None,
+        }
+    }
 }
 
 /// A proficiency's rank, split by where it came from: points the player

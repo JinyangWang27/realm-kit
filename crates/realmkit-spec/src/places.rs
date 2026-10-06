@@ -108,6 +108,9 @@ pub struct Character {
     /// Leads an army: an enemy to engage in a mass battle, or an ally.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub army: Option<Army>,
+    /// The faction the character belongs to, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faction: Option<Id>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

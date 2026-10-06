@@ -7,6 +7,7 @@ mod combat;
 mod crafting;
 mod economy;
 mod equipment;
+mod factions;
 mod progression;
 mod story;
 mod text;
@@ -61,6 +62,7 @@ pub fn diagnostics(w: &WorldSpec) -> Vec<Diagnostic> {
     story::evidence(&mut out, w);
     story::phases(&mut out, w);
     story::outcomes(&mut out, w);
+    factions::rules(&mut out, w);
     time::rules(&mut out, w);
     if let Some(economy) = w.economy() {
         economy::rules(&mut out, w, economy);
@@ -224,6 +226,12 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
         Condition::Phase { phase } => {
             reference(out, owner, "phase", phase, w.phase_index(phase).is_some())
         }
+        Condition::Standing {
+            track,
+            faction,
+            at_least,
+        } => factions::at_least(out, w, owner, track, faction.as_ref(), *at_least),
+        Condition::AtWar { factions: pair } => factions::pair(out, w, owner, pair),
     }
 }
 

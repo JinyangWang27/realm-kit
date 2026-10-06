@@ -53,9 +53,9 @@ A package is a directory containing these required UTF-8 JSON files:
 
 | File | Content |
 | --- | --- |
-| `world.json` | Format version, world ID/name/language and translations, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events`, `start_questions`, `evidence`, `phases` and `outcomes` |
+| `world.json` | Format version, world ID/name/language and translations, starting location, player character ID, declared flags, optional `combat`, `time` and `economy` blocks, optional `roads`, `events`, `start_questions`, `evidence`, `phases`, `outcomes`, `factions`, `diplomacy` and `standing` |
 | `locations.json` | Array of locations with descriptions, directional exits, placed character IDs, optional map positions and when the player knows of them |
-| `characters.json` | Array of characters (people or features) with descriptions, availability conditions, and optional dialogue and combat profile |
+| `characters.json` | Array of characters (people or features) with descriptions, availability conditions, and optional dialogue, combat profile and faction |
 | `items.json` | Array of items with names and descriptions |
 | `quests.json` | Array of quests with giver, defeat or flag objective, prose, rewards and completion flags |
 | `dialogues.json` | Array of dialogue trees with nodes, choices, conditions and effects |
@@ -240,6 +240,11 @@ composition of others:
 - `phase` (`{ "kind": "phase", "phase": "leads" }`) holds once the story
   has reached that phase or a later one; see
   [Story phases](#story-phases-main-quests-and-outcomes).
+- `standing` (`{ "kind": "standing", "track": "favour", "faction": "keep",
+  "at_least": 20 }`) holds while the player's value on that track, with that
+  faction on a faction track, is at least `at_least`; `at_war` (`{ "kind":
+  "at_war", "factions": ["keep", "fen"] }`) holds while the two are at war, in
+  either order. See [Factions](#factions-diplomacy-and-standing).
 - `all` holds when every condition in `of` does, `any` when at least one
   does, and `not` when its `condition` does not. `of` must not be empty.
 - `at_least` holds when at least `count` of the conditions in `of` do, so
@@ -339,8 +344,9 @@ A `schedule` first falls at minute `at`, which must be after `start`, and then,
 if it has one, every `every` minutes (at least 1). An occurrence applies the
 event's `effects` in order when its optional `requires` holds, and does nothing
 otherwise. An occurrence whose effects cannot all apply, such as a grant past
-a bound, is skipped whole, so it never holds time back. Events may `set_flag`, `grant_items`, `grant_currency` and
-`grant_technique` (a recurring event without XP); they cannot accept or
+a bound, is skipped whole, so it never holds time back. Events may `set_flag`, `grant_items`, `grant_currency`,
+`grant_technique` (a recurring event without XP), `change_standing`,
+`declare_war` and `make_peace`; they cannot accept or
 complete quests, take items or take payment, which belong to conversations.
 
 A character may move among locations on a schedule:
@@ -738,6 +744,88 @@ lines describe what is seen; clients offer "Examine" instead of "Talk to".
 A feature needs a dialogue and has no combat profile, army or movement
 (`invalid_feature`). `kind` defaults to `person`.
 
+A character may name the `faction` it belongs to, which must exist
+(`missing_reference`). Clients show it beside the name; nothing in the
+rules follows from it yet.
+
+## Factions, diplomacy and standing
+
+Three optional, separate parts of `world.json`. A world may author factions
+alone, as political entities that characters belong to, with no mutable
+state; diplomacy and standing each add state only when authored.
+
+```json
+"factions": [
+  { "id": "keep", "name": "Hollin Keep" },
+  { "id": "fen", "name": "the fen bands" },
+  { "id": "guild", "name": "the Vellmarket wool guild" }
+],
+"diplomacy": { "at_war": [["keep", "fen"]] },
+"standing": [
+  {
+    "id": "renown",
+    "name": "Renown",
+    "min": 0,
+    "max": 1000,
+    "thresholds": [{ "at": 10, "name": "Known on the fen roads" }]
+  },
+  {
+    "id": "favour",
+    "name": "Favour",
+    "scope": "faction",
+    "min": -100,
+    "max": 100,
+    "starts": { "fen": -40 },
+    "thresholds": [{ "at": -40, "name": "Distrusted" }, { "at": 20, "name": "Trusted" }]
+  }
+]
+```
+
+- **Factions** have unique IDs and a non-blank `name`, which is prose and so
+  translatable. A faction owns, decides and fields nothing by itself.
+- **Diplomacy** is war or peace between each unordered pair of factions.
+  `at_war` lists the pairs at war at the start, each once in either order
+  (`duplicate_pair`), between two different (`self_relation`), existing
+  factions; every other pair starts at peace. Only the `declare_war` and
+  `make_peace` effects change it afterwards, and they and the `at_war`
+  condition need the `diplomacy` block (`diplomacy_disabled`), which may be
+  `{}` when every pair starts at peace. Saves keep the pairs at war now, each
+  in one canonical order; loading checks only that each is a canonical pair
+  of two different, existing factions in a world with diplomacy.
+- **Standing** tracks are bounded integers the world measures the player
+  by; there are no built-in tracks such as renown or honour. A track runs
+  from `min` to `max` (`min` below `max`, both within ±`STANDING_BOUND`,
+  1,000,000: `invalid_bounds`). Its `scope` is `global` (the default), one
+  value for the world, or `faction`, one value per faction, which needs
+  factions (`standing_scope`). It starts at `start` (default 0), and a faction
+  track at `starts` for the factions it names (only faction tracks have
+  `starts`: `standing_scope`); starts lie within the bounds
+  (`invalid_start`). `thresholds` name ranges for presentation, in strictly
+  rising order within the bounds (`invalid_threshold`): a value shows the
+  name of the highest threshold it has reached, and none below the first.
+  Saves keep every value; loading checks only that every track, and every
+  faction on a faction track, has one within the bounds. War, peace and
+  standing move freely both ways, so a save is not checked for how they got
+  there; the package revision binds the rules that move them.
+
+```json
+{ "kind": "change_standing", "track": "renown", "by": 10 }
+{ "kind": "change_standing", "track": "favour", "faction": "fen", "by": -20 }
+{ "kind": "declare_war", "factions": ["fen", "guild"] }
+{ "kind": "make_peace", "factions": ["keep", "fen"] }
+```
+
+`change_standing` moves the value by `by` and then clamps it to the track's
+bounds, so it never refuses; a change the bound absorbs entirely, such as
+renown gained at its maximum, reports nothing. `by` is non-zero and at most
+`max - min` in size (`invalid_change`). A faction track's conditions and
+effects name a `faction`, and a global track's never do (`standing_scope`).
+A `standing` condition's `at_least` lies above `min` and at most `max`, or
+it would always or never hold (`invalid_standing`). Declaring a war already
+fought or making a peace already kept changes nothing and reports nothing.
+These effects work in dialogue choices and events; start answers may
+change standing but not diplomacy, which `at_war` authors directly.
+
 ## Start questions
 
 `start_questions` in `world.json` are asked at New Game, before the first
@@ -768,9 +856,10 @@ an answer never skips or adds a question.
   IDs, and option IDs within a question, are unique.
 - An option's `effects` apply in order to the starting state: `set_flag`,
   `grant_items`, `grant_currency`, `grant_technique` (with XP, since an answer
-  is given once) and `raise_proficiency`. Quests, `take_items`,
-  `pay_currency` and workshops are refused (`invalid_effect`): no giver or
-  market is at hand before play begins. The starting currency plus the
+  is given once), `raise_proficiency` and `change_standing`. Quests,
+  `take_items`, `pay_currency`, workshops, evidence, phases and diplomacy are
+  refused (`invalid_effect`): no giver or market is at hand before play
+  begins, and the authored start already fixes who is at war. The starting currency plus the
   largest currency grant of each question must stay within `CURRENCY_BOUND`
   (`start_overflow`).
 - Later conditions and text read what an answer produced like any other
@@ -891,7 +980,13 @@ other requires under `not`, or the two must require different statuses of
 one quest. So at most one ever holds, whatever order things happen in. No outcome may
 hold at the start: each `when` must require, on every branch, something no
 start provides, such as a quest taken up, evidence, a workshop, a phase after
-the first or a flag no start answer sets (`outcome_at_start`). Terminal and failure
+the first, a flag no start answer sets, standing beyond what the authored
+start and the start answers could give (above the most, or under `not`,
+below the least), or a war or peace the start does not have
+(`outcome_at_start`). A war between two factions and its negation exclude
+each other whichever order names the pair, and so do standing of at least
+one value and, under `not`, standing of at least a lower one on the same
+track and faction. Terminal and failure
 endings are not yet modelled.
 
 The journal (`Engine::journal`, the CLI's Quests panel) shows the current
@@ -919,6 +1014,9 @@ Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 { "kind": "raise_proficiency", "proficiency": "trading", "ranks": 1 }
 { "kind": "discover_evidence", "evidence": "wheel_ruts" }
 { "kind": "enter_phase", "phase": "lost_wagons" }
+{ "kind": "change_standing", "track": "favour", "faction": "keep", "by": 20 }
+{ "kind": "declare_war", "factions": ["fen", "guild"] }
+{ "kind": "make_peace", "factions": ["keep", "fen"] }
 ```
 
 Effects apply in authored order to the staged state, and the choice commits
@@ -931,7 +1029,8 @@ player has refuses the choice. `buy_workshop` and `sell_workshop` act in the
 town where the player stands ([Workshops](#workshops)), and
 `raise_proficiency` teaches ranks without spending points, up to the top
 rank ([Proficiencies](#proficiencies)). Events cannot
-use these three.
+use these three. `change_standing`, `declare_war` and `make_peace` are
+described under [Factions](#factions-diplomacy-and-standing).
 A choice can be taken again while its condition holds, so a one-time gift
 pairs `grant_items` with `set_flag` under a `not` condition on that flag.
 
@@ -1619,9 +1718,10 @@ the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
 skill references, usable and affordable skills, loot quantities, fighter
 placement, template placeholders, evidence that can be discovered, phases
-that can be entered, quest prerequisite cycles and main quests waiting on side
-quests. `load()` reports a package whose
-`format_version` is not 18 as `SpecError::UnsupportedFormat` before parsing it.
+that can be entered, quest prerequisite cycles, main quests waiting on side
+quests, and factions, diplomacy pairs and standing tracks with their scopes,
+bounds and thresholds. `load()` reports a package whose
+`format_version` is not 19 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.

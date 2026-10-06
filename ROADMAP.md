@@ -72,9 +72,11 @@ The current priority is:
    saves bound to the rules alone. Still to come when the original game's
    content needs them: failing, abandoned and deadline quests, terminal and
    failure outcomes, dialogue-by-role and conditional text.
-3. **P0 — political identity.** Factions and typed standing/relation tracks are
-   required before the game world's states, martial schools and orders can be represented
-   as gameplay rather than lore-only labels.
+3. **P0 — political identity · foundation delivered**. Factions, war and
+   peace, and standing tracks, global or per faction (M6b-1), let the game
+   world's states, martial schools and orders be gameplay rather than
+   lore-only labels. Still to come when content needs them: per-character
+   relation, personalities and reactions to deeds, and membership ranks.
 4. **P1 — living sandbox world.** Finish the retinue pieces the original game needs
    (especially companions, provisions/morale and travel speed), then holdings and
    sieges, world agents, faction strategy, and the minimum politics/order
@@ -1246,10 +1248,11 @@ world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
 Each slice depends on the M5 foundations it uses, following the hard
 requirements in [Modularity](docs/sandbox-worlds.md#modularity): the economy
 needs only M5a's effects and M5b's schedules, so it came first. Deliver in
-slices, each bumping the package and save format as usual.
+slices; a slice changes the package and save format version only under the
+[Versions](docs/world-format.md#versions) rule, so optional additions leave it as it is.
 
 The original game now supplies the concrete ordering pressure. After the already delivered
-economy and first troop/battle slices, prioritize **M6b factions/standing**, the
+economy, first troop/battle and M6b factions/standing slices, prioritize the
 remaining **M6c** retinue/companion/travel needs, then **M6e holdings/sieges**,
 **M6f world agents**, **M6g faction strategy**, and only the minimal **M6h**
 politics/order composition that the game's authored content requires. M6d additions
@@ -1301,6 +1304,20 @@ original-game fixture actually uses them.
    drive reactions to player deeds, either detected by the engine or reported
    by an authored `ReportDeed` effect. Proficiencies such as trading,
    leadership and surgery belong to the capability that uses them.
+   **M6b-1 · delivered**: authored factions with translatable
+   names and optional character affiliation; optional diplomacy, war or
+   peace per unordered pair, starting as authored and changed only by
+   idempotent `declare_war` and `make_peace`; authored standing tracks,
+   global or per faction, bounded, with starting values and named
+   thresholds, changed by `change_standing` and clamped to their bounds;
+   `standing` and `at_war` conditions wherever conditions work; events for
+   every change; and saves that keep only the values and the pairs at war.
+   Factions alone add no state. `examples/marches` sets the fen bands
+   against the keep, and, at the thaw, against the wool guild. Still to
+   come: per-character relation tracks, personalities, deeds and
+   reactions, companion friction, and diplomacy that factions decide for
+   themselves (M6g). Allies still join by an authored condition rather
+   than by faction.
 3. **M6c — retinue.** Troop definitions with wages and upgrade paths, a roster
    of counts and saved XP pools per troop type, companions as unique
    characters who wear their own gear from a shared stash, recruiting, an
@@ -1506,9 +1523,11 @@ complete cross-project register remains in
    outcomes recorded once. Several languages are settled too: one base
    language plus complete overlays, and a rules-only save revision. Settle failure, deadlines and terminal outcomes
    when the original game's content beyond the MVP needs them.
-3. **Politics P0:** settle M6b faction membership/war-peace representation and
-   standing-track scopes/thresholds before authoring the game world's political entities,
-   schools and orders.
+3. **Politics P0 · war/peace and standing settled**: factions as
+   plain entities, war or peace per unordered pair, and standing tracks with
+   global or per-faction scopes, bounds and named thresholds. Settle
+   membership ranks, per-character relation and personalities before
+   authoring the game world's schools and orders.
 4. **Party P1:** settle companion progression/gear, roster limit, provisions,
    morale and travel-speed rules required by the first full party of the original game.
 5. **Living world P1:** settle only the holding, world-agent and faction-strategy

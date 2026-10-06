@@ -198,6 +198,15 @@ Soldiers who survive share the victory's XP and rise in level together,
 renamed as the world decides, and at the end of a line you choose their
 branch (`Upgrade ›`). In the marches, levies raised at Ashmere beat the fen
 outlaws beside the keep's men.
+Worlds may have factions. People show whom they serve (`Steward Brannoc
+(Hollin Keep)`), factions are at war or at peace with each other, and the
+world measures you on its own standing tracks, such as renown or favour
+with each faction. What you do moves them (`Favour with Hollin Keep +20 (now
+20, Trusted)`), wars break out and end (`War: the fen bands and the
+Vellmarket wool guild.`), and conversations and people can depend on both:
+the marches' steward lets a trusted traveller carry terms to the fen, and
+once there is peace, the outlaws are gone. The status panel lists your
+standing and the wars being fought.
 Stories can be told in phases, with a main questline and side quests that
 wait for an earlier quest or a later phase, and investigations turn on
 evidence. Examining things (`Examine the cold camp`, or `examine cold_camp`)
@@ -278,9 +287,10 @@ terms are defined in the [glossary](docs/glossary.md). Unresolved design questio
 and their decision points are tracked in the
 [open-decisions register](docs/open-decisions.md).
 
-This is a playable scaffold, not a complete RPG system. Equipment, skills/MP,
-multi-target kill counts, encounters, independent dungeon instances, factions,
-TUI, multiplayer, and source compilation are deferred. The crypt is
+This is a playable scaffold, not a complete RPG system. Multi-target kill
+counts, independent dungeon instances, companions, holdings, world agents,
+faction strategy and membership, multiplayer, and source compilation are
+deferred. The crypt is
 an ordinary graph location. No empty crates or placeholder runtime systems
 are created for those features.
 

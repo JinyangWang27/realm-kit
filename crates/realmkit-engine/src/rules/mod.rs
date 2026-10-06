@@ -7,6 +7,7 @@ mod bank;
 mod consume;
 mod crafting;
 mod economy;
+mod factions;
 mod map;
 mod player;
 mod proficiency;
@@ -16,6 +17,7 @@ mod time;
 
 pub(super) use actions::actions;
 pub(super) use economy::{quote, stock_up, ware_price};
+pub(super) use factions::initial as initial_standing;
 pub(super) use map::{known, map_view};
 pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
 pub(super) use proficiency::{
@@ -63,6 +65,14 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
         } => rank(state, *proficiency) >= *at_least,
         Condition::Evidence { evidence } => state.evidence.contains(evidence),
         Condition::Phase { phase } => state.phases.contains(phase),
+        Condition::Standing {
+            track,
+            faction,
+            at_least,
+        } => factions::standing(state, track, faction.as_deref()).is_some_and(|v| v >= *at_least),
+        Condition::AtWar { factions } => state
+            .at_war
+            .contains(&realmkit_spec::faction_pair(factions)),
         Condition::TimeOfDay { from, to } => state.time.is_some_and(|now| {
             let minute = now % realmkit_spec::MINUTES_PER_DAY;
             if from < to {

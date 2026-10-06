@@ -10,6 +10,7 @@ use std::{
 mod combat;
 mod crafting;
 mod economy;
+mod factions;
 mod items;
 mod places;
 mod stats;
@@ -22,6 +23,7 @@ mod validation;
 pub use combat::*;
 pub use crafting::*;
 pub use economy::*;
+pub use factions::*;
 pub use items::*;
 pub use places::*;
 pub use stats::*;
@@ -106,6 +108,15 @@ pub struct World {
     /// The route's authored endings; absent in a world without them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub outcomes: Vec<RouteOutcome>,
+    /// The world's political entities; absent in a world without them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub factions: Vec<Faction>,
+    /// War and peace between factions; absent where it never changes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diplomacy: Option<Diplomacy>,
+    /// Tracks the player's standing is measured on; there are no built-in ones.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub standing: Vec<StandingTrack>,
 }
 
 // Serde defaults shared by several content types.
@@ -291,6 +302,12 @@ impl WorldSpec {
     /// A phase's place in the story's order.
     pub fn phase_index(&self, id: &str) -> Option<usize> {
         self.world.phases.iter().position(|p| p.id == id)
+    }
+    pub fn faction(&self, id: &str) -> Option<&Faction> {
+        self.world.factions.iter().find(|v| v.id == id)
+    }
+    pub fn standing_track(&self, id: &str) -> Option<&StandingTrack> {
+        self.world.standing.iter().find(|v| v.id == id)
     }
     pub fn dialogue(&self, id: &str) -> Option<&Dialogue> {
         self.dialogues.iter().find(|v| v.id == id)

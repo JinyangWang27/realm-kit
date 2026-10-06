@@ -178,6 +178,19 @@ impl<'w> Engine<'w> {
                     .collect(),
                 outcome: None,
                 taken_choices: BTreeSet::new(),
+                standing: world
+                    .world
+                    .standing
+                    .iter()
+                    .map(|track| (track.id.clone(), rules::initial_standing(world, track)))
+                    .collect(),
+                at_war: world
+                    .world
+                    .diplomacy
+                    .iter()
+                    .flat_map(|d| &d.at_war)
+                    .map(realmkit_spec::faction_pair)
+                    .collect(),
             },
         };
         // Merchants open with their stock at its targets, drawing nothing.

@@ -251,6 +251,12 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
             evidence,
             w.evidence(evidence).is_some(),
         ),
+        Effect::ChangeStanding { track, faction, by } => {
+            factions::change(out, w, owner, track, faction.as_ref(), *by)
+        }
+        Effect::DeclareWar { factions: pair } | Effect::MakePeace { factions: pair } => {
+            factions::pair(out, w, owner, pair)
+        }
         Effect::GrantTechnique(grant) => {
             progression::technique_grant(out, w, owner, grant);
             // A choice can be taken again; teaching a rank is idempotent,
@@ -295,7 +301,8 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 Effect::SetFlag { .. }
                 | Effect::GrantItems { .. }
                 | Effect::GrantCurrency { .. }
-                | Effect::RaiseProficiency { .. } => self::effect(out, w, &question.id, effect),
+                | Effect::RaiseProficiency { .. }
+                | Effect::ChangeStanding { .. } => self::effect(out, w, &question.id, effect),
                 // Answered once, so a grant may carry XP like a quest reward.
                 Effect::GrantTechnique(grant) => {
                     progression::technique_grant(out, w, &question.id, grant)
@@ -307,11 +314,13 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 | Effect::BuyWorkshop { .. }
                 | Effect::SellWorkshop { .. }
                 | Effect::DiscoverEvidence { .. }
-                | Effect::EnterPhase { .. } => issue(
+                | Effect::EnterPhase { .. }
+                | Effect::DeclareWar { .. }
+                | Effect::MakePeace { .. } => issue(
                     out,
                     &question.id,
                     "invalid_effect",
-                    "a start option may set flags, grant items or currency, teach techniques and raise proficiencies",
+                    "a start option may set flags, grant items or currency, teach techniques, raise proficiencies and change standing",
                 ),
             }
         }
@@ -454,8 +463,9 @@ pub(super) fn phases(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 
 /// Outcomes have unique IDs and valid conditions, and none can hold at the
 /// start: each requires, on every branch, something no start provides. That
-/// is a quest taken up, evidence, a workshop, a phase after the first, or a
-/// flag no start answer sets.
+/// is a quest taken up, evidence, a workshop, a phase after the first, a
+/// flag no start answer sets, standing beyond anything a start can give, or
+/// a war or peace the start does not have.
 pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     ids(
         out,
@@ -475,6 +485,9 @@ pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
         Condition::Evidence { .. } | Condition::Workshop { .. } => true,
         Condition::Phase { phase } => w.phase_index(phase).is_some_and(|i| i > 0),
         Condition::Flag { flag } => !answered.contains(flag),
+        Condition::Standing { .. } | Condition::AtWar { .. } | Condition::Not { .. } => {
+            factions::never_at_start(w, leaf)
+        }
         _ => false,
     };
     for (i, outcome) in w.world.outcomes.iter().enumerate() {
@@ -500,7 +513,7 @@ pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 out,
                 &outcome.id,
                 "outcome_at_start",
-                "an outcome must require something no start provides: a quest taken up, evidence, a workshop, a later phase or a flag no start answer sets",
+                "an outcome must require something no start provides: a quest taken up, evidence, a workshop, a later phase, a flag no start answer sets, standing no start gives, a war that starts at peace or a peace that starts at war",
             );
         }
     }

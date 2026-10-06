@@ -228,28 +228,44 @@ The existence of an entity in the fiction does not require its corresponding
 mechanical capability. For example, factions can exist as world entities without
 a faction/reputation system.
 
+## Faction
+
+An authored political entity, such as a kingdom, clan or guild, with an ID
+and a name. Characters may belong to one. A faction is not a container: it
+owns no holdings or armies and has no strategy, offices or members' ranks of
+its own; later capabilities refer to it instead.
+
+## Diplomacy
+
+Whether each unordered pair of factions is at war or at peace. A world that
+authors it lists the pairs at war at the start; effects declare war and make
+peace afterwards. There are no alliances, truces or war scores.
+
 ## Standing
 
-Proposed for M6. An authored, bounded integer track with named thresholds,
-scoped globally, per faction or per character, such as renown or a lord's
-relation with the player. Conditions read it and effects change it.
+An authored, bounded integer track with named thresholds, global or held
+with each faction, such as renown or favour at a court. There are no
+built-in tracks. Conditions read it; effects change it, clamped to its
+bounds. Per-character tracks, such as a lord's relation with the player,
+are still proposed.
 
 ## Market
 
-Proposed for M6. A location that trades an authored set of goods. Each good has
+A location that trades an authored set of goods. Each good has
 a saved price index, in thousandths of its base price, that a recurring tick
 moves against the market's authored production and demand. The engine derives
 integer buying and selling prices from it.
 
 ## Prosperity
 
-Proposed for M6. A market's bounded integer measure of wealth. It drifts towards
-an ideal set by scarcity and buildings, rises with trade, falls with raids and
-sieges, and scales income, tariffs, merchant stock and recruit pools.
+A market's bounded integer measure of wealth. It drifts one point a day
+towards an ideal that scarcity lowers, and scales demand and merchants'
+stock. Proposed for later: buildings that raise the ideal, trade, raids and
+sieges that move it, and income, tariffs and recruit pools that it scales.
 
 ## Workshop
 
-Proposed for M6. A player-owned business in a town that runs one processed
+A player-owned business in a town that runs one processed
 good's recipe and pays the local profit, possibly a loss, on a recurring
 schedule. It is owned property, not a holding.
 
@@ -279,10 +295,11 @@ Monthly payroll needs no upkeep.
 
 ## Retinue
 
-Proposed for M6. The player's troops, held as a count and an XP pool per troop
-definition, plus any companions, who are unique characters wearing gear from a
-shared stash. An engine-computed limit caps its size, and wages fall due on a
-recurring schedule or at each month end ([Payroll](#payroll)).
+The player's troops, held per troop line and level as squads of healthy and
+wounded soldiers sharing an XP pool. An authored limit caps its size, and
+wages fall due on a recurring schedule or at each month end
+([Payroll](#payroll)). Proposed for later: companions, unique characters
+wearing gear from a shared stash, and a limit the engine computes.
 
 ## Prisoner
 

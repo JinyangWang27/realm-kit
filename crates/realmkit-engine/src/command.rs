@@ -408,6 +408,22 @@ pub enum Event {
     PhaseEntered {
         phase: Id,
     },
+    /// The player's standing on `track`, with `faction` on a faction track,
+    /// moved by `by` to `value`, after clamping to the track's bounds.
+    StandingChanged {
+        track: Id,
+        faction: Option<Id>,
+        by: i32,
+        value: i32,
+    },
+    /// The two factions, in canonical order, went to war.
+    WarDeclared {
+        factions: [Id; 2],
+    },
+    /// The two factions, in canonical order, made peace.
+    PeaceMade {
+        factions: [Id; 2],
+    },
     InventoryViewed,
     StatusViewed,
     QuestsViewed,
