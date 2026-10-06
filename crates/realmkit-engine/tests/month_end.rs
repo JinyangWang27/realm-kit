@@ -37,13 +37,13 @@ fn unbanked() -> WorldSpec {
     world
 }
 
-/// [`banked`], with wages paid at each month end instead of each upkeep,
-/// and a fifth of each squad leaving when they go unpaid. The daily upkeep
-/// stays, to mend the wounded.
+/// [`banked`], with wages paid at each month end instead of each upkeep.
+/// The daily upkeep stays, to mend the wounded; its legacy desertion share
+/// is cleared, since it never applies to monthly wages.
 fn monthly(epoch: GregorianDate, basis_points: u32, silver: u64) -> WorldSpec {
     let mut world = banked(epoch, basis_points, silver);
     let troops = world.world.troops.as_mut().unwrap();
-    troops.payroll = Payroll::Monthly { desert_percent: 20 };
+    troops.payroll = Payroll::Monthly {};
     troops.upkeep.as_mut().unwrap().desert_percent = 0;
     world
 }
@@ -415,7 +415,8 @@ fn wages_come_from_the_bank_then_the_purse_or_not_at_all() {
     let mut engine = levies(&world, 4, 1, 6);
     assert_eq!(wages(&wait_until(&mut engine, end)), Some((6, 4)));
     assert_eq!((bank(&engine).balance, currency(&engine)), (0, 54));
-    // Short of the whole bill: nothing is paid, and a share deserts.
+    // Short of the whole bill: nothing is paid, which is reported, and
+    // nobody leaves until persistent morale weighs it.
     let world = monthly(date(742, 1, 1), 0, 64);
     let mut engine = levies(&world, 2, 1, 6);
     assert_eq!((bank(&engine).balance, currency(&engine)), (2, 2));
@@ -425,13 +426,16 @@ fn wages_come_from_the_bank_then_the_purse_or_not_at_all() {
         amount: 6,
         available: 4
     }));
-    assert!(events.contains(&Event::Deserted {
-        line: "levy".into(),
-        level: 1,
-        count: 1
-    }));
+    assert!(!events.iter().any(|e| matches!(e, Event::Deserted { .. })));
     assert_eq!((bank(&engine).balance, currency(&engine)), (2, 2));
-    assert_eq!(engine.state().retinue.as_ref().unwrap().heads(), 5);
+    assert_eq!(
+        squad(&engine, "levy", 1),
+        Some(Squad {
+            healthy: 6,
+            wounded: 0,
+            xp: 0
+        })
+    );
 }
 
 #[test]
@@ -567,25 +571,18 @@ fn saves_reject_bank_accounts_the_rules_could_not_produce() {
 }
 
 #[test]
-fn monthly_wages_need_no_upkeep_and_desert_by_their_own_share() {
-    // Half of each squad leaves over unpaid wages, with no upkeep at all.
+fn monthly_wages_need_no_upkeep_and_unpaid_cost_nobody() {
     let mut world = monthly(date(742, 1, 1), 0, 64);
-    let troops = world.world.troops.as_mut().unwrap();
-    troops.payroll = Payroll::Monthly { desert_percent: 50 };
-    troops.upkeep = None;
+    world.world.troops.as_mut().unwrap().upkeep = None;
     let end = month_end(&world, START);
-    let mut engine = levies(&world, 0, 1, 6);
+    let mut engine = levies(&world, 2, 1, 6);
     let events = wait_until(&mut engine, end);
     assert!(events.contains(&Event::WagesUnpaid {
         amount: 6,
         available: 4
     }));
-    assert!(events.contains(&Event::Deserted {
-        line: "levy".into(),
-        level: 1,
-        count: 3
-    }));
-    assert_eq!(engine.state().retinue.as_ref().unwrap().heads(), 3);
+    assert!(!events.iter().any(|e| matches!(e, Event::Deserted { .. })));
+    assert_eq!(engine.state().retinue.as_ref().unwrap().heads(), 6);
     // Paid, with nothing on the days between and nobody mended.
     let world_paid = {
         let mut world = world.clone();
@@ -613,9 +610,9 @@ fn monthly_wages_need_no_upkeep_and_desert_by_their_own_share() {
 }
 
 #[test]
-fn upkeep_beside_monthly_wages_never_takes_its_own_deserters() {
-    // Upkeep's share is all of each squad, the month's a fifth: unpaid
-    // wages cost one levy of six, by the month's share.
+fn upkeep_beside_monthly_wages_never_acts_on_them() {
+    // Upkeep's legacy share would take every soldier; beside monthly
+    // wages it is never used, even when they go unpaid.
     let mut world = monthly(date(742, 1, 1), 0, 64);
     world
         .world
@@ -627,17 +624,46 @@ fn upkeep_beside_monthly_wages_never_takes_its_own_deserters() {
         .unwrap()
         .desert_percent = 100;
     let mut engine = levies(&world, 2, 1, 6);
-    let events = wait_until(&mut engine, month_end(&world, START));
-    let deserted: Vec<_> = events
+    let events = wait_until(&mut engine, month_end(&world, START) + 3 * DAY);
+    assert!(events
         .iter()
-        .filter(|e| matches!(e, Event::Deserted { .. }))
-        .collect();
-    assert_eq!(
-        deserted,
-        [&Event::Deserted {
-            line: "levy".into(),
-            level: 1,
-            count: 1
-        }]
-    );
+        .any(|e| matches!(e, Event::WagesUnpaid { .. })));
+    assert!(!events.iter().any(|e| matches!(e, Event::Deserted { .. })));
+    assert_eq!(engine.state().retinue.as_ref().unwrap().heads(), 6);
+}
+
+#[test]
+fn money_banking_and_payroll_keep_to_their_own_modules() {
+    // The economy and its bank know nothing of what money pays for.
+    let economy = [
+        ("bank", include_str!("../src/rules/bank.rs")),
+        ("economy", include_str!("../src/rules/economy.rs")),
+    ];
+    for (module, source) in economy {
+        for word in [
+            "retinue", "Wages", "wage", "Payroll", "payroll", "Desert", "morale",
+        ] {
+            assert!(!source.contains(word), "{module} mentions {word}");
+        }
+    }
+    // Payroll pays through the economy's generic payment and never touches
+    // a balance itself.
+    let retinue = include_str!("../src/rules/retinue.rs");
+    assert!(retinue.contains("economy::try_pay(state, wages)"));
+    for word in [".bank", ".currency", "balance"] {
+        assert!(!retinue.contains(word), "retinue touches {word}");
+    }
+    // Time alone orders the month boundary: the day's close, interest, then
+    // payroll.
+    let time = include_str!("../src/rules/time.rs");
+    let order = [
+        "bank::close_day(state)",
+        "bank::interest(world, state, ended.day, events)",
+        "retinue::payroll(world, state, events)",
+    ]
+    .map(|call| {
+        time.find(call)
+            .unwrap_or_else(|| panic!("time lacks {call}"))
+    });
+    assert!(order.is_sorted(), "{order:?}");
 }

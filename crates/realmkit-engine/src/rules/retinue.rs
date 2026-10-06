@@ -202,10 +202,16 @@ fn line<'w>(world: &'w WorldSpec, id: &str) -> &'w TroopLine {
 }
 
 /// The upkeep schedule: wages, where they fall due on it, then recovery.
+/// Unpaid upkeep wages cost each squad `desert_percent` of its soldiers:
+/// legacy behaviour, kept for upkeep payroll only.
 pub(crate) fn upkeep(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
     let rules = troops(world).upkeep.unwrap();
-    if matches!(troops(world).payroll, Payroll::Upkeep {}) {
-        pay(world, state, events);
+    if matches!(troops(world).payroll, Payroll::Upkeep {}) && !pay(world, state, events) {
+        desert(
+            state.retinue.as_mut().unwrap(),
+            rules.desert_percent,
+            events,
+        );
     }
     let retinue = state.retinue.as_mut().unwrap();
     mend(retinue, Some(rules.recover_percent), events);
@@ -215,20 +221,20 @@ pub(crate) fn upkeep(world: &WorldSpec, state: &mut GameState, events: &mut Vec<
 }
 
 /// Month-end wages for the roster standing at the settlement, with no
-/// proration for days served.
+/// proration for days served. Unpaid, they are only reported: nobody
+/// leaves until persistent morale weighs missed wages.
 pub(crate) fn payroll(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
     pay(world, state, events);
-    prune(state.retinue.as_mut().unwrap());
-    promote(world, state, events);
 }
 
-/// Every soldier's wage at their level, all or nothing: from the bank
-/// first, where there is one, then carried currency. Unpaid wages cost each
-/// squad a share of its soldiers, healthy ones first.
-fn pay(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
-    let retinue = state.retinue.as_mut().unwrap();
+/// Charges every soldier's wage at their level through the economy and
+/// reports how it went; `false` when the wages went unpaid.
+fn pay(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) -> bool {
     // At most the roster limit times the currency bound: inside 64 bits.
-    let wages: u64 = retinue
+    let wages: u64 = state
+        .retinue
+        .as_ref()
+        .unwrap()
         .roster
         .iter()
         .flat_map(|(id, levels)| {
@@ -238,35 +244,34 @@ fn pay(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
         })
         .sum();
     if wages == 0 {
-        return;
+        return true;
     }
-    let wallet = state.economy.as_mut().unwrap();
-    let banked = wallet.bank.map_or(0, |b| b.balance);
-    let available = banked + wallet.currency;
-    if available >= wages {
-        let from_bank = wages.min(banked);
-        if let Some(bank) = wallet.bank.as_mut() {
-            bank.balance -= from_bank;
+    match economy::try_pay(state, wages) {
+        Ok(from_bank) => {
+            events.push(Event::WagesPaid {
+                amount: wages,
+                from_bank,
+            });
+            true
         }
-        wallet.currency -= wages - from_bank;
-        events.push(Event::WagesPaid {
-            amount: wages,
-            from_bank,
-        });
-        return;
+        Err(available) => {
+            events.push(Event::WagesUnpaid {
+                amount: wages,
+                available,
+            });
+            false
+        }
     }
-    events.push(Event::WagesUnpaid {
-        amount: wages,
-        available,
-    });
-    // Upkeep payroll is paid only by upkeep, so its block is there.
-    let percent = u64::from(match troops(world).payroll {
-        Payroll::Monthly { desert_percent } => desert_percent,
-        Payroll::Upkeep {} => troops(world).upkeep.unwrap().desert_percent,
-    });
+}
+
+/// Each squad loses `percent` of its soldiers, at least one, healthy ones
+/// first.
+fn desert(retinue: &mut RetinueState, percent: u32, events: &mut Vec<Event>) {
     for (id, levels) in &mut retinue.roster {
         for (level, squad) in levels.iter_mut() {
-            let count = (squad.heads() * percent / 100).max(1).min(squad.heads());
+            let count = (squad.heads() * u64::from(percent) / 100)
+                .max(1)
+                .min(squad.heads());
             let healthy = count.min(squad.healthy);
             leave(squad, healthy, count - healthy);
             events.push(Event::Deserted {

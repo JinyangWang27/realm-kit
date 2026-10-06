@@ -27,7 +27,7 @@ fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
     let settles = world.economy().is_some_and(|e| e.banking.is_some())
         || world
             .troops()
-            .is_some_and(|t| matches!(t.payroll, Payroll::Monthly { .. }));
+            .is_some_and(|t| matches!(t.payroll, Payroll::Monthly {}));
     let midnight = settles.then_some((
         Schedule {
             at: 0,
@@ -127,7 +127,7 @@ fn pass(
         cursor = (minute, index);
         state.time = Some(minute);
         match due[index].1 {
-            Due::Midnight => bank::midnight(world, state, events),
+            Due::Midnight => midnight(world, state, events),
             Due::Event(event) => {
                 if allowed(state, event.requires.as_ref()) {
                     occur(world, state, &event.effects, events);
@@ -154,6 +154,33 @@ fn pass(
         });
     }
     Ok(())
+}
+
+/// Midnight in a world that settles months, in a fixed order: the bank
+/// closes the day just ended; on the first of a month, the month before
+/// settles, its interest before monthly wages, so interest can help pay
+/// them. Anything else due at this minute comes after, so it belongs to
+/// the new day and month.
+fn midnight(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
+    bank::close_day(state);
+    let calendar = world.world.time.as_ref().unwrap().calendar.unwrap();
+    let now = state.time.unwrap();
+    if calendar.date(now).unwrap().day != 1 {
+        return;
+    }
+    // Midnights come strictly after the start of play, so `now` > 0.
+    let ended = calendar.date(now - 1).unwrap();
+    events.push(Event::MonthEnded {
+        year: ended.year,
+        month: ended.month,
+    });
+    bank::interest(world, state, ended.day, events);
+    if world
+        .troops()
+        .is_some_and(|t| matches!(t.payroll, Payroll::Monthly {}))
+    {
+        retinue::payroll(world, state, events);
+    }
 }
 
 /// Applies one occurrence's effects as a whole, or not at all: an occurrence

@@ -159,15 +159,14 @@ fn lines(out: &mut Vec<Diagnostic>, w: &WorldSpec, troops: &Troops) {
         );
     }
     percent(out, owner, troops.wounded_percent, 100, "the wounded share");
-    if let Payroll::Monthly { desert_percent } = troops.payroll {
+    if matches!(troops.payroll, Payroll::Monthly {}) {
         time::calendar_needed(out, w, owner);
-        percent(out, owner, desert_percent, 100, "desertion");
         if troops.upkeep.is_some_and(|u| u.desert_percent > 0) {
             warn(
                 out,
                 owner,
                 "unused_percent",
-                "wages are paid monthly, so upkeep's desertion share is never used",
+                "upkeep's desertion share applies only to wages paid on upkeep, not monthly",
             );
         }
     }

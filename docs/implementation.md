@@ -136,12 +136,12 @@ proves the complete single-player loop with authored content.
   existing dispatcher closes each day at the bank's balance and, on the
   first of a month, credits interest in basis points on the ended month's
   average daily close over all its calendar days, then pays monthly
-  payroll for the roster standing then, with no proration. Wages are one
-  operation, all or nothing from the bank then carried currency with the
-  same desertion rule when unmet, that upkeep payroll calls on its
-  schedule and monthly payroll at the month end with its own desertion
-  share; monthly payroll needs no upkeep, which where authored only mends
-  the wounded. Saves
+  payroll for the roster standing then, with no proration. The economy
+  pays any amount all or nothing, bank then carried currency, and knows
+  nothing of wages; the retinue charges its wage bill through it, on
+  upkeep with the legacy desertion when unmet, or at the month end, where
+  unmet wages are only reported until persistent morale. Monthly payroll
+  needs no upkeep, which where authored only mends the wounded. Saves
   keep the balance and the month's sum of closes, checked against the
   days closed so far. Worlds without a bank or monthly payroll behave
   exactly as before. `examples/marches` banks in Greyford and

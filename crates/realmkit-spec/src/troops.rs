@@ -31,18 +31,15 @@ pub struct Troops {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Payroll {
-    /// On each upkeep, whose `desert_percent` applies when they go unpaid.
-    /// Braced so that a stray field is refused like any other.
+    /// On each upkeep, whose `desert_percent` applies when they go unpaid:
+    /// legacy behaviour. Braced, like `Monthly`, so that a stray field is
+    /// refused like any other.
     Upkeep {},
     /// At each Gregorian month end, for the roster standing then; needs a
-    /// calendar. It needs no upkeep: where there is one, it only mends the
-    /// wounded.
-    Monthly {
-        /// The share of each squad that leaves when the month's wages go
-        /// unpaid.
-        #[serde(default)]
-        desert_percent: u32,
-    },
+    /// calendar and no upkeep, which where authored only mends the wounded.
+    /// It is a cadence alone: unpaid wages are reported, and what they cost
+    /// is left to persistent morale.
+    Monthly {},
 }
 
 impl Default for Payroll {
@@ -117,7 +114,7 @@ pub struct Upkeep {
     #[serde(default)]
     pub recover_percent: u32,
     /// The share of each stack that leaves when wages go unpaid on upkeep;
-    /// monthly payroll has its own.
+    /// legacy, and unused with monthly payroll.
     #[serde(default)]
     pub desert_percent: u32,
 }

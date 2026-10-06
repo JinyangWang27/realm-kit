@@ -1485,30 +1485,33 @@ fight authored armies.
   (1 to 10,000, `invalid_limit`).
 - **Upkeep** (needs world time) pays every soldier's wage at once on its
   schedule, or, when the money does not cover it, pays nothing and loses
-  `desert_percent` of each squad (at least one, the healthy first); with
-  monthly payroll it pays no wages and only mends. Then
+  `desert_percent` of each squad (at least one, the healthy first). This
+  desertion is legacy behaviour, kept as it was for upkeep payroll; with
+  monthly payroll upkeep pays no wages and only mends. Then
   `recover_percent` of each squad's wounded mend, rounded up. Resting at a
   safe place mends them all. Wages without upkeep draw a warning
   (`unused_wages`).
 - **Paying wages.** Wages are all or nothing: from the
   [bank](#banking) first, where the world has one, then from carried
-  currency. When both together fall short, nothing is paid,
-  `WagesUnpaid` reports the bill and what was there, and the desertions
-  follow. There is no partial pay and no arrears.
+  currency. When both together fall short, nothing is paid and
+  `WagesUnpaid` reports the bill and what was there; on upkeep payroll the
+  legacy desertions follow. There is no partial pay and no arrears.
 - **Monthly payroll** moves wages from the upkeep schedule to each
   Gregorian month end:
 
   ```json
-  "payroll": { "kind": "monthly", "desert_percent": 20 }
+  "payroll": { "kind": "monthly" }
   ```
 
-  `desert_percent` (0 to 100, `invalid_percent`) is the share of each
-  squad that leaves when the month's wages go unpaid, at least one, the
-  healthy first, as on upkeep. Monthly payroll needs a calendar
-  (`calendar_disabled`) and no `upkeep` block. Where there is one, upkeep
-  only mends the wounded on its own schedule and never charges wages, so
-  a nonzero `upkeep.desert_percent` beside monthly payroll is never used
-  and draws a warning (`unused_percent`).
+  It is a cadence alone, with no other fields. Monthly payroll needs a
+  calendar (`calendar_disabled`) and no `upkeep` block. Where there is
+  one, upkeep only mends the wounded on its own schedule and never charges
+  wages, so a nonzero `upkeep.desert_percent` beside monthly payroll is
+  never used and draws a warning (`unused_percent`).
+  Unpaid monthly wages stop at `WagesUnpaid`: nobody leaves. That is
+  deliberate until persistent morale arrives, which will weigh missed
+  wages with provisions, victories and defeats, and decide desertion on
+  the party's daily upkeep.
   The bill is the roster standing at the settlement, each soldier's wage
   at their current level, with no proration: a soldier recruited the last
   evening of a month costs a whole month, one lost before the month end

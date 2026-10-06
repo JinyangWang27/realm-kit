@@ -1644,13 +1644,26 @@ needs to be confirmed:
   snapshot of the roster at the month-end settlement, each soldier's wage
   at their level, with no proration and no recruitment dates. Wages,
   whenever due, are all or nothing from the bank first and then carried
-  cash; when both fall short nothing is paid, the shortfall is reported
-  and a share of each squad deserts. Financial payroll owns its share:
-  the monthly kind carries its own `desert_percent`, so it needs no upkeep
-  block, and upkeep's `desert_percent` applies only to upkeep payroll.
-  There are no arrears. Upkeep, where authored, only mends the wounded on
-  its own schedule beside monthly payroll; provisions and morale will stay
-  there too.
+  cash, through the economy's generic payment; when both fall short
+  nothing is paid and the retinue reports `WagesUnpaid`. Monthly payroll
+  is a cadence alone: it carries no desertion, and missed monthly wages
+  remove nobody until persistent morale weighs them with provisions,
+  victories and defeats and decides desertion on the party's daily
+  upkeep. Upkeep's `desert_percent` stays as legacy behaviour for upkeep
+  payroll only. Monthly payroll needs no upkeep block; where one is
+  authored it only mends the wounded on its own schedule. There are no
+  arrears.
+- **Money, payroll and time boundaries (M6a, M6c) · decided.** The
+  economy owns money: deposits, withdrawals, interest, and one generic
+  payment that takes an amount from the bank, then carried cash, all or
+  nothing, and reports where it came from or what was there. It knows
+  nothing of wages, payroll, desertion or morale. The retinue owns
+  payroll: the wage bill, its cadence, what paying or missing it means,
+  and the wage events. Time owns calendar boundaries and their order: the
+  dispatcher's midnight closes the bank's day and, on the first of a
+  month, emits `MonthEnded`, has the bank credit interest and the
+  retinue settle monthly payroll, in that order; neither of those modules
+  calls the other.
 - **Exits beyond compass directions (M5b) · decided.** Roads are an undirected
   list in `world.json`, each with an ASCII ID, two ends and optional travel
   minutes, condition and blocked text; at most one road joins a pair, so

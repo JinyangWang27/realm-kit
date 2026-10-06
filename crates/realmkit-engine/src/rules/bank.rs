@@ -1,8 +1,9 @@
-//! The bank: deposits and withdrawals at its branches, and the midnight
-//! bookkeeping that settles each Gregorian month.
+//! The bank: deposits and withdrawals at its branches, each day's closing
+//! balance, and interest on a month's average close. It knows nothing of
+//! what its money is later spent on.
 
 use super::*;
-use realmkit_spec::{Payroll, BASIS_POINTS, CURRENCY_BOUND};
+use realmkit_spec::{BASIS_POINTS, CURRENCY_BOUND};
 
 /// The account, open at a branch where the player stands.
 fn account_here<'s>(
@@ -58,40 +59,23 @@ pub(crate) fn transfer(
     Ok(())
 }
 
-/// Midnight, in a world that settles months. The day just ended closes at
-/// the bank's balance; on the first of a month, the month before settles:
-/// interest on its average daily close, then month-end wages for the roster
-/// standing now. Anything else due at this minute comes after, so it
-/// belongs to the new day and month.
-pub(crate) fn midnight(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
-    let calendar = world.world.time.as_ref().unwrap().calendar.unwrap();
-    let now = state.time.unwrap();
+/// Midnight: the day just ended closes at the bank's balance.
+pub(crate) fn close_day(state: &mut GameState) {
     // At most 31 closes of at most the currency bound: far inside 64 bits.
     if let Some(bank) = state.economy.as_mut().and_then(|e| e.bank.as_mut()) {
         bank.month_to_date += bank.balance;
-    }
-    if calendar.date(now).unwrap().day != 1 {
-        return;
-    }
-    // Midnights come strictly after the start of play, so `now` > 0.
-    let ended = calendar.date(now - 1).unwrap();
-    events.push(Event::MonthEnded {
-        year: ended.year,
-        month: ended.month,
-    });
-    interest(world, state, ended.day, events);
-    if world
-        .troops()
-        .is_some_and(|t| matches!(t.payroll, Payroll::Monthly { .. }))
-    {
-        retinue::payroll(world, state, events);
     }
 }
 
 /// Interest on the ended month's average daily close over all its `days`,
 /// rounded down once, paid into the bank up to the currency bound. The
 /// month's sum starts again from nothing.
-fn interest(world: &WorldSpec, state: &mut GameState, days: u8, events: &mut Vec<Event>) {
+pub(crate) fn interest(
+    world: &WorldSpec,
+    state: &mut GameState,
+    days: u8,
+    events: &mut Vec<Event>,
+) {
     let Some(bank) = state.economy.as_mut().and_then(|e| e.bank.as_mut()) else {
         return;
     };

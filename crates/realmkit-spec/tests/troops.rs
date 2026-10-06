@@ -168,43 +168,35 @@ fn rewards_on_an_ally_and_wages_without_upkeep_are_warned_about() {
 }
 
 #[test]
-fn monthly_wages_own_their_desertion_and_need_only_a_calendar() {
+fn monthly_wages_are_a_cadence_that_needs_only_a_calendar() {
     let mut world = marches();
     assert_eq!(world.troops().unwrap().payroll, Payroll::Upkeep {});
-    let monthly = Payroll::Monthly { desert_percent: 20 };
-    troops(&mut world).payroll = monthly;
+    troops(&mut world).payroll = Payroll::Monthly {};
     // No upkeep is needed: it would only mend the wounded.
     troops(&mut world).upkeep = None;
     assert!(codes(&world).is_empty(), "{:?}", world.diagnostics());
     assert_ne!(world.revision(), marches().revision());
     // Upkeep payroll is the default and is left out when written; the
-    // monthly kind carries its share.
+    // monthly kind is its kind alone.
     let json = serde_json::to_string(marches().troops().unwrap()).unwrap();
     assert!(!json.contains("payroll"));
     let json = serde_json::to_string(world.troops().unwrap()).unwrap();
-    assert!(
-        json.contains(r#""payroll":{"kind":"monthly","desert_percent":20}"#),
-        "{json}"
-    );
+    assert!(json.contains(r#""payroll":{"kind":"monthly"}"#), "{json}");
     let read = |text: &str| serde_json::from_str::<Payroll>(text);
     assert_eq!(read(r#"{ "kind": "upkeep" }"#).unwrap(), Payroll::Upkeep {});
     assert_eq!(
         read(r#"{ "kind": "monthly" }"#).unwrap(),
-        Payroll::Monthly { desert_percent: 0 }
+        Payroll::Monthly {}
     );
-    assert!(read(r#"{ "kind": "monthly", "desert_percent": 5, "arrears": 1 }"#).is_err());
+    // Monthly payroll carries no desertion: missed wages are for morale.
+    assert!(read(r#"{ "kind": "monthly", "desert_percent": 20 }"#).is_err());
     assert!(read(r#"{ "kind": "upkeep", "desert_percent": 5 }"#).is_err());
     let mut undated = world.clone();
     undated.world.time.as_mut().unwrap().calendar = None;
     undated.world.economy.as_mut().unwrap().banking = None;
     assert_eq!(codes(&undated), ["calendar_disabled"]);
-    let mut deserting = world.clone();
-    troops(&mut deserting).payroll = Payroll::Monthly {
-        desert_percent: 101,
-    };
-    assert_eq!(codes(&deserting), ["invalid_percent"]);
-    // Beside monthly wages, upkeep only mends: its own desertion share is
-    // never used, which is warned about.
+    // Beside monthly wages, upkeep only mends: its legacy desertion share
+    // is never used, which is warned about.
     troops(&mut world).upkeep = marches().troops().unwrap().upkeep;
     let diagnostics = world.diagnostics();
     assert_eq!(codes(&world), ["unused_percent"]);

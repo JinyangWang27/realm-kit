@@ -273,8 +273,9 @@ salaries or holding income, are meant to join.
 When the roster's wages fall due: on the upkeep schedule, or, with monthly
 payroll, at each month end for the roster standing then, with no proration.
 Either way wages come from the bank first, then carried currency, all or
-nothing; unpaid wages cost deserters, by upkeep's share or by monthly
-payroll's own. Monthly payroll needs no upkeep.
+nothing; unpaid upkeep wages cost deserters by upkeep's legacy share, while
+unpaid monthly wages are only reported until persistent morale arrives.
+Monthly payroll needs no upkeep.
 
 ## Retinue
 

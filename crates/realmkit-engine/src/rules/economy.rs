@@ -243,6 +243,26 @@ pub(crate) fn pay(
     Ok(())
 }
 
+/// Pays `amount` all or nothing, from the bank first, where the world has
+/// one, then from carried currency: `Ok` with the part the bank paid, or,
+/// when both together fall short, `Err` with what they hold and nothing
+/// changed. It reports nothing; the caller says what the money was for.
+pub(crate) fn try_pay(state: &mut GameState, amount: u64) -> Result<u64, u64> {
+    let wallet = state.economy.as_mut().unwrap();
+    let banked = wallet.bank.map_or(0, |b| b.balance);
+    // Both within the currency bound: far inside 64 bits.
+    let available = banked + wallet.currency;
+    if available < amount {
+        return Err(available);
+    }
+    let from_bank = amount.min(banked);
+    if let Some(bank) = wallet.bank.as_mut() {
+        bank.balance -= from_bank;
+    }
+    wallet.currency -= amount - from_bank;
+    Ok(from_bank)
+}
+
 /// One price tick, in four phases; each finishes for every market before the
 /// next begins. `scripts/combat_sim/economy.py` mirrors it exactly.
 ///

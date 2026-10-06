@@ -506,8 +506,9 @@ they do, without scripting each character.
   soldier recruited the evening before costs a whole month, one lost before
   it costs nothing. Interest is credited first, then wages are paid all or
   nothing from the bank and then carried cash; when both fall short,
-  nothing is paid and the payroll's own desertion share leaves, as on
-  upkeep. Monthly payroll needs no upkeep tick at all. Recruiting and upgrade
+  nothing is paid and the shortfall is reported, but nobody leaves:
+  [persistent morale](#retinue) will weigh missed wages and decide
+  desertion. Monthly payroll needs no upkeep tick at all. Recruiting and upgrade
   costs stay immediate. Worlds that do not opt in keep wages on the upkeep
   tick exactly as before.
 - **Size limit.** The engine computes the roster limit as an integer: an
