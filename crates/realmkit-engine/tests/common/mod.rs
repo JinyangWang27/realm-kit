@@ -115,6 +115,30 @@ pub fn marches() -> WorldSpec {
     .unwrap()
 }
 
+/// Clears everything the marches schedule, so play can start anywhere up to
+/// the end of time.
+pub fn unscheduled(world: &mut WorldSpec) {
+    world.world.events.clear();
+    let economy = world.world.economy.as_mut().unwrap();
+    economy.tick = None;
+    economy.prosperity = None;
+    economy.stock = None;
+    economy.workshops = None;
+    economy.markets.iter_mut().for_each(|m| m.prosperity = None);
+    world.dialogues.retain(|d| d.id != "maddoc");
+    world.characters.iter_mut().for_each(|c| {
+        if c.id == "maddoc" {
+            c.dialogue = None;
+        }
+    });
+    world.world.troops.as_mut().unwrap().upkeep = None;
+    for location in &mut world.locations {
+        location.recruits.iter_mut().for_each(|r| r.refill = None);
+    }
+    world.characters.retain(|c| c.moves.is_none());
+    world.locations[0].characters.retain(|c| c != "wenna");
+}
+
 pub fn caravan_trail() -> WorldSpec {
     WorldSpec::load(concat!(
         env!("CARGO_MANIFEST_DIR"),

@@ -29,10 +29,14 @@ pub(crate) fn map_view(world: &WorldSpec, state: &GameState) -> Option<MapView> 
         .roads
         .iter()
         .filter(|r| r.between.iter().all(|end| known(world, state, end)))
-        .map(|r| MapRoad {
-            road: r.id.clone(),
-            between: r.between.clone(),
-            minutes: r.minutes,
+        .map(|r| {
+            let (shortest, longest) = r.span();
+            MapRoad {
+                road: r.id.clone(),
+                between: r.between.clone(),
+                minutes: shortest,
+                longest: (!r.durations.is_empty()).then_some(longest),
+            }
         })
         .collect();
     let exits = world

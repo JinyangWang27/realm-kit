@@ -86,6 +86,7 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                     && r.market.is_some() == world.random_market()
                     && r.battle.is_some() == world.random_battle()
                     && r.stock.is_some() == world.random_stock()
+                    && r.travel.is_some() == world.random_travel()
             }
         },
         "random state does not match the world",

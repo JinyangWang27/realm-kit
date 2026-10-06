@@ -497,8 +497,13 @@ pub struct MapPlace {
 pub struct MapRoad {
     pub road: Id,
     pub between: [Id; 2],
-    /// The player's travel time along it.
+    /// The player's travel time along it; the shortest, for a road whose
+    /// time varies.
     pub minutes: u64,
+    /// The longest travel time of a road whose time varies, drawn only when
+    /// the player sets out; `None` for a fixed road.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub longest: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

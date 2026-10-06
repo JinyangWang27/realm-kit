@@ -238,7 +238,8 @@ fn relocate(state: &mut GameState, character: &Character, events: &mut Vec<Event
     }
 }
 
-/// Takes the road to `to`: arrives, then its travel time passes.
+/// Takes the road to `to`: arrives, then its travel time passes, drawn as
+/// the player sets out on a road whose time varies.
 pub(crate) fn travel(
     world: &WorldSpec,
     state: &mut GameState,
@@ -260,10 +261,29 @@ pub(crate) fn travel(
         from,
         to: to.clone(),
     });
+    let minutes = journey(state, road);
     // On the road: the destination shows who is there on arrival.
-    pass(world, state, road.minutes, events, false)?;
+    pass(world, state, minutes, events, false)?;
     events.push(Event::LocationViewed { location: to });
     Ok(())
+}
+
+/// A road's travel time: fixed, or drawn from the travel stream with each
+/// travel time as likely as its weight.
+fn journey(state: &mut GameState, road: &realmkit_spec::Road) -> u64 {
+    if road.durations.is_empty() {
+        return road.minutes;
+    }
+    let total = road.durations.iter().map(|d| u64::from(d.weight)).sum();
+    let stream = state.rng.as_mut().unwrap().travel.as_mut().unwrap();
+    let mut draw = rng::below(stream, total);
+    for time in &road.durations {
+        match draw.checked_sub(u64::from(time.weight)) {
+            Some(rest) => draw = rest,
+            None => return time.minutes,
+        }
+    }
+    unreachable!("a draw below the total weight falls on some travel time")
 }
 
 pub(crate) fn wait(
