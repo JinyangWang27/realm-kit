@@ -162,9 +162,10 @@ and improvement tiers make a piece better one step at a time, trained by a
 smithing technique. At an altar, a learned enchantment is laid on a piece
 once for good, and stays through later improvement (`examples/smithy`).
 Worlds can also keep a clock (`examples/marches`). Roads between places take
-authored time (`Travel to Ashmere — 2 h`, or `travel ashmere`), `wait 2h` lets
-time pass, some people keep hours, others wander from town to town on a
-schedule, and events such as a thaw that opens a causeway happen at set times
+authored time (`Travel to Ashmere — 2 h`, or `travel ashmere`); a road whose
+time varies shows its range (`1 h 30 min–4 h`) and says how long the journey
+took. `wait 2h` lets time pass, some people keep hours, others wander from
+town to town on a schedule, and events such as a thaw that opens a causeway happen at set times
 whether or not you are there. Time moves only when you travel, wait or rest.
 A world with a calendar shows the date too, such as `742-03-02 08:00`.
 Worlds with an economy have currency and markets: buy smoked eels where the

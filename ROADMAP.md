@@ -1176,6 +1176,11 @@ dialogue in the opening town would otherwise duplicate content.
    boundaries after a minute, which the original game's financial
    settlement uses: banking interest and monthly payroll are delivered
    (M6a and M6c below); salaries and holding settlement are not.
+   **Extended** with variable road travel: a road may author weighted
+   `durations` in place of `minutes`, drawn from a dedicated `travel` RNG
+   domain only when the player sets out, so presentation never draws and
+   other domains never shift it. M6c travel speed will scale the drawn
+   duration as it scales a fixed one.
 3. **M5c — authored progression and quest lifecycle · partly
    delivered**: story phases moved only by `enter_phase`, `main` quests,
    quest `requires` for chains and phase-gated waves, and route outcomes

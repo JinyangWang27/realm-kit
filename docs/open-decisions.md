@@ -1668,7 +1668,9 @@ needs to be confirmed:
   list in `world.json`, each with an ASCII ID, two ends and optional travel
   minutes, condition and blocked text; at most one road joins a pair, so
   travel names its destination. A world, and even one location, may mix
-  roads with compass exits.
+  roads with compass exits. As delivered later, a road may instead author
+  weighted `durations`, one drawn per journey from a `travel` RNG domain
+  when the player sets out; the map shows only the shortest and longest.
 - **Offers (M5c).** Proposed: the saved RNG draws an offer's parameters from
   authored candidate lists only at an explicit gameplay transition, such as the
   giver's recurring refresh or the player's arrival, and the drawn offer is
@@ -1932,7 +1934,8 @@ needs to be confirmed:
   healthy troop type's authored speed, with penalties for size, wounded and
   prisoners and a bonus from pathfinding, in integers with one rounding. A
   party with no healthy troops moves at the base speed. Roads with an authored
-  duration take at least one minute; roads without one take no time. Agent
+  duration take at least one minute; roads without one take no time. On a
+  road whose time varies, speed scales the drawn duration. Agent
   parties use the same rule. Where equipment exists, a worn mount's authored
   travel speed replaces the base for its wearer, and the slowest counts.
 - **Recruit pools (M6c).** Decided as delivered: each recruiting location

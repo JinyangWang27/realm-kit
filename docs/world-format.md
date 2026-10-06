@@ -153,8 +153,8 @@ state. A location may give a `map` position for drawing an overland map:
   towards its destination.
 
 With positions, the engine offers a `Map` panel and answers a map query with
-the places the player knows of, the roads with their travel minutes and the
-exits between those places, and the player's place. A place is known while
+the places the player knows of, the roads with their travel minutes (the
+shortest and longest, for one whose time varies) and the exits between those places, and the player's place. A place is known while
 its optional `known_when` condition holds, and always while the player
 stands there:
 
@@ -330,6 +330,37 @@ A road without minutes takes no time and needs no clock. A road may have a
 `requires` condition, and then needs a `blocked_text` shown when it does not
 hold. Roads and compass exits can be mixed, even at one location; exits stay
 directed and take no time. Clients list roads in authored order.
+
+A road whose time varies authors `durations` in place of `minutes`:
+
+```json
+{
+  "id": "old-fen-road",
+  "between": ["ashmere", "hollin_keep"],
+  "durations": [
+    { "minutes": 90, "weight": 1 },
+    { "minutes": 120, "weight": 6 },
+    { "minutes": 240, "weight": 1 }
+  ]
+}
+```
+
+Each journey takes one of its travel times, drawn when the player sets out,
+each as likely as its `weight` against the others: here 2 h six times in
+eight. A road has `durations` or `minutes`, never both; its `durations` are
+two or more different travel times, each with a weight of at least 1
+(`invalid_travel_times`), each taking 1 to 43,200 minutes
+(`invalid_duration`), and it needs the time block like any road that takes
+time. The draw comes from the world's `travel` random stream, which a world
+keeps only while some road varies, so movers, prices and battles never
+shift it, and nothing but a successful `travel` along such a road draws:
+listing roads, the map and a refused journey draw nothing. The time it took
+reaches the client as the usual `TimePassed`, and the scheduled occurrences
+it crosses happen on the way as on any road. Before setting out, a client
+knows only the shortest and longest time (`MapRoad::minutes` and
+`MapRoad::longest`); the CLI shows `1 h 30 min–4 h` and, on arrival, how
+long the journey took. A later travel speed would scale the drawn time as it
+scales a fixed one.
 
 `events` happen on a schedule:
 
@@ -1497,9 +1528,10 @@ A skill's `crit`, the combat block's `player_basic_crit` and a profile's
 The chance is 1–100% and the multiplier 101–1,000% of a normal hit, applied
 inside the damage formula before its single rounding. A world that authors any
 crit keeps a seeded `combat` stream in its saved state (SplitMix64, versioned),
-and a world with characters who move keeps a separate `world` stream; each
-starts from the seed mixed with its own constant, so draws in one never shift
-the other. A world with neither keeps no random state and plays exactly as it
+and a world with characters who move keeps a separate `world` stream, as a
+world whose economy or battles draw keeps its own and a world with a road
+whose time varies keeps a `travel` stream; each starts from the seed mixed
+with its own constant, so draws in one never shift another. A world with neither keeps no random state and plays exactly as it
 did. A draw happens only
 when an action with a crit resolves, so a refused command never consumes one,
 and the same seed and commands always replay identically. Clients choose the
