@@ -83,6 +83,9 @@ pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy)
     prosperity(out, w, economy);
     stock(out, w, economy);
     workshops(out, w, economy);
+    if let Some(banking) = &economy.banking {
+        banks(out, w, banking);
+    }
     if let Some(trading) = &economy.trading {
         if trading.name.trim().is_empty() {
             issue(
@@ -127,6 +130,28 @@ pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy)
             tick.input_pull_percent.into(),
             100,
             "an input pull",
+        );
+    }
+}
+
+/// Branches at distinct real locations, and a rate of at most 100 percent.
+fn banks(out: &mut Vec<Diagnostic>, w: &WorldSpec, banking: &Banking) {
+    let owner = &w.world.id;
+    time::calendar_needed(out, w, owner);
+    ids(
+        out,
+        "bank branch",
+        banking.branches.iter().map(String::as_str),
+    );
+    for branch in &banking.branches {
+        reference(out, owner, "location", branch, w.location(branch).is_some());
+    }
+    if banking.branches.is_empty() || banking.monthly_interest_basis_points > BASIS_POINTS {
+        issue(
+            out,
+            owner,
+            "invalid_banking",
+            format!("a bank has a branch and pays at most {BASIS_POINTS} basis points a month"),
         );
     }
 }

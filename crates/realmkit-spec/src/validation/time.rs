@@ -14,6 +14,19 @@ pub(super) fn needed(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str) {
     }
 }
 
+/// Content that settles at Gregorian month ends needs a dated clock.
+pub(super) fn calendar_needed(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str) {
+    needed(out, w, owner);
+    if w.world.time.as_ref().is_some_and(|t| t.calendar.is_none()) {
+        issue(
+            out,
+            owner,
+            "calendar_disabled",
+            "this world has no calendar, so it has no month ends to settle at",
+        );
+    }
+}
+
 pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     if let Some(time) = &w.world.time {
         clock(out, w, time);

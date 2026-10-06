@@ -22,6 +22,8 @@ pub const SUPPLY_BOUND: u64 = 100_000_000;
 pub const PROSPERITY_BOUND: u32 = 100;
 /// The most units of one good a market keeps in stock.
 pub const STOCK_BOUND: u64 = 1_000_000;
+/// The highest monthly interest rate, in basis points: 100 percent.
+pub const BASIS_POINTS: u32 = 10_000;
 /// The highest rank of any proficiency.
 pub const RANK_BOUND: u32 = 100;
 /// The most workshops one town holds.
@@ -63,6 +65,22 @@ pub struct Economy {
     /// The trading proficiency, which narrows the spread.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trading: Option<Trading>,
+    /// One bank, reached at its branches; needs a calendar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub banking: Option<Banking>,
+}
+
+/// One banking network: a single account, reached at any branch, that
+/// earns interest at each Gregorian month end on the month's average daily
+/// closing balance.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Banking {
+    /// Locations where the player deposits and withdraws.
+    pub branches: Vec<Id>,
+    /// Interest per month in hundredths of a percent, at most [`BASIS_POINTS`].
+    #[serde(default)]
+    pub monthly_interest_basis_points: u32,
 }
 
 /// Each market's prosperity, from 0 to [`PROSPERITY_BOUND`], drifting one

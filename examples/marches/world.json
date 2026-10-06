@@ -25,7 +25,8 @@
     "start": 480,
     "clock": "Day {day}, {hour}:{minute}",
     "wait": 60,
-    "rest": 480
+    "rest": 480,
+    "calendar": { "epoch": { "year": 742, "month": 3, "day": 25 } }
   },
   "roads": [
     { "id": "greyford-ashmere", "between": ["greyford", "ashmere"], "minutes": 120 },
@@ -127,7 +128,8 @@
         }
       ]
     },
-    "trading": { "name": "Trade", "max": 3, "narrow_percent": 4 }
+    "trading": { "name": "Trade", "max": 3, "narrow_percent": 4 },
+    "banking": { "branches": ["greyford", "vellmarket"], "monthly_interest_basis_points": 25 }
   },
   "troops": {
     "classes": [

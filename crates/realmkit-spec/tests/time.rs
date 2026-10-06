@@ -163,11 +163,11 @@ fn everything_that_takes_time_needs_a_clock() {
     world.world.time = None;
     let codes = codes(&world);
     // Four timed roads, the thaw, two people's hours, Wenna, the price tick,
-    // prosperity, restocking, workshops, the troops' upkeep and Ashmere's
-    // recruits refilling.
+    // prosperity, restocking, workshops, the bank, the troops' upkeep and
+    // Ashmere's recruits refilling.
     assert_eq!(
         codes.iter().filter(|c| *c == "time_disabled").count(),
-        14,
+        15,
         "{codes:?}"
     );
     // A road without minutes takes no time, so it needs no clock.
@@ -179,6 +179,7 @@ fn everything_that_takes_time_needs_a_clock() {
     economy.prosperity = None;
     economy.stock = None;
     economy.workshops = None;
+    economy.banking = None;
     economy.markets.iter_mut().for_each(|m| m.prosperity = None);
     world.dialogues.retain(|d| d.id != "maddoc");
     let troops = world.world.troops.as_mut().unwrap();
@@ -343,7 +344,9 @@ fn a_calendar_is_checked_with_stable_codes_and_belongs_to_the_rules() {
     ] {
         assert_eq!(codes(&dated(epoch)), ["invalid_calendar"], "{epoch:?}");
     }
+    // The clock alone; the bank's own need is checked with banking.
     let mut world = dated(date(742, 1, 1));
+    world.world.economy.as_mut().unwrap().banking = None;
     world.world.time.as_mut().unwrap().calendar = None;
     assert_eq!(codes(&world), ["calendar_disabled"]);
     world.world.time.as_mut().unwrap().clock.0 = "{day_of_week}".into();

@@ -166,3 +166,24 @@ fn rewards_on_an_ally_and_wages_without_upkeep_are_warned_about() {
     );
     assert!(world.validate().is_ok());
 }
+
+#[test]
+fn monthly_wages_need_a_calendar_and_upkeep() {
+    let mut world = marches();
+    assert_eq!(world.troops().unwrap().payroll, Payroll::Upkeep);
+    troops(&mut world).payroll = Payroll::Monthly;
+    assert!(codes(&world).is_empty(), "{:?}", world.diagnostics());
+    assert_ne!(world.revision(), marches().revision());
+    // Upkeep payroll is the default and is left out when written.
+    let json = serde_json::to_string(marches().troops().unwrap()).unwrap();
+    assert!(!json.contains("payroll"));
+    let json = serde_json::to_string(world.troops().unwrap()).unwrap();
+    assert!(json.contains(r#""payroll":"monthly""#), "{json}");
+    let mut undated = world.clone();
+    undated.world.time.as_mut().unwrap().calendar = None;
+    undated.world.economy.as_mut().unwrap().banking = None;
+    assert_eq!(codes(&undated), ["calendar_disabled"]);
+    // Desertion over unpaid wages takes its share from upkeep.
+    troops(&mut world).upkeep = None;
+    assert_eq!(codes(&world), ["invalid_payroll"]);
+}
