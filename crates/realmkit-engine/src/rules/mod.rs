@@ -69,7 +69,7 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
             track,
             faction,
             at_least,
-        } => factions::standing(state, track, faction.as_deref()) >= *at_least,
+        } => factions::standing(state, track, faction.as_deref()).is_some_and(|v| v >= *at_least),
         Condition::AtWar { factions } => state
             .at_war
             .contains(&realmkit_spec::faction_pair(factions)),

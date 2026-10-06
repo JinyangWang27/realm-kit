@@ -285,3 +285,58 @@ fn capabilities_stay_separate() {
     });
     assert_eq!(codes(&world), Vec::<String>::new());
 }
+
+#[test]
+fn an_outcome_may_wait_on_standing_or_war_no_start_gives() {
+    let outcome = |when: Condition| RouteOutcome {
+        id: "ending".into(),
+        name: "An ending".into(),
+        text: "It ends.".into(),
+        when,
+    };
+    let favour = |at_least| Condition::Standing {
+        track: "favour".into(),
+        faction: Some("keep".into()),
+        at_least,
+    };
+    let at_war = |a: &str, b: &str| Condition::AtWar {
+        factions: pair(a, b),
+    };
+    let codes_with = |w: &mut WorldSpec, when| {
+        w.world.outcomes = vec![outcome(when)];
+        codes(w)
+    };
+    let mut world = marches();
+    // Favour with the keep starts at 0, and the fen and the guild at peace.
+    assert_eq!(codes_with(&mut world, favour(1)), Vec::<String>::new());
+    assert_eq!(
+        codes_with(&mut world, at_war("guild", "fen")),
+        Vec::<String>::new()
+    );
+    // The keep and the fen start at war; favour 0 holds from the start.
+    assert_eq!(
+        codes_with(&mut world, at_war("fen", "keep")),
+        ["outcome_at_start"]
+    );
+    assert_eq!(codes_with(&mut world, favour(0)), ["outcome_at_start"]);
+    // A start answer worth 30 favour could give 30 at once, not 31.
+    world.world.start_questions.push(StartQuestion {
+        id: "origin".into(),
+        name: "Origin".into(),
+        text: "Where from?".into(),
+        options: vec![
+            StartOption {
+                id: "keep".into(),
+                text: "The keep.".into(),
+                effects: change("favour", Some("keep"), 30),
+            },
+            StartOption {
+                id: "road".into(),
+                text: "The road.".into(),
+                effects: vec![],
+            },
+        ],
+    });
+    assert_eq!(codes_with(&mut world, favour(30)), ["outcome_at_start"]);
+    assert_eq!(codes_with(&mut world, favour(31)), Vec::<String>::new());
+}

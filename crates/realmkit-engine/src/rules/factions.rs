@@ -3,9 +3,10 @@
 use super::*;
 use realmkit_spec::faction_pair;
 
-/// The player's value on `track`; validation keeps references sound.
-pub(super) fn standing(state: &GameState, track: &str, faction: Option<&str>) -> i32 {
-    state.standing[track].get(faction).unwrap()
+/// The player's value on `track`; `None` for a track, scope or faction the
+/// world lacks, which a host may still ask about.
+pub(super) fn standing(state: &GameState, track: &str, faction: Option<&str>) -> Option<i32> {
+    state.standing.get(track)?.get(faction)
 }
 
 /// Moves standing by `by`, clamped to the track's bounds. A change the bound

@@ -802,7 +802,10 @@ state; diplomacy and standing each add state only when authored.
   (`invalid_start`). `thresholds` name ranges for presentation, in strictly
   rising order within the bounds (`invalid_threshold`): a value shows the
   name of the highest threshold it has reached, and none below the first.
-  Saves keep every value.
+  Saves keep every value. A save must agree with what start answers and
+  unconditional one-shot events that only set flags, change standing or
+  change diplomacy have certainly done, unless another effect could have
+  changed it since.
 
 ```json
 { "kind": "change_standing", "track": "renown", "by": 10 }
@@ -976,7 +979,9 @@ other requires under `not`, or the two must require different statuses of
 one quest. So at most one ever holds, whatever order things happen in. No outcome may
 hold at the start: each `when` must require, on every branch, something no
 start provides, such as a quest taken up, evidence, a workshop, a phase after
-the first or a flag no start answer sets (`outcome_at_start`). Terminal and failure
+the first, a flag no start answer sets, standing above the authored start
+plus the most each start question's answers could add, or a war between
+factions that start at peace (`outcome_at_start`). Terminal and failure
 endings are not yet modelled.
 
 The journal (`Engine::journal`, the CLI's Quests panel) shows the current

@@ -204,3 +204,46 @@ pub(super) fn change(
         );
     }
 }
+
+/// Whether a standing or war condition is false at every possible start.
+/// Start answers may raise standing, so the most a start gives is the
+/// authored start plus, for each question, its most generous option's
+/// gains; they never change diplomacy.
+pub(super) fn never_at_start(w: &WorldSpec, leaf: &Condition) -> bool {
+    match leaf {
+        Condition::Standing {
+            track,
+            faction,
+            at_least,
+        } => w.standing_track(track).is_some_and(|t| {
+            let gains = |o: &StartOption| -> i64 {
+                o.effects
+                    .iter()
+                    .filter_map(|e| match e {
+                        Effect::ChangeStanding {
+                            track: k,
+                            faction: f,
+                            by,
+                        } if k == track && f == faction => Some(i64::from((*by).max(0))),
+                        _ => None,
+                    })
+                    .sum()
+            };
+            let raised: i64 = w
+                .world
+                .start_questions
+                .iter()
+                .map(|q| q.options.iter().map(gains).max().unwrap_or(0))
+                .sum();
+            let most = (i64::from(t.start(faction.as_deref())) + raised).min(i64::from(t.max));
+            i64::from(*at_least) > most
+        }),
+        Condition::AtWar { factions } => !w
+            .world
+            .diplomacy
+            .iter()
+            .flat_map(|d| &d.at_war)
+            .any(|p| faction_pair(p) == faction_pair(factions)),
+        _ => false,
+    }
+}

@@ -463,8 +463,9 @@ pub(super) fn phases(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 
 /// Outcomes have unique IDs and valid conditions, and none can hold at the
 /// start: each requires, on every branch, something no start provides. That
-/// is a quest taken up, evidence, a workshop, a phase after the first, or a
-/// flag no start answer sets.
+/// is a quest taken up, evidence, a workshop, a phase after the first, a
+/// flag no start answer sets, standing above anything a start can give, or
+/// a war that starts at peace.
 pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     ids(
         out,
@@ -484,6 +485,7 @@ pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
         Condition::Evidence { .. } | Condition::Workshop { .. } => true,
         Condition::Phase { phase } => w.phase_index(phase).is_some_and(|i| i > 0),
         Condition::Flag { flag } => !answered.contains(flag),
+        Condition::Standing { .. } | Condition::AtWar { .. } => factions::never_at_start(w, leaf),
         _ => false,
     };
     for (i, outcome) in w.world.outcomes.iter().enumerate() {
@@ -509,7 +511,7 @@ pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 out,
                 &outcome.id,
                 "outcome_at_start",
-                "an outcome must require something no start provides: a quest taken up, evidence, a workshop, a later phase or a flag no start answer sets",
+                "an outcome must require something no start provides: a quest taken up, evidence, a workshop, a later phase, a flag no start answer sets, standing no start gives or a war that starts at peace",
             );
         }
     }
