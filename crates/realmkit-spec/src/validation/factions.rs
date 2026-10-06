@@ -242,7 +242,8 @@ pub(super) fn never_at_start(w: &WorldSpec, leaf: &Condition) -> bool {
 /// option, and kept within the bounds. Clamping along the way can only
 /// narrow the range, so the range is safe either way.
 fn start_range(w: &WorldSpec, track: &str, faction: Option<&Id>) -> Option<(i32, i32)> {
-    let t = w.standing_track(track)?;
+    // Inverted bounds are reported as invalid_bounds; there is no range.
+    let t = w.standing_track(track).filter(|t| t.min <= t.max)?;
     let moved = |o: &StartOption, sign: i32| -> i64 {
         o.effects
             .iter()

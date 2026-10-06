@@ -433,3 +433,22 @@ fn higher_standing_excludes_falling_below_a_lower_one() {
     world.world.outcomes[1].when = favour(-5);
     assert!(codes(&world).contains(&"ambiguous_outcomes".to_string()));
 }
+
+#[test]
+fn inverted_bounds_are_reported_wherever_the_track_is_read() {
+    let mut world = marches();
+    let favour = world.world.standing.iter_mut().find(|t| t.id == "favour");
+    let favour = favour.unwrap();
+    (favour.min, favour.max) = (100, -100);
+    world.world.outcomes = vec![RouteOutcome {
+        id: "honoured".into(),
+        name: "Honoured".into(),
+        text: "It ends.".into(),
+        when: Condition::Standing {
+            track: "favour".into(),
+            faction: Some("keep".into()),
+            at_least: 50,
+        },
+    }];
+    assert!(codes(&world).contains(&"invalid_bounds".to_string()));
+}
