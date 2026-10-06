@@ -246,8 +246,9 @@ The package uses fixed JSON filenames, with world metadata (including the
 optional combat block), locations, characters, items, quests and dialogues in
 separate files. IDs are
 explicit strings, exits are directed, and every reference is validated on load.
-Unknown fields and unsupported versions fail early. The format implements only
-the MVP domains, with extensions requiring an explicit format/version decision.
+Unknown fields and unsupported versions fail early. The format grows by optional
+fields and new kinds without a version change; the version rises only under
+the [Versions](world-format.md#versions) rule.
 
 Combat is optional. Where a world has it, damage comes from the two-channel
 formula in `realmkit-engine::damage`, with checked integer arithmetic and one

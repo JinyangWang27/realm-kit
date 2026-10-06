@@ -1246,7 +1246,8 @@ world that picks all of them ([Modularity](docs/sandbox-worlds.md#modularity)).
 Each slice depends on the M5 foundations it uses, following the hard
 requirements in [Modularity](docs/sandbox-worlds.md#modularity): the economy
 needs only M5a's effects and M5b's schedules, so it came first. Deliver in
-slices, each bumping the package and save format as usual.
+slices; a slice changes the package and save format version only under the
+[Versions](docs/world-format.md#versions) rule, so optional additions leave it as it is.
 
 The original game now supplies the concrete ordering pressure. After the already delivered
 economy, first troop/battle and M6b factions/standing slices, prioritize the
