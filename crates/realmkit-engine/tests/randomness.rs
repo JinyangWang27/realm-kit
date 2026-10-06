@@ -40,6 +40,7 @@ fn a_world_without_random_content_keeps_no_generator() {
             market: None,
             battle: None,
             stock: None,
+            travel: None,
         })
     );
 }

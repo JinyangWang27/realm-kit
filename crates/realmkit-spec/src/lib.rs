@@ -228,6 +228,11 @@ impl WorldSpec {
             || self.random_market()
             || self.random_battle()
             || self.random_stock()
+            || self.random_travel()
+    }
+    /// Whether travel draws random numbers: some road's time varies.
+    pub fn random_travel(&self) -> bool {
+        self.world.roads.iter().any(|r| !r.durations.is_empty())
     }
     /// Whether restocking draws random numbers: the economy keeps stock.
     pub fn random_stock(&self) -> bool {

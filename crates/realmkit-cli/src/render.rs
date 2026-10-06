@@ -158,6 +158,14 @@ pub fn money(world: &realmkit_spec::WorldSpec, amount: u64) -> String {
     }
 }
 
+/// A road's travel time, "2 h", or "1 h 30 min–4 h" for one whose time varies.
+pub fn travel_time(shortest: u64, longest: u64) -> String {
+    match shortest == longest {
+        true => duration(shortest),
+        false => format!("{}–{}", duration(shortest), duration(longest)),
+    }
+}
+
 /// "45 min", "1 h 30 min", "2 d 4 h".
 pub fn duration(minutes: u64) -> String {
     let (days, hours, mins) = (minutes / 1_440, minutes % 1_440 / 60, minutes % 60);
@@ -331,8 +339,12 @@ pub fn events(
     let name = |id: &str| &world.character(id).unwrap().name;
     let player = name(&world.world.player);
     // After travel the location shows the clock, so the time is repeated
-    // only to date something that happened on the way.
-    let travelled = events.iter().any(|e| matches!(e, Event::Moved { .. }));
+    // only to date something that happened on the way, or to say how long
+    // a road whose time varies took.
+    let travelled = events.iter().any(|e| match e {
+        Event::Moved { from, to } => world.road(from, to).is_none_or(|r| r.durations.is_empty()),
+        _ => false,
+    });
     for event in events {
         match event {
             Event::LocationViewed { location } => {
@@ -901,11 +913,35 @@ mod tests {
         };
         let quiet = render(&[moved.clone(), passed(false)]);
         assert!(!quiet.contains("later"), "{quiet}");
-        let eventful = render(&[moved, Event::CurrencyReceived { amount: 5 }, passed(true)]);
+        let eventful = render(&[
+            moved.clone(),
+            Event::CurrencyReceived { amount: 5 },
+            passed(true),
+        ]);
         assert!(
             eventful.contains("Received: 5 silver\n2 h later: Day 1, 10:00"),
             "{eventful}"
         );
+        // A road whose time varies always says how long it took.
+        let mut world = world.clone();
+        let road = &mut world.world.roads[0];
+        road.minutes = 0;
+        road.durations = [(90, 1), (120, 1)]
+            .map(|(minutes, weight)| realmkit_spec::TravelTime { minutes, weight })
+            .to_vec();
+        let engine = Engine::new(&world).unwrap();
+        let mut output = Vec::new();
+        events(
+            &mut output,
+            &engine,
+            &[moved, passed(false)],
+            Paint::default(),
+        )
+        .unwrap();
+        let varied = String::from_utf8(output).unwrap();
+        assert!(varied.contains("2 h later: Day 1, 10:00"), "{varied}");
+        assert_eq!(travel_time(90, 120), "1 h 30 min–2 h");
+        assert_eq!(travel_time(120, 120), "2 h");
     }
 
     #[test]

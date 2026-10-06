@@ -141,7 +141,8 @@ fn roads(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 format!("a road takes at most {DURATION_BOUND} minutes"),
             );
         }
-        if road.minutes > 0 {
+        travel_times(out, road);
+        if road.minutes > 0 || !road.durations.is_empty() {
             needed(out, w, &road.id);
         }
         condition(out, w, &road.id, road.requires.as_ref());
@@ -153,6 +154,40 @@ fn roads(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 "a road has `blocked_text` exactly when it has `requires`",
             );
         }
+    }
+}
+
+/// A road whose time varies draws among two or more different travel times,
+/// each from 1 minute up to the bound and at least as likely as 1, instead
+/// of a fixed time.
+fn travel_times(out: &mut Vec<Diagnostic>, road: &Road) {
+    if road.durations.is_empty() {
+        return;
+    }
+    if road
+        .durations
+        .iter()
+        .any(|d| d.minutes == 0 || d.minutes > DURATION_BOUND)
+    {
+        issue(
+            out,
+            &road.id,
+            "invalid_duration",
+            format!("a road's travel times take from 1 to {DURATION_BOUND} minutes"),
+        );
+    }
+    let distinct: BTreeSet<u64> = road.durations.iter().map(|d| d.minutes).collect();
+    if road.minutes > 0
+        || distinct.len() < 2
+        || distinct.len() < road.durations.len()
+        || road.durations.iter().any(|d| d.weight == 0)
+    {
+        issue(
+            out,
+            &road.id,
+            "invalid_travel_times",
+            "a road's `durations` are two or more different travel times, each with a weight of at least 1, in place of `minutes`",
+        );
     }
 }
 

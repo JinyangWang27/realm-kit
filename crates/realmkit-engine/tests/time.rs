@@ -316,26 +316,8 @@ fn a_save_keeps_the_clock_and_the_whereabouts_and_rejects_impossible_ones() {
 #[test]
 fn time_never_passes_beyond_its_bound() {
     let mut world = marches();
+    unscheduled(&mut world);
     world.world.time.as_mut().unwrap().start = WORLD_TIME_BOUND - 60;
-    world.world.events.clear();
-    let economy = world.world.economy.as_mut().unwrap();
-    economy.tick = None;
-    economy.prosperity = None;
-    economy.stock = None;
-    economy.workshops = None;
-    economy.markets.iter_mut().for_each(|m| m.prosperity = None);
-    world.dialogues.retain(|d| d.id != "maddoc");
-    world.characters.iter_mut().for_each(|c| {
-        if c.id == "maddoc" {
-            c.dialogue = None;
-        }
-    });
-    world.world.troops.as_mut().unwrap().upkeep = None;
-    for location in &mut world.locations {
-        location.recruits.iter_mut().for_each(|r| r.refill = None);
-    }
-    world.characters.retain(|c| c.moves.is_none());
-    world.locations[0].characters.retain(|c| c != "wenna");
     let mut engine = Engine::new(&world).unwrap();
     let before = engine.state().clone();
     assert!(matches!(

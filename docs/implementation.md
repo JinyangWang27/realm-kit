@@ -92,6 +92,13 @@ proves the complete single-player loop with authored content.
   condition. Occurrences resolve in chronological, then schedule, order, and
   saves keep only the minute and each mover's location. `examples/marches`
   exercises it.
+- [x] Variable road travel (M5b extension): a road may author weighted
+  `durations` in place of `minutes`; a successful `travel` draws one from
+  its own `travel` random stream, kept only in worlds with such a road and
+  checked by save validation, and the time passes as on any road. The map
+  query gives the shortest and longest (`MapRoad::longest`) and draws
+  nothing; the CLI shows the range and how long the journey took. Engine
+  tests use a varied `examples/marches` road.
 - [x] Gregorian calendar (M5b extension): an optional `time.calendar.epoch`
   dates minute 0; the date, next midnight and next first of a month derive
   from the minute alone and are never saved; the clock gains `{year}`,
@@ -148,7 +155,7 @@ proves the complete single-player loop with authored content.
   Vellmarket; engine tests cover monthly payroll.
 - [x] Presentation seam and start choices (original-game P0): locations may author
   map positions and kinds, all or none; `Engine::map_view` returns the places,
-  roads with travel minutes, one-way exits and the player's place, behind a
+  roads with travel minutes (shortest and longest where they vary), one-way exits and the player's place, behind a
   `Map` panel; the CLI draws it as text, in a fixed 80 × 24 frame in line
   mode (`map`, `map zoom <n> <place>`) and on its own screen with zoom, pan
   and a Tab cycle in terminal play. Packages load from memory

@@ -1,7 +1,9 @@
 use crate::{
     input,
     render::Paint,
-    render::{direction_name, duration, gear_name, money, piece_name, soldier, stat_name},
+    render::{
+        direction_name, duration, gear_name, money, piece_name, soldier, stat_name, travel_time,
+    },
 };
 use realmkit_engine::{BattleOrder, Command, Engine};
 use realmkit_spec::{CharacterKind, Resource, StartQuestion, Stat};
@@ -319,12 +321,12 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         ),
         // "Travel to Ashmere — 2 h", or "[locked]" like an exit.
         Command::Travel(to) => {
-            let road = world.road(&here.id, to)?;
+            let (shortest, longest) = world.road(&here.id, to)?.span();
             format!(
                 "{TRAVEL_TO} {}{}{}",
                 world.location(to)?.name,
-                if road.minutes > 0 {
-                    format!(" — {}", duration(road.minutes))
+                if longest > 0 {
+                    format!(" — {}", travel_time(shortest, longest))
                 } else {
                     String::new()
                 },
