@@ -161,7 +161,7 @@ pub fn duration(minutes: u64) -> String {
 /// The world's clock at `minute`, from its authored template.
 pub fn clock(world: &realmkit_spec::WorldSpec, minute: u64) -> Option<String> {
     let time = world.world.time.as_ref()?;
-    let values = realmkit_spec::clock_values(minute);
+    let values = realmkit_spec::clock_values(time, minute);
     let values: Vec<(&str, &str)> = values.iter().map(|(k, v)| (*k, v.as_str())).collect();
     interpolate(&time.clock, &values).ok()
 }
@@ -734,6 +734,29 @@ mod tests {
         // Emoji keep their count per scalar, so a modified one is not
         // measured as two wide characters.
         assert_eq!(width("👩🏽"), 2);
+    }
+
+    #[test]
+    fn a_clock_with_a_calendar_shows_the_date_and_one_without_is_unchanged() {
+        let mut world = realmkit_spec::WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/marches"
+        ))
+        .unwrap();
+        assert_eq!(clock(&world, 1_925).as_deref(), Some("Day 2, 08:05"));
+        let time = world.world.time.as_mut().unwrap();
+        time.clock.0 = "{year}-{month}-{day_of_month} {hour}:{minute} (day {day})".into();
+        time.calendar = Some(realmkit_spec::Calendar {
+            epoch: realmkit_spec::GregorianDate {
+                year: 742,
+                month: 12,
+                day: 31,
+            },
+        });
+        assert_eq!(
+            clock(&world, 1_925).as_deref(),
+            Some("743-01-01 08:05 (day 2)")
+        );
     }
 
     #[test]

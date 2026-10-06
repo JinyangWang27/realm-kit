@@ -16,7 +16,8 @@ pub struct WorldTime {
     /// The minute a new playthrough starts at.
     pub start: u64,
     /// How the time is shown: `{day}` (from 1), `{hour}` and `{minute}`
-    /// (two digits each).
+    /// (two digits each); with a calendar also `{year}`, `{month}` and
+    /// `{day_of_month}` (two digits each).
     pub clock: TextTemplate,
     /// Waiting is possible, and the menu offers this many minutes at a time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -24,6 +25,72 @@ pub struct WorldTime {
     /// Resting at a safe location also passes this many minutes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rest: Option<u64>,
+    /// Pins minute 0 to a Gregorian midnight, so the time has a date.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar: Option<Calendar>,
+}
+
+/// The proleptic Gregorian calendar, from the date at minute 0. A date is
+/// always derived from the minute, never saved beside it.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Calendar {
+    pub epoch: GregorianDate,
+}
+
+/// A day in the proleptic Gregorian calendar; `month` and `day` count from 1.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct GregorianDate {
+    pub year: i32,
+    pub month: u8,
+    pub day: u8,
+}
+
+impl GregorianDate {
+    fn to_date(self) -> Option<::time::Date> {
+        let month = ::time::Month::try_from(self.month).ok()?;
+        ::time::Date::from_calendar_date(self.year, month, self.day).ok()
+    }
+
+    fn from_date(date: ::time::Date) -> Self {
+        Self {
+            year: date.year(),
+            month: date.month().into(),
+            day: date.day(),
+        }
+    }
+}
+
+impl Calendar {
+    /// The date at `minute`; `None` if the epoch is no real date or the
+    /// date falls outside the years -9999 to 9999. Validation rules out both
+    /// up to `WORLD_TIME_BOUND`.
+    pub fn date(&self, minute: u64) -> Option<GregorianDate> {
+        let days = i32::try_from(minute / MINUTES_PER_DAY).ok()?;
+        let epoch = self.epoch.to_date()?.to_julian_day();
+        let date = ::time::Date::from_julian_day(epoch.checked_add(days)?).ok()?;
+        Some(GregorianDate::from_date(date))
+    }
+
+    /// The first midnight strictly after `minute`.
+    pub fn next_day(&self, minute: u64) -> Option<u64> {
+        (minute / MINUTES_PER_DAY + 1).checked_mul(MINUTES_PER_DAY)
+    }
+
+    /// The first first-of-a-month midnight strictly after `minute`. Every
+    /// month boundary a step crosses is found by repeating this from the
+    /// boundary before it.
+    pub fn next_month(&self, minute: u64) -> Option<u64> {
+        let today = self.date(minute)?.to_date()?;
+        let year = match today.month() {
+            ::time::Month::December => today.year().checked_add(1)?,
+            _ => today.year(),
+        };
+        let first = ::time::Date::from_calendar_date(year, today.month().next(), 1).ok()?;
+        let days = first.to_julian_day() - self.epoch.to_date()?.to_julian_day();
+        u64::try_from(days).ok()?.checked_mul(MINUTES_PER_DAY)
+    }
 }
 
 /// An undirected road between two locations.
@@ -102,15 +169,29 @@ pub struct Moves {
     pub schedule: Schedule,
 }
 
-/// "Day 3, 08:05" from a clock template.
-pub fn clock_values(minute: u64) -> [(&'static str, String); 3] {
+/// The placeholders every clock may use.
+pub(crate) const CLOCK_FIELDS: [&str; 3] = ["day", "hour", "minute"];
+/// The placeholders only a clock with a calendar may use.
+pub(crate) const CALENDAR_FIELDS: [&str; 3] = ["year", "month", "day_of_month"];
+
+/// "Day 3, 08:05" or "742-02-03 08:05" from a clock template. `{day}` is
+/// always the elapsed day from 1, calendar or not.
+pub fn clock_values(time: &WorldTime, minute: u64) -> Vec<(&'static str, String)> {
     let day = minute / MINUTES_PER_DAY + 1;
     let of_day = minute % MINUTES_PER_DAY;
-    [
+    let mut values = vec![
         ("day", day.to_string()),
         ("hour", format!("{:02}", of_day / 60)),
         ("minute", format!("{:02}", of_day % 60)),
-    ]
+    ];
+    if let Some(date) = time.calendar.and_then(|c| c.date(minute)) {
+        values.extend([
+            ("year", date.year.to_string()),
+            ("month", format!("{:02}", date.month)),
+            ("day_of_month", format!("{:02}", date.day)),
+        ]);
+    }
+    values
 }
 
 fn is_zero_u64(value: &u64) -> bool {

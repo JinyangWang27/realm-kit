@@ -278,6 +278,31 @@ without it has no time at all, and its saves carry none.
 - `rest`, if present, is how long resting at a safe place takes; it needs the
   combat block.
 
+A world may also date its time with the proleptic Gregorian calendar:
+
+```json
+"time": {
+  "start": 480,
+  "clock": "{year}-{month}-{day_of_month} {hour}:{minute}",
+  "calendar": { "epoch": { "year": 742, "month": 1, "day": 1 } }
+}
+```
+
+- `calendar.epoch` is the date at minute 0, midnight. `start` stays minutes
+  after it, so this game begins at 742-01-01 08:00.
+- The epoch must be a real date (no 742-02-29 or 742-04-31), and minute
+  1,000,000,000 after it must still fall in the years -9999 to 9999
+  (`invalid_calendar`). Year 0 and earlier years are allowed.
+- With a calendar, `clock` may also use `{year}`, `{month}` and
+  `{day_of_month}`, the last two with two digits. Without one these are
+  rejected (`calendar_disabled`). `{day}` keeps counting elapsed days from 1
+  either way.
+- WorldTime remains elapsed minutes. Calendar position is derived from the
+  epoch and the minute, never saved, so there is one time source of truth.
+  Calendar support is optional; a world without it behaves as before. The
+  epoch is a rule, so moving it changes the revision and older saves no
+  longer load.
+
 `roads` join locations, in either direction:
 
 ```json

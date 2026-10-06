@@ -45,7 +45,36 @@ fn clock(out: &mut Vec<Diagnostic>, w: &WorldSpec, time: &WorldTime) {
             format!("world time starts at most at minute {WORLD_TIME_BOUND}"),
         );
     }
-    template(out, owner, &time.clock.0, &["day", "hour", "minute"]);
+    let fields = [CLOCK_FIELDS, CALENDAR_FIELDS].concat();
+    template(out, owner, &time.clock.0, &fields);
+    match time.calendar {
+        Some(calendar) => {
+            // The whole range of world time must have a date, so no step
+            // can leave the calendar.
+            if calendar.date(WORLD_TIME_BOUND).is_none() {
+                issue(
+                    out,
+                    owner,
+                    "invalid_calendar",
+                    format!(
+                        "the epoch is a real Gregorian date, and minute {WORLD_TIME_BOUND} after it falls in the years -9999 to 9999"
+                    ),
+                );
+            }
+        }
+        None if CALENDAR_FIELDS
+            .iter()
+            .any(|f| time.clock.0.contains(&format!("{{{f}}}"))) =>
+        {
+            issue(
+                out,
+                owner,
+                "calendar_disabled",
+                "this world has no calendar, so its clock has no year, month or day of the month",
+            );
+        }
+        None => {}
+    }
     for (minutes, what) in [(time.wait, "a wait"), (time.rest, "a rest")] {
         if minutes.is_some_and(|m| m == 0 || m > DURATION_BOUND) {
             issue(
