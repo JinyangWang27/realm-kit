@@ -202,6 +202,66 @@ fn everything_that_takes_time_needs_a_clock() {
         road.minutes = 0;
     }
     assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    // A road whose time varies needs one, like a fixed road with minutes.
+    vary(&mut world);
+    assert_eq!(common::codes(&world), ["time_disabled"]);
+}
+
+/// Ashmere's road takes 90 minutes once in eight, 2 h six times and 4 h once.
+fn vary(w: &mut WorldSpec) {
+    let road = road(w, "greyford-ashmere");
+    road.minutes = 0;
+    road.durations = [(90, 1), (120, 6), (240, 1)]
+        .map(|(minutes, weight)| TravelTime { minutes, weight })
+        .to_vec();
+}
+
+#[test]
+fn a_road_whose_time_varies_is_checked_with_stable_codes() {
+    let mut world = marches();
+    vary(&mut world);
+    assert!(codes(&world).is_empty(), "{:?}", codes(&world));
+    assert!(world.random_travel() && world.stochastic());
+    assert!(!marches().random_travel());
+    assert_eq!(road(&mut world, "greyford-ashmere").span(), (90, 240));
+    assert_eq!(road(&mut world, "greyford-hollin").span(), (240, 240));
+    let json = serde_json::to_string(&world.world).unwrap();
+    assert_eq!(serde_json::from_str::<World>(&json).unwrap(), world.world);
+    // A fixed road serializes as before.
+    assert!(!serde_json::to_string(&marches().world.roads)
+        .unwrap()
+        .contains("durations"));
+    let parsed: Road = serde_json::from_str(
+        r#"{ "id": "r", "between": ["a", "b"], "durations": [{ "minutes": 90, "weight": 1 }, { "minutes": 120, "weight": 3 }] }"#,
+    )
+    .unwrap();
+    assert_eq!(parsed.span(), (90, 120));
+    // Every travel time names its weight, and nothing else.
+    for shape in [
+        r#"{ "id": "r", "between": ["a", "b"], "durations": [{ "minutes": 90 }] }"#,
+        r#"{ "id": "r", "between": ["a", "b"], "durations": [{ "minutes": 90, "weight": 1, "chance": 5 }] }"#,
+    ] {
+        assert!(serde_json::from_str::<Road>(shape).is_err(), "{shape}");
+    }
+
+    type Change = fn(&mut Road);
+    let cases: Vec<(Change, &str)> = vec![
+        (|r| r.minutes = 120, "invalid_travel_times"),
+        (|r| r.durations.truncate(1), "invalid_travel_times"),
+        (|r| r.durations[2].minutes = 90, "invalid_travel_times"),
+        (|r| r.durations[1].weight = 0, "invalid_travel_times"),
+        (|r| r.durations[0].minutes = 0, "invalid_duration"),
+        (
+            |r| r.durations[2].minutes = DURATION_BOUND + 1,
+            "invalid_duration",
+        ),
+    ];
+    for (index, (change, code)) in cases.into_iter().enumerate() {
+        let mut world = marches();
+        vary(&mut world);
+        change(road(&mut world, "greyford-ashmere"));
+        assert_eq!(codes(&world), [code], "case {index}");
+    }
 }
 
 #[test]

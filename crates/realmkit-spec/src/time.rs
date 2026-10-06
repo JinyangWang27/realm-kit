@@ -102,6 +102,10 @@ pub struct Road {
     /// Travel time; a road without one takes no time.
     #[serde(default, skip_serializing_if = "is_zero_u64")]
     pub minutes: u64,
+    /// Travel times drawn from instead when the player sets out, each as
+    /// likely as its weight; a road has these or `minutes`, never both.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub durations: Vec<TravelTime>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires: Option<Condition>,
     /// Shown when `requires` does not hold; needed exactly when it is set.
@@ -118,6 +122,22 @@ impl Road {
             _ => None,
         }
     }
+
+    /// The shortest and longest travel time; the same for a fixed road.
+    pub fn span(&self) -> (u64, u64) {
+        let drawn = self.durations.iter().map(|d| d.minutes);
+        let shortest = drawn.clone().min().unwrap_or(self.minutes);
+        (shortest, drawn.max().unwrap_or(self.minutes))
+    }
+}
+
+/// One travel time a road may take.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TravelTime {
+    pub minutes: u64,
+    /// How likely it is, against the road's other travel times.
+    pub weight: u32,
 }
 
 /// When something happens: first at minute `at`, then every `every` minutes.
