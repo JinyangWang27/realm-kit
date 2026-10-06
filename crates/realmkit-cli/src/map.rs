@@ -3,7 +3,7 @@
 
 use crate::{
     menu::Key,
-    render::{self, duration, Paint},
+    render::{self, travel_time, Paint},
 };
 use crossterm::{
     cursor::MoveTo,
@@ -301,7 +301,7 @@ pub fn render(world: &WorldSpec, view: &MapView, viewport: &Viewport) -> Vec<Str
                 let Some(&(col, row)) = points.get(points.len() / 2) else {
                     continue;
                 };
-                let text = duration(road.minutes);
+                let text = travel_time(road.minutes, road.longest.unwrap_or(road.minutes));
                 let width = render::width(&text) as i64;
                 canvas.try_text(&text, (col as i64 - width / 2, row as i64), true);
             }
@@ -337,8 +337,8 @@ pub fn frame(world: &WorldSpec, view: &MapView, zoom: Option<(u32, &str)>) -> Op
 }
 
 /// The places one road or exit from here, in authored order, with the
-/// road's time where there is one.
-fn neighbours(view: &MapView) -> Vec<(&str, Option<u64>)> {
+/// road's shortest and longest time where there is one.
+fn neighbours(view: &MapView) -> Vec<(&str, Option<(u64, u64)>)> {
     let here = view.here.as_str();
     let roads = view.roads.iter().filter_map(|r| {
         let [a, b] = &r.between;
@@ -349,7 +349,10 @@ fn neighbours(view: &MapView) -> Vec<(&str, Option<u64>)> {
         } else {
             return None;
         };
-        Some((other.as_str(), Some(r.minutes)))
+        Some((
+            other.as_str(),
+            Some((r.minutes, r.longest.unwrap_or(r.minutes))),
+        ))
     });
     let exits = view
         .exits
@@ -398,7 +401,9 @@ pub fn explore(
         }
         let name = |id: &str| world.location(id).unwrap().name.as_str();
         let status = match picked.map(|i| neighbours[i]) {
-            Some((id, Some(minutes))) => format!("{} — {}", name(id), duration(minutes)),
+            Some((id, Some((shortest, longest)))) => {
+                format!("{} — {}", name(id), travel_time(shortest, longest))
+            }
             Some((id, None)) => name(id).to_string(),
             None => name(&view.here).to_string(),
         };

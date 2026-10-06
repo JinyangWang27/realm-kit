@@ -1,8 +1,8 @@
 //! Panels: views of the current state that spend no time.
 
 use crate::render::{
-    clock, direction_name, duration, faction_name, faction_pair, money, piece_name, standing_value,
-    stat_name, workshop_name, Paint,
+    clock, direction_name, faction_name, faction_pair, money, piece_name, standing_value,
+    stat_name, travel_time, workshop_name, Paint,
 };
 use realmkit_engine::{Engine, Standing};
 use realmkit_spec::{Proficiency, Stat};
@@ -32,8 +32,9 @@ pub fn location(
             let to = road.leads(&location.id).filter(|to| engine.knows(to))?;
             let to = world.location(to)?;
             let mut notes = Vec::new();
-            if road.minutes > 0 {
-                notes.push(duration(road.minutes));
+            let (shortest, longest) = road.span();
+            if longest > 0 {
+                notes.push(travel_time(shortest, longest));
             }
             if !engine.allows(road.requires.as_ref()) {
                 notes.push("closed".into());
