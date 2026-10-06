@@ -237,46 +237,37 @@ pub(super) fn never_at_start(w: &WorldSpec, leaf: &Condition) -> bool {
     }
 }
 
-/// The lowest and highest value a track may hold at the start: the authored
-/// start moved, for each start question, by its harshest or most generous
-/// option, and kept within the bounds. Clamping along the way can only
-/// narrow the range, so the range is safe either way.
+/// The lowest and highest value a track may hold at the start. Each start
+/// question in turn moves the range by each of its options, which applies
+/// its changes in authored order, clamping after each. That makes an option
+/// a non-decreasing function of the value, so it maps the range's ends to
+/// the ends of its own range, and the question's range spans the lowest and
+/// highest of those across its options.
 fn start_range(w: &WorldSpec, track: &str, faction: Option<&Id>) -> Option<(i32, i32)> {
     // Inverted bounds are reported as invalid_bounds; there is no range.
     let t = w.standing_track(track).filter(|t| t.min <= t.max)?;
-    let moved = |o: &StartOption, sign: i32| -> i64 {
-        o.effects
-            .iter()
-            .filter_map(|e| match e {
-                Effect::ChangeStanding {
-                    track: k,
-                    faction: f,
-                    by,
-                } if k == track && f.as_ref() == faction && by.signum() == sign => {
-                    Some(i64::from(*by))
-                }
-                _ => None,
-            })
-            .sum()
+    let (min, max) = (i64::from(t.min), i64::from(t.max));
+    let apply = |option: &StartOption, value: i64| -> i64 {
+        option.effects.iter().fold(value, |value, e| match e {
+            Effect::ChangeStanding {
+                track: k,
+                faction: f,
+                by,
+            } if k == track && f.as_ref() == faction => (value + i64::from(*by)).clamp(min, max),
+            _ => value,
+        })
     };
-    let per_question = |sign: i32| -> i64 {
-        w.world
-            .start_questions
-            .iter()
-            .map(|q| {
-                let options = q.options.iter().map(|o| moved(o, sign));
-                if sign > 0 {
-                    options.max().unwrap_or(0)
-                } else {
-                    options.min().unwrap_or(0)
-                }
-            })
-            .sum()
-    };
-    let start = i64::from(t.start(faction.map(Id::as_str)));
-    let clamp = |v: i64| v.clamp(i64::from(t.min), i64::from(t.max)) as i32;
-    Some((
-        clamp(start + per_question(-1)),
-        clamp(start + per_question(1)),
-    ))
+    let start = i64::from(t.start(faction.map(Id::as_str))).clamp(min, max);
+    let (low, high) = w
+        .world
+        .start_questions
+        .iter()
+        .filter(|q| !q.options.is_empty())
+        .fold((start, start), |(low, high), q| {
+            let lows = q.options.iter().map(|o| apply(o, low));
+            let highs = q.options.iter().map(|o| apply(o, high));
+            (lows.min().unwrap(), highs.max().unwrap())
+        });
+    // Within the bounds, so both fit.
+    Some((low as i32, high as i32))
 }

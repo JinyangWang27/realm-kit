@@ -452,3 +452,67 @@ fn inverted_bounds_are_reported_wherever_the_track_is_read() {
     }];
     assert!(codes(&world).contains(&"invalid_bounds".to_string()));
 }
+
+#[test]
+fn a_start_answer_applies_its_changes_in_order_with_clamping() {
+    // On a 0..=10 track starting at 0, +10 then -10 ends at 0, never 10;
+    // -10 then +10 ends at 10, never 0.
+    let fame = |at_least| Condition::Standing {
+        track: "fame".into(),
+        faction: None,
+        at_least,
+    };
+    let codes_with = |options: Vec<Vec<i32>>, when: Condition| {
+        let mut world = marches();
+        world.world.standing.push(StandingTrack {
+            id: "fame".into(),
+            name: "Fame".into(),
+            scope: StandingScope::Global,
+            min: 0,
+            max: 10,
+            start: 0,
+            starts: Default::default(),
+            thresholds: vec![],
+        });
+        world.world.start_questions.push(StartQuestion {
+            id: "origin".into(),
+            name: "Origin".into(),
+            text: "Where from?".into(),
+            options: options
+                .into_iter()
+                .enumerate()
+                .map(|(i, bys)| StartOption {
+                    id: format!("option{i}"),
+                    text: "An answer.".into(),
+                    effects: bys
+                        .into_iter()
+                        .flat_map(|by| change("fame", None, by))
+                        .collect(),
+                })
+                .collect(),
+        });
+        world.world.outcomes = vec![RouteOutcome {
+            id: "famed".into(),
+            name: "Famed".into(),
+            text: "It ends.".into(),
+            when,
+        }];
+        codes(&world)
+    };
+    let none = Vec::<String>::new();
+    assert_eq!(codes_with(vec![vec![10, -10]], fame(5)), none);
+    assert_eq!(
+        codes_with(
+            vec![vec![-10, 10]],
+            Condition::Not {
+                condition: Box::new(fame(10)),
+            }
+        ),
+        none
+    );
+    // Another answer worth 5 makes 5 possible at the start.
+    assert_eq!(
+        codes_with(vec![vec![10, -10], vec![5]], fame(5)),
+        ["outcome_at_start"]
+    );
+}
