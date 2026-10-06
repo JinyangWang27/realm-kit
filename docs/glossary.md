@@ -123,7 +123,8 @@ again on the new branch. WorldTime is independent of story-phase progression and
 encounter scheduling.
 
 Presentation may render the same scalar using setting-appropriate clocks, dates or
-qualitative periods.
+qualitative periods. A world may author an optional Gregorian calendar epoch; the
+date is then derived from WorldTime, which stays the one time source of truth.
 
 ## Recurring Schedule
 

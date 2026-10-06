@@ -92,6 +92,12 @@ proves the complete single-player loop with authored content.
   condition. Occurrences resolve in chronological, then schedule, order, and
   saves keep only the minute and each mover's location. `examples/marches`
   exercises it.
+- [x] Gregorian calendar (M5b extension): an optional `time.calendar.epoch`
+  dates minute 0; the date, next midnight and next first of a month derive
+  from the minute alone and are never saved; the clock gains `{year}`,
+  `{month}` and `{day_of_month}` while `{day}` still counts elapsed days.
+  Validation rejects impossible epochs, a minute range past the year 9999 and
+  calendar placeholders without a calendar.
 - [x] Economy core (M6a): currency with a world-language format, goods,
   producer kinds and markets whose price index per good follows production
   and demand on a scheduled four-phase price tick drawn from its own

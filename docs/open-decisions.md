@@ -731,6 +731,16 @@ world's presentation layer to a setting-specific calendar/date. The engine store
 the scalar; presentation may render it as clock time, day number, traditional
 period names or other authored text.
 
+A world may also pin minute 0 to a proleptic Gregorian date. WorldTime remains
+elapsed minutes; the Gregorian position is derived from the epoch and the minute,
+never saved, so there is one time source of truth. Calendar support is optional.
+The spec derives the date and the next day and month boundaries after a minute,
+so a host and later capabilities read the same result. True month boundaries
+are meant for later banking interest, monthly payroll, salaries and holding
+settlement, which find every boundary a step crosses by repeating the
+next-month lookup; none of them exists yet. Time zones, daylight saving, locale
+calendars and custom calendars stay out.
+
 World time advances only through explicit authored/capability actions such as
 travel, waiting, rest, appointments or other mechanics that genuinely consume
 time. There are no universal command durations. Presentation-only actions consume
@@ -1603,6 +1613,12 @@ needs to be confirmed:
   schedule order (authored events, then movers; later capabilities append
   their own schedules after these). Effects cannot start or stop a schedule;
   an occurrence's authored condition decides whether it does anything.
+- **Gregorian calendar (M5b) · decided.** `time.calendar.epoch` authors the
+  Gregorian date at minute 0. Dates come from the minute through the `time`
+  crate and are never saved; `{day}` keeps its elapsed-day meaning and the
+  clock gains `{year}`, `{month}` and `{day_of_month}`. Validation keeps the
+  whole minute range inside the library's years. Scheduling on calendar
+  boundaries waits for the capability that needs it.
 - **Exits beyond compass directions (M5b) · decided.** Roads are an undirected
   list in `world.json`, each with an ASCII ID, two ends and optional travel
   minutes, condition and blocked text; at most one road joins a pair, so

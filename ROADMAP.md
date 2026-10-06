@@ -1166,7 +1166,14 @@ dialogue in the opening town would otherwise duplicate content.
    begins here. Follow-up: a character who appears or leaves because the
    clock entered or left its `time_of_day` hours, and a market that opens
    or closes with its merchant, change silently; report them as movers'
-   arrivals are reported.
+   arrivals are reported. **Extended** with an optional proleptic Gregorian
+   calendar: `time.calendar.epoch` dates minute 0, and the clock may show
+   `{year}`, `{month}` and `{day_of_month}`. WorldTime remains elapsed
+   minutes, the calendar position is derived and never saved, and there is
+   one time source of truth. The spec finds the next day and month
+   boundaries after a minute, which the original game's financial
+   settlement will use: banking interest, monthly payroll, salaries and
+   holding settlement, none delivered yet.
 3. **M5c — authored progression and quest lifecycle · partly
    delivered**: story phases moved only by `enter_phase`, `main` quests,
    quest `requires` for chains and phase-gated waves, and route outcomes

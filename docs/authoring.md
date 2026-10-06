@@ -342,8 +342,11 @@ An in-world clock/calendar is optional. When a world needs it, author world time
 as a minute count from a world/route-defined epoch that is monotonic within one
 forward committed history. Loading or recovering an older snapshot restores its
 saved value exactly. Presentation may map that scalar to clock times, dates, day
-counts or setting-specific periods; the runtime does not need to understand the
-display calendar.
+counts or setting-specific periods. A world may opt into the proleptic
+Gregorian calendar by authoring the date at minute 0; WorldTime remains elapsed
+minutes, the calendar position is derived from it, and there is one time source
+of truth. Calendar support is optional, and no other calendar is built in: a
+setting-specific calendar stays authored presentation text.
 
 Advance world time only through explicit authored/capability actions such as
 travel, waiting, rest or appointments. Do not assign generic durations to every
