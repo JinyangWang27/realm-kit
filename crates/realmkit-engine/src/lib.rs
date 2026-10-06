@@ -163,6 +163,7 @@ impl<'w> Engine<'w> {
                     },
                     stock: BTreeMap::new(),
                     workshops: BTreeMap::new(),
+                    bank: economy.banking.as_ref().map(|_| BankAccount::default()),
                 }),
                 proficiencies: BTreeMap::new(),
                 start_choices: Vec::new(),

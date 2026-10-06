@@ -123,6 +123,7 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     actions.extend(soldiers(world, state));
     actions.extend(crafting::offered(world, state));
     actions.extend(trade(world, state));
+    actions.extend(banking(world, state));
     actions.extend(panels);
     actions
 }
@@ -248,6 +249,35 @@ fn trade(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                     && quote.stock.is_none_or(|n| n < realmkit_spec::STOCK_BOUND),
             });
         }
+    }
+    actions
+}
+
+/// At a bank branch: depositing everything carried and withdrawing the
+/// whole balance, each offered while there is something to move and
+/// unavailable when it would pass the currency bound.
+fn banking(world: &WorldSpec, state: &GameState) -> Vec<Action> {
+    let branch = world
+        .economy()
+        .and_then(|e| e.banking.as_ref())
+        .is_some_and(|b| b.branches.contains(&state.player.location));
+    let (Some(wallet), true) = (&state.economy, branch) else {
+        return Vec::new();
+    };
+    let bank = wallet.bank.unwrap();
+    let fits = |to: u64, amount: u64| to + amount <= realmkit_spec::CURRENCY_BOUND;
+    let mut actions = Vec::new();
+    if wallet.currency > 0 {
+        actions.push(Action {
+            command: Command::Deposit(wallet.currency),
+            available: fits(bank.balance, wallet.currency),
+        });
+    }
+    if bank.balance > 0 {
+        actions.push(Action {
+            command: Command::Withdraw(bank.balance),
+            available: fits(wallet.currency, bank.balance),
+        });
     }
     actions
 }

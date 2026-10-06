@@ -45,7 +45,7 @@ capability is present.
 | Pursuit and escape | Relative distance, route, obstacles, stamina | Chase, flee, intercept, take a shortcut |
 | Survival | Hunger, fatigue, temperature, injury, supplies | Eat, rest, shelter, forage, treat injury |
 | Travel and time | Calendar, journey progress, schedules, deadlines | Travel, wait, camp, choose a route |
-| Economy and trade | Currency, prices, merchant stock, debts | Buy, sell, bargain, borrow, repay |
+| Economy and trade | Currency, prices, merchant stock, bank deposits, debts | Buy, sell, bargain, deposit, withdraw, borrow, repay |
 | Inventory | Carried fungible/non-equipment items and their quantities/possession | Take, drop, give, transfer |
 | Equipment | Equipment instances, their ownership/possession, equipped slots and effective modifiers | Acquire, equip, compare, unequip, transfer |
 | Crafting | Recipes, crafting-resource quantities, proficiency, stations | Forge, improve, enchant, brew |

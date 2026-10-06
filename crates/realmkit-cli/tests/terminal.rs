@@ -633,7 +633,7 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         "Sold: Smoked eels ×6 for 85 silver",
         "Bought: Cloth ×1 for 100 silver",
         "Sold: Cloth ×1 for 126 silver",
-        "Inventory:\n  223 silver\n",
+        "Inventory:\n  223 silver · 0 silver in the bank\n",
         "6. Market ›",
         // Levies raised at Ashmere fight the outlaws beside the keep's guard.
         "6. Recruit ›",
@@ -646,7 +646,9 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         "Round 1 — yours: strength 25, lost 0, morale 100 · theirs: strength 14, lost 1, morale 90",
         "You run down the fleeing enemy: 1 fall.\nVictory.\nWounded: Levy ×1\nKilled: Levy ×2\n",
         "Promoted: Levy ×4 (level 2).",
-        "Wages paid: 4 silver\nRecovered: Levy ×1\n",
+        // Some of it banked in Greyford, the bank pays their wages first.
+        "Deposited: 50 silver",
+        "Wages paid: 4 silver (4 silver from the bank)\nRecovered: Levy ×1\n",
         // A second victory makes Spearmen of them; two become riders, who
         // flank in a battle saved, fought a round, and loaded back.
         "Promoted: Spearman ×3 (level 3).",
@@ -658,6 +660,12 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
         // A weavery bought from Maddoc pays out at the week's settlement.
         "You buy the Weavery in Vellmarket for 150 silver.",
         "Your workshops earn 122 silver.",
+        // The same account at the Vellmarket branch, settled at March's end.
+        "Withdrawn: 20 silver",
+        "8. Bank — 26 silver ›",
+        "The month ends: March 742.\nBank interest: 0 silver on an average of 8 silver.\n",
+        "Wages paid: 10 silver (6 silver from the bank)",
+        "Inventory:\n  119 silver · 0 silver in the bank\n",
         "  Trade 1/3 · 1 proficiency point to spend\n  Workshops: Weavery in Vellmarket\n",
         "Market at Vellmarket:\n  Prosperity 40\n",
     ] {
@@ -669,6 +677,7 @@ fn the_marches_pass_time_on_roads_and_by_waiting() {
     assert!(help.contains("travel <location-id>"));
     assert!(help.contains("buy <item> [units]"));
     assert!(help.contains("train trading [points]"));
+    assert!(help.contains("deposit <amount>"));
     // The market submenu prices every good, and shows what is sold out or
     // cannot be afforded.
     let menu = run(

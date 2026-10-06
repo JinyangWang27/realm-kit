@@ -282,6 +282,21 @@ pub struct EconomyState {
     /// The player's workshops, by town then kind.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub workshops: BTreeMap<Id, BTreeMap<Id, u32>>,
+    /// The player's bank account; present only in worlds with banking.
+    /// `currency` is what the player carries, apart from it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bank: Option<BankAccount>,
+}
+
+/// Money held at the bank. Interest follows the Gregorian month's daily
+/// closing balances, so only their running sum is kept; how many days it
+/// covers follows from the date.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BankAccount {
+    pub balance: u64,
+    /// The sum of this month's daily closing balances so far.
+    pub month_to_date: u64,
 }
 
 /// What a market's merchants hold: units of every good, and a purse.

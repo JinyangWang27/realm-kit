@@ -30,6 +30,12 @@ pub enum EngineError {
     OutOfStock(Id),
     #[error("the merchants cannot pay that much")]
     MerchantCannotPay,
+    #[error("there is no bank here")]
+    NoBank,
+    #[error("an amount is 1 to {}", realmkit_spec::CURRENCY_BOUND)]
+    InvalidAmount,
+    #[error("your bank balance does not cover that")]
+    NotEnoughDeposit,
     #[error("workshops are bought in a town with a market")]
     NoWorkshopHere,
     #[error("you own as many workshops here as a town allows")]

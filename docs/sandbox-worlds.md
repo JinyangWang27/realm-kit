@@ -92,10 +92,10 @@ quest deadlines, offers, runtime instances) is optional.
 | World time | none | Roads without durations take no time; without wait and rest, only travel passes time. |
 | Recurring schedules | world time | None; everything periodic below needs them. |
 | Offers | none | Without world time, offers have no deadlines; without schedules, they refresh only on arrival. |
-| Economy | none | Without schedules, prices move only through the player's own trade, and prosperity, restocks and workshop income do not exist; without producers, prices only revert to base; without world agents, trade links converge on the price tick and no caravans run; without a trading proficiency, the spread is fixed. Workshops are a separate part. |
+| Economy | none | Without schedules, prices move only through the player's own trade, and prosperity, restocks and workshop income do not exist; without producers, prices only revert to base; without world agents, trade links converge on the price tick and no caravans run; without a trading proficiency, the spread is fixed. Workshops are a separate part, and so is banking, which needs a calendar; without it all money is carried. |
 | Factions and standing | none | Diplomacy and standing tracks are separate parts; a world may author either. |
 | Personalities | none | Traits alone can gate dialogue. Reactions need standing; companion friction needs standing and a retinue, and its morale effect needs morale; agent behaviour needs world agents. |
-| Retinue | none | Wages, provisions, wounded recovery, morale drift and desertion run on the retinue's upkeep tick, so they need recurring schedules; wages and provisions also need the economy. Morale, wounded troops, upgrades and travel speed (which needs world time) are each separate parts. Without them nobody is paid or eats, morale is not tracked, every loss is killed, troops never upgrade, and roads take their authored time. |
+| Retinue | none | Wages, provisions, wounded recovery, morale drift and desertion run on the retinue's upkeep tick, so they need recurring schedules; wages and provisions also need the economy. Monthly payroll moves wages to Gregorian month ends and needs a calendar. Morale, wounded troops, upgrades and travel speed (which needs world time) are each separate parts. Without them nobody is paid or eats, morale is not tracked, every loss is killed, troops never upgrade, and roads take their authored time. |
 | Companion gear | retinue, equipment | None. Companions fight in encounters only where personal combat exists. |
 | Mass battle | retinue | Without morale or proficiencies, those terms leave the formula; without prisoners, losses are never captured; champion duels need personal combat. Rewards, loot and lasting injuries are separate parts; looted gear needs equipment. |
 | Prisoners | retinue, and mass battle or personal combat | Ransom needs the economy; escapes run on a prison tick, so they need recurring schedules; holding prisons need holdings. |
@@ -380,6 +380,24 @@ prices: the engine derives every price from them.
   Selling or closing it is another dialogue effect. Workshops are owned
   property, not [holdings](#holdings): they have no garrison and never change
   hands in a war.
+- **Banking** (delivered). The player's currency is carried cash; a world
+  with a calendar may also keep one bank, whose account is held apart and
+  reached only at authored branch locations. Deposits and withdrawals take
+  no time. At each real Gregorian month end the bank pays interest, in
+  basis points, on the average of that month's daily closing balances over
+  every day of the month, rounded down once; only a day's close counts,
+  and a day before any deposit closes at nothing. Every midnight is due
+  before anything else at its minute, so a deposit or event at the new
+  month's midnight belongs to the new month. One bank per world for now:
+  loans, debt, credit, other currencies, rival banks, public treasuries
+  and confiscation are deferred, and future defeat or robbery would take
+  carried cash, not the account.
+- **Month-end settlement.** At the first midnight of a month, after the
+  bank's last daily close: the ended month's interest, then
+  [monthly payroll](#retinue). This is the seam later monthly credits and
+  debits, such as office salaries, mercenary stipends, companion
+  retainers and holding income, will join; none of them exists yet.
+  Workshops keep their own authored schedule.
 - **Commands.** Buy and sell. The engine previews the price, and the change the
   trade makes to it, before the player confirms. Buying and selling a workshop
   happen in dialogue.
@@ -480,6 +498,19 @@ they do, without scripting each character.
   where standing exists. Without schedules, a pool never refills.
   Wages fall due on the upkeep tick. What happens when they go unpaid
   (desertion, lost standing) is authored.
+- **Monthly payroll** (delivered). A world may instead pay wages at each
+  Gregorian month end, separating financial payroll from the physical
+  upkeep, which keeps mending the wounded on its own schedule. The bill is
+  a snapshot of the roster standing at the settlement, each soldier's wage
+  at their current level, with no proration and no recruitment dates: a
+  soldier recruited the evening before costs a whole month, one lost before
+  it costs nothing. Interest is credited first, then wages are paid all or
+  nothing from the bank and then carried cash; when both fall short,
+  nothing is paid and the shortfall is reported, but nobody leaves:
+  [persistent morale](#retinue) will weigh missed wages and decide
+  desertion. Monthly payroll needs no upkeep tick at all. Recruiting and upgrade
+  costs stay immediate. Worlds that do not opt in keep wages on the upkeep
+  tick exactly as before.
 - **Size limit.** The engine computes the roster limit as an integer: an
   authored base plus authored contributions from standing tracks and the
   retinue's leadership proficiency. Companions count towards it; prisoners have

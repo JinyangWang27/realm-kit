@@ -43,6 +43,9 @@ pub fn help(world: &WorldSpec) -> String {
     if world.economy().is_some() {
         attack += "market — prices here\nbuy <item> [units]\nsell <item> [units]\n";
     }
+    if world.economy().is_some_and(|e| e.banking.is_some()) {
+        attack += "deposit <amount> — into the bank, at a branch\nwithdraw <amount> — from the bank, at a branch\n";
+    }
     if world.troops().is_some() {
         attack += "retinue — your soldiers\nrecruit <line> [count] — where soldiers are raised\nupgrade <line> <to-line> [count]\n";
     }
@@ -221,6 +224,12 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
             good: (*good).into(),
             quantity: quantity(rest)?,
         },
+        ("deposit", [amount]) => {
+            Command::Deposit(amount.parse().map_err(|_| "expected an amount")?)
+        }
+        ("withdraw", [amount]) => {
+            Command::Withdraw(amount.parse().map_err(|_| "expected an amount")?)
+        }
         ("wait", []) => Command::Wait(context.wait_step.ok_or("this world has no waiting")?),
         ("wait", [value]) => Command::Wait(minutes(&value.to_ascii_lowercase())?),
         ("engage", [id]) => Command::Engage((*id).into()),
@@ -474,6 +483,16 @@ mod tests {
             }))
         );
         assert!(parse("buy cloth many").is_err());
+        assert_eq!(
+            parse("deposit 120"),
+            Ok(Input::Command(Command::Deposit(120)))
+        );
+        assert_eq!(
+            parse("withdraw 5"),
+            Ok(Input::Command(Command::Withdraw(5)))
+        );
+        assert!(parse("deposit").is_err());
+        assert!(parse("withdraw -5").is_err());
         assert_eq!(parse("wait 90"), Ok(Input::Command(Command::Wait(90))));
         assert_eq!(parse("wait 2h"), Ok(Input::Command(Command::Wait(120))));
         assert_eq!(parse("wait 1D"), Ok(Input::Command(Command::Wait(1_440))));

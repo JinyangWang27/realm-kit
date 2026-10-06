@@ -1172,8 +1172,8 @@ dialogue in the opening town would otherwise duplicate content.
    minutes, the calendar position is derived and never saved, and there is
    one time source of truth. The spec finds the next day and month
    boundaries after a minute, which the original game's financial
-   settlement will use: banking interest, monthly payroll, salaries and
-   holding settlement, none delivered yet.
+   settlement uses: banking interest and monthly payroll are delivered
+   (M6a and M6c below); salaries and holding settlement are not.
 3. **M5c — authored progression and quest lifecycle · partly
    delivered**: story phases moved only by `enter_phase`, `main` quests,
    quest `requires` for chains and phase-gated waves, and route outcomes
@@ -1284,6 +1284,17 @@ original-game fixture actually uses them.
    capabilities they need: party proficiencies (companions), studying
    items over world time, a wider spread for unneeded goods and disliked
    merchants (M6b), and caravan and village-trade prosperity (M6f).
+   **Banking · delivered**, driven by the original game on the M5b
+   calendar: carried cash and one optional bank account apart from it,
+   with deposits and withdrawals only at authored branches, in no time;
+   interest in basis points at each real Gregorian month end on the
+   average of that month's daily closing balances; and a month-end
+   settlement that runs first at the month's midnight, crediting interest
+   before [monthly payroll](#m6--living-sandbox-worlds--proposed). The
+   settlement is the seam for later monthly credits and debits; loans,
+   debt, several banks or currencies, public treasuries, office salaries,
+   mercenary stipends, companion retainers and holding income are still
+   to come with the capabilities that need them.
 2. **M6b — factions and standing.** War and peace between factions, authored
    standing tracks such as renown and relation, and the conditions and effects
    that read and change them. Authored personality traits steer dialogue and
@@ -1321,7 +1332,14 @@ original-game fixture actually uses them.
    condition holds, ahead of factions; wounded and killed losses, the
    player knocked out rather than killed, and victory XP shared with the
    squads that fought. `examples/marches` raises levies and beats the fen
-   outlaws. Still to come: companions, provisions, persistent morale,
+   outlaws. **Monthly payroll · delivered**, from the original game:
+   a `monthly` payroll separates financial payroll from physical upkeep,
+   paying a month-end snapshot of the roster with no proration through
+   the economy's generic payment, bank first and then carried cash, all or
+   nothing; missed monthly wages are reported and remove nobody until
+   persistent morale lands. It needs no upkeep, which where authored only
+   mends the wounded on its own schedule; worlds that do not opt in keep
+   their scheduled wages and legacy desertion. Still to come: companions, provisions, persistent morale,
    travel speed, leaders and companions as individuals, ground, prisoners,
    injuries and loot tables.
 5. **M6e — holdings and sieges.** Ownership that changes during play, income,

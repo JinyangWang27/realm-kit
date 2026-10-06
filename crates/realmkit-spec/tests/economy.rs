@@ -466,3 +466,58 @@ fn workshops_and_proficiencies_need_their_blocks() {
     assert!(world.diagnostics().is_empty());
     assert!(!world.random_stock());
 }
+
+#[test]
+fn banking_is_checked_with_stable_codes() {
+    let world = marches();
+    let banking = world.economy().unwrap().banking.as_ref().unwrap();
+    assert_eq!(banking.branches, ["greyford", "vellmarket"]);
+    assert_eq!(banking.monthly_interest_basis_points, 25);
+    type Change = fn(&mut WorldSpec);
+    let cases: Vec<(Change, &[&str])> = vec![
+        (
+            |w| economy(w).banking.as_mut().unwrap().branches.clear(),
+            &["invalid_banking"],
+        ),
+        (
+            |w| {
+                economy(w)
+                    .banking
+                    .as_mut()
+                    .unwrap()
+                    .monthly_interest_basis_points = 10_001
+            },
+            &["invalid_banking"],
+        ),
+        (
+            |w| economy(w).banking.as_mut().unwrap().branches[1] = "fen".into(),
+            &["missing_reference"],
+        ),
+        (
+            |w| economy(w).banking.as_mut().unwrap().branches[1] = "greyford".into(),
+            &["duplicate_id"],
+        ),
+        // Interest settles at Gregorian month ends.
+        (
+            |w| w.world.time.as_mut().unwrap().calendar = None,
+            &["calendar_disabled"],
+        ),
+    ];
+    for (index, (change, expected)) in cases.into_iter().enumerate() {
+        let mut world = marches();
+        change(&mut world);
+        assert_eq!(codes(&world), *expected, "case {index}");
+    }
+    // A full rate is allowed, and the bank is a rule.
+    let mut world = marches();
+    economy(&mut world)
+        .banking
+        .as_mut()
+        .unwrap()
+        .monthly_interest_basis_points = 10_000;
+    assert!(codes(&world).is_empty());
+    assert_ne!(world.revision(), marches().revision());
+    let json =
+        r#"{ "branches": ["greyford"], "monthly_interest_basis_points": 25, "loans": true }"#;
+    assert!(serde_json::from_str::<Banking>(json).is_err());
+}

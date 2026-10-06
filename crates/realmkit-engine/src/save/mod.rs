@@ -249,6 +249,25 @@ fn economy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
         },
         "merchants' stock does not match the world",
     )?;
+    // The account exists with banking. Its month's sum covers at most the
+    // days closed so far this month since play began, so on the first of a
+    // month, or the first day of play, it is nothing.
+    ensure(
+        match (&economy.banking, wallet.bank) {
+            (None, None) => true,
+            (Some(_), Some(bank)) => {
+                let time = world.world.time.as_ref().unwrap();
+                let now = state.time.unwrap();
+                let day = time.calendar.unwrap().date(now).unwrap().day;
+                let days = realmkit_spec::MINUTES_PER_DAY;
+                let closed = (now / days - time.start / days).min(u64::from(day) - 1);
+                bank.balance <= realmkit_spec::CURRENCY_BOUND
+                    && bank.month_to_date <= closed * realmkit_spec::CURRENCY_BOUND
+            }
+            _ => false,
+        },
+        "the bank account does not match the world",
+    )?;
     // Workshops stand only in towns, within each town's limit, and only of
     // kinds some authored effect that could have fired sells.
     let limit = economy.workshops.as_ref().map_or(0, |w| u64::from(w.limit));

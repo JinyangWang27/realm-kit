@@ -538,7 +538,7 @@ mod tests {
         assert!(frames[5].contains(&expected), "{}", frames[5]);
         // Leaving returns to the menu.
         let after = text.rsplit_once("\u{1b}[?1049l").unwrap().1;
-        assert!(after.contains("12. Map"), "{after}");
+        assert!(after.contains("13. Map"), "{after}");
     }
 
     #[test]

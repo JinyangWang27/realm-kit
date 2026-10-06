@@ -253,12 +253,36 @@ Proposed for M6. A player-owned business in a town that runs one processed
 good's recipe and pays the local profit, possibly a loss, on a recurring
 schedule. It is owned property, not a holding.
 
+## Bank
+
+An optional single account the player reaches at authored branch locations,
+apart from the carried currency. Deposits and withdrawals happen only at a
+branch, take no time, and earn interest at each Gregorian month end on the
+month's average daily closing balance. There is one bank per world; loans and
+debt are not part of it.
+
+## Month-End Settlement
+
+What happens at the first midnight of a Gregorian month, before anything else
+due at that minute: the day's bank close, the ended month's interest, then
+monthly payroll. It is the seam later monthly credits and debits, such as
+salaries or holding income, are meant to join.
+
+## Payroll
+
+When the roster's wages fall due: on the upkeep schedule, or, with monthly
+payroll, at each month end for the roster standing then, with no proration.
+Either way wages come from the bank first, then carried currency, all or
+nothing; unpaid upkeep wages cost deserters by upkeep's legacy share, while
+unpaid monthly wages are only reported until persistent morale arrives.
+Monthly payroll needs no upkeep.
+
 ## Retinue
 
 Proposed for M6. The player's troops, held as a count and an XP pool per troop
 definition, plus any companions, who are unique characters wearing gear from a
 shared stash. An engine-computed limit caps its size, and wages fall due on a
-recurring schedule.
+recurring schedule or at each month end ([Payroll](#payroll)).
 
 ## Prisoner
 

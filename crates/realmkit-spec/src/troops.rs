@@ -21,6 +21,37 @@ pub struct Troops {
     /// Wages and recovery on a schedule; needs world time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upkeep: Option<Upkeep>,
+    /// When wages fall due: on the upkeep schedule, or at each month end.
+    #[serde(default, skip_serializing_if = "Payroll::is_upkeep")]
+    pub payroll: Payroll,
+}
+
+/// When the roster's wages fall due. Either way they are paid from the bank
+/// first, where the world has one, then from carried currency.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Payroll {
+    /// On each upkeep, whose `desert_percent` applies when they go unpaid:
+    /// legacy behaviour. Braced, like `Monthly`, so that a stray field is
+    /// refused like any other.
+    Upkeep {},
+    /// At each Gregorian month end, for the roster standing then; needs a
+    /// calendar and no upkeep, which where authored only mends the wounded.
+    /// It is a cadence alone: unpaid wages are reported, and what they cost
+    /// is left to persistent morale.
+    Monthly {},
+}
+
+impl Default for Payroll {
+    fn default() -> Self {
+        Payroll::Upkeep {}
+    }
+}
+
+impl Payroll {
+    fn is_upkeep(&self) -> bool {
+        *self == Payroll::Upkeep {}
+    }
 }
 
 /// A kind of soldier for matchups: shooting, riding, or neither.
@@ -82,7 +113,8 @@ pub struct Upkeep {
     /// The share of each stack's wounded who recover on each upkeep.
     #[serde(default)]
     pub recover_percent: u32,
-    /// The share of each stack that leaves when wages go unpaid.
+    /// The share of each stack that leaves when wages go unpaid on upkeep;
+    /// legacy, and unused with monthly payroll.
     #[serde(default)]
     pub desert_percent: u32,
 }

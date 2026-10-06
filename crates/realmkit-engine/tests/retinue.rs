@@ -174,7 +174,10 @@ fn unpaid_wages_cost_deserters_and_the_wounded_mend() {
     let mut engine = at_ashmere(&world);
     engine.execute(recruit("levy", 5)).unwrap();
     let events = engine.execute(Wait(1_440 - 600)).unwrap();
-    assert!(events.contains(&Event::WagesPaid { amount: 5 }));
+    assert!(events.contains(&Event::WagesPaid {
+        amount: 5,
+        from_bank: 0
+    }));
     assert_eq!(currency(&engine), 45);
     // Half the wounded mend each day, rounded up; resting mends the rest.
     let world = marches();
