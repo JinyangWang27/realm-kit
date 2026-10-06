@@ -27,6 +27,7 @@ wait 8h
 market
 sell cloth
 inventory
+deposit 50
 quests
 travel ashmere
 recruit levy 6
@@ -51,9 +52,12 @@ autoresolve
 retinue
 travel vellmarket
 sell eels 12
+withdraw 20
 talk maddoc
 choose 1
+deposit 40
 wait 7d
+inventory
 status
 market
 quit

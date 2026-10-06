@@ -2,13 +2,15 @@
 //! occurrence it crosses happens in order.
 
 use super::*;
-use realmkit_spec::{Schedule, DURATION_BOUND, WORLD_TIME_BOUND};
+use realmkit_spec::{Payroll, Schedule, DURATION_BOUND, MINUTES_PER_DAY, WORLD_TIME_BOUND};
 
 /// Something that happens on a schedule. Occurrences at the same minute go
-/// in this order: authored events, characters who move, the price tick,
-/// prosperity, restocking, workshop settlement, the retinue's upkeep, then
-/// recruiting pools refilling in location order.
+/// in this order: midnight in a world that settles months (the bank's daily
+/// close, then the month end), authored events, characters who move, the
+/// price tick, prosperity, restocking, workshop settlement, the retinue's
+/// upkeep, then recruiting pools refilling in location order.
 enum Due<'w> {
+    Midnight,
     Event(&'w realmkit_spec::WorldEvent),
     Mover(&'w Character),
     PriceTick,
@@ -20,6 +22,19 @@ enum Due<'w> {
 }
 
 fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
+    // Every midnight, the calendar's day boundaries, while a bank or
+    // month-end wages need them; validation keeps both to dated worlds.
+    let settles = world.economy().is_some_and(|e| e.banking.is_some())
+        || world
+            .troops()
+            .is_some_and(|t| t.payroll == Payroll::Monthly);
+    let midnight = settles.then_some((
+        Schedule {
+            at: 0,
+            every: Some(MINUTES_PER_DAY),
+        },
+        Due::Midnight,
+    ));
     let events = world
         .world
         .events
@@ -51,7 +66,9 @@ fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
         let refill = l.recruits.as_ref()?.refill?;
         Some((refill.schedule, Due::Refill(l)))
     });
-    events
+    midnight
+        .into_iter()
+        .chain(events)
         .chain(movers)
         .chain(prices)
         .chain(prosperity)
@@ -110,6 +127,7 @@ fn pass(
         cursor = (minute, index);
         state.time = Some(minute);
         match due[index].1 {
+            Due::Midnight => bank::midnight(world, state, events),
             Due::Event(event) => {
                 if allowed(state, event.requires.as_ref()) {
                     occur(world, state, &event.effects, events);

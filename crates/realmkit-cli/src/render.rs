@@ -132,6 +132,21 @@ pub fn soldier(world: &realmkit_spec::WorldSpec, line: &str, level: usize) -> St
         .map_or_else(|| line.to_string(), |l| l.name_at(level).to_string())
 }
 
+const MONTHS: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
 /// An amount in the world's currency, such as "120 silver".
 pub fn money(world: &realmkit_spec::WorldSpec, amount: u64) -> String {
     let amount = amount.to_string();
@@ -480,8 +495,56 @@ pub fn events(
                     soldier(world, line, *level)
                 ))
             )?,
-            Event::WagesPaid { amount } => {
-                writeln!(output, "Wages paid: {}", money(world, *amount))?
+            Event::WagesPaid {
+                amount,
+                from_bank: 0,
+            } => writeln!(output, "Wages paid: {}", money(world, *amount))?,
+            Event::WagesPaid { amount, from_bank } => writeln!(
+                output,
+                "Wages paid: {} ({} from the bank)",
+                money(world, *amount),
+                money(world, *from_bank)
+            )?,
+            Event::WagesUnpaid { amount, available } => writeln!(
+                output,
+                "{}",
+                paint.bad(&format!(
+                    "Wages of {} go unpaid; you have {}.",
+                    money(world, *amount),
+                    money(world, *available)
+                ))
+            )?,
+            Event::Deposited { amount } => {
+                writeln!(output, "Deposited: {}", money(world, *amount))?
+            }
+            Event::Withdrawn { amount } => {
+                writeln!(output, "Withdrawn: {}", money(world, *amount))?
+            }
+            Event::MonthEnded { year, month } => writeln!(
+                output,
+                "{}",
+                paint.title(&format!(
+                    "The month ends: {} {year}.",
+                    MONTHS[usize::from(*month) - 1]
+                ))
+            )?,
+            Event::InterestCredited {
+                average,
+                amount,
+                forgone,
+            } => {
+                let mut line = format!(
+                    "Bank interest: {} on an average of {}.",
+                    money(world, *amount),
+                    money(world, *average)
+                );
+                if *forgone > 0 {
+                    line += &format!(
+                        " {} more is beyond what the bank can hold.",
+                        money(world, *forgone)
+                    );
+                }
+                writeln!(output, "{}", paint.good(&line))?
             }
             Event::Deserted { line, level, count } => writeln!(
                 output,

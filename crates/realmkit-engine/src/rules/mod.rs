@@ -3,6 +3,7 @@
 use super::*;
 
 mod actions;
+mod bank;
 mod consume;
 mod crafting;
 mod economy;
@@ -248,6 +249,8 @@ pub(super) fn execute(
             economy::market_here(world, state)?;
             events.push(Event::MarketViewed)
         }
+        Command::Deposit(amount) => bank::transfer(world, state, amount, true, &mut events)?,
+        Command::Withdraw(amount) => bank::transfer(world, state, amount, false, &mut events)?,
         Command::Buy { good, quantity } => {
             economy::trade(world, state, &good, quantity, true, &mut events)?
         }

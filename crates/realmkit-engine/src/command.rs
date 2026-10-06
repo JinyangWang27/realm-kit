@@ -23,6 +23,10 @@ pub enum Command {
     },
     /// Shows this location's prices; only at a market.
     Market,
+    /// Moves carried currency into the bank; only at a branch.
+    Deposit(u64),
+    /// Moves currency from the bank into the player's purse; only at a branch.
+    Withdraw(u64),
     /// Starts an encounter with a fighter at the current location.
     Engage(Id),
     /// In an encounter: a basic attack in the player's basic-attack channel.
@@ -197,8 +201,17 @@ pub enum Event {
         level: usize,
         count: u64,
     },
+    /// The roster's wages, `from_bank` of them out of the bank and the
+    /// rest from carried currency.
     WagesPaid {
         amount: u64,
+        from_bank: u64,
+    },
+    /// Wages fell due that the bank and carried currency together,
+    /// `available`, could not cover, so none were paid; desertions follow.
+    WagesUnpaid {
+        amount: u64,
+        available: u64,
     },
     /// Soldiers left over unpaid wages.
     Deserted {
@@ -278,6 +291,26 @@ pub enum Event {
     WorkshopsLost {
         amount: u64,
         shortfall: u64,
+    },
+    Deposited {
+        amount: u64,
+    },
+    Withdrawn {
+        amount: u64,
+    },
+    /// A Gregorian month ended at midnight; what settles for it follows:
+    /// interest, then month-end wages.
+    MonthEnded {
+        year: i32,
+        month: u8,
+    },
+    /// Interest on the month's `average` daily closing balance, rounded
+    /// down, was paid into the bank; `forgone` more would have passed the
+    /// currency bound.
+    InterestCredited {
+        average: u64,
+        amount: u64,
+        forgone: u64,
     },
     TechniqueLearned {
         technique: Id,

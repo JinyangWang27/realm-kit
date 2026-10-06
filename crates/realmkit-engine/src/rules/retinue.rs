@@ -1,8 +1,9 @@
 //! The player's soldiers: recruiting, promotion by shared XP, upgrades into
-//! branch lines, and the upkeep that pays, loses and mends them.
+//! branch lines, the wages that pay or lose them and the upkeep that mends
+//! them.
 
 use super::*;
-use realmkit_spec::{TroopLine, Troops};
+use realmkit_spec::{Payroll, TroopLine, Troops};
 
 fn troops(world: &WorldSpec) -> &Troops {
     world.troops().unwrap()
@@ -200,11 +201,33 @@ fn line<'w>(world: &'w WorldSpec, id: &str) -> &'w TroopLine {
     troops(world).line(id).unwrap()
 }
 
-/// Wages, all or nothing, then recovery. Unpaid wages cost each squad a
-/// share of its soldiers, healthy ones first.
+/// The upkeep schedule: wages, where they fall due on it, then recovery.
 pub(crate) fn upkeep(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
     let rules = troops(world).upkeep.unwrap();
+    if troops(world).payroll == Payroll::Upkeep {
+        pay(world, state, events);
+    }
     let retinue = state.retinue.as_mut().unwrap();
+    mend(retinue, Some(rules.recover_percent), events);
+    prune(retinue);
+    // Deserters take their shares rounded down, which can promote the rest.
+    promote(world, state, events);
+}
+
+/// Month-end wages for the roster standing at the settlement, with no
+/// proration for days served.
+pub(crate) fn payroll(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
+    pay(world, state, events);
+    prune(state.retinue.as_mut().unwrap());
+    promote(world, state, events);
+}
+
+/// Every soldier's wage at their level, all or nothing: from the bank
+/// first, where there is one, then carried currency. Unpaid wages cost each
+/// squad a share of its soldiers, healthy ones first.
+fn pay(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
+    let retinue = state.retinue.as_mut().unwrap();
+    // At most the roster limit times the currency bound: inside 64 bits.
     let wages: u64 = retinue
         .roster
         .iter()
@@ -214,32 +237,41 @@ pub(crate) fn upkeep(world: &WorldSpec, state: &mut GameState, events: &mut Vec<
                 .map(|(level, squad)| line(world, id).wage_at(*level) * squad.heads())
         })
         .sum();
-    if wages > 0 {
-        let wallet = state.economy.as_mut().unwrap();
-        if wallet.currency >= wages {
-            wallet.currency -= wages;
-            events.push(Event::WagesPaid { amount: wages });
-        } else {
-            for (id, levels) in &mut retinue.roster {
-                for (level, squad) in levels.iter_mut() {
-                    let count = (squad.heads() * u64::from(rules.desert_percent) / 100)
-                        .max(1)
-                        .min(squad.heads());
-                    let healthy = count.min(squad.healthy);
-                    leave(squad, healthy, count - healthy);
-                    events.push(Event::Deserted {
-                        line: id.clone(),
-                        level: *level,
-                        count,
-                    });
-                }
-            }
+    if wages == 0 {
+        return;
+    }
+    let wallet = state.economy.as_mut().unwrap();
+    let banked = wallet.bank.map_or(0, |b| b.balance);
+    let available = banked + wallet.currency;
+    if available >= wages {
+        let from_bank = wages.min(banked);
+        if let Some(bank) = wallet.bank.as_mut() {
+            bank.balance -= from_bank;
+        }
+        wallet.currency -= wages - from_bank;
+        events.push(Event::WagesPaid {
+            amount: wages,
+            from_bank,
+        });
+        return;
+    }
+    events.push(Event::WagesUnpaid {
+        amount: wages,
+        available,
+    });
+    let percent = u64::from(troops(world).upkeep.unwrap().desert_percent);
+    for (id, levels) in &mut retinue.roster {
+        for (level, squad) in levels.iter_mut() {
+            let count = (squad.heads() * percent / 100).max(1).min(squad.heads());
+            let healthy = count.min(squad.healthy);
+            leave(squad, healthy, count - healthy);
+            events.push(Event::Deserted {
+                line: id.clone(),
+                level: *level,
+                count,
+            });
         }
     }
-    mend(retinue, Some(rules.recover_percent), events);
-    prune(retinue);
-    // Deserters take their shares rounded down, which can promote the rest.
-    promote(world, state, events);
 }
 
 /// Wounded soldiers heal: a share of each squad, rounded up, or all of them.

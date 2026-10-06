@@ -233,7 +233,11 @@ pub fn inventory(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> 
     let state = engine.state();
     writeln!(output, "{}", paint.title("Inventory:"))?;
     if let Some(wallet) = &state.economy {
-        writeln!(output, "  {}", money(world, wallet.currency))?;
+        write!(output, "  {}", money(world, wallet.currency))?;
+        match wallet.bank {
+            Some(bank) => writeln!(output, " · {} in the bank", money(world, bank.balance))?,
+            None => writeln!(output)?,
+        }
     }
     let gear = state.combat.as_ref().map(|c| &c.gear);
     if state.player.inventory.is_empty() && gear.is_none_or(|g| g.is_empty()) {

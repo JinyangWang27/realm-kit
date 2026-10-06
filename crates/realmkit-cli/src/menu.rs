@@ -30,6 +30,7 @@ const SOLD_OUT: &str = "[sold out]";
 const EQUIPMENT_GROUP: &str = "Equipment";
 const SMITHING_GROUP: &str = "Smithing";
 const MARKET_GROUP: &str = "Market";
+const BANK_GROUP: &str = "Bank";
 const CONSUME_GROUP: &str = "Use item";
 const RECRUIT_GROUP: &str = "Recruit";
 const UPGRADE_GROUP: &str = "Upgrade";
@@ -53,6 +54,9 @@ const BUY: &str = "Buy";
 const SELL: &str = "Sell";
 const NEXT_PRICE: &str = "next";
 const AFFORD: &str = "[cannot afford]";
+const DEPOSIT: &str = "Deposit";
+const WITHDRAW: &str = "Withdraw";
+const ALL: &str = "all";
 const ENCHANTING_GROUP: &str = "Enchanting";
 const ENCHANT: &str = "Enchant";
 const FORGE: &str = "Forge";
@@ -111,6 +115,7 @@ pub enum Group {
     Smithing,
     Enchanting,
     Market,
+    Bank,
     Consume,
     Recruit,
     Upgrade,
@@ -125,6 +130,7 @@ impl Group {
             Command::Forge(_) | Command::Improve(_) => Some(Self::Smithing),
             Command::Enchant { .. } => Some(Self::Enchanting),
             Command::Market | Command::Buy { .. } | Command::Sell { .. } => Some(Self::Market),
+            Command::Deposit(_) | Command::Withdraw(_) => Some(Self::Bank),
             Command::Use(_) => Some(Self::Consume),
             Command::Recruit { .. } => Some(Self::Recruit),
             Command::Upgrade { .. } => Some(Self::Upgrade),
@@ -285,6 +291,12 @@ fn group_label(engine: &Engine<'_>, group: Group) -> String {
         Group::Smithing => format!("{SMITHING_GROUP} {OPENS}"),
         Group::Enchanting => format!("{ENCHANTING_GROUP} {OPENS}"),
         Group::Market => format!("{MARKET_GROUP} {OPENS}"),
+        // "Bank — 300 silver ›": the balance, without opening it.
+        Group::Bank => {
+            let balance = engine.state().economy.as_ref().and_then(|e| e.bank);
+            let balance = balance.map_or(0, |b| b.balance);
+            format!("{BANK_GROUP} — {} {OPENS}", money(engine.world(), balance))
+        }
         Group::Consume => format!("{CONSUME_GROUP} {OPENS}"),
         Group::Recruit => format!("{RECRUIT_GROUP} {OPENS}"),
         Group::Upgrade => format!("{UPGRADE_GROUP} {OPENS}"),
@@ -532,6 +544,9 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         }
         Command::Market => PRICES.into(),
         _ if !action.available => return None,
+        // "Deposit all — 120 silver".
+        Command::Deposit(amount) => format!("{DEPOSIT} {ALL} — {}", money(world, *amount)),
+        Command::Withdraw(amount) => format!("{WITHDRAW} {ALL} — {}", money(world, *amount)),
         Command::Rest => REST.into(),
         Command::Wait(minutes) => format!("{WAIT} — {}", duration(*minutes)),
         Command::Flee => FLEE.into(),
@@ -1175,6 +1190,33 @@ mod tests {
             usable,
             ["Healing draught ×1 — +30 HP [nothing to restore]", "Back"]
         );
+    }
+
+    #[test]
+    fn a_branch_shows_the_balance_and_moves_it_all_either_way() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/marches"
+        ))
+        .unwrap();
+        let mut engine = Engine::new(&world).unwrap();
+        assert_eq!(
+            submenu(&engine, "Bank — 0 silver ›"),
+            ["Deposit all — 100 silver", "Back"]
+        );
+        engine.execute(Command::Deposit(40)).unwrap();
+        assert_eq!(
+            submenu(&engine, "Bank — 40 silver ›"),
+            [
+                "Deposit all — 60 silver",
+                "Withdraw all — 40 silver",
+                "Back"
+            ]
+        );
+        // Ashmere has no branch.
+        engine.execute(Command::Travel("ashmere".into())).unwrap();
+        let menu = Menu::new(&engine, false, None);
+        assert!(!menu.entries().iter().any(|e| e.label.starts_with("Bank")));
     }
 
     #[test]
