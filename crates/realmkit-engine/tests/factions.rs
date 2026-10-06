@@ -256,7 +256,7 @@ fn saves_keep_standing_and_wars_and_replay_matches() {
 }
 
 #[test]
-fn saves_with_impossible_standing_or_wars_are_refused() {
+fn saves_with_malformed_standing_or_wars_are_refused() {
     let world = marches();
     let engine = Engine::new(&world).unwrap();
     type Tamper = fn(&mut GameState);
@@ -282,9 +282,9 @@ fn saves_with_impossible_standing_or_wars_are_refused() {
         |s| {
             s.standing.remove("renown");
         },
-        // No effect ever changes the keep and the guild's diplomacy.
+        // An unknown faction.
         |s| {
-            s.at_war.insert(pair("guild", "keep"));
+            s.at_war.insert(pair("crown", "keep"));
         },
         // Pairs are kept in canonical order, between different factions.
         |s| {
@@ -306,11 +306,28 @@ fn saves_with_impossible_standing_or_wars_are_refused() {
             "case {index}"
         );
     }
-    // Before the thaw, the fen and the guild cannot be at war yet.
-    let mut snapshot = engine.snapshot();
+}
+
+#[test]
+fn saves_check_standing_and_wars_by_shape_not_history() {
+    // Standing and diplomacy move freely both ways, so any well-formed value
+    // loads, whether or not some effect could have produced it: here wars
+    // nothing declares and renown nothing gives.
+    let world = marches();
+    let mut snapshot = Engine::new(&world).unwrap().snapshot();
+    snapshot.state.at_war.clear();
+    snapshot.state.at_war.insert(pair("guild", "keep"));
     snapshot.state.at_war.insert(pair("fen", "guild"));
-    assert!(Engine::restore(&world, snapshot.clone()).is_err());
+    snapshot
+        .state
+        .standing
+        .insert("renown".into(), Standing::Global(1_000));
+    assert!(Engine::restore(&world, snapshot).is_ok());
+    // A past event's flags are still required, even though the thaw also
+    // declares a war, while that war itself is not.
+    let mut snapshot = Engine::new(&world).unwrap().snapshot();
     snapshot.state.time = Some(2_280);
+    assert!(Engine::restore(&world, snapshot.clone()).is_err());
     snapshot.state.flags.insert("thaw".into());
     assert!(Engine::restore(&world, snapshot).is_ok());
 }
@@ -390,210 +407,4 @@ fn a_host_asking_about_standing_the_world_lacks_hears_no() {
         assert!(!engine.holds(&unknown), "{unknown:?}");
         assert!(!engine.allows(Some(&unknown)));
     }
-}
-
-#[test]
-fn a_save_keeps_what_certain_events_and_start_answers_did() {
-    // Fame moves only by a start answer and an unconditional one-shot event
-    // at 10:00, so by then it is exactly what they made of it.
-    let mut world = marches();
-    world.world.standing.push(StandingTrack {
-        id: "fame".into(),
-        name: "Fame".into(),
-        scope: StandingScope::Global,
-        min: 0,
-        max: 10,
-        start: 0,
-        starts: Default::default(),
-        thresholds: vec![],
-    });
-    world.world.start_questions.push(StartQuestion {
-        id: "birth".into(),
-        name: "Birth".into(),
-        text: "Born where?".into(),
-        options: vec![StartOption {
-            id: "keep".into(),
-            text: "At the keep.".into(),
-            effects: vec![change("fame", None, 3)],
-        }],
-    });
-    world.world.events.push(WorldEvent {
-        id: "ballad".into(),
-        schedule: Schedule {
-            at: 600,
-            every: None,
-        },
-        requires: None,
-        effects: vec![change("fame", None, 9)],
-    });
-    assert_eq!(world.diagnostics(), []);
-    let engine = Engine::start(&world, 7, &["keep".into()]).unwrap();
-    let restored = |fame: i32, time: u64| {
-        let mut snapshot = engine.snapshot();
-        snapshot.state.time = Some(time);
-        snapshot
-            .state
-            .standing
-            .insert("fame".into(), Standing::Global(fame));
-        Engine::restore(&world, snapshot).is_ok()
-    };
-    // The answer gave 3; the ballad then clamps it to 10.
-    assert!(restored(3, 480) && !restored(0, 480));
-    assert!(restored(10, 600) && !restored(3, 600));
-    // Were the steward to sing too, anything in bounds could follow.
-    let mut sung = world.clone();
-    let steward = sung
-        .dialogues
-        .iter_mut()
-        .find(|d| d.id == "steward")
-        .unwrap();
-    steward.nodes[0].choices.push(DialogueChoice {
-        text: TEST.into(),
-        effects: vec![change("fame", None, -10)],
-        ..Default::default()
-    });
-    let mut snapshot = engine.snapshot();
-    snapshot.package_revision = sung.revision();
-    snapshot.state.time = Some(600);
-    snapshot
-        .state
-        .standing
-        .insert("fame".into(), Standing::Global(0));
-    assert!(Engine::restore(&sung, snapshot).is_ok());
-}
-
-#[test]
-fn a_save_keeps_the_war_a_certain_event_declared() {
-    let world = marches();
-    let mut snapshot = Engine::new(&world).unwrap().snapshot();
-    snapshot.state.time = Some(2_280);
-    snapshot.state.flags.insert("thaw".into());
-    // The thaw sets the fen against the guild, and nothing makes that peace.
-    assert!(Engine::restore(&world, snapshot.clone()).is_err());
-    snapshot.state.at_war.insert(pair("fen", "guild"));
-    assert!(Engine::restore(&world, snapshot.clone()).is_ok());
-    // A peace some choice could make would explain it.
-    let world = trusted(vec![Effect::MakePeace {
-        factions: pair("guild", "fen"),
-    }]);
-    snapshot.package_revision = world.revision();
-    snapshot.state.standing.insert(
-        "favour".into(),
-        Standing::Factions(
-            [
-                ("fen".into(), -40),
-                ("guild".into(), 0),
-                ("keep".into(), 20),
-            ]
-            .into(),
-        ),
-    );
-    snapshot.state.at_war.remove(&pair("fen", "guild"));
-    assert!(Engine::restore(&world, snapshot).is_ok());
-}
-
-/// The marches with a steward choice applying `effects` that no save could
-/// have taken: it needs a flag nothing sets.
-fn unreachable(effects: Vec<Effect>) -> WorldSpec {
-    let mut world = marches();
-    world.world.flags.push("never".into());
-    let steward = world.dialogues.iter_mut().find(|d| d.id == "steward");
-    steward.unwrap().nodes[0].choices.push(DialogueChoice {
-        text: TEST.into(),
-        requires: Some(Condition::Flag {
-            flag: "never".into(),
-        }),
-        effects,
-        ..Default::default()
-    });
-    world
-}
-
-#[test]
-fn a_choice_that_could_never_be_taken_explains_nothing() {
-    // It would undo the thaw's war, but it could not have been taken.
-    let world = unreachable(vec![Effect::MakePeace {
-        factions: pair("fen", "guild"),
-    }]);
-    assert_eq!(world.diagnostics(), []);
-    let mut snapshot = Engine::new(&world).unwrap().snapshot();
-    snapshot.state.time = Some(2_280);
-    snapshot.state.flags.insert("thaw".into());
-    assert!(Engine::restore(&world, snapshot.clone()).is_err());
-    snapshot.state.at_war.insert(pair("fen", "guild"));
-    assert!(Engine::restore(&world, snapshot.clone()).is_ok());
-    // Nor can it explain fame that nothing reachable gives; the same choice
-    // without its gate could.
-    let fame = |gated: bool| {
-        let mut world = unreachable(vec![change("fame", None, 5)]);
-        world.world.standing.push(StandingTrack {
-            id: "fame".into(),
-            name: "Fame".into(),
-            scope: StandingScope::Global,
-            min: 0,
-            max: 10,
-            start: 0,
-            starts: Default::default(),
-            thresholds: vec![],
-        });
-        if !gated {
-            let steward = world.dialogues.iter_mut().find(|d| d.id == "steward");
-            steward.unwrap().nodes[0]
-                .choices
-                .last_mut()
-                .unwrap()
-                .requires = None;
-        }
-        assert_eq!(world.diagnostics(), []);
-        let mut snapshot = Engine::new(&world).unwrap().snapshot();
-        snapshot
-            .state
-            .standing
-            .insert("fame".into(), Standing::Global(5));
-        Engine::restore(&world, snapshot).is_ok()
-    };
-    assert!(!fame(true));
-    assert!(fame(false));
-}
-
-#[test]
-fn certain_wars_and_peaces_replay_in_order() {
-    // The keep and the guild go to war at 10:00 and make peace at 11:40,
-    // and nothing else touches them.
-    let mut world = marches();
-    for (id, at, effect) in [
-        (
-            "feud",
-            600,
-            Effect::DeclareWar {
-                factions: pair("keep", "guild"),
-            },
-        ),
-        (
-            "truce",
-            700,
-            Effect::MakePeace {
-                factions: pair("guild", "keep"),
-            },
-        ),
-    ] {
-        world.world.events.push(WorldEvent {
-            id: id.into(),
-            schedule: Schedule { at, every: None },
-            requires: None,
-            effects: vec![effect],
-        });
-    }
-    assert_eq!(world.diagnostics(), []);
-    let engine = Engine::new(&world).unwrap();
-    let restored = |time: u64, war: bool| {
-        let mut snapshot = engine.snapshot();
-        snapshot.state.time = Some(time);
-        if war {
-            snapshot.state.at_war.insert(pair("guild", "keep"));
-        }
-        Engine::restore(&world, snapshot).is_ok()
-    };
-    assert!(restored(650, true) && !restored(650, false));
-    assert!(restored(700, false) && !restored(700, true));
 }

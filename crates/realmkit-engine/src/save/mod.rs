@@ -26,8 +26,7 @@ pub(super) fn check(
     let state = &snapshot.state;
     basics(world, state)?;
     quests(world, fresh, state)?;
-    // Before anything evaluates standing conditions, which read every
-    // track; after quests, which reachability reads.
+    // Before anything evaluates standing conditions, which read every track.
     standing(world, state)?;
     diplomacy(world, state)?;
     let progress = Progress::of(world, state)?;
@@ -343,28 +342,6 @@ pub(super) fn fired<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effe
         .events
         .iter()
         .filter(|e| e.schedule.at <= now)
-        .flat_map(|e| &e.effects);
-    let start = chosen(world, state).into_iter().flat_map(|o| &o.effects);
-    start.chain(choices).chain(events).collect()
-}
-
-/// The effects of [`fired`] whose transition could have happened: the
-/// chosen start options', and those of dialogue choices and due events
-/// whose conditions could once have held.
-fn reachable<'w>(world: &'w WorldSpec, state: &GameState) -> Vec<&'w Effect> {
-    let now = state.time.unwrap_or(0);
-    let choices = world
-        .dialogues
-        .iter()
-        .flat_map(|d| &d.nodes)
-        .flat_map(|n| &n.choices)
-        .filter(|c| lasting(world, state, c.requires.as_ref()))
-        .flat_map(|c| &c.effects);
-    let events = world
-        .world
-        .events
-        .iter()
-        .filter(|e| e.schedule.at <= now && lasting(world, state, e.requires.as_ref()))
         .flat_map(|e| &e.effects);
     let start = chosen(world, state).into_iter().flat_map(|o| &o.effects);
     start.chain(choices).chain(events).collect()
@@ -813,9 +790,27 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
             _ => None,
         })
         .collect();
-    // Flags are never cleared, so a certain event's flags are set.
-    let mut required = certain_events(world, state)
-        .into_iter()
+    // An unconditional event whose effects cannot fail has happened once its
+    // first minute has come, and flags are never cleared, so its flags are
+    // set. Standing and diplomacy effects are named only because they never
+    // fail; what they did is not checked, since that state moves freely.
+    let now = state.time.unwrap_or(0);
+    let mut required = world
+        .world
+        .events
+        .iter()
+        .filter(|e| e.requires.is_none() && e.schedule.at <= now)
+        .filter(|e| {
+            e.effects.iter().all(|f| {
+                matches!(
+                    f,
+                    Effect::SetFlag { .. }
+                        | Effect::ChangeStanding { .. }
+                        | Effect::DeclareWar { .. }
+                        | Effect::MakePeace { .. }
+                )
+            })
+        })
         .flat_map(|e| &e.effects)
         .filter_map(|e| match e {
             Effect::SetFlag { flag } => Some(flag),
@@ -834,35 +829,6 @@ fn flags(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<()
             }),
         "story flags do not match progress",
     )
-}
-
-/// Unconditional events whose first minute has come and whose effects
-/// cannot fail, so they have happened, in the order they first did.
-fn certain_events<'w>(
-    world: &'w WorldSpec,
-    state: &GameState,
-) -> Vec<&'w realmkit_spec::WorldEvent> {
-    let now = state.time.unwrap_or(0);
-    let mut due: Vec<_> = world
-        .world
-        .events
-        .iter()
-        .filter(|e| e.requires.is_none() && e.schedule.at <= now)
-        .filter(|e| {
-            e.effects.iter().all(|f| {
-                matches!(
-                    f,
-                    Effect::SetFlag { .. }
-                        | Effect::ChangeStanding { .. }
-                        | Effect::DeclareWar { .. }
-                        | Effect::MakePeace { .. }
-                )
-            })
-        })
-        .collect();
-    // Stable, so events due at one minute keep their authored order.
-    due.sort_by_key(|e| e.schedule.at);
-    due
 }
 
 /// Whether a dialogue choice with an effect `matches` could have been taken:
@@ -913,65 +879,21 @@ fn phases(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     )
 }
 
-/// Every authored track has a value for its scope, within its bounds, and
-/// one off its start only where an effect that could have fired changes it.
+/// Every authored track has a value for its scope, for each faction on a
+/// faction track, within its bounds. Standing moves freely both ways, so
+/// how it got there is not checked; the package revision binds the rules.
 fn standing(world: &WorldSpec, state: &GameState) -> Result<(), String> {
-    let fired = reachable(world, state);
-    let changes = |track: &Id, faction: Option<&Id>| {
-        fired.iter().any(|e| {
-            matches!(e, Effect::ChangeStanding { track: t, faction: f, .. }
-                if t == track && f.as_ref() == faction)
-        })
-    };
-    // A value only start answers and certain one-shot events can change is
-    // exactly what they made of it, in the order they applied.
-    let touches = |e: &Effect, track: &Id, faction: Option<&Id>| {
-        matches!(e, Effect::ChangeStanding { track: t, faction: f, .. }
-            if t == track && f.as_ref() == faction)
-    };
-    let certain: Vec<&Effect> = chosen(world, state)
-        .into_iter()
-        .flat_map(|o| &o.effects)
-        .chain(
-            certain_events(world, state)
-                .into_iter()
-                .filter(|e| e.schedule.every.is_none())
-                .flat_map(|e| &e.effects),
-        )
-        .collect();
-    let determined = |track: &realmkit_spec::StandingTrack, faction: Option<&Id>, value: i32| {
-        let mine = |e: &&&Effect| touches(e, &track.id, faction);
-        if fired.iter().filter(mine).count() != certain.iter().filter(mine).count() {
-            return true;
-        }
-        let made = certain.iter().filter(mine).fold(
-            track.start(faction.map(Id::as_str)),
-            |made: i32, e: &&Effect| match e {
-                Effect::ChangeStanding { by, .. } => {
-                    made.saturating_add(*by).clamp(track.min, track.max)
-                }
-                _ => made,
-            },
-        );
-        value == made
-    };
     ensure(
         state.standing.len() == world.world.standing.len()
             && world.world.standing.iter().all(|track| {
-                let valid = |faction: Option<&Id>, value: i32| {
-                    (track.min..=track.max).contains(&value)
-                        && (value == track.start(faction.map(Id::as_str))
-                            || changes(&track.id, faction))
-                        && determined(track, faction, value)
-                };
+                let within = |value: &i32| (track.min..=track.max).contains(value);
                 match (
                     state.standing.get(&track.id),
                     rules::initial_standing(world, track),
                 ) {
-                    (Some(Standing::Global(value)), Standing::Global(_)) => valid(None, *value),
+                    (Some(Standing::Global(value)), Standing::Global(_)) => within(value),
                     (Some(Standing::Factions(values)), Standing::Factions(start)) => {
-                        values.keys().eq(start.keys())
-                            && values.iter().all(|(f, value)| valid(Some(f), *value))
+                        values.keys().eq(start.keys()) && values.values().all(within)
                     }
                     _ => false,
                 }
@@ -980,78 +902,17 @@ fn standing(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     )
 }
 
-/// Pairs at war are different, authored factions in canonical order, and
-/// each pair differs from its authored start only where an effect that could
-/// have fired declares that war or makes that peace.
+/// Wars exist only in worlds with diplomacy, each between two different,
+/// authored factions in canonical order. War and peace come and go, so
+/// which pairs are at war is not checked against history.
 fn diplomacy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
-    let fired = reachable(world, state);
-    let start: BTreeSet<[Id; 2]> = world
-        .world
-        .diplomacy
-        .iter()
-        .flat_map(|d| &d.at_war)
-        .map(realmkit_spec::faction_pair)
-        .collect();
-    let moved = |pair: &[Id; 2], war: bool| {
-        fired.iter().any(|e| match e {
-            Effect::DeclareWar { factions } if war => {
-                realmkit_spec::faction_pair(factions) == *pair
-            }
-            Effect::MakePeace { factions } if !war => {
-                realmkit_spec::faction_pair(factions) == *pair
-            }
-            _ => false,
-        })
-    };
-    let direction = |e: &Effect| match e {
-        Effect::DeclareWar { factions } => Some((realmkit_spec::faction_pair(factions), true)),
-        Effect::MakePeace { factions } => Some((realmkit_spec::faction_pair(factions), false)),
-        _ => None,
-    };
-    let certain = certain_events(world, state);
-    let one_shot: Vec<([Id; 2], bool)> = certain
-        .iter()
-        .filter(|e| e.schedule.every.is_none())
-        .flat_map(|e| &e.effects)
-        .filter_map(direction)
-        .collect();
-    let settled = certain
-        .iter()
-        .flat_map(|e| &e.effects)
-        .filter_map(direction)
-        .all(|(pair, war)| {
-            let touching: Vec<bool> = fired
-                .iter()
-                .filter_map(|e| direction(e))
-                .filter(|(other, _)| *other == pair)
-                .map(|(_, w)| w)
-                .collect();
-            let ordered: Vec<bool> = one_shot
-                .iter()
-                .filter(|(other, _)| *other == pair)
-                .map(|(_, w)| *w)
-                .collect();
-            let now = state.at_war.contains(&pair);
-            // Only certain one-shot events touch the pair: the last decides.
-            if touching.len() == ordered.len() {
-                return ordered.last().is_none_or(|last| now == *last);
-            }
-            // Otherwise a war or peace holds while every effect that could
-            // have touched the pair agrees with it.
-            !touching.iter().all(|w| *w == war) || now == war
-        });
     ensure(
-        settled
-            && (world.world.diplomacy.is_some() || state.at_war.is_empty())
+        (world.world.diplomacy.is_some() || state.at_war.is_empty())
             && state.at_war.iter().all(|pair| {
                 *pair == realmkit_spec::faction_pair(pair)
                     && pair[0] != pair[1]
                     && pair.iter().all(|f| world.faction(f).is_some())
-            })
-            && state
-                .at_war
-                .symmetric_difference(&start)
-                .all(|pair| moved(pair, state.at_war.contains(pair))),
+            }),
         "diplomacy does not match the world",
     )
 }

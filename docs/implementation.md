@@ -204,8 +204,9 @@ proves the complete single-player loop with authored content.
   `declare_war` and `make_peace` (idempotent) effects in dialogue and
   events, and `change_standing` in start answers; `StandingChanged`,
   `WarDeclared` and `PeaceMade` events. Saves keep every standing value
-  and the pairs at war in canonical order, checked against the track
-  bounds and against effects that could have fired. Each part is
+  and the pairs at war in canonical order. Since both move freely, a save
+  is checked for their shape only: scopes, factions, bounds and canonical
+  pairs, with the package revision binding the rules. Each part is
   optional: factions alone add no state. The CLI shows affiliations,
   standing and wars. `examples/marches` has three factions, renown and
   favour, a war the thaw starts and a peace the steward can make.
@@ -267,8 +268,8 @@ invariants the rules maintain (known IDs, each capability's state present
 exactly when the world authors it, XP matching the level, vitals within their
 maximums, an encounter or battle the rules could produce, quest states
 matching defeats, flags and prerequisites, the economy, roster and bank
-within their bounds, evidence, phases, outcome, standing and wars that some
-effect could explain, and a valid conversation). The CLI writes each save to a new
+within their bounds, evidence, phases and outcome that the recorded progress
+explains, standing and wars of the right shape, and a valid conversation). The CLI writes each save to a new
 file, then updates `lineage.json`; both writes go to a temporary file first and
 are then renamed into place.
 

@@ -1775,6 +1775,10 @@ needs to be confirmed:
   presentation, and a scope: global or per faction. There is no fixed list
   of tracks such as renown or honour. A change clamps to the bounds and
   never refuses, so an effect list does not fail for reaching a limit.
+  Saves check standing and diplomacy for shape only (scopes, factions,
+  bounds, canonical pairs): unlike flags, evidence or phases, which never go
+  back and so keep historical checks, they move freely both ways, like
+  currency, and the package revision already binds the rules that move them.
   Still open: per-character tracks (with companions or courtship),
   alliances, truces, war weariness and whether thresholds should be
   referable from conditions by name.

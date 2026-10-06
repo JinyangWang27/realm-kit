@@ -790,7 +790,8 @@ state; diplomacy and standing each add state only when authored.
   `make_peace` effects change it afterwards, and they and the `at_war`
   condition need the `diplomacy` block (`diplomacy_disabled`), which may be
   `{}` when every pair starts at peace. Saves keep the pairs at war now, each
-  in one canonical order.
+  in one canonical order; loading checks only that each is a canonical pair
+  of two different, existing factions in a world with diplomacy.
 - **Standing** tracks are bounded integers the world measures the player
   by; there are no built-in tracks such as renown or honour. A track runs
   from `min` to `max` (`min` below `max`, both within ±`STANDING_BOUND`,
@@ -802,10 +803,10 @@ state; diplomacy and standing each add state only when authored.
   (`invalid_start`). `thresholds` name ranges for presentation, in strictly
   rising order within the bounds (`invalid_threshold`): a value shows the
   name of the highest threshold it has reached, and none below the first.
-  Saves keep every value. A save must agree with what start answers and
-  unconditional one-shot events that only set flags, change standing or
-  change diplomacy have certainly done, unless another effect could have
-  changed it since.
+  Saves keep every value; loading checks only that every track, and every
+  faction on a faction track, has one within the bounds. War, peace and
+  standing move freely both ways, so a save is not checked for how they got
+  there; the package revision binds the rules that move them.
 
 ```json
 { "kind": "change_standing", "track": "renown", "by": 10 }
