@@ -1639,15 +1639,18 @@ needs to be confirmed:
   banks or currencies, solvency, public treasuries and confiscation, office
   salaries, mercenary stipends, companion retainers, holding income, and
   defeat or robbery taking carried cash.
-- **Monthly payroll (M6c) · decided.** `troops.payroll` is `upkeep` (the
-  default, unchanged) or `monthly`. Monthly wages are a snapshot of the
-  roster at the month-end settlement, each soldier's wage at their level,
-  with no proration and no recruitment dates. Wages, whenever due, are all
-  or nothing from the bank first and then carried cash; when both fall
-  short nothing is paid, the shortfall is reported and upkeep's
-  `desert_percent` applies, so monthly payroll needs an upkeep block. There
-  are no arrears. Upkeep keeps mending the wounded on its own schedule;
-  provisions and morale will stay there too.
+- **Monthly payroll (M6c) · decided.** `troops.payroll` is the `upkeep`
+  kind (the default, unchanged) or the `monthly` kind. Monthly wages are a
+  snapshot of the roster at the month-end settlement, each soldier's wage
+  at their level, with no proration and no recruitment dates. Wages,
+  whenever due, are all or nothing from the bank first and then carried
+  cash; when both fall short nothing is paid, the shortfall is reported
+  and a share of each squad deserts. Financial payroll owns its share:
+  the monthly kind carries its own `desert_percent`, so it needs no upkeep
+  block, and upkeep's `desert_percent` applies only to upkeep payroll.
+  There are no arrears. Upkeep, where authored, only mends the wounded on
+  its own schedule beside monthly payroll; provisions and morale will stay
+  there too.
 - **Exits beyond compass directions (M5b) · decided.** Roads are an undirected
   list in `world.json`, each with an ASCII ID, two ends and optional travel
   minutes, condition and blocked text; at most one road joins a pair, so

@@ -204,7 +204,7 @@ fn line<'w>(world: &'w WorldSpec, id: &str) -> &'w TroopLine {
 /// The upkeep schedule: wages, where they fall due on it, then recovery.
 pub(crate) fn upkeep(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
     let rules = troops(world).upkeep.unwrap();
-    if troops(world).payroll == Payroll::Upkeep {
+    if matches!(troops(world).payroll, Payroll::Upkeep {}) {
         pay(world, state, events);
     }
     let retinue = state.retinue.as_mut().unwrap();
@@ -259,7 +259,11 @@ fn pay(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
         amount: wages,
         available,
     });
-    let percent = u64::from(troops(world).upkeep.unwrap().desert_percent);
+    // Upkeep payroll is paid only by upkeep, so its block is there.
+    let percent = u64::from(match troops(world).payroll {
+        Payroll::Monthly { desert_percent } => desert_percent,
+        Payroll::Upkeep {} => troops(world).upkeep.unwrap().desert_percent,
+    });
     for (id, levels) in &mut retinue.roster {
         for (level, squad) in levels.iter_mut() {
             let count = (squad.heads() * percent / 100).max(1).min(squad.heads());

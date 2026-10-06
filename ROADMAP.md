@@ -1333,11 +1333,12 @@ original-game fixture actually uses them.
    player knocked out rather than killed, and victory XP shared with the
    squads that fought. `examples/marches` raises levies and beats the fen
    outlaws. **Monthly payroll · delivered**, from the original game:
-   `troops.payroll: monthly` separates financial payroll from physical
-   upkeep, paying a month-end snapshot of the roster with no proration,
-   from the bank first and then carried cash, all or nothing with the
-   usual desertion, while upkeep keeps mending the wounded on its own
-   schedule; worlds that do not opt in keep their scheduled wages. Still to come: companions, provisions, persistent morale,
+   a `monthly` payroll separates financial payroll from physical upkeep,
+   paying a month-end snapshot of the roster with no proration, from the
+   bank first and then carried cash, all or nothing with its own
+   desertion share; it needs no upkeep, which where authored only mends
+   the wounded on its own schedule; worlds that do not opt in keep their
+   scheduled wages. Still to come: companions, provisions, persistent morale,
    travel speed, leaders and companions as individuals, ground, prisoners,
    injuries and loot tables.
 5. **M6e — holdings and sieges.** Ownership that changes during play, income,

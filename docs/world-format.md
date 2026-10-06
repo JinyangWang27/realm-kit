@@ -1485,7 +1485,8 @@ fight authored armies.
   (1 to 10,000, `invalid_limit`).
 - **Upkeep** (needs world time) pays every soldier's wage at once on its
   schedule, or, when the money does not cover it, pays nothing and loses
-  `desert_percent` of each squad (at least one, the healthy first). Then
+  `desert_percent` of each squad (at least one, the healthy first); with
+  monthly payroll it pays no wages and only mends. Then
   `recover_percent` of each squad's wounded mend, rounded up. Resting at a
   safe place mends them all. Wages without upkeep draw a warning
   (`unused_wages`).
@@ -1494,18 +1495,28 @@ fight authored armies.
   currency. When both together fall short, nothing is paid,
   `WagesUnpaid` reports the bill and what was there, and the desertions
   follow. There is no partial pay and no arrears.
-- **Monthly payroll.** `"payroll": "monthly"` moves wages from the upkeep
-  schedule to each Gregorian month end, while upkeep keeps mending the
-  wounded on its own schedule and lends its `desert_percent`. It needs a
-  calendar (`calendar_disabled`) and an `upkeep` block (`invalid_payroll`).
+- **Monthly payroll** moves wages from the upkeep schedule to each
+  Gregorian month end:
+
+  ```json
+  "payroll": { "kind": "monthly", "desert_percent": 20 }
+  ```
+
+  `desert_percent` (0 to 100, `invalid_percent`) is the share of each
+  squad that leaves when the month's wages go unpaid, at least one, the
+  healthy first, as on upkeep. Monthly payroll needs a calendar
+  (`calendar_disabled`) and no `upkeep` block. Where there is one, upkeep
+  only mends the wounded on its own schedule and never charges wages, so
+  a nonzero `upkeep.desert_percent` beside monthly payroll is never used
+  and draws a warning (`unused_percent`).
   The bill is the roster standing at the settlement, each soldier's wage
   at their current level, with no proration: a soldier recruited the last
   evening of a month costs a whole month, one lost before the month end
   costs nothing, and one recruited at the new month's midnight is first
   paid a month later. Interest is credited before wages, so it can help
   pay them. Recruiting prices and upgrade costs are paid at once, as
-  before. Without `payroll`, or with `"upkeep"`, wages fall due on the
-  upkeep schedule exactly as before.
+  before. Without `payroll`, or with `{ "kind": "upkeep" }`, wages fall due
+  on the upkeep schedule exactly as before.
 
 A location may offer recruits, each line from a pool that starts full and
 refills on a schedule (needs world time):

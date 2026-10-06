@@ -37,10 +37,14 @@ fn unbanked() -> WorldSpec {
     world
 }
 
-/// [`banked`], with wages paid at each month end instead of each upkeep.
+/// [`banked`], with wages paid at each month end instead of each upkeep,
+/// and a fifth of each squad leaving when they go unpaid. The daily upkeep
+/// stays, to mend the wounded.
 fn monthly(epoch: GregorianDate, basis_points: u32, silver: u64) -> WorldSpec {
     let mut world = banked(epoch, basis_points, silver);
-    world.world.troops.as_mut().unwrap().payroll = Payroll::Monthly;
+    let troops = world.world.troops.as_mut().unwrap();
+    troops.payroll = Payroll::Monthly { desert_percent: 20 };
+    troops.upkeep.as_mut().unwrap().desert_percent = 0;
     world
 }
 
@@ -560,4 +564,80 @@ fn saves_reject_bank_accounts_the_rules_could_not_produce() {
     let mut snapshot = Engine::new_with_seed(&plain, 7).unwrap().snapshot();
     snapshot.state.economy.as_mut().unwrap().bank = Some(BankAccount::default());
     assert!(Engine::restore(&plain, snapshot).is_err());
+}
+
+#[test]
+fn monthly_wages_need_no_upkeep_and_desert_by_their_own_share() {
+    // Half of each squad leaves over unpaid wages, with no upkeep at all.
+    let mut world = monthly(date(742, 1, 1), 0, 64);
+    let troops = world.world.troops.as_mut().unwrap();
+    troops.payroll = Payroll::Monthly { desert_percent: 50 };
+    troops.upkeep = None;
+    let end = month_end(&world, START);
+    let mut engine = levies(&world, 0, 1, 6);
+    let events = wait_until(&mut engine, end);
+    assert!(events.contains(&Event::WagesUnpaid {
+        amount: 6,
+        available: 4
+    }));
+    assert!(events.contains(&Event::Deserted {
+        line: "levy".into(),
+        level: 1,
+        count: 3
+    }));
+    assert_eq!(engine.state().retinue.as_ref().unwrap().heads(), 3);
+    // Paid, with nothing on the days between and nobody mended.
+    let world_paid = {
+        let mut world = world.clone();
+        world.world.economy.as_mut().unwrap().currency.start = 1_000;
+        world
+    };
+    let mut snapshot = Engine::new_with_seed(&world_paid, 7).unwrap().snapshot();
+    let roster = &mut snapshot.state.retinue.as_mut().unwrap().roster;
+    roster.entry("levy".into()).or_default().insert(
+        1,
+        Squad {
+            healthy: 2,
+            wounded: 3,
+            xp: 0,
+        },
+    );
+    let mut engine = Engine::restore(&world_paid, snapshot).unwrap();
+    let daily = wait_until(&mut engine, end - 1);
+    assert!(!daily.iter().any(|e| matches!(
+        e,
+        Event::Recovered { .. } | Event::WagesPaid { .. } | Event::WagesUnpaid { .. }
+    )));
+    assert_eq!(wages(&engine.execute(Wait(1)).unwrap()), Some((5, 0)));
+    assert_eq!(squad(&engine, "levy", 1).unwrap().wounded, 3);
+}
+
+#[test]
+fn upkeep_beside_monthly_wages_never_takes_its_own_deserters() {
+    // Upkeep's share is all of each squad, the month's a fifth: unpaid
+    // wages cost one levy of six, by the month's share.
+    let mut world = monthly(date(742, 1, 1), 0, 64);
+    world
+        .world
+        .troops
+        .as_mut()
+        .unwrap()
+        .upkeep
+        .as_mut()
+        .unwrap()
+        .desert_percent = 100;
+    let mut engine = levies(&world, 2, 1, 6);
+    let events = wait_until(&mut engine, month_end(&world, START));
+    let deserted: Vec<_> = events
+        .iter()
+        .filter(|e| matches!(e, Event::Deserted { .. }))
+        .collect();
+    assert_eq!(
+        deserted,
+        [&Event::Deserted {
+            line: "levy".into(),
+            level: 1,
+            count: 1
+        }]
+    );
 }

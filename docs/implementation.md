@@ -138,8 +138,10 @@ proves the complete single-player loop with authored content.
   average daily close over all its calendar days, then pays monthly
   payroll for the roster standing then, with no proration. Wages are one
   operation, all or nothing from the bank then carried currency with the
-  same desertion when unmet, that upkeep payroll calls on its schedule and
-  monthly payroll at the month end; upkeep still mends the wounded. Saves
+  same desertion rule when unmet, that upkeep payroll calls on its
+  schedule and monthly payroll at the month end with its own desertion
+  share; monthly payroll needs no upkeep, which where authored only mends
+  the wounded. Saves
   keep the balance and the month's sum of closes, checked against the
   days closed so far. Worlds without a bank or monthly payroll behave
   exactly as before. `examples/marches` banks in Greyford and

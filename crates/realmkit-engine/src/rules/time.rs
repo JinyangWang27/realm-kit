@@ -27,7 +27,7 @@ fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
     let settles = world.economy().is_some_and(|e| e.banking.is_some())
         || world
             .troops()
-            .is_some_and(|t| t.payroll == Payroll::Monthly);
+            .is_some_and(|t| matches!(t.payroll, Payroll::Monthly { .. }));
     let midnight = settles.then_some((
         Schedule {
             at: 0,

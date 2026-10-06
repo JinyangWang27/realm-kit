@@ -82,7 +82,7 @@ pub(crate) fn midnight(world: &WorldSpec, state: &mut GameState, events: &mut Ve
     interest(world, state, ended.day, events);
     if world
         .troops()
-        .is_some_and(|t| t.payroll == Payroll::Monthly)
+        .is_some_and(|t| matches!(t.payroll, Payroll::Monthly { .. }))
     {
         retinue::payroll(world, state, events);
     }
