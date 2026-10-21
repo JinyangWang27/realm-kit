@@ -6,7 +6,7 @@ partially delivered; M7 through M9 remain proposed. Individual slices below are 
 scope. Combat pacing and balance formulas remain design decisions where their
 sections still say so, not promises about current behavior.
 The [open-decisions register](docs/open-decisions.md) records unresolved choices
-and when they must be settled.
+and when they must be settled. The [spatial-host and military battle boundary design](docs/spatial-hosts-and-military-battles.md) records future pressure from continuously explored graphical worlds without turning the engine into a real-time renderer.
 
 ## Principles that carry through every milestone
 
@@ -1239,6 +1239,8 @@ only for a world that needs one.
 
 ## M6 — Living sandbox worlds · proposed
 
+**Additional host/integration pressure (design only):** [Spatial hosts, stationed forces, and battle boundaries](docs/spatial-hosts-and-military-battles.md) explains optional distributed troop custody, non-owned military stations, remote force orders, world-anchored battle presentation and explicit in-world time advancement for continuous clients. These remain proposed, **not delivered**. The original game's three-ordinary-escort limit is a game rule, not a RealmKit constant. Prioritize a small deterministic fixture before adding a new format field or command.
+
 Let a world keep moving without the player: an overland realm of rival
 kingdoms where the player trades, hires soldiers, earns standing, holds fiefs
 and joins orders while lords, bandits and caravans act on their own. The
@@ -1363,12 +1365,13 @@ original-game fixture actually uses them.
    mends the wounded on its own schedule; worlds that do not opt in keep
    their scheduled wages and legacy desertion. Still to come: companions, provisions, persistent morale,
    travel speed, leaders and companions as individuals, ground, prisoners,
-   injuries and loot tables.
+   injuries and loot tables. Future distributed custody (nearby escort vs stationed force vs traveling party), when the consumer needs it, must reuse the squad counts/XP model and preserve the player's existing retinue rules.
 5. **M6e — holdings and sieges.** Ownership that changes during play, income,
    garrisons, authored buildings, sieges as mass battles after a preparation
    time, and raiding enemy villages for loot at the cost of their income.
    Villages add rent collected in person with a risk of unrest, demanding
    supplies, herds of livestock, and bandit trouble cleared through offers.
+   A military station that hosts another owner's troops is a separate proposed access/hosting use case; it must not require player ownership of a holding.
 6. **M6f — world agents.** Party instances on the road graph that apply a
    closed set of engine policies on recurring world ticks, with priorities
    that may test the leader's traits, routing by shortest travel time with ties
@@ -1376,7 +1379,7 @@ original-game fixture actually uses them.
    player, off-screen battles, weighted diplomacy events, and an
    `AGENT_BOUND`. Caravans trade along authored links. The player learns of
    off-screen change through notable events, a saved news journal, and
-   remembered prices and whereabouts.
+   remembered prices and whereabouts. Remote deployment orders should use saved route progress, not instant teleportation; this is an extension to validate against the first fixture, not an already implemented world-agent behavior.
 7. **M6g — faction strategy.** A faction tick with its own RNG domain;
    defend, gather, campaign, raid and rest stances chosen by authored
    priorities; a
