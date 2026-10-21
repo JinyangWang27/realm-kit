@@ -126,6 +126,10 @@ Presentation may render the same scalar using setting-appropriate clocks, dates 
 qualitative periods. A world may author an optional Gregorian calendar epoch; the
 date is then derived from WorldTime, which stays the one time source of truth.
 
+## Host-driven WorldTime Advancement
+
+**Proposed optional command boundary.** A continuous graphical host can commit bounded in-world elapsed durations explicitly and deterministically, allowing schedules to run on the same canonical [World Time](#world-time). The renderer's frame clock must never implicitly mutate engine state; the exact command and pause policy are undecided. See [Spatial hosts](spatial-hosts-and-military-battles.md#host-driven-passage-of-time-future-requirement).
+
 ## Recurring Schedule
 
 Proposed for M5. An authored period of at least one minute and a first
@@ -301,6 +305,10 @@ wages fall due on a recurring schedule or at each month end
 ([Payroll](#payroll)). Proposed for later: companions, unique characters
 wearing gear from a shared stash, and a limit the engine computes.
 
+## Adventuring Party / Escort Deployment
+
+**Proposed optional distinction.** The nearby player-controlled company drawn from the personal retinue and unique companions. An authored game's escort cap limits what is deployed nearby; it is **not** a universal RealmKit roster cap. The same private troops may also be stationed or assigned to detached forces when those optional capabilities exist. See [Spatial hosts](spatial-hosts-and-military-battles.md).
+
 ## Prisoner
 
 Proposed for M6. A captured troop, counted per troop definition, or a captured
@@ -331,6 +339,22 @@ character; derived stats subtract its penalties until an effect removes it.
 
 Proposed for M6. A location owned by a faction or character that can change
 hands during play, with income, a garrison and authored buildings.
+
+## Military Station
+
+**Proposed.** A location or authorized facility where forces may be hosted, recruited, trained, recovered or dispatched. Access, station capacity and troop command rights may exist without the player owning the location as a [Holding](#holding).
+
+## Stationed Force / Garrison
+
+**Proposed extension.** A roster assigned to a military station or holding rather than traveling with the player. Troop custody, owner, authorized commander and local controller may differ. Stationed soldiers remain subject to whatever upkeep their world authors.
+
+## Detached / Field Force
+
+**Proposed extension.** A force with saved identity, roster, orders and location/road progress, able to move and act independently from the player. Not a requirement to render each soldier as a free-roaming character; may compose with [World Agent](#world-agent).
+
+## Battle Site / Battle Rendering Instance
+
+**Proposed host seam.** A battle site identifies an authored real world location/region for a conflict. A rendering instance is a temporary view of the same canonical battle; a game client may show a bounded subset of its terrain without instantiating a second authoritative playthrough. Existing mass battles remain discrete; real-time combat authority is an open decision. See [Spatial hosts](spatial-hosts-and-military-battles.md#battle-sites-and-isolated-high-detail-battle-instances).
 
 ## World Agent
 
@@ -390,7 +414,7 @@ expressible as area-local integer `(x, y)` coordinates when a grid is useful.
 
 Spatial layout never creates movement edges. A client may render an entire compact
 area or any viewport size appropriate to its screen. A fixed 3×3 viewport is not a
-RealmKit semantic requirement.
+RealmKit semantic requirement. A 3D client's external terrain and transforms are likewise presentation data, not alternative authoritative traversal edges.
 
 ## Traversal Graph
 
