@@ -11,6 +11,8 @@ optional block: the demo uses it, while
 See the [architecture glossary](docs/glossary.md) and
 [optional capability catalog](docs/capabilities.md).
 
+For the **proposed** presentation-independent boundaries needed by continuously explorable 3D clients—stationed forces, explicit world-time advancement, and world-anchored battle instances—see [Spatial hosts and military battles](docs/spatial-hosts-and-military-battles.md). These are not yet delivered features; RealmKit itself remains a deterministic command/event engine, not a real-time renderer.
+
 The first playable world, *The Bell in the Pines*, is hand-authored. Talk to
 Elder Mara, choose dialogue, accept her quest, defeat the ash wolf, collect loot
 and XP, level up, and return to unlock the chapel and its crypt.
