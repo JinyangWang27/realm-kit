@@ -24,6 +24,22 @@ class Resource(Enum):
     RAGE = "rage"  # starts at 0 every fight; builds from acting and from damage taken
 
 
+@dataclass(frozen=True)
+class Costs:
+    """What one use spends from each resource, for a skill that spends both."""
+
+    mp: int = 0
+    rage: int = 0
+
+
+@dataclass(frozen=True)
+class ResourceUse:
+    """Which resources a character uses; a resource it does not use stays at 0."""
+
+    mp: bool
+    rage: bool
+
+
 class Kind(Enum):
     """Monster tiers; their multipliers are content (see content.Tier)."""
 
@@ -42,6 +58,17 @@ class Skill:
     time: int = 100  # action cost in percent of a basic attack; delays the next turn
     cross_share: int | None = None  # overrides the world's share, e.g. a 内力-heavy palm
     level: int = 1  # minimum character level to use it; later skills are stronger or cheaper
+    costs: Costs | None = None  # costs in both resources, in place of `cost` and `resource`
+
+    def cost_in(self, resource: Resource) -> int:
+        """What one use spends from `resource`."""
+        if self.costs is not None:
+            return self.costs.mp if resource is Resource.MP else self.costs.rage
+        return self.cost if resource is self.resource else 0
+
+    @property
+    def total_cost(self) -> int:
+        return self.cost_in(Resource.MP) + self.cost_in(Resource.RAGE)
 
 
 def round_half_up(value: Fraction) -> int:
@@ -93,6 +120,7 @@ class Combatant:
     basic: Skill = BASIC_ATTACK  # free fallback action; its channel belongs to the character
     growth: float | None = None  # this character's per-level growth; None means the world's
     xp: int = 0  # XP granted when defeated, authored on the combat profile
+    uses: ResourceUse | None = None  # None: MP when it has any, Rage when the world builds it
 
 
 @dataclass(frozen=True)
@@ -155,6 +183,14 @@ class Rules:
     mp_regen_percent: int = 3  # % of max MP regained per baseline turn of encounter time
     rage_per_action: int = 1
     rage_per_max_hp: int = 20  # rage gained from taking damage equal to max HP
+    rage_cap: int | None = None  # the most rage anyone holds; None saturates instead
+
+    def uses(self, character: Combatant) -> ResourceUse:
+        """The resources `character` uses: as authored, else MP when it has any maximum
+        MP and Rage when the world builds Rage at all."""
+        if character.uses is not None:
+            return character.uses
+        return ResourceUse(mp=character.mp > 0, rage=self.rage_per_action > 0 or self.rage_per_max_hp > 0)
 
     @property
     def baseline_turn(self) -> int:

@@ -545,3 +545,79 @@ fn without_a_choice_resources_follow_the_world() {
     assert_eq!(wolf.mp, None);
     assert_eq!(engine.pools_of("nobody"), None);
 }
+
+fn physical(id: &str, power: u32, cost: u32, resource: Resource, costs: Option<Costs>) -> Skill {
+    Skill {
+        channel: Channel::Physical,
+        cost,
+        resource,
+        costs,
+        ..skill(id, power, Costs::default())
+    }
+}
+
+// Numbers from `scripts/combat_sim`: `Encounter(Rules(rage_cap=5), you, [foe]).run()`
+// with storm (190, 8 MP and 4 Rage), slash (140, 3 Rage) and a rage-only foe
+// whose maul costs 5 Rage. Uncapped, the same fight leaves 18 HP and 1 MP.
+#[test]
+fn a_capped_dual_resource_fight_matches_the_simulator() {
+    let stats = |hp, mp, patk, pdef, satk, sdef, speed| Stats {
+        hp,
+        mp,
+        patk,
+        pdef,
+        satk,
+        sdef,
+        speed,
+    };
+    let storm = physical(
+        "storm",
+        190,
+        0,
+        Resource::Mp,
+        Some(Costs { mp: 8, rage: 4 }),
+    );
+    let slash = physical("slash", 140, 3, Resource::Rage, None);
+    let maul = physical("maul", 150, 5, Resource::Rage, None);
+    let mut world = duel();
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.levels = vec![Level {
+        xp: 0,
+        stats: stats(60, 30, 12, 8, 10, 8, 100),
+        points: 0,
+        proficiency_points: 0,
+    }];
+    combat.resources = Resources {
+        mp_regen_percent: 3,
+        rage_per_action: 1,
+        rage_per_max_hp: 20,
+        rage_cap: Some(5),
+        // Kept after the fight, so the player's last Rage can be read.
+        rage_carries: true,
+        ..Resources::default()
+    };
+    combat.player_basic_channel = Channel::Physical;
+    combat.skills = vec![storm.clone(), slash.clone(), maul];
+    combat.player_skills = vec!["storm".into(), "slash".into()];
+    let witch = combatant(&mut world, "witch");
+    witch.stats = stats(70, 20, 10, 9, 2, 6, 110);
+    witch.skills = vec!["maul".into()];
+    witch.basic_channel = Channel::Physical;
+    witch.resources = Some(RAGE_ONLY);
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    let mut engine = engaged(&world);
+    let mut actions = 0;
+    while engine.encounter().is_some() {
+        let me = vitals(&engine);
+        let affordable =
+            |s: &Skill| me.mp >= s.cost_in(Resource::Mp) && me.rage >= s.cost_in(Resource::Rage);
+        let command = match [&storm, &slash].into_iter().find(|s| affordable(s)) {
+            Some(s) => cast(&s.id),
+            None => Attack("witch".into()),
+        };
+        engine.execute(command).unwrap();
+        actions += 1;
+    }
+    let left = vitals(&engine);
+    assert_eq!((actions, left.hp, left.mp, left.rage), (6, 21, 9, 1));
+}
