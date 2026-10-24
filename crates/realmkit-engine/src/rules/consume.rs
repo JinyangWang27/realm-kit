@@ -4,11 +4,19 @@
 use super::*;
 use realmkit_spec::Consumable;
 
-/// What a consumable restores to vitals `hp`/`mp`, capped at `max`.
-pub(crate) fn gain(hp: u32, mp: u32, max: Stats, c: Consumable) -> (u32, u32) {
+/// What a consumable restores to the player's `now`, capped at the maxima:
+/// none of a resource the player does not use.
+pub(crate) fn gain(
+    world: &WorldSpec,
+    combat: &CombatState,
+    now: Vitals,
+    c: Consumable,
+) -> (u32, u32) {
+    let max = player_stats(world, combat);
+    let mp_max = crate::character::resources::player_pools(world, &max).mp_max();
     (
-        c.hp.min(max.hp.saturating_sub(hp)),
-        c.mp.min(max.mp.saturating_sub(mp)),
+        c.hp.min(max.hp.saturating_sub(now.hp)),
+        c.mp.min(mp_max.saturating_sub(now.mp)),
     )
 }
 
@@ -32,9 +40,8 @@ pub(crate) fn consume(
         return Err(EngineError::NotEnoughMaterials(item));
     }
     // Validation keeps consumables to worlds with combat.
-    let max = player_stats(world, state.combat.as_ref().unwrap());
     let now = player_vitals(state).unwrap();
-    let (hp, mp) = gain(now.hp, now.mp, max, restores);
+    let (hp, mp) = gain(world, state.combat.as_ref().unwrap(), now, restores);
     if hp == 0 && mp == 0 {
         return Err(EngineError::NothingToRestore);
     }
@@ -44,11 +51,12 @@ pub(crate) fn consume(
     }];
     story::take_items(state, &stack, &mut Vec::new())?;
     events.push(Event::Consumed { item, hp, mp });
-    match &mut state.combat.as_mut().unwrap().stance {
-        Stance::Exploring(vitals) => {
+    let combat = state.combat.as_mut().unwrap();
+    match &combat.stance {
+        Stance::Exploring => {
             // Within the maxima, which validation bounds far below u32::MAX.
-            vitals.hp += hp;
-            vitals.mp += mp;
+            combat.vitals.hp += hp;
+            combat.vitals.mp += mp;
             state.dialogue = None;
             Ok(())
         }

@@ -39,10 +39,46 @@ fn skills_are_bounded_referenced_usable_and_affordable() {
         |w| w.world.combat.as_mut().unwrap().skills[1].cost = 25,
         |w| w.world.combat.as_mut().unwrap().skills[1].time = 0,
         |w| w.world.combat.as_mut().unwrap().skills[1].time = TIME_BOUNDS.1 + 1,
-        |w| w.world.combat.as_mut().unwrap().timeline.action_cost = 0,
-        |w| w.world.combat.as_mut().unwrap().timeline.action_cost = ACTION_COST_BOUND + 1,
-        |w| w.world.combat.as_mut().unwrap().timeline.speed_cap = 0,
-        |w| w.world.combat.as_mut().unwrap().timeline.speed_cap = STAT_BOUND + 1,
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .timeline
+                .as_mut()
+                .unwrap()
+                .action_cost = 0
+        },
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .timeline
+                .as_mut()
+                .unwrap()
+                .action_cost = ACTION_COST_BOUND + 1
+        },
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .timeline
+                .as_mut()
+                .unwrap()
+                .speed_cap = 0
+        },
+        |w| {
+            w.world
+                .combat
+                .as_mut()
+                .unwrap()
+                .timeline
+                .as_mut()
+                .unwrap()
+                .speed_cap = STAT_BOUND + 1
+        },
         // Hex costs 5; the witch has 10.
         |w| w.characters[1].combat.as_mut().unwrap().stats.mp = 4,
         // A special skill with no attack in either channel.
@@ -235,4 +271,105 @@ fn crits_are_bounded_and_make_a_world_stochastic() {
         world.world.combat.as_mut().unwrap().skills[0].crit = crit(chance, multiplier);
         assert!(world.validate().is_err(), "crit {chance}/{multiplier}");
     }
+}
+
+#[test]
+fn resource_rules_are_bounded() {
+    let changes: Vec<fn(&mut Resources)> = vec![
+        |r| r.rage_cap = Some(0),
+        |r| r.rage_cap = Some(STAT_BOUND + 1),
+        |r| {
+            r.mp_recovery = Some(Recovery {
+                percent: 0,
+                every: 60,
+            })
+        },
+        |r| {
+            r.mp_recovery = Some(Recovery {
+                percent: 101,
+                every: 60,
+            })
+        },
+        |r| {
+            r.mp_recovery = Some(Recovery {
+                percent: 10,
+                every: 0,
+            })
+        },
+        |r| {
+            r.rage_decay = Some(Decay {
+                points: 0,
+                every: 60,
+            })
+        },
+        |r| {
+            r.rage_decay = Some(Decay {
+                points: 1,
+                every: DURATION_BOUND + 1,
+            })
+        },
+    ];
+    for (i, change) in changes.into_iter().enumerate() {
+        let mut world = duel();
+        change(&mut world.world.combat.as_mut().unwrap().resources);
+        assert!(
+            codes(&world).contains(&"invalid_resources".to_string()),
+            "change {i} was accepted"
+        );
+    }
+}
+
+#[test]
+fn world_time_resource_rules_without_a_clock_or_carried_rage_only_warn() {
+    // The duel keeps no clock, so recovery never happens.
+    let mut world = duel();
+    world.world.combat.as_mut().unwrap().resources.mp_recovery = Some(Recovery {
+        percent: 10,
+        every: 60,
+    });
+    assert!(world.validate().is_ok());
+    let warnings = world.diagnostics();
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    assert_eq!(
+        (warnings[0].code.as_str(), warnings[0].severity),
+        ("unused_resource", Severity::Warning)
+    );
+    // Decay with Rage that clears after every fight has nothing to drain,
+    // and needs a clock too.
+    let mut world = arena();
+    world.world.combat.as_mut().unwrap().resources.rage_decay = Some(Decay {
+        points: 1,
+        every: 60,
+    });
+    assert!(world.validate().is_ok());
+    let unused = codes(&world)
+        .into_iter()
+        .filter(|c| c == "unused_resource")
+        .count();
+    assert_eq!(unused, 2);
+}
+
+#[test]
+fn a_world_may_leave_out_the_timeline() {
+    let mut world = duel();
+    world.world.combat.as_mut().unwrap().timeline = None;
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    // A world that leaves the new fields out serializes exactly as before,
+    // so its rules revision, and the saves bound to it, stay the same.
+    let json = serde_json::to_value(&duel().world.combat).unwrap();
+    let keys = |v: &serde_json::Value| -> Vec<String> {
+        let mut keys: Vec<_> = v.as_object().unwrap().keys().cloned().collect();
+        keys.sort();
+        keys
+    };
+    assert!(json["timeline"].is_object() && json.get("player_resources").is_none());
+    assert_eq!(
+        keys(&json["resources"]),
+        ["mp_regen_percent", "rage_per_action", "rage_per_max_hp"]
+    );
+    assert!(json["skills"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|s| s.get("costs").is_none()));
 }

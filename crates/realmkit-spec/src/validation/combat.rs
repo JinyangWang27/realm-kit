@@ -6,7 +6,7 @@ use super::*;
 pub(super) fn rules(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
     let owner = &w.world.id;
     basics(out, owner, combat);
-    resources(out, owner, combat);
+    resources(out, w, owner, combat);
     progression::stat_points(out, w, owner, combat);
     progression::techniques(out, w, combat);
     equipment::equipment(out, w, combat);
@@ -31,7 +31,9 @@ fn basics(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
     }
     share(out, owner, combat.cross_share);
     crit(out, owner, combat.player_basic_crit);
-    let timeline = combat.timeline;
+    let Some(timeline) = combat.timeline else {
+        return;
+    };
     if !(1..=ACTION_COST_BOUND).contains(&timeline.action_cost)
         || timeline.speed_cap == 0
         || timeline.speed_cap > STAT_BOUND
@@ -45,19 +47,29 @@ fn basics(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
     }
 }
 
-/// Unused resource constants are harmless, so they only warn.
-fn resources(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
-    let uses = |resource| {
-        combat
-            .skills
-            .iter()
-            .any(|s| s.resource == resource && s.cost > 0)
-    };
+/// Resource rules within their bounds. Unused resource constants are
+/// harmless, so they only warn.
+fn resources(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &Combat) {
+    let uses = |resource| combat.skills.iter().any(|s| s.cost_in(resource) > 0);
     let r = combat.resources;
-    let rage = r.rage_per_action > 0 || r.rage_per_max_hp > 0;
+    let rage = r.gains_rage();
+    let periodic = |every: u64| (1..=DURATION_BOUND).contains(&every);
+    if r.rage_cap.is_some_and(|cap| cap == 0 || cap > STAT_BOUND)
+        || r.mp_recovery
+            .is_some_and(|m| !(1..=100).contains(&m.percent) || !periodic(m.every))
+        || r.rage_decay
+            .is_some_and(|d| d.points == 0 || d.points > STAT_BOUND || !periodic(d.every))
+    {
+        issue(
+            out,
+            owner,
+            "invalid_resources",
+            format!("a rage cap is from 1 to {STAT_BOUND}; recovery is 1 to 100 percent and decay 1 to {STAT_BOUND} points, every 1 to {DURATION_BOUND} minutes"),
+        );
+    }
     for (set, used, what) in [
         (
-            r.mp_regen_percent > 0,
+            r.mp_regen_percent > 0 || r.mp_recovery.is_some(),
             uses(Resource::Mp),
             "MP regeneration",
         ),
@@ -72,18 +84,47 @@ fn resources(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
             );
         }
     }
-    // Rage starts at 0 in every fight, so without a source a rage cost is never met.
-    if !rage {
-        for skill in combat
-            .skills
-            .iter()
-            .filter(|s| s.resource == Resource::Rage && s.cost > 0)
-        {
+    let clock = w.world.time.is_some();
+    for (set, what) in [
+        (
+            r.mp_recovery.is_some() && !clock,
+            "MP recovery needs world time, which this world does not keep",
+        ),
+        (
+            r.rage_decay.is_some() && !clock,
+            "rage decay needs world time, which this world does not keep",
+        ),
+        (
+            r.rage_decay.is_some() && !r.rage_carries,
+            "rage clears after every fight, so it has nothing to decay",
+        ),
+    ] {
+        if set {
+            warn(out, owner, "unused_resource", what);
+        }
+    }
+    for skill in combat
+        .skills
+        .iter()
+        .filter(|s| s.cost_in(Resource::Rage) > 0)
+    {
+        // Rage starts at 0, so without a source a rage cost is never met.
+        if !rage {
             warn(
                 out,
                 &skill.id,
                 "unusable_skill",
                 "costs rage, but this world has no rage_per_action or rage_per_max_hp",
+            );
+        }
+        if r.rage_cap
+            .is_some_and(|cap| skill.cost_in(Resource::Rage) > cap)
+        {
+            issue(
+                out,
+                &skill.id,
+                "unaffordable_skill",
+                "costs more rage than the rage cap allows",
             );
         }
     }
@@ -141,6 +182,14 @@ fn skills(out: &mut Vec<Diagnostic>, combat: &Combat) {
                     "skill power must be from {} to {}",
                     POWER_BOUNDS.0, POWER_BOUNDS.1
                 ),
+            );
+        }
+        if skill.costs.is_some() && skill.cost > 0 {
+            issue(
+                out,
+                &skill.id,
+                "conflicting_costs",
+                "give costs in either cost and resource or costs, not both",
             );
         }
         if skill.level == 0 {
@@ -257,6 +306,7 @@ fn player_attacks(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
         out,
         combat,
         &w.world.player,
+        combat.player_resources,
         combat.player_basic_channel,
         unlocked,
         &first,
@@ -334,6 +384,7 @@ pub(super) fn usable_skills<'a>(
     out: &mut Vec<Diagnostic>,
     combat: &Combat,
     owner: &str,
+    uses: Option<ResourceUse>,
     basic: Channel,
     skills: impl Iterator<Item = (&'a Skill, &'a Stats)>,
     first: &Stats,
@@ -356,8 +407,28 @@ pub(super) fn usable_skills<'a>(
                 format!("{} needs attack in its channel", skill.id),
             );
         }
+        // A resource the character does not use pays for nothing.
+        for (resource, used) in uses.map_or(vec![], |u| {
+            vec![(Resource::Mp, u.mp), (Resource::Rage, u.rage)]
+        }) {
+            if !used && skill.cost_in(resource) > 0 {
+                issue(
+                    out,
+                    owner,
+                    "inactive_resource",
+                    format!(
+                        "{} costs {}, which the character does not use",
+                        skill.id,
+                        match resource {
+                            Resource::Mp => "MP",
+                            Resource::Rage => "rage",
+                        }
+                    ),
+                );
+            }
+        }
         // Rage accumulates during a fight, so only MP has a ceiling to check.
-        if skill.resource == Resource::Mp && skill.cost > stats.mp {
+        if skill.cost_in(Resource::Mp) > stats.mp {
             issue(
                 out,
                 owner,

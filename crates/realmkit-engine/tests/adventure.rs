@@ -53,10 +53,9 @@ fn full_quest_loop_and_replay_produce_identical_state_and_events() {
     assert_eq!(state.combat.as_ref().unwrap().level, 2);
     assert_eq!(state.combat.as_ref().unwrap().xp, 15);
     // Levelling up restores HP to level 2's maximum, and the fight is over.
-    assert_eq!(
-        state.combat.as_ref().unwrap().stance,
-        Stance::Exploring(Vitals { hp: 48, mp: 0 })
-    );
+    let combat = state.combat.as_ref().unwrap();
+    assert_eq!(combat.stance, Stance::Exploring);
+    assert_eq!((combat.vitals.hp, combat.vitals.mp), (48, 0));
     assert_eq!(state.player.inventory["ash_pelt"], 1);
     assert_eq!(state.player.inventory["candle"], 1);
     assert_eq!(state.quests["quiet_the_track"], QuestStatus::Completed);
@@ -117,7 +116,7 @@ fn combat_tracks_damage_and_never_rewards_a_defeat_twice() {
     }));
     assert_eq!(vitals(&engine).hp, 36);
     let events = engine.execute(Attack("wolf".into())).unwrap();
-    assert_eq!(foe(&engine).hp, 13);
+    assert_eq!(foe_vitals(&engine).hp, 13);
     assert_eq!(vitals(&engine).hp, 32);
     assert!(events
         .iter()
@@ -364,8 +363,20 @@ fn mismatched_or_corrupt_saves_are_rejected() {
         |s| s.package_revision = "fnv1a64:0".into(),
         |s| s.player_route_id = "other".into(),
         |s| s.state.player.location = "nowhere".into(),
-        |s| s.state.combat.as_mut().unwrap().stance = Stance::Exploring(Vitals { hp: 41, mp: 0 }),
-        |s| s.state.combat.as_mut().unwrap().stance = Stance::Exploring(Vitals { hp: 1, mp: 1 }),
+        |s| {
+            s.state.combat.as_mut().unwrap().vitals = Vitals {
+                hp: 41,
+                mp: 0,
+                ..Vitals::default()
+            }
+        },
+        |s| {
+            s.state.combat.as_mut().unwrap().vitals = Vitals {
+                hp: 1,
+                mp: 1,
+                ..Vitals::default()
+            }
+        },
         |s| s.state.combat.as_mut().unwrap().level = 0,
         |s| s.state.combat.as_mut().unwrap().xp = 10,
         |s| s.state.combat = None,

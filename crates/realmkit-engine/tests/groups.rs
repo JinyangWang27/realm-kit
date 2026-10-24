@@ -30,7 +30,7 @@ fn a_pack_fights_together_and_every_member_must_fall() {
     assert_eq!(bites, 2);
     // Felling the first wolf leaves the fight running against the second.
     let mut first = Vec::new();
-    while engine.encounter().unwrap().participants[1].hp > 0 {
+    while foe_vitals(&engine).hp > 0 {
         first.extend(engine.execute(Attack("grey_wolf".into())).unwrap());
     }
     assert!(engine.encounter().is_some());
@@ -149,7 +149,7 @@ fn fleeing_resolves_at_the_players_next_turn_and_grants_nothing() {
     engine.execute(Engage("grey_wolf".into())).unwrap();
     assert!(engine.encounter().unwrap().participants[1..]
         .iter()
-        .all(|p| p.hp == 24));
+        .all(|p| p.vitals.unwrap().hp == 24));
 }
 
 #[test]
@@ -294,8 +294,13 @@ fn a_save_after_one_sparring_partner_yields_still_loads() {
     let broken: Vec<fn(&mut Encounter)> = vec![
         |e| e.participants[2].yielded = true,
         |e| e.participants[1].yielded = false,
-        |e| (e.participants[2].hp, e.participants[2].yielded) = (0, false),
-        |e| e.participants[1].hp = 0,
+        |e| {
+            (
+                e.participants[2].vitals.as_mut().unwrap().hp,
+                e.participants[2].yielded,
+            ) = (0, false)
+        },
+        |e| e.participants[1].vitals.as_mut().unwrap().hp = 0,
     ];
     for (i, corrupt) in broken.into_iter().enumerate() {
         let mut snapshot = good.clone();

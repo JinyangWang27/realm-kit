@@ -359,9 +359,9 @@ fn a_rank_that_lowers_max_hp_carries_rage_progress_over() {
             engine.execute(Engage("dummy".into())).unwrap();
         }
         engine.execute(palm("palm_drifting")).unwrap();
-        if let Some(encounter) = engine.encounter() {
+        if engine.encounter().is_some() {
             let max = engine.player_stats().unwrap().hp;
-            assert!(encounter.participants[0].rage_remainder < u64::from(max));
+            assert!(engine.player_vitals().unwrap().rage_remainder < u64::from(max));
             assert!(Engine::restore(&world, engine.snapshot()).is_ok());
         }
     }

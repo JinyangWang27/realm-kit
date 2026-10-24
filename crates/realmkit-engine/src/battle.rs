@@ -45,11 +45,12 @@ fn troop<'w>(world: &'w WorldSpec, stack: &BattleStack) -> Unit<'w> {
     }
 }
 
-/// Each side's units: on side 0 the player comes first.
+/// Each side's units: on side 0 the player comes first, at `hp`.
 fn units<'w>(
     world: &'w WorldSpec,
     combat: &CombatState,
     battle: &BattleState,
+    hp: u32,
 ) -> [Vec<Unit<'w>>; 2] {
     let stats = rules::player_stats(world, combat);
     let channel = gear::basic(world, combat)
@@ -57,10 +58,10 @@ fn units<'w>(
         .unwrap_or(world.combat().unwrap().player_basic_channel);
     let player = Unit {
         stats,
-        count: u64::from(battle.hp > 0),
+        count: u64::from(hp > 0),
         class: None,
         channel,
-        hp: u64::from(battle.hp),
+        hp: u64::from(hp),
     };
     let side = |s: usize| battle.sides[s].stacks.iter().map(|st| troop(world, st));
     [
@@ -205,10 +206,12 @@ fn strike(
     Ok(())
 }
 
-/// Losses from the damage dealt to side `s`; returns how many fell.
+/// Losses from the damage dealt to side `s`, the player's at `hp`; returns
+/// how many fell.
 fn apply(
     world: &WorldSpec,
     battle: &mut BattleState,
+    hp: &mut u32,
     s: usize,
     dealt: &BTreeMap<usize, u128>,
 ) -> u64 {
@@ -216,11 +219,11 @@ fn apply(
     for (t, amount) in dealt {
         // Side 0's unit 0 is the player.
         if s == 0 && *t == 0 {
-            if battle.hp > 0 && *amount >= u128::from(battle.hp) {
-                battle.hp = 0;
+            if *hp > 0 && *amount >= u128::from(*hp) {
+                *hp = 0;
                 losses += 1;
-            } else if battle.hp > 0 {
-                battle.hp -= *amount as u32;
+            } else if *hp > 0 {
+                *hp -= *amount as u32;
             }
             continue;
         }
@@ -270,16 +273,21 @@ fn strength(world: &WorldSpec, units: &[Unit], side: &BattleSide) -> u64 {
     u64::try_from(total * morale_mod(world, side) / 10_000).unwrap_or(u64::MAX)
 }
 
-fn in_battle(combat: &Option<CombatState>) -> Result<(&CombatState, BattleState), EngineError> {
+/// The battle to work on, and the player's HP, both stored again after.
+fn in_battle(
+    combat: &Option<CombatState>,
+) -> Result<(&CombatState, BattleState, u32), EngineError> {
     let combat = combat.as_ref().ok_or(EngineError::NotInBattle)?;
     match &combat.stance {
-        Stance::Battle(battle) => Ok((combat, battle.clone())),
+        Stance::Battle(battle) => Ok((combat, battle.clone(), combat.vitals.hp)),
         _ => Err(EngineError::NotInBattle),
     }
 }
 
-fn store(state: &mut GameState, battle: BattleState) {
-    state.combat.as_mut().unwrap().stance = Stance::Battle(battle);
+fn store(state: &mut GameState, battle: BattleState, hp: u32) {
+    let combat = state.combat.as_mut().unwrap();
+    combat.stance = Stance::Battle(battle);
+    combat.vitals.hp = hp;
 }
 
 /// The winner cuts down a routed or retreating side, which deals nothing.
@@ -287,10 +295,11 @@ fn pursue(
     world: &WorldSpec,
     state: &mut GameState,
     battle: &mut BattleState,
+    hp: &mut u32,
     winner: usize,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
-    let units = units(world, state.combat.as_ref().unwrap(), battle);
+    let units = units(world, state.combat.as_ref().unwrap(), battle, *hp);
     let mut dealt = BTreeMap::new();
     let order = BattleOrder::Charge;
     strike(
@@ -304,7 +313,7 @@ fn pursue(
         true,
         &mut dealt,
     )?;
-    let losses = apply(world, battle, 1 - winner, &dealt);
+    let losses = apply(world, battle, hp, 1 - winner, &dealt);
     events.push(Event::Pursuit { by: winner, losses });
     Ok(())
 }
@@ -316,15 +325,15 @@ fn round(
     order: BattleOrder,
     events: &mut Vec<Event>,
 ) -> Result<Option<BattleOutcome>, EngineError> {
-    let (combat, mut battle) = in_battle(&state.combat)?;
+    let (combat, mut battle, mut hp) = in_battle(&state.combat)?;
     let rules = world.battle().unwrap();
-    let units = units(world, combat, &battle);
+    let units = units(world, combat, &battle, hp);
     if order == BattleOrder::Flank && !units[0].iter().any(|u| u.mounted() && u.count > 0) {
         return Err(EngineError::NoFlank);
     }
     if order == BattleOrder::Retreat {
-        pursue(world, state, &mut battle, 1, events)?;
-        store(state, battle);
+        pursue(world, state, &mut battle, &mut hp, 1, events)?;
+        store(state, battle, hp);
         return Ok(Some(BattleOutcome::Defeat));
     }
     let holding = order == BattleOrder::Hold;
@@ -352,12 +361,12 @@ fn round(
         false,
         &mut dealt[0],
     )?;
-    let losses = [0, 1].map(|s| apply(world, &mut battle, s, &dealt[s]));
+    let losses = [0, 1].map(|s| apply(world, &mut battle, &mut hp, s, &dealt[s]));
     for (side, lost) in battle.sides.iter_mut().zip(losses) {
         demoralize(world, side, lost);
     }
     battle.round += 1;
-    let after = self::units(world, state.combat.as_ref().unwrap(), &battle);
+    let after = self::units(world, state.combat.as_ref().unwrap(), &battle, hp);
     let strengths = [0, 1].map(|s| strength(world, &after[s], &battle.sides[s]));
     events.push(Event::BattleRound {
         round: battle.round,
@@ -370,7 +379,7 @@ fn round(
         [true, true] => Some(BattleOutcome::Draw),
         [false, true] | [true, false] => {
             let winner = usize::from(gone[0]);
-            pursue(world, state, &mut battle, winner, events)?;
+            pursue(world, state, &mut battle, &mut hp, winner, events)?;
             Some(if winner == 0 {
                 BattleOutcome::Victory
             } else {
@@ -384,7 +393,7 @@ fn round(
         }),
         [false, false] => None,
     };
-    store(state, battle);
+    store(state, battle, hp);
     Ok(outcome)
 }
 
@@ -404,7 +413,7 @@ pub(super) fn engage(
         return Err(EngineError::NotHostile(id));
     }
     let combat = state.combat.as_ref().unwrap();
-    let Stance::Exploring(vitals) = combat.stance else {
+    let (Stance::Exploring, hp) = (&combat.stance, combat.vitals.hp) else {
         return Err(EngineError::InEncounter);
     };
     let allies = allies_here(world, state);
@@ -425,11 +434,9 @@ pub(super) fn engage(
         army: id.clone(),
         allies: allies.clone(),
         round: 0,
-        hp: vitals.hp,
-        mp: vitals.mp,
         sides: [side(ours, 1), side(theirs, 0)],
     };
-    store(state, battle);
+    store(state, battle, hp);
     state.dialogue = None;
     events.push(Event::BattleStarted { army: id, allies });
     Ok(())
@@ -517,7 +524,7 @@ fn finish(
     outcome: BattleOutcome,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
-    let (_, battle) = in_battle(&state.combat)?;
+    let (_, battle, _) = in_battle(&state.combat)?;
     let rules = world.troops().unwrap();
     let before = roster_stacks(world, state);
     let (mut wounded, mut killed) = (Vec::new(), Vec::new());
@@ -546,10 +553,9 @@ fn finish(
         }
         rules::prune(retinue);
     }
-    state.combat.as_mut().unwrap().stance = Stance::Exploring(Vitals {
-        hp: battle.hp.max(1),
-        mp: battle.mp,
-    });
+    let combat = state.combat.as_mut().unwrap();
+    combat.stance = Stance::Exploring;
+    combat.vitals.hp = combat.vitals.hp.max(1);
     events.push(Event::BattleEnded {
         outcome,
         wounded,
