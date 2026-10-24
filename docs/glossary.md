@@ -144,11 +144,25 @@ units have no implicit conversion to real time or optional World Time.
 
 ## Encounter
 
-Proposed for M3. Active local combat state: an ordered list of participants,
-each a Character with a combat profile, a side, a controller (player or authored
-policy), HP/MP, rage and a next action time on the Encounter Timeline. While
-active, it is the sole owner of its participants' HP and MP. Rage exists only
-inside an encounter.
+The optional turn-based layer's fight: an ordered list of participants, each
+a Character with a combat profile, a side, a controller (player or authored
+policy) and a next action time on the Encounter Timeline. It owns its
+opponents' [Vitals](#vitals) for the length of the fight; the player's stay
+with the player. Rage belongs to one encounter unless the world carries it.
+See [Combat architecture](combat.md).
+
+## Vitals
+
+A fighting character's current HP, MP and Rage, with one owner per
+character: the player's in `CombatState::vitals` whatever the stance, an
+opponent's in its encounter. Maxima are derived, never saved.
+
+## MP and Rage
+
+The two resources every fighter can use, each chosen or not per character.
+MP is a reserve that starts full and time refills; Rage is momentum that starts
+at 0 and fighting builds. A resource a character does not use is absent, which
+is not the same as one at 0. A world may give Rage its own name in prose.
 
 ## Combat Profile
 

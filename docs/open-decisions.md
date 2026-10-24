@@ -1559,15 +1559,19 @@ summary:
 - Ties resolve by `(next_time, side order, participant order)`. MP is checked at
   validation and spent on resolution. A speed change applies from the actor's next
   action. Dead participants lose pending actions.
-- While an encounter is active it solely owns every participant's HP and MP.
-  Opponent vitals never persist outside an encounter.
+- While an encounter is active it owns its opponents' HP, MP and Rage, which
+  never persist outside it. The player's vitals stay with the player, in
+  `CombatState::vitals`, and the encounter changes them in place
+  ([Combat architecture](combat.md)).
 - Grinding uses repeatable groups, which grant rewards on every victory and
   record no defeats, and `Flee`, which takes effect at the player's next turn.
   Copies within one encounter are told apart by participant position; Section 10
   instance IDs are only for copies with persistent state.
 - Skills spend MP or rage. MP regenerates over encounter time and by resting,
   and MP costs are flat as authored; rage starts at zero in each encounter and builds
-  from actions and damage taken. The
+  from actions and damage taken. Delivered since: skills costing both, a Rage cap,
+  Rage carried between fights with decay, MP recovery over world time and an
+  authored choice of resources per character. The
   [balance simulation](../ROADMAP.md#balance-simulation--proposed) tunes both
   against grinding-oriented targets.
 - Most parts of combat are optional and exist only when content uses them:

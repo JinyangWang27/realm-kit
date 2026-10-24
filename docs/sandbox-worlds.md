@@ -779,9 +779,9 @@ battles out of personal combat. This capability resolves army against army.
   between two.
 - **Champions.** Optionally, the author can let the player fight a personal
   encounter against the enemy commander at a chosen moment. While the duel
-  runs, the battle stance holds that encounter, and the player's and the
-  commander's HP and MP live in the encounter until it ends and then return to
-  the battle, so they never live in two places. The result of that duel
+  runs, the battle stance holds that encounter; the player's vitals stay in
+  `CombatState::vitals` and the commander's live in the encounter until it
+  ends, so neither lives in two places. The result of that duel
   modifies the battle.
 - **Simulator parity.** The formula must be mirrored in `scripts/combat_sim`
   before its numbers are pinned in tests, exactly as the personal-combat

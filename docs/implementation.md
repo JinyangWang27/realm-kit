@@ -38,8 +38,8 @@ proves the complete single-player loop with authored content.
 - [x] Encounters (M3c-1): `Engage` starts a fight on a paused initiative
   timeline where speed sets turn frequency; MP regenerates over encounter time
   and rage builds from acting and being hit; opponents use their strongest
-  affordable skill. The player's vitals live in one place at a time
-  (`Stance::Exploring` or `Stance::Fighting`), encounters save and resume
+  affordable skill. The player's vitals live in one place, now
+  `CombatState::vitals` whatever the stance, encounters save and resume
   exactly, and results match `scripts/combat_sim`.
 - [x] Grinding (M3c-2): authored groups bring packs into one encounter,
   repeatable groups can be fought again, `Flee` escapes at the player's next
@@ -226,6 +226,16 @@ The open items are **not delivered** and do not change the format by
 themselves. They mirror the original-game-driven roadmap priority while keeping
 every capability optional:
 
+- [x] Combat layers ([combat.md](combat.md)): a universal character core
+  (stats, vitals, MP and Rage, costs, damage) separate from the optional
+  turn-based encounter layer, which the timeline now enables. Vitals have one
+  owner per character outside any stance. Characters use MP, Rage, both or
+  neither; skills may cost both; Rage can be capped, carried between fights
+  and decayed, and MP recovers over world time. Existing packages and
+  walkthroughs are unchanged; saves in the earlier vitals layout are refused
+  by name.
+- [ ] A real-time combat layer over the same core, with its own fixed-step
+  clock and commands, once a client needs one.
 - [x] Overland-map authored placement + engine map query, with
   places known by an authored condition.
 - [x] Embeddable graphical-client seam, including a browser/WASM hosting proof

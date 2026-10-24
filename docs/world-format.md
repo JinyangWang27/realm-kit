@@ -13,7 +13,9 @@ combat and other genre mechanics as source-grounded capabilities.
 one number (`FORMAT_VERSION` and `SAVE_FORMAT_VERSION`). A package or save of
 another version is rejected with a message naming it; there is no migration.
 To bring an older package up to date, edit it against this guide until
-`realmkit validate` accepts it; old saves cannot be carried over.
+`realmkit validate` accepts it; old saves cannot be carried over. Format 19
+saves made before the player's vitals moved out of the stance into
+`combat.vitals` are refused by name.
 While the format is in active development the number stays put: new optional
 fields, new condition, effect and event kinds, and other growth that leaves
 older content valid land without a bump. Two other checks already reject what
@@ -761,8 +763,8 @@ while its `requires` condition holds; the player can talk to it if it has a
 [Stats](#stats-damage-and-skills)), the `xp` granted on defeat, optional `loot`,
 optional `skills` (skill IDs, usable once the profile's `level` reaches each
 skill's unlock level), `basic_channel` (`physical` by default), `level`
-(default 1; it also scales the XP the character grants) and an optional
-`group`. A defeated character is gone: it is no longer listed and cannot be
+(default 1; it also scales the XP the character grants), an optional
+`group`, and an optional `resources` choice (see [MP and Rage](#mp-and-rage)). A defeated character is gone: it is no longer listed and cannot be
 talked to. A character with a combat profile is one instance: it may be placed
 at most once, and its defeat is permanent (no respawns) unless its group is
 repeatable. Other
@@ -1150,7 +1152,9 @@ the next), so the choice need not repeat the condition.
 ## Combat block, numeric rules and templates
 
 The optional `combat` object in `world.json` holds the level table, skills and
-combat prose:
+combat prose. Everything in it except the `timeline` describes characters
+however a fight is run; the `timeline` enables turn-based encounters. See
+[Combat architecture](combat.md) for which rules belong to which layer:
 
 ```json
 "combat": {
@@ -1188,13 +1192,75 @@ combat prose:
 Every level entry and combat profile has seven `stats`: `hp`, `mp` (optional,
 default 0), physical attack and defence `patk`/`pdef`, special attack and
 defence `satk`/`sdef`, and `speed`. Each is at most 9,999, and HP and speed are
-at least 1. Speed sets how often a character acts in an encounter.
+at least 1. Speed is how quickly a character acts: the turn-based timeline
+turns it into the delay between turns.
 
 Level entries supply cumulative `xp` and the player's stats at that level. The
 first entry requires zero XP; thresholds strictly increase; no stat decreases
 between levels. Saves hold only current HP and MP, XP, level and spent stat
 points; every other stat is derived. Levelling up restores HP and MP fully, to
 the effective maxima.
+
+### MP and Rage
+
+Every fighter can use two resources: **MP**, a reserve that starts full and
+is kept between fights, and **Rage**, momentum that starts at 0 and builds
+from fighting. `resources` sets their rules; every field is optional, and zero
+or absent leaves a rule out:
+
+```json
+"resources": {
+  "mp_regen_percent": 3,
+  "rage_per_action": 1,
+  "rage_per_max_hp": 20,
+  "rage_cap": 100,
+  "rage_carries": true,
+  "mp_recovery": { "percent": 10, "every": 60 },
+  "rage_decay": { "points": 5, "every": 30 }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `mp_regen_percent` | Turn-based only: percent of maximum MP regained per baseline turn of [encounter](#encounters) time. |
+| `rage_per_action` | Rage for each attack or skill the character resolves, credited after it. |
+| `rage_per_max_hp` | Rage for taking damage equal to maximum HP, proportionally and cumulatively. |
+| `rage_cap` | The most Rage anyone holds (1 to 9,999); at the cap nothing is banked toward the next point. Absent, Rage saturates. |
+| `rage_carries` | Rage stays with the character after a fight. Absent or false, it clears when a fight ends. |
+| `mp_recovery` | `percent` (1–100) of maximum MP, rounded down but at least 1, each time world time reaches a multiple of `every` minutes (1 to 43,200). |
+| `rage_decay` | `points` (1 to 9,999) of Rage lost each time world time reaches a multiple of `every` minutes. Rage drained to 0 keeps no part of a point. |
+
+Recovery and decay count fixed minutes of the clock from minute 0, so a
+wait, a rest or a journey crosses the same boundaries however it is split.
+They apply before anything else scheduled at the same minute. Fights never
+pass world time, and encounter time is not world time, so MP never
+regenerates twice for the same span. Without a world clock they never apply
+(`unused_resource`), and decay without `rage_carries` has nothing to drain.
+
+Which resources a character uses is chosen with `player_resources` in the
+combat block and `resources` in a [combat profile](#characters), each
+`{ "mp": true, "rage": false }` with both fields given. Without a choice, a
+character uses MP when its maximum MP is above 0 and Rage when the world has
+`rage_per_action` or `rage_per_max_hp`. A resource a character does not use
+stays at 0 and gains, regains and pays for nothing; clients show it as absent
+rather than empty. Characters may use MP only, Rage only, both or neither.
+
+A skill costs `cost` from its `resource` (`mp` by default), or `costs` in
+both at once:
+
+```json
+{ "id": "storm", "name": "Storm Cut", "power": 200, "channel": "physical",
+  "costs": { "mp": 6, "rage": 3 }, "text": "{attacker} cut a storm at {target}: {damage} damage." }
+```
+
+A skill gives one form or the other (`conflicting_costs`). It is usable only
+when every cost is covered; MP is checked and spent first. A refused skill
+changes nothing. A character's skills may not cost a resource it was chosen
+not to use (`inactive_resource`), and a Rage cost above `rage_cap` can never
+be paid (`unaffordable_skill`).
+
+A world may name Rage in its prose as momentum or fighting spirit; it stays
+the same resource.
 
 ### Stat points
 
@@ -1235,14 +1301,15 @@ halves damage; no scale constant or character level enters.
 
 A skill has an `id`, `name`, `power` (1–1,000; a basic attack is 100), a
 `channel`, a `cost` (default 0, spent exactly as authored) in its `resource`
-(`mp`, the default, or `rage`), an action `time` in percent of a basic attack
-(default 100), the `level` at which the player can use it (default 1), an
+(`mp`, the default, or `rage`) or [`costs`](#mp-and-rage) in both, an action
+`time` in percent of a basic attack (default 100; the turn-based timeline
+delays the user's next turn by it), the `level` at which the player can use it (default 1), an
 optional `cross_share` overriding the world's, and its own `text` template
 (`{attacker}`, `{target}`, `{damage}`). `player_skills` lists the player's skills; `player_basic_channel`
 and a profile's `basic_channel` set the channel of each character's basic
 attack. Every usable skill and basic attack needs attack in its channel, and
 every MP skill must be affordable with the MP its user has when it unlocks;
-rage builds up during a fight, so rage costs have no such ceiling.
+rage builds up during a fight, so rage costs have no ceiling but `rage_cap`.
 
 ### Techniques
 
@@ -1450,8 +1517,11 @@ The combat block can list `enchantments`, each laid on a piece at a station:
 
 ### Encounters
 
-`engage` starts an encounter with a fighter at the player's location; it then
-owns everyone's HP and MP until it ends. Each participant acts on a paused
+`engage` starts an encounter with a fighter at the player's location, in a
+world whose combat block has a `timeline`; without one, fighters are listed but
+cannot be engaged. The player brings their own vitals into the encounter and
+keeps them; each opponent's vitals belong to the encounter and are whole again
+next time. Each participant acts on a paused
 initiative timeline: an action of `time` percent delays its actor's next turn
 by
 
@@ -1476,8 +1546,9 @@ fraction; time at full MP banks nothing. Rage starts at 0 in every encounter,
 grows by `rage_per_action` after each of the actor's own actions (so an actor
 one point short cannot spend what its own action earns), and by
 `rage_per_max_hp` for taking damage equal to its maximum HP, proportionally and
-cumulatively. Rage never outlasts the encounter; `resources` defaults to zero,
-which leaves either resource unused.
+cumulatively. Unless the world sets `rage_carries`, Rage never outlasts the
+encounter. See [MP and Rage](#mp-and-rage) for caps, resource choices and costs
+in both resources.
 
 The combat block's `groups` shape encounters:
 
@@ -1506,8 +1577,8 @@ schedule alive. The player yielding ends the encounter as a loss: the group's
 `defeat_flags` are set and play continues with the HP left. A defeat objective
 cannot target a member of a yielding group.
 
-The encounter is won when every opponent has died or yielded. The player's HP
-and MP return to exploring, and each opponent that died grants its loot and XP
+The encounter is won when every opponent has died or yielded. The player
+returns to exploring with the HP and MP left, and each opponent that died grants its loot and XP
 and advances defeat objectives. Its XP scales by level difference: ±10% per
 level of the opponent's level above or below the player's, capped at ±40% and
 rounded down, and nothing from an opponent five or more levels below. It is
@@ -1748,7 +1819,9 @@ non-empty `all`/`any`, counted items in item conditions and `take_items`,
 dialogue links/effects, declared flags,
 the player character, quest givers and targets, combat content in worlds
 without combat (`combat_disabled`), level rules, stat, power and share bounds,
-skill references, usable and affordable skills, loot quantities, fighter
+skill references, usable and affordable skills, resource bounds
+(`invalid_resources`), costs in one form (`conflicting_costs`), costs in a
+resource the character does not use (`inactive_resource`), loot quantities, fighter
 placement, template placeholders, evidence that can be discovered, phases
 that can be entered, quest prerequisite cycles, main quests waiting on side
 quests, and factions, diplomacy pairs and standing tracks with their scopes,
