@@ -117,8 +117,6 @@ fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Res
     };
     let world = engine.world();
     let name = |id: &str| world.character(id).unwrap().name.as_str();
-    let resources = world.combat().unwrap().resources;
-    let rage = resources.rage_per_action > 0 || resources.rage_per_max_hp > 0;
     let (player, opponents) = encounter.participants.split_first().unwrap();
     let width = encounter
         .participants
@@ -131,26 +129,30 @@ fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Res
             Some(profile) => profile.stats,
             None => engine.player_stats().unwrap(),
         };
+        let (v, pools) = (
+            engine.vitals_of(p).unwrap(),
+            engine.pools_of(&p.character).unwrap(),
+        );
         let label = name(&p.character);
         let pad = " ".repeat(width - render::width(label));
         let digits = max.hp.to_string().len();
         write!(
             output,
             "{label}{pad}  {} {:>digits$}/{}",
-            bar(p.hp, max.hp, paint),
-            p.hp,
+            bar(v.hp, max.hp, paint),
+            v.hp,
             max.hp
         )?;
         let mut notes = Vec::new();
-        if p.hp == 0 {
+        if v.hp == 0 {
             writeln!(output, "  {DOWN}")?;
             continue;
         }
-        if max.mp > 0 {
-            notes.push(format!("MP {}/{}", p.mp, max.mp));
+        if let Some(max) = pools.mp.filter(|max| *max > 0) {
+            notes.push(format!("MP {}/{max}", v.mp));
         }
-        if rage {
-            notes.push(format!("rage {}", p.rage));
+        if pools.rage.is_some() {
+            notes.push(format!("rage {}", v.rage));
         }
         if p.yielded {
             notes.push(YIELDED.into());

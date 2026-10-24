@@ -2,6 +2,7 @@
 //! techniques, vitals and an open encounter.
 
 use super::*;
+use crate::character::{self, resources, Pools};
 use realmkit_spec::Combat;
 
 pub(super) fn check(
@@ -18,12 +19,22 @@ pub(super) fn check(
     allocation(world, combat, rules)?;
     techniques(world, state, combat, rules, progress)?;
     crafting(world, state, combat, rules, progress)?;
-    let max = rules::player_stats(world, combat);
+    let max = character::player_stats(world, combat);
+    let pools = resources::player_pools(world, &max);
+    ensure(
+        within(rules, &combat.vitals, &max, pools),
+        "player vitals exceed their maximums",
+    )?;
+    // Rage that belongs to one fight is gone outside it.
+    let fighting = matches!(combat.stance, Stance::Fighting(_));
+    ensure(
+        fighting
+            || rules.resources.rage_carries
+            || (combat.vitals.rage == 0 && combat.vitals.rage_remainder == 0),
+        "rage outlasts the fight it belongs to",
+    )?;
     match &combat.stance {
-        Stance::Exploring(v) => ensure(
-            v.hp <= max.hp && v.mp <= max.mp,
-            "player vitals exceed their maximums",
-        )?,
+        Stance::Exploring => {}
         Stance::Fighting(encounter) => encounter_state(world, state, combat, rules, encounter)?,
         Stance::Battle(battle) => super::battle::check(world, state, combat, battle)?,
     }
@@ -32,6 +43,19 @@ pub(super) fn check(
             && (progress.any_repeatable || combat.xp <= progress.xp_ceiling),
         "experience does not match progress",
     )
+}
+
+/// Vitals the rules could leave at stats `max` and `pools`: HP and each
+/// resource within its ceiling, nothing in a resource the character does not
+/// use, and damage-rage progress below one point (none at a world's cap).
+fn within(rules: &Combat, v: &Vitals, max: &Stats, pools: Pools) -> bool {
+    let capped = rules.resources.rage_cap.is_some() && v.rage == pools.rage_cap();
+    v.hp <= max.hp
+        && v.mp <= pools.mp_max()
+        && v.rage <= pools.rage_cap()
+        && v.rage_remainder < u64::from(max.hp)
+        && (pools.rage.is_some() || v.rage_remainder == 0)
+        && !(capped && v.rage_remainder > 0)
 }
 
 /// Pieces are real equipment at a tier it has, with IDs below the counter,
@@ -272,12 +296,14 @@ fn encounter_state(
     encounter: &Encounter,
 ) -> Result<(), String> {
     let invalid = || "invalid encounter state".to_string();
-    let per_point =
-        100 * u128::from(encounter::baseline_turn(&rules.timeline).map_err(|_| invalid())?);
+    let timeline = rules.timeline.as_ref().ok_or_else(invalid)?;
+    let per_point = 100 * u128::from(encounter::baseline_turn(timeline).map_err(|_| invalid())?);
     let (player, opponents) = encounter.participants.split_first().ok_or_else(invalid)?;
+    // The player's vitals are the character's own; each opponent's, the encounter's.
     let player_ok = player.character == world.world.player
         && player.side == 0
-        && player.control == Control::Player;
+        && player.control == Control::Player
+        && player.vitals.is_none();
     // Exactly the opponents engaging the first one would bring in.
     let expected = opponents
         .first()
@@ -288,6 +314,7 @@ fn encounter_state(
         && opponents.iter().all(|p| {
             p.side == 1
                 && p.control == Control::Policy
+                && p.vitals.is_some()
                 && !combat.defeated.contains(&p.character)
                 && rules::character_here(world, state, &p.character)
                     .is_some_and(|c| c.combat.is_some())
@@ -302,33 +329,41 @@ fn encounter_state(
         return Err(invalid());
     }
     let yield_share = encounter::group(world, encounter).and_then(|g| g.yield_share);
-    let vitals_ok = encounter.participants.iter().all(|p| {
-        let max = encounter::stats(world, rules::player_stats(world, combat), p);
+    let me = character::player_stats(world, combat);
+    let fighting = |i: usize| encounter.fighting(i, &combat.vitals);
+    let vitals_ok = encounter.participants.iter().enumerate().all(|(i, p)| {
+        let max = encounter::stats(world, me, p);
+        let pools = match p.control {
+            Control::Player => resources::player_pools(world, &me),
+            Control::Policy => {
+                resources::profile_pools(world, character::profile(world, &p.character))
+            }
+        };
+        let v = encounter.vitals(i, &combat.vitals);
         // In a yielding group nobody dies, and a participant has yielded exactly
         // when a hit left it at or below its threshold. An untouched participant
         // at full HP has not yielded even if full HP is within the threshold
         // (a 100% share). Elsewhere nobody yields.
         let yield_ok = match yield_share {
             Some(share) => {
-                let low = p.hp <= encounter::yield_threshold(max.hp, share);
-                p.hp > 0 && (p.yielded == low || (!p.yielded && p.hp == max.hp))
+                let low = v.hp <= encounter::yield_threshold(max.hp, share);
+                v.hp > 0 && (p.yielded == low || (!p.yielded && v.hp == max.hp))
             }
             None => !p.yielded,
         };
         yield_ok
-            && p.hp <= max.hp
-            && p.mp <= max.mp
+            && within(rules, v, &max, pools)
             && u128::from(p.mp_remainder) < per_point
-            && p.rage_remainder < u64::from(max.hp)
             // Only participants still fighting keep up with the schedule.
-            && (!p.fighting() || p.next_time >= encounter.now)
+            && (!fighting(i) || p.next_time >= encounter.now)
     });
     // A live encounter always rests at the player's turn: the player acts now,
     // and every opponent later or, on a tie, after the player's side.
-    let paused = player.hp == 0 || player.next_time == encounter.now;
+    let dead = combat.vitals.hp == 0;
+    let paused = dead || player.next_time == encounter.now;
     // A finished fight never stays open: the player still fights an opponent who
     // still fights, or the player is dead.
-    let open = player.hp == 0 || (player.fighting() && opponents.iter().any(Participant::fighting));
+    let open = dead || (fighting(0) && (1..encounter.participants.len()).any(fighting));
     if vitals_ok && paused && open && state.dialogue.is_none() {
         Ok(())
     } else {

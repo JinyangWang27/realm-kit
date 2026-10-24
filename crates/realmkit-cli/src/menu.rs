@@ -179,8 +179,6 @@ fn encounter_lines(engine: &Engine<'_>) -> Vec<String> {
     };
     let world = engine.world();
     let name = |id: &str| world.character(id).unwrap().name.as_str();
-    let resources = world.combat().unwrap().resources;
-    let rage = resources.rage_per_action > 0 || resources.rage_per_max_hp > 0;
     let vitals: Vec<_> = encounter
         .participants
         .iter()
@@ -189,12 +187,16 @@ fn encounter_lines(engine: &Engine<'_>) -> Vec<String> {
                 Some(profile) => profile.stats,
                 None => engine.player_stats().unwrap(),
             };
-            let mut line = format!("{} HP {}/{}", name(&p.character), p.hp, max.hp);
-            if max.mp > 0 {
-                line += &format!(" · {MP} {}/{}", p.mp, max.mp);
+            let (v, pools) = (
+                engine.vitals_of(p).unwrap(),
+                engine.pools_of(&p.character).unwrap(),
+            );
+            let mut line = format!("{} HP {}/{}", name(&p.character), v.hp, max.hp);
+            if let Some(max) = pools.mp.filter(|max| *max > 0) {
+                line += &format!(" · {MP} {}/{max}", v.mp);
             }
-            if rage {
-                line += &format!(" · {RAGE} {}", p.rage);
+            if pools.rage.is_some() {
+                line += &format!(" · {RAGE} {}", v.rage);
             }
             if p.yielded {
                 line += &format!(" · {YIELDED}");
@@ -219,8 +221,9 @@ fn battle_lines(engine: &Engine<'_>) -> Vec<String> {
     let world = engine.world();
     let player = &world.character(&world.world.player).unwrap().name;
     let max = engine.player_stats().unwrap().hp;
-    let you = if battle.hp > 0 {
-        format!("{player} HP {}/{max}", battle.hp)
+    let hp = engine.player_vitals().unwrap().hp;
+    let you = if hp > 0 {
+        format!("{player} HP {hp}/{max}")
     } else {
         format!("{player} {KNOCKED_OUT}")
     };

@@ -39,9 +39,11 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         .map(|id| available(Command::Talk((*id).clone())))
         .collect();
     if state.combat.is_some() {
-        // Fighters, and armies that are not on the player's side.
+        // Fighters, where the world runs turn-based fights, and armies that
+        // are not on the player's side.
+        let turn_based = world.combat().is_some_and(|c| c.timeline.is_some());
         let foe = |c: &Character| {
-            c.combat.is_some() || c.army.as_ref().is_some_and(|a| a.joins.is_none())
+            (c.combat.is_some() && turn_based) || c.army.as_ref().is_some_and(|a| a.joins.is_none())
         };
         actions.extend(
             here.iter()
@@ -178,14 +180,13 @@ fn consumables(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     let (Some(combat), Some(now)) = (&state.combat, player_vitals(state)) else {
         return Vec::new();
     };
-    let max = player_stats(world, combat);
     state
         .player
         .inventory
         .keys()
         .filter_map(|id| {
             let restores = consume::consumable(world, id).ok()?;
-            let (hp, mp) = consume::gain(now.hp, now.mp, max, restores);
+            let (hp, mp) = consume::gain(world, combat, now, restores);
             Some(Action {
                 command: Command::Use(id.clone()),
                 available: hp > 0 || mp > 0,
@@ -321,17 +322,18 @@ fn fight_actions(
         command,
         available: true,
     };
-    let level = state.combat.as_ref().unwrap().level;
-    let player = &encounter.participants[0];
-    let skills: Vec<_> = techniques::player_skills(world, state.combat.as_ref().unwrap())
+    let combat = state.combat.as_ref().unwrap();
+    let level = combat.level;
+    let player = &combat.vitals;
+    let pools = crate::character::resources::player_pools(world, &player_stats(world, combat));
+    let skills: Vec<_> = techniques::player_skills(world, combat)
         .into_iter()
         .filter(|s| s.level <= level)
         .collect();
     let mut actions = Vec::new();
-    for foe in encounter
-        .participants
-        .iter()
-        .filter(|p| p.side != 0 && p.fighting())
+    for foe in (0..encounter.participants.len())
+        .filter(|&i| encounter.participants[i].side != 0 && encounter.fighting(i, player))
+        .map(|i| &encounter.participants[i])
     {
         actions.push(available(Command::Attack(foe.character.clone())));
         // Unaffordable skills stay listed, so the player sees why they are not usable.
@@ -340,7 +342,7 @@ fn fight_actions(
                 skill: s.id.clone(),
                 target: foe.character.clone(),
             },
-            available: encounter::check_skill(player, level, s).is_ok(),
+            available: encounter::check_skill(player, pools, level, s).is_ok(),
         }));
     }
     actions.extend(consumables(world, state));

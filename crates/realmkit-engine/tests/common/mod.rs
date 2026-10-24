@@ -43,6 +43,11 @@ pub fn foe(engine: &Engine<'_>) -> Participant {
     engine.encounter().unwrap().participants[1].clone()
 }
 
+/// The first opponent's vitals, which the encounter holds.
+pub fn foe_vitals(engine: &Engine<'_>) -> Vitals {
+    foe(engine).vitals.unwrap()
+}
+
 pub fn offered(engine: &Engine<'_>) -> Vec<(Command, bool)> {
     engine
         .actions()
@@ -84,12 +89,11 @@ pub fn fight_out(engine: &mut Engine<'_>) -> Vec<Event> {
         if engine.is_dead() {
             break;
         }
-        let foe = encounter.participants[1..]
-            .iter()
-            .find(|p| p.fighting())
-            .unwrap()
-            .character
-            .clone();
+        let player = vitals(engine);
+        let foe = (1..encounter.participants.len())
+            .find(|&i| encounter.fighting(i, &player))
+            .map(|i| encounter.participants[i].character.clone())
+            .unwrap();
         events.extend(engine.execute(Attack(foe)).unwrap());
     }
     events

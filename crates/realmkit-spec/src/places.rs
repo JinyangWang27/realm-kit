@@ -133,6 +133,9 @@ pub struct CombatProfile {
     /// Engaging any member brings in every present, undefeated member.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<Id>,
+    /// Which resources this character uses; absent, they follow from the world.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resources: Option<ResourceUse>,
 }
 
 fn is_person(kind: &CharacterKind) -> bool {

@@ -145,7 +145,7 @@ fn skills_spend_their_resource_and_opponents_choose_their_strongest_affordable_s
             .count()
     };
     assert_eq!(hexes(&events), 1);
-    assert_eq!(foe(&engine).mp, 0);
+    assert_eq!(foe_vitals(&engine).mp, 0);
     // Out of MP, she falls back to her basic attack.
     let events = engine.execute(cast("spark")).unwrap();
     assert_eq!(hexes(&events), 0);
@@ -160,7 +160,7 @@ fn mp_regenerates_over_encounter_time_with_a_carried_remainder() {
     let mut engine = engaged(&world);
     let mp = |engine: &Engine<'_>| {
         let player = &engine.encounter().unwrap().participants[0];
-        (player.mp, player.mp_remainder)
+        (vitals(engine).mp, player.mp_remainder)
     };
     // Time spent at full MP banks nothing; the pause at the player's turn
     // already includes the regeneration up to it.
@@ -210,19 +210,13 @@ fn rage_from_damage_taken_is_proportional_and_cumulative() {
     engine.execute(Move(North)).unwrap();
     engine.execute(Engage("wolf".into())).unwrap();
     // The wolf's 4 damage is a tenth of 40 HP: 20 × 4 / 40 = 2 rage, nothing carried.
-    let player = &engine.encounter().unwrap().participants[0];
+    let player = vitals(&engine);
     assert_eq!((player.rage, player.rage_remainder), (2, 0));
     engine.execute(Attack("wolf".into())).unwrap();
     // +1 for acting, +2 for the next bite; the wolf keeps 20 × 7 = 140 of 20 HP: 7 rage.
-    let encounter = engine.encounter().unwrap();
-    assert_eq!(encounter.participants[0].rage, 5);
-    assert_eq!(
-        (
-            encounter.participants[1].rage,
-            encounter.participants[1].rage_remainder
-        ),
-        (2 + 7, 0)
-    );
+    assert_eq!(vitals(&engine).rage, 5);
+    let wolf = foe_vitals(&engine);
+    assert_eq!((wolf.rage, wolf.rage_remainder), (2 + 7, 0));
 }
 
 #[test]
@@ -292,15 +286,18 @@ fn inconsistent_encounter_saves_are_rejected() {
         |e| e.participants.swap(0, 1),
         |e| e.participants.truncate(1),
         |e| e.participants.push(e.participants[1].clone()),
-        |e| e.participants[1].hp = 31,
-        |e| e.participants[1].mp = 11,
+        |e| e.participants[1].vitals.as_mut().unwrap().hp = 31,
+        |e| e.participants[1].vitals.as_mut().unwrap().mp = 11,
         |e| e.participants[0].mp_remainder = 100_000,
-        |e| e.participants[1].rage_remainder = 30,
+        |e| e.participants[1].vitals.as_mut().unwrap().rage_remainder = 30,
+        // The player's vitals have one owner, and an opponent's are its own.
+        |e| e.participants[0].vitals = e.participants[1].vitals,
+        |e| e.participants[1].vitals = None,
         |e| e.participants[1].next_time = e.now - 1,
         |e| e.participants[1].control = Control::Player,
         |e| e.participants[1].side = 0,
         |e| e.participants[1].character = "apprentice".into(),
-        |e| e.participants[1].hp = 0,
+        |e| e.participants[1].vitals.as_mut().unwrap().hp = 0,
         // The opponent would be overdue: the player's turn must be now.
         |e| e.participants[0].next_time += 1,
         |e| e.participants[1].side = 2,
@@ -369,6 +366,7 @@ fn skill(id: &str, power: u32, channel: Channel, cost: u32, resource: Resource) 
         channel,
         cost,
         resource,
+        costs: None,
         time: 100,
         level: 1,
         cross_share: None,
@@ -392,6 +390,7 @@ fn replay(fight: SimFight) {
         mp_regen_percent: 3,
         rage_per_action: 1,
         rage_per_max_hp: 20,
+        ..Resources::default()
     };
     combat.player_basic_channel = fight.player_basic;
     combat.player_skills = fight.player_skills.iter().map(|s| s.id.clone()).collect();
@@ -404,8 +403,8 @@ fn replay(fight: SimFight) {
     assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
     let mut engine = engaged(&world);
     let mut actions = 0;
-    while let Some(encounter) = engine.encounter() {
-        let player = &encounter.participants[0];
+    while engine.encounter().is_some() {
+        let player = vitals(&engine);
         let pool = |s: &Skill| match s.resource {
             Resource::Mp => player.mp,
             Resource::Rage => player.rage,
@@ -526,13 +525,21 @@ fn rage_saturates_instead_of_failing_the_encounter() {
     let mut engine = Engine::new(&world).unwrap();
     engine.execute(Move(North)).unwrap();
     engine.execute(Engage("wolf".into())).unwrap();
-    assert_eq!(foe(&engine).rage, u32::MAX);
+    assert_eq!(foe_vitals(&engine).rage, u32::MAX);
 }
 
 #[test]
 fn the_largest_action_cost_saves_and_restores_without_overflow() {
     let mut world = duel();
-    world.world.combat.as_mut().unwrap().timeline.action_cost = ACTION_COST_BOUND;
+    world
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .timeline
+        .as_mut()
+        .unwrap()
+        .action_cost = ACTION_COST_BOUND;
     let engine = engaged(&world);
     assert!(Engine::restore(&world, engine.snapshot()).is_ok());
 }

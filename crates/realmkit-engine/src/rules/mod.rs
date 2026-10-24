@@ -15,11 +15,12 @@ mod retinue;
 mod story;
 mod time;
 
+pub(super) use crate::character::{clamp_vitals, player_stats};
 pub(super) use actions::actions;
 pub(super) use economy::{quote, stock_up, ware_price};
 pub(super) use factions::initial as initial_standing;
 pub(super) use map::{known, map_view};
-pub(super) use player::{clamp_vitals, granted_points, player_stats, unspent_points};
+pub(super) use player::{granted_points, unspent_points};
 pub(super) use proficiency::{
     granted_points as granted_proficiency_points, rank, unspent_proficiency_points,
 };
@@ -90,20 +91,7 @@ pub(super) fn allowed(state: &GameState, requires: Option<&Condition>) -> bool {
 }
 
 pub(super) fn player_vitals(state: &GameState) -> Option<Vitals> {
-    Some(match &state.combat.as_ref()?.stance {
-        Stance::Exploring(vitals) => *vitals,
-        Stance::Fighting(encounter) => {
-            let player = &encounter.participants[0];
-            Vitals {
-                hp: player.hp,
-                mp: player.mp,
-            }
-        }
-        Stance::Battle(battle) => Vitals {
-            hp: battle.hp,
-            mp: battle.mp,
-        },
-    })
+    Some(state.combat.as_ref()?.vitals)
 }
 
 /// Only a personal fight kills: a battle knocks the player out instead.
@@ -125,7 +113,7 @@ pub(super) fn defeated(state: &GameState, id: &str) -> bool {
 pub(super) fn fighting(state: &GameState) -> Option<&Encounter> {
     match &state.combat.as_ref()?.stance {
         Stance::Fighting(encounter) => Some(encounter),
-        Stance::Exploring(_) | Stance::Battle(_) => None,
+        Stance::Exploring | Stance::Battle(_) => None,
     }
 }
 

@@ -1,4 +1,5 @@
-//! Combat numbers shared by the level table, profiles and bonuses.
+//! Combat numbers shared by the level table, profiles and bonuses. They
+//! describe a character, not a way of running a fight.
 
 use crate::*;
 
@@ -12,7 +13,8 @@ pub struct Stats {
     pub pdef: u32,
     pub satk: u32,
     pub sdef: u32,
-    /// How often the character acts in an encounter.
+    /// How quickly the character acts. The turn-based timeline turns it into
+    /// the delay between turns.
     pub speed: u32,
 }
 

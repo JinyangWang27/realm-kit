@@ -16,7 +16,6 @@ pub(super) fn check(
         .filter(|a| a.joins.is_none())
         .ok_or_else(invalid)?;
     let rules = world.battle().ok_or_else(invalid)?;
-    let max = rules::player_stats(world, combat);
     // Conditions cannot change mid-battle, so the allies are those here now.
     let allies_ok = battle.allies == crate::battle::allies_here(world, state);
     let mut ours = crate::battle::roster_stacks(world, state);
@@ -52,7 +51,7 @@ pub(super) fn check(
     };
     // An undecided battle: both sides still have someone standing.
     let standing = [
-        battle.hp > 0 || battle.sides[0].stacks.iter().any(|s| s.count > 0),
+        combat.vitals.hp > 0 || battle.sides[0].stacks.iter().any(|s| s.count > 0),
         battle.sides[1].stacks.iter().any(|s| s.count > 0),
     ];
     ensure(
@@ -61,8 +60,6 @@ pub(super) fn check(
             && side_ok(&battle.sides[1], &theirs, 0)
             && battle.round < rules.rounds
             && standing == [true, true]
-            && battle.hp <= max.hp
-            && battle.mp <= max.mp
             && state.dialogue.is_none(),
         "invalid battle state",
     )

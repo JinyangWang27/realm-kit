@@ -287,6 +287,7 @@ fn combat_profile(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, profile
             out,
             rules,
             owner,
+            profile.resources,
             profile.basic_channel,
             usable.map(|s| (s, &profile.stats)),
             &profile.stats,
