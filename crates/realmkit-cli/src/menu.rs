@@ -350,23 +350,41 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 Some(rank) => format!("{} · {rank}", skill.name),
                 None => skill.name.clone(),
             };
-            let resource = match skill.resource {
+            let named = |resource| match resource {
                 Resource::Mp => MP,
                 Resource::Rage => RAGE,
             };
+            // Every cost, MP first, as the engine checks and spends them.
+            let costs: Vec<_> = [Resource::Mp, Resource::Rage]
+                .into_iter()
+                .filter(|r| skill.cost_in(*r) > 0)
+                .collect();
+            let listed: Vec<_> = costs
+                .iter()
+                .map(|r| format!("{} {}", skill.cost_in(*r), named(*r)))
+                .collect();
+            // The first cost the player cannot cover is the one named.
+            let (vitals, pools) = (engine.player_vitals(), engine.player_pools());
+            let short = costs.iter().copied().find(|r| match (vitals, pools) {
+                (Some(v), Some(p)) => match r {
+                    Resource::Mp => p.mp.is_none() || v.mp < skill.cost_in(*r),
+                    Resource::Rage => p.rage.is_none() || v.rage < skill.cost_in(*r),
+                },
+                _ => true,
+            });
             format!(
                 "{} {ON} {}{}{}",
                 name,
                 world.character(target).unwrap().name,
-                if skill.cost > 0 {
-                    format!(" — {} {resource}", skill.cost)
-                } else {
+                if listed.is_empty() {
                     String::new()
+                } else {
+                    format!(" — {}", listed.join(", "))
                 },
-                if action.available {
-                    String::new()
-                } else {
-                    format!(" [not enough {resource}]")
+                match short.filter(|_| !action.available) {
+                    Some(resource) => format!(" [not enough {}]", named(resource)),
+                    None if action.available => String::new(),
+                    None => format!(" [not enough {}]", named(skill.resource)),
                 }
             )
         }
@@ -1026,6 +1044,33 @@ mod tests {
             engine.execute(Command::Move(Direction::East)),
             Err(realmkit_engine::EngineError::NoExit)
         ));
+    }
+
+    #[test]
+    fn skill_labels_list_every_cost_and_name_the_short_resource() {
+        let mut world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/duel")).unwrap();
+        let combat = world.world.combat.as_mut().unwrap();
+        combat.resources.rage_per_action = 1;
+        let mut storm = combat.skills[1].clone();
+        (storm.id, storm.name, storm.cost) = ("storm".into(), "Storm".into(), 0);
+        storm.costs = Some(realmkit_spec::Costs { mp: 6, rage: 3 });
+        combat.skills.push(storm);
+        combat.player_skills.push("storm".into());
+        let mut engine = Engine::new(&world).unwrap();
+        engine.execute(Command::Move(Direction::North)).unwrap();
+        engine.execute(Command::Engage("witch".into())).unwrap();
+        // The witch's opening hex builds no rage here; the player has not acted.
+        let menu = Menu::new(&engine, false, None);
+        let labels: Vec<_> = menu.entries().iter().map(|e| e.label.clone()).collect();
+        assert!(
+            labels.contains(&"Storm on The Hedge Witch — 6 MP, 3 rage [not enough rage]".into()),
+            "{labels:?}"
+        );
+        assert!(
+            labels.contains(&"Bolt on The Hedge Witch — 12 MP".into()),
+            "{labels:?}"
+        );
     }
 
     #[test]

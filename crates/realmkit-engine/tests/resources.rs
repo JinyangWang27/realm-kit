@@ -621,3 +621,44 @@ fn a_capped_dual_resource_fight_matches_the_simulator() {
     let left = vitals(&engine);
     assert_eq!((actions, left.hp, left.mp, left.rage), (6, 21, 9, 1));
 }
+
+#[test]
+fn fractional_rage_carries_until_a_decay_boundary_drains_it() {
+    let world = fighters(Some(BOTH), &["spark", "bolt"]);
+    let fresh = Engine::new(&world).unwrap();
+    let start = Vitals {
+        rage: 0,
+        rage_remainder: 5,
+        ..vitals(&fresh)
+    };
+    // Minute 20 crosses no decay boundary: the part of a point stays.
+    let mut engine = with_vitals(&world, &fresh, start);
+    engine.execute(Wait(20)).unwrap();
+    assert_eq!(vitals(&engine).rage_remainder, 5);
+    // Minute 30 drains, and drained Rage keeps no part of a point.
+    engine.execute(Wait(10)).unwrap();
+    assert_eq!(vitals(&engine).rage_remainder, 0);
+}
+
+#[test]
+fn an_opponent_weighs_costs_too_large_to_add_in_u32() {
+    // Uncapped Rage can pay any cost, so a policy summing costs must not overflow.
+    let mut world = fighters(None, &["spark"]);
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.resources.rage_cap = None;
+    combat.resources.rage_per_action = u32::MAX;
+    combat.skills.push(skill(
+        "ruin",
+        130,
+        Costs {
+            mp: 1,
+            rage: u32::MAX,
+        },
+    ));
+    combatant(&mut world, "witch").skills = vec!["hex".into(), "ruin".into()];
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    let mut engine = engaged(&world);
+    // Her opening hex earns u32::MAX rage, so both skills are affordable next turn.
+    engine.execute(cast("spark")).unwrap();
+    assert!(engine.encounter().is_some() || !engine.is_dead());
+}

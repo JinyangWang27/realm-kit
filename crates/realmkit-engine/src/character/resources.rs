@@ -191,8 +191,9 @@ pub(crate) fn elapse(world: &WorldSpec, state: &mut GameState, from: u64, to: u6
         vitals.rage = vitals
             .rage
             .saturating_sub(lost.try_into().unwrap_or(u32::MAX));
-        // Drained Rage keeps no part of a point either.
-        if vitals.rage == 0 {
+        // Rage drained by a boundary keeps no part of a point either; a
+        // span that crosses none leaves the fraction to carry on.
+        if lost > 0 && vitals.rage == 0 {
             vitals.rage_remainder = 0;
         }
     }

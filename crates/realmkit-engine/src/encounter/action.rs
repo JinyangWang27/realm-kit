@@ -37,7 +37,9 @@ pub(crate) fn check_skill(
 pub(super) fn choose<'w>(world: &'w WorldSpec, vitals: &Vitals, id: &str) -> Option<&'w Skill> {
     let profile = profile(world, id);
     let pools = resources::profile_pools(world, profile);
-    let cost = |s: &Skill| s.cost_in(Resource::Mp) + s.cost_in(Resource::Rage);
+    // Wide enough that two authored costs never overflow.
+    let cost =
+        |s: &Skill| u64::from(s.cost_in(Resource::Mp)) + u64::from(s.cost_in(Resource::Rage));
     profile
         .skills
         .iter()
