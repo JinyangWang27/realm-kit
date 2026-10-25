@@ -16,6 +16,9 @@ fn profile() -> CombatProfile {
         level: 1,
         group: None,
         resources: None,
+        ally: false,
+        targeting: Targeting::First,
+        guard_hold: None,
     }
 }
 

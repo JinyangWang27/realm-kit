@@ -40,8 +40,8 @@ pub enum Stance {
     Exploring,
     /// A personal fight on the turn-based initiative timeline.
     Fighting(Encounter),
-    /// A one-on-one real-time duel on its own fixed-step clock.
-    Dueling(Duel),
+    /// A real-time fight on its own fixed-step clock.
+    Realtime(RealtimeEncounter),
     /// Leading a mass battle.
     Battle(BattleState),
 }
@@ -130,9 +130,9 @@ pub struct Encounter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Control {
-    /// The timeline pauses for a command.
+    /// Acts on the player's commands; the timeline pauses for one.
     Player,
-    /// The engine resolves an authored policy immediately.
+    /// The engine acts by the character's authored policy.
     Policy,
 }
 
@@ -165,30 +165,39 @@ impl Encounter {
     }
 }
 
-/// A one-on-one fight on the real-time layer's clock: the steps it has run
-/// and what each fighter is doing. Like an encounter, it copies no vitals
-/// but the opponent's, which last only as long as the duel.
+/// A fight on the real-time layer's clock: the steps it has run and what
+/// each fighter is doing. Fighters on different teams are hostile; fighters
+/// can join while it runs. Like an encounter, it copies no vitals but those
+/// of the characters who are not the player, which last only as long as the
+/// fight.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Duel {
-    /// Steps of duel time so far. Only an advance moves it; it is neither
+pub struct RealtimeEncounter {
+    /// Steps of fight time so far. Only an advance moves it; it is neither
     /// world time nor encounter time.
     pub step: u64,
-    /// The player, then the opponent.
-    pub fighters: [Fighter; 2],
+    /// In join order: the player, the opponents the fight started with,
+    /// then everyone who joined, as they did. Nobody is ever removed.
+    pub fighters: Vec<Fighter>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Fighter {
     pub character: Id,
-    /// The opponent's vitals for this duel; `None` for the player, whose
+    /// 0 is the player's team; the opponents it started with are team 1.
+    pub team: u32,
+    pub control: Control,
+    /// The step it joined at; 0 for those the fight started with.
+    pub joined: u64,
+    /// This fighter's vitals for this fight; `None` for the player, whose
     /// vitals stay in [`CombatState::vitals`].
     pub vitals: Option<Vitals>,
-    /// Duel-time regeneration progress toward the next MP point; it ends
-    /// with the duel.
+    /// Fight-time regeneration progress toward the next MP point; it ends
+    /// with the fight.
     pub mp_remainder: u64,
-    pub action: DuelAction,
+    /// What it is committed to; `Ready` for good once it is out.
+    pub action: RealtimeAction,
     /// Stopped fighting, alive, in a yielding group.
     pub yielded: bool,
 }
@@ -197,12 +206,14 @@ pub struct Fighter {
 /// reaches its `until` step; the fighter is then in the next one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub enum DuelAction {
+pub enum RealtimeAction {
     /// Free to act.
     Ready,
-    /// A basic attack (`skill` is `None`) or a skill, already paid for.
+    /// A basic attack (`skill` is `None`) or a skill, already paid for,
+    /// aimed at a hostile `target`.
     Attack {
         skill: Option<Id>,
+        target: Id,
         phase: AttackPhase,
         until: u64,
         /// Whether this attack has landed; each lands at most once.
@@ -225,14 +236,23 @@ pub enum AttackPhase {
     Recovery,
 }
 
-impl Duel {
-    /// Fighter `i`'s vitals: the opponent's own, or the player's.
+impl RealtimeEncounter {
+    /// Fighter `i`'s vitals: its own, or the player's.
     pub fn vitals<'a>(&'a self, i: usize, player: &'a Vitals) -> &'a Vitals {
         self.fighters[i].vitals.as_ref().unwrap_or(player)
     }
     /// Whether fighter `i` still fights: alive and not yielded.
     pub fn fighting(&self, i: usize, player: &Vitals) -> bool {
         self.vitals(i, player).hp > 0 && !self.fighters[i].yielded
+    }
+    /// The fighter playing `character`, if it is in this fight.
+    pub fn index(&self, character: &str) -> Option<usize> {
+        self.fighters.iter().position(|f| f.character == character)
+    }
+    /// Whether anyone off the player's team still fights; the fight goes
+    /// on while someone does.
+    pub fn contested(&self, player: &Vitals) -> bool {
+        (1..self.fighters.len()).any(|i| self.fighters[i].team != 0 && self.fighting(i, player))
     }
 }
 

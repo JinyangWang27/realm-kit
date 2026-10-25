@@ -85,7 +85,7 @@ pub struct Timeline {
     pub speed_cap: u32,
 }
 
-/// Real-time duel timing, in fixed steps of the duel's own clock. Phase
+/// Real-time fight timing, in fixed steps of the fight's own clock. Phase
 /// lengths are a basic action's at speed 100; a fighter at speed `s` using
 /// an action of time `t`% holds each phase `max(1, ceil(length × t / s))` steps.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -111,6 +111,10 @@ pub struct Realtime {
     /// neither world time nor encounter time.
     #[serde(default)]
     pub mp_regen_percent: u32,
+    /// Whether a reported contact may land on the attacker's own team.
+    /// Without it, such a report is refused; nobody aims at a teammate either way.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub friendly_fire: bool,
 }
 
 /// MP and Rage: what builds, restores and drains them. Every field is

@@ -258,10 +258,10 @@ impl<'w> Engine<'w> {
     pub fn encounter(&self) -> Option<&Encounter> {
         rules::fighting(&self.state)
     }
-    /// The real-time duel, if any.
-    pub fn duel(&self) -> Option<&Duel> {
+    /// The real-time fight, if any.
+    pub fn realtime(&self) -> Option<&RealtimeEncounter> {
         match &self.state.combat.as_ref()?.stance {
-            Stance::Dueling(duel) => Some(duel),
+            Stance::Realtime(duel) => Some(duel),
             Stance::Exploring | Stance::Fighting(_) | Stance::Battle(_) => None,
         }
     }
@@ -269,7 +269,7 @@ impl<'w> Engine<'w> {
     pub fn battle(&self) -> Option<&BattleState> {
         match &self.state.combat.as_ref()?.stance {
             Stance::Battle(battle) => Some(battle),
-            Stance::Exploring | Stance::Fighting(_) | Stance::Dueling(_) => None,
+            Stance::Exploring | Stance::Fighting(_) | Stance::Realtime(_) => None,
         }
     }
     /// The next `n` actors, projected as if every action took a basic

@@ -165,6 +165,11 @@ retreat takes time. In the terminal you step the clock yourself (`step 3`,
 `strike`, `strike lunge`, `guard`, `lower`, `disengage`) and play the host's
 part by reporting that an active attack touched (`contact master`); the
 engine decides whether it could and what it does (`examples/practice-yard`).
+A real-time fight can be a group (`duel left_twin` brings in both twins, and
+`strike at right_twin` picks one), and can grow while it runs: the host
+reports arrivals (`join brigand 1` for another foe, `join <ally> 0` for a
+friend at your side), allies fight by the same rules as foes, and the fight
+ends only when the last foe falls or yields.
 Worlds can also grant stat
 points on levelling up, which you spend to shape your own build, and
 techniques mastered rank by rank, each rank named by the world

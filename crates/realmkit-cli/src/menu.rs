@@ -5,7 +5,7 @@ use crate::{
         direction_name, duration, gear_name, money, piece_name, soldier, stat_name, travel_time,
     },
 };
-use realmkit_engine::{AttackPhase, BattleOrder, Command, DuelAction, Engine, Intent, Vitals};
+use realmkit_engine::{AttackPhase, BattleOrder, Command, Engine, Intent, RealtimeAction, Vitals};
 use realmkit_spec::{CharacterKind, Resource, StartQuestion, Stat};
 use std::io::{self, Write};
 
@@ -27,6 +27,9 @@ const FLEE: &str = "Flee";
 const DUEL: &str = "Duel";
 const STEP: &str = "Wait a step";
 const STRIKE: &str = "Strike";
+const AT: &str = "at";
+const ALLY: &str = "at your side";
+const TEAM: &str = "side";
 const GUARD: &str = "Raise guard";
 const LOWER: &str = "Lower guard";
 const DISENGAGE: &str = "Disengage";
@@ -239,15 +242,15 @@ fn fighter_line(engine: &Engine<'_>, character: &str, v: Vitals, yielded: bool) 
 /// "Step 12 | You HP 40/40 · ready | The Master HP 30/30 · striking until 15":
 /// each fighter's vitals and what they are committed to, and until when.
 fn duel_lines(engine: &Engine<'_>) -> Vec<String> {
-    let Some(duel) = engine.duel() else {
+    let Some(duel) = engine.realtime() else {
         return Vec::new();
     };
     let player = engine.player_vitals().unwrap();
     let mut parts = vec![format!("{STEP_NOW} {}", duel.step)];
     for (i, f) in duel.fighters.iter().enumerate() {
         let doing = match &f.action {
-            DuelAction::Ready => READY.to_string(),
-            DuelAction::Attack { phase, until, .. } => {
+            RealtimeAction::Ready => READY.to_string(),
+            RealtimeAction::Attack { phase, until, .. } => {
                 let phase = match phase {
                     AttackPhase::Windup => WINDING_UP,
                     AttackPhase::Active => STRIKING,
@@ -255,13 +258,19 @@ fn duel_lines(engine: &Engine<'_>) -> Vec<String> {
                 };
                 format!("{phase} {UNTIL} {until}")
             }
-            DuelAction::Guard { ready_at } if *ready_at <= duel.step => GUARD_UP.to_string(),
-            DuelAction::Guard { ready_at } => format!("{GUARD_RAISING} {UNTIL} {ready_at}"),
-            DuelAction::Retreat { until } => format!("{DISENGAGING} {UNTIL} {until}"),
+            RealtimeAction::Guard { ready_at } if *ready_at <= duel.step => GUARD_UP.to_string(),
+            RealtimeAction::Guard { ready_at } => format!("{GUARD_RAISING} {UNTIL} {ready_at}"),
+            RealtimeAction::Retreat { until } => format!("{DISENGAGING} {UNTIL} {until}"),
         };
         let v = *duel.vitals(i, &player);
+        // Only fights that grew beyond the player and their foes say whose side.
+        let side = match f.team {
+            0 if i > 0 => format!(" · {ALLY}"),
+            0 | 1 => String::new(),
+            team => format!(" · {TEAM} {team}"),
+        };
         parts.push(format!(
-            "{} · {doing}",
+            "{}{side} · {doing}",
             fighter_line(engine, &f.character, v, f.yielded)
         ));
     }
@@ -630,16 +639,25 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Wait(minutes) => format!("{WAIT} — {}", duration(*minutes)),
         Command::Flee => FLEE.into(),
         Command::Duel(id) => format!("{DUEL} {}", world.character(id)?.name),
-        // Contact is the host's report, never a choice.
-        Command::Intent(intent) => match intent {
-            Intent::Advance(_) => STEP.into(),
-            Intent::Attack => STRIKE.into(),
-            Intent::Skill(skill) => format!("{STRIKE}: {}", world.skill(skill)?.name),
-            Intent::Guard => GUARD.into(),
-            Intent::LowerGuard => LOWER.into(),
-            Intent::Retreat => DISENGAGE.into(),
-            Intent::Contact(_) => return None,
-        },
+        // Contact and arrivals are the host's reports, never a choice.
+        // "Strike: Lunge at The Left Twin" when there is more than one foe.
+        Command::Intent(intent) => {
+            let at = |target: &Option<String>| match target {
+                Some(id) => world.character(id).map(|c| format!(" {AT} {}", c.name)),
+                None => Some(String::new()),
+            };
+            match intent {
+                Intent::Advance(_) => STEP.into(),
+                Intent::Attack { target } => format!("{STRIKE}{}", at(target)?),
+                Intent::Skill { skill, target } => {
+                    format!("{STRIKE}: {}{}", world.skill(skill)?.name, at(target)?)
+                }
+                Intent::Guard => GUARD.into(),
+                Intent::LowerGuard => LOWER.into(),
+                Intent::Retreat => DISENGAGE.into(),
+                Intent::Contact { .. } | Intent::Join { .. } => return None,
+            }
+        }
         // "Train Attack: 12 → 13", from the same effective stats the engine uses.
         Command::Allocate { stat, .. } => {
             let now = engine.player_stats().unwrap().get(*stat);
@@ -866,7 +884,7 @@ impl Menu {
             dialogue,
             header: if engine.battle().is_some() {
                 battle_lines(engine)
-            } else if engine.duel().is_some() {
+            } else if engine.realtime().is_some() {
                 duel_lines(engine)
             } else {
                 encounter_lines(engine)

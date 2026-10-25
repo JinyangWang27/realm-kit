@@ -286,12 +286,21 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   groups; duel-time MP regeneration; saves at any step; settlement shared
   with encounters, exactly once. Contact is host-reported and only bounded by
   the engine (active window, once per attack), with no accuracy or crit roll.
+- **Multi-participant real-time fights (Combat-RT-02):** the duel generalized
+  into a `RealtimeEncounter` of fighters in join order on numbered teams,
+  player- or engine-controlled. Groups start together; allies (`ally`
+  profiles), hostile reinforcements and third teams join mid-fight through a
+  validated, host-reported `Join` that leaves the clock and everyone's state
+  untouched. Attacks carry explicit targets, contact names attacker and
+  target, `friendly_fire` is opt-in, and engine-controlled fighters aim by
+  authored `targeting` and may hold a guard (`guard_hold`). The fight ends
+  when nobody off the player's team fights, settling every fallen foe once.
 
 Next, when a client needs it: spatial authority for real-time contact
 (positions, reach and hit volumes on the fixed step, or a validated spatial
-record), a host bridge for a 3D client, opponent defence and spacing,
-interruption and poise, dodges and parries; then companions with their own
-vitals. See [Not supported yet](docs/combat.md#not-supported-yet).
+record), a host bridge for a 3D client, spacing and retreat for
+engine-controlled fighters, interruption and poise, dodges and parries; then
+persistent named companions with their own vitals and world-level lifecycle. See [Not supported yet](docs/combat.md#not-supported-yet).
 
 ### Optional parts of combat · proposed
 

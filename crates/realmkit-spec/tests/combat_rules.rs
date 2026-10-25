@@ -384,6 +384,7 @@ fn realtime() -> Realtime {
         guard_percent: 25,
         retreat: 90,
         mp_regen_percent: 2,
+        friendly_fire: false,
     }
 }
 
@@ -424,4 +425,30 @@ fn real_time_rules_are_optional_and_bounded() {
     // revision, and the saves bound to it, stay the same.
     let json = serde_json::to_value(&duel().world.combat).unwrap();
     assert!(json.get("realtime").is_none());
+}
+
+#[test]
+fn real_time_conduct_is_bounded_and_absent_by_default() {
+    let mut world = duel();
+    fighter(&mut world, "witch").guard_hold = Some(PHASE_BOUND);
+    fighter(&mut world, "witch").targeting = Targeting::Weakest;
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    for hold in [0, PHASE_BOUND + 1] {
+        let mut world = duel();
+        fighter(&mut world, "witch").guard_hold = Some(hold);
+        assert!(codes(&world).contains(&"invalid_guard_hold".to_string()));
+    }
+    // An ally fights beside the player, so no group can bring it in as an opponent.
+    let mut world = duel();
+    let groups = &mut world.world.combat.as_mut().unwrap().groups;
+    groups.push(serde_json::from_value(serde_json::json!({ "id": "pair" })).unwrap());
+    fighter(&mut world, "witch").ally = true;
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    fighter(&mut world, "witch").group = Some("pair".into());
+    assert!(codes(&world).contains(&"ally_in_group".to_string()));
+    // Profiles without them serialize as before, keeping rules revisions.
+    let json = serde_json::to_value(duel().character("witch").unwrap()).unwrap();
+    for field in ["ally", "targeting", "guard_hold"] {
+        assert!(json["combat"].get(field).is_none());
+    }
 }

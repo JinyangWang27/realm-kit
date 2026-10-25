@@ -153,13 +153,17 @@ See [Combat architecture](combat.md).
 
 ## Duel
 
-The optional real-time layer's fight: the player against one opponent who
-fights alone, on a fixed-step clock of its own (duel time) that only an
-explicit advance moves. Each fighter is ready or committed to an attack's
-wind-up, active or recovery phase, a guard or a retreat. Whether an active
-attack touched is reported by the host and bounded by the engine; everything
-it does is decided by the engine. Like an encounter, it owns only its
-opponent's [Vitals](#vitals). See [Real-time duels](combat.md#real-time-duels).
+The optional real-time layer's fight (`RealtimeEncounter`): the player
+against one opponent or a group, on a fixed-step clock of its own (fight
+time) that only an explicit advance moves. Fighters are on numbered teams,
+the player's being 0; allies, reinforcements and third parties can join
+while it runs, and it ends when nobody off the player's team still fights.
+Each fighter is ready or committed to an attack's wind-up, active or
+recovery phase, a guard or a retreat. Whether an active attack touched, and
+whom, is reported by the host and bounded by the engine; everything it does
+is decided by the engine. Like an encounter, it owns only the
+[Vitals](#vitals) of fighters other than the player. See
+[Real-time duels](combat.md#real-time-duels).
 
 ## Vitals
 
