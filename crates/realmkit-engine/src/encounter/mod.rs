@@ -261,7 +261,9 @@ fn fighting<'s>(
             },
             me,
         )),
-        Stance::Exploring | Stance::Dueling(_) | Stance::Battle(_) => Err(EngineError::NotFighting),
+        Stance::Exploring | Stance::Realtime(_) | Stance::Battle(_) => {
+            Err(EngineError::NotFighting)
+        }
     }
 }
 

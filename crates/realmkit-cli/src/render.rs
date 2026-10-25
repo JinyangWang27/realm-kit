@@ -523,6 +523,26 @@ pub fn events(
                 name(character)
             )?,
             Event::RetreatStarted => writeln!(output, "You turn to disengage.")?,
+            Event::Joined { character, team: 0 } => {
+                writeln!(output, "{} joins the fight at your side.", name(character))?
+            }
+            Event::Joined { character, .. } => {
+                writeln!(output, "{} joins the fight.", name(character))?
+            }
+            Event::Struck {
+                attacker,
+                target,
+                amount,
+                variant,
+                skill,
+            } => {
+                let narrative = &world.combat().unwrap().narrative;
+                let text = skill.as_ref().map_or(&narrative.attack[*variant], |id| {
+                    &world.skill(id).unwrap().text
+                });
+                hit(output, text, name(attacker), name(target), *amount)?;
+            }
+            Event::AllyDown { character } => writeln!(output, "{} falls.", name(character))?,
             Event::Yielded { character } if *character == world.world.player => {
                 writeln!(output, "You yield.")?
             }

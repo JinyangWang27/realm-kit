@@ -8,7 +8,7 @@ use realmkit_spec::Group;
 
 /// The player returns to exploring, with any Rage that belongs to one fight
 /// gone. A victory then grants each opponent in `fallen` its loot and XP
-/// (scaled by level difference), records it unless its group is repeatable,
+/// (scaled by level difference), records it unless its own group is repeatable,
 /// advances defeat objectives and sets the group's victory flags; the
 /// player's yield sets its defeat flags; a flight grants and records nothing.
 /// The stance is gone before anything is granted, so nothing can settle twice.
@@ -30,8 +30,7 @@ pub(crate) fn settle(
         Outcome::Fled => return Ok(()),
     };
     if outcome == Outcome::Victory {
-        let repeatable = group.is_some_and(|g| g.repeatable);
-        victory_rewards(world, state, fallen, repeatable, events)?;
+        victory_rewards(world, state, fallen, events)?;
     }
     for flag in flags {
         rules::set_flag(world, state, flag, events);
@@ -40,13 +39,12 @@ pub(crate) fn settle(
 }
 
 /// Each fallen opponent's loot and XP, scaled from the level the player
-/// fought at; its defeat is recorded unless the group is repeatable, and
+/// fought at; its defeat is recorded unless its group is repeatable, and
 /// advances defeat objectives. Passive arts then take their share.
 fn victory_rewards(
     world: &WorldSpec,
     state: &mut GameState,
     fallen: Vec<Id>,
-    repeatable: bool,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     // Every reward scales from the level the player fought at, so a
@@ -56,7 +54,9 @@ fn victory_rewards(
     for id in fallen {
         let profile = profile(world, &id);
         let combat = state.combat.as_mut().unwrap();
-        if !repeatable {
+        // A reinforcement from another group keeps its own group's rule.
+        let repeatable = profile.group.as_deref().and_then(|g| world.group(g));
+        if !repeatable.is_some_and(|g| g.repeatable) {
             combat.defeated.insert(id.clone());
         }
         let xp = xp_for_defeat(profile.xp, level, profile.level);

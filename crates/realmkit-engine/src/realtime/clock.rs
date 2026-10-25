@@ -1,12 +1,13 @@
-//! The duel's fixed-step clock. Each step runs in one order: the clock
-//! moves on, both fighters regenerate MP, the player's committed action
-//! moves through its phases, then the opponent's, and a ready opponent
-//! begins its next attack. Nothing depends on how steps are batched into
-//! advances, so a host may submit one step per frame or many at once.
+//! The fight's fixed-step clock. Each step runs in one order: the clock
+//! moves on, every fighter still fighting regenerates MP, each fighter's
+//! committed action moves through its phases, and each engine-controlled
+//! fighter acts by its policy, all in join order. Nothing depends on how
+//! steps are batched into advances, so a host may submit one step per frame
+//! or many at once.
 
 use super::*;
 
-/// Runs `steps` steps, stopping at the step the duel ends.
+/// Runs `steps` steps, stopping at the step the fight ends.
 pub(super) fn advance(
     world: &WorldSpec,
     state: &mut GameState,
@@ -28,18 +29,21 @@ fn step(
     events: &mut Vec<Event>,
 ) -> Result<bool, EngineError> {
     let realtime = *rules(world)?;
-    let mut ring = dueling(world, &mut state.combat)?;
-    ring.duel.step = ring
-        .duel
+    let mut ring = ring(world, &mut state.combat)?;
+    ring.fight.step = ring
+        .fight
         .step
         .checked_add(1)
         .ok_or(EngineError::NumericLimit)?;
-    let now = ring.duel.step;
-    // Duel time regenerates only on this clock, per second of steps.
+    let now = ring.fight.step;
+    // Fight time regenerates only on this clock, per second of steps.
     let per_point = 100 * u128::from(realtime.steps_per_second);
-    for i in 0..2 {
+    for i in 0..ring.fight.fighters.len() {
+        if !ring.fighting(i) {
+            continue;
+        }
         let max = ring.sides[i].pools.mp_max();
-        let fighter = &mut ring.duel.fighters[i];
+        let fighter = &mut ring.fight.fighters[i];
         let mp = match fighter.vitals.as_mut() {
             Some(vitals) => &mut vitals.mp,
             None => &mut ring.player.mp,
@@ -47,19 +51,49 @@ fn step(
         let rate = realtime.mp_regen_percent;
         resources::regenerate(mp, &mut fighter.mp_remainder, max, rate, 1, per_point);
     }
-    for i in 0..2 {
+    for i in 0..ring.fight.fighters.len() {
         if phase(world, &realtime, &mut ring, i, now, events)? {
             return Ok(true);
         }
     }
-    // The opponent's authored policy: attack whenever free, with the
-    // strongest skill it can pay for.
-    if ring.duel.fighters[1].action == DuelAction::Ready {
-        let opponent = &ring.duel.fighters[1].character;
-        let skill = encounter::choose(world, ring.duel.vitals(1, ring.player), opponent);
-        begin(&realtime, &mut ring, 1, skill, events)?;
+    for i in 0..ring.fight.fighters.len() {
+        if ring.fight.fighters[i].control == Control::Policy && ring.fighting(i) {
+            policy(world, &realtime, &mut ring, i, now, events)?;
+        }
     }
     Ok(false)
+}
+
+/// An engine-controlled fighter's authored policy: with a `guard_hold`, it
+/// raises its guard whenever it is ready and attacks once the guard has
+/// been up that many steps; without one, it attacks whenever it is ready.
+/// Each attack aims by its `targeting` and uses the strongest skill it can
+/// pay for, else a basic attack, chosen as in turn-based encounters.
+fn policy(
+    world: &WorldSpec,
+    realtime: &Realtime,
+    ring: &mut Ring,
+    i: usize,
+    now: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let character = &ring.fight.fighters[i].character;
+    let hold = profile(world, character).guard_hold;
+    let attack = match (&ring.fight.fighters[i].action, hold) {
+        (RealtimeAction::Ready, Some(_)) => return raise(realtime, ring, i, events),
+        (RealtimeAction::Ready, None) => true,
+        (RealtimeAction::Guard { ready_at }, Some(hold)) => {
+            now >= ready_at.saturating_add(u64::from(hold))
+        }
+        _ => false,
+    };
+    // Someone always fights against it while the fight runs.
+    let Some(t) = pick(world, ring, i).filter(|_| attack) else {
+        return Ok(());
+    };
+    let skill = encounter::choose(world, ring.vitals(i), character);
+    let target = ring.fight.fighters[t].character.clone();
+    begin(realtime, ring, i, skill, target, events)
 }
 
 /// Moves fighter `i`'s action on if its current state ends at `now`;
@@ -73,14 +107,15 @@ fn phase(
     events: &mut Vec<Event>,
 ) -> Result<bool, EngineError> {
     let side = ring.sides[i];
-    let fighter = &mut ring.duel.fighters[i];
+    let fighter = &mut ring.fight.fighters[i];
     let character = fighter.character.clone();
     match &mut fighter.action {
-        DuelAction::Attack {
+        RealtimeAction::Attack {
             skill,
             phase,
             until,
             connected,
+            ..
         } if *until == now => {
             let id = skill.clone();
             let skill = id.as_deref().map(|id| world.skill(id).unwrap());
@@ -95,7 +130,7 @@ fn phase(
                     AttackPhase::Recovery
                 }
                 AttackPhase::Recovery => {
-                    fighter.action = DuelAction::Ready;
+                    fighter.action = RealtimeAction::Ready;
                     events.push(Event::Ready { character });
                     return Ok(false);
                 }
@@ -111,11 +146,11 @@ fn phase(
             });
             Ok(false)
         }
-        DuelAction::Guard { ready_at } if *ready_at == now => {
+        RealtimeAction::Guard { ready_at } if *ready_at == now => {
             events.push(Event::GuardUp { character });
             Ok(false)
         }
-        DuelAction::Retreat { until } => Ok(*until == now),
+        RealtimeAction::Retreat { until } => Ok(*until == now),
         _ => Ok(false),
     }
 }

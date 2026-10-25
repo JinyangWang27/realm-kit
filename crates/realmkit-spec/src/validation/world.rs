@@ -279,7 +279,10 @@ fn combat_profile(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, profile
     if profile.ally && profile.group.is_some() {
         issue(out, owner, "ally_in_group", "an ally belongs to no group");
     }
-    if profile.guard_hold.is_some_and(|h| !(1..=PHASE_BOUND).contains(&h)) {
+    if profile
+        .guard_hold
+        .is_some_and(|h| !(1..=PHASE_BOUND).contains(&h))
+    {
         issue(
             out,
             owner,

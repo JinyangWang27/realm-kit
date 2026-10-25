@@ -66,8 +66,14 @@ pub enum EngineError {
     InEncounter,
     #[error("this world has no real-time duels")]
     NoDuels,
-    #[error("{0} does not fight alone")]
-    NotOneOnOne(Id),
+    #[error("{0} is already in the fight")]
+    AlreadyJoined(Id),
+    #[error("{character} cannot join team {team}")]
+    InvalidTeam { character: Id, team: u32 },
+    #[error("choose whom to strike")]
+    NeedTarget,
+    #[error("{0} cannot be struck now")]
+    InvalidTarget(Id),
     #[error("finish what you are doing first")]
     Committed,
     #[error("you are not guarding")]

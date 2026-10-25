@@ -21,11 +21,14 @@ fn step(n: u32) -> Command {
 }
 
 fn strike() -> Command {
-    Intent(realmkit_engine::Intent::Attack)
+    Intent(realmkit_engine::Intent::Attack { target: None })
 }
 
 fn skill(id: &str) -> Command {
-    Intent(realmkit_engine::Intent::Skill(id.into()))
+    Intent(realmkit_engine::Intent::Skill {
+        skill: id.into(),
+        target: None,
+    })
 }
 
 fn guard() -> Command {
@@ -33,7 +36,10 @@ fn guard() -> Command {
 }
 
 fn contact(by: &str) -> Command {
-    Intent(realmkit_engine::Intent::Contact(by.into()))
+    Intent(realmkit_engine::Intent::Contact {
+        attacker: by.into(),
+        target: None,
+    })
 }
 
 fn retreat() -> Command {
@@ -47,8 +53,8 @@ fn run(engine: &mut Engine<'_>, commands: &[Command]) -> Vec<Event> {
         .collect()
 }
 
-fn duel(engine: &Engine<'_>) -> realmkit_engine::Duel {
-    engine.duel().unwrap().clone()
+fn duel(engine: &Engine<'_>) -> realmkit_engine::RealtimeEncounter {
+    engine.realtime().unwrap().clone()
 }
 
 fn opponent(engine: &Engine<'_>) -> Vitals {
@@ -95,9 +101,9 @@ fn a_duel_replays_identically_and_settles_a_victory_once() {
     let mut first = Engine::new_with_seed(&world, 9).unwrap();
     let mut events = run(&mut first, &commands);
     // Basic hits until the brigand falls, each landing as the host reports.
-    while first.duel().is_some() {
+    while first.realtime().is_some() {
         for command in landed_attack() {
-            if first.duel().is_some() {
+            if first.realtime().is_some() {
                 events.extend(first.execute(command.clone()).unwrap());
                 commands.push(command);
             }
@@ -119,7 +125,7 @@ fn a_duel_replays_identically_and_settles_a_victory_once() {
     assert!(dealt[1] > basic);
 
     // The duel settled at the hit that felled the brigand.
-    assert!(first.duel().is_none());
+    assert!(first.realtime().is_none());
     let ended: Vec<_> = events
         .iter()
         .filter(|e| matches!(e, Event::EncounterEnded { .. }))
@@ -185,7 +191,7 @@ fn an_attack_moves_through_its_phases_and_commits_the_attacker() {
     let mut engine = Engine::new(&world).unwrap();
     run(&mut engine, &[Duel("master".into()), strike()]);
     let phase_at = |engine: &Engine<'_>| match duel(engine).fighters[0].action {
-        DuelAction::Attack { phase, until, .. } => Some((phase, until)),
+        RealtimeAction::Attack { phase, until, .. } => Some((phase, until)),
         _ => None,
     };
     assert_eq!(phase_at(&engine), Some((AttackPhase::Windup, 3)));
@@ -226,7 +232,7 @@ fn an_attack_moves_through_its_phases_and_commits_the_attacker() {
     assert!(events.contains(&Event::Ready {
         character: "trainee".into()
     }));
-    assert_eq!(duel(&engine).fighters[0].action, DuelAction::Ready);
+    assert_eq!(duel(&engine).fighters[0].action, RealtimeAction::Ready);
     // An attack that closes its window untouched is a miss, and earns no rage.
     let rage = vitals(&engine).rage;
     let events = run(&mut engine, &[strike(), step(5)]);
@@ -242,7 +248,7 @@ fn speed_and_skill_time_scale_the_phases() {
     let mut engine = Engine::new(&world).unwrap();
     // The lunge takes 120% of a basic attack's time: ceil(3 × 1.2) = 4 steps.
     run(&mut engine, &[Duel("master".into()), skill("lunge")]);
-    let DuelAction::Attack { until, .. } = duel(&engine).fighters[0].action else {
+    let RealtimeAction::Attack { until, .. } = duel(&engine).fighters[0].action else {
         panic!("attacking");
     };
     assert_eq!(until, 4);
@@ -250,7 +256,7 @@ fn speed_and_skill_time_scale_the_phases() {
     // beginning after the first step.
     let mut engine = Engine::new(&world).unwrap();
     run(&mut engine, &[Duel("brigand".into()), step(1)]);
-    let DuelAction::Attack { phase, until, .. } = duel(&engine).fighters[1].action else {
+    let RealtimeAction::Attack { phase, until, .. } = duel(&engine).fighters[1].action else {
         panic!("attacking");
     };
     assert_eq!((phase, until), (AttackPhase::Windup, 5));
@@ -334,17 +340,12 @@ fn refused_intents_change_nothing_and_draw_nothing() {
         assert!(expected(&error), "{command:?} gave {error:?}");
         assert_eq!(engine.snapshot().to_json(), before, "{command:?}");
     }
-    // Outside a duel there is nothing to give intents to, and a pair does
-    // not fight one-on-one.
+    // Outside a duel there is nothing to give intents to.
     let mut engine = Engine::new_with_seed(&world, 5).unwrap();
     let before = engine.snapshot().to_json();
     assert!(matches!(
         engine.execute(strike()),
         Err(EngineError::NotFighting)
-    ));
-    assert!(matches!(
-        engine.execute(Duel("left_twin".into())),
-        Err(EngineError::NotOneOnOne(_))
     ));
     assert_eq!(engine.snapshot().to_json(), before);
 }
@@ -379,7 +380,7 @@ fn the_duel_reads_and_writes_the_players_one_copy_of_their_vitals() {
     // The master lands a sweep; the wound stays with the player after the bout.
     while !matches!(
         duel(&engine).fighters[1].action,
-        DuelAction::Attack {
+        RealtimeAction::Attack {
             phase: AttackPhase::Active,
             ..
         }
@@ -390,7 +391,7 @@ fn the_duel_reads_and_writes_the_players_one_copy_of_their_vitals() {
     let wounded = vitals(&engine);
     assert!(wounded.hp < 40);
     run(&mut engine, &[retreat(), step(6)]);
-    assert!(engine.duel().is_none());
+    assert!(engine.realtime().is_none());
     let after = vitals(&engine);
     assert_eq!(after.hp, wounded.hp);
     // Rage belongs to one fight in this world.
@@ -405,10 +406,10 @@ fn yielding_and_retreating_settle_their_own_way() {
     run(&mut engine, &[Duel("master".into())]);
     let per_hit = basic_hit(&world, &engine, "master");
     let mut events = Vec::new();
-    while engine.duel().is_some() {
+    while engine.realtime().is_some() {
         events.extend(run(&mut engine, &landed_attack()[..2]));
         events.extend(run(&mut engine, &[contact("trainee")]));
-        if engine.duel().is_some() {
+        if engine.realtime().is_some() {
             events.extend(run(&mut engine, &[step(6)]));
         }
     }
@@ -429,10 +430,10 @@ fn yielding_and_retreating_settle_their_own_way() {
     let mut engine = Engine::new(&world).unwrap();
     run(&mut engine, &[Duel("master".into())]);
     let mut events = Vec::new();
-    while engine.duel().is_some() {
+    while engine.realtime().is_some() {
         let active = matches!(
             duel(&engine).fighters[1].action,
-            DuelAction::Attack {
+            RealtimeAction::Attack {
                 phase: AttackPhase::Active,
                 connected: false,
                 ..
@@ -451,7 +452,7 @@ fn yielding_and_retreating_settle_their_own_way() {
     let mut engine = Engine::new(&world).unwrap();
     let events = run(&mut engine, &[Duel("master".into()), retreat(), step(5)]);
     assert!(events.contains(&Event::RetreatStarted));
-    assert!(engine.duel().is_some());
+    assert!(engine.realtime().is_some());
     let events = run(&mut engine, &[step(10)]);
     assert_eq!(
         events.last(),
@@ -459,7 +460,7 @@ fn yielding_and_retreating_settle_their_own_way() {
             outcome: Outcome::Fled
         })
     );
-    assert!(engine.duel().is_none());
+    assert!(engine.realtime().is_none());
     assert!(engine.state().flags.is_empty());
 }
 
@@ -472,7 +473,7 @@ fn a_player_killed_in_a_duel_stays_dead() {
     while !engine.is_dead() {
         let active = matches!(
             duel(&engine).fighters[1].action,
-            DuelAction::Attack {
+            RealtimeAction::Attack {
                 phase: AttackPhase::Active,
                 connected: false,
                 ..
@@ -482,7 +483,7 @@ fn a_player_killed_in_a_duel_stays_dead() {
         events.extend(engine.execute(command).unwrap());
     }
     assert_eq!(events.last(), Some(&Event::PlayerDied));
-    assert!(engine.duel().is_some());
+    assert!(engine.realtime().is_some());
     assert!(matches!(
         engine.execute(step(1)),
         Err(EngineError::PlayerDead)
@@ -522,17 +523,17 @@ fn saves_with_duel_states_the_rules_cannot_reach_are_refused() {
     let mut engine = Engine::new(&world).unwrap();
     run(&mut engine, &[Duel("master".into()), strike(), step(1)]);
     Engine::restore(&world, engine.snapshot()).unwrap();
-    let tamper = |edit: &dyn Fn(&mut realmkit_engine::Duel, &mut Vitals)| {
+    let tamper = |edit: &dyn Fn(&mut realmkit_engine::RealtimeEncounter, &mut Vitals)| {
         let mut snapshot = engine.snapshot();
         let combat = snapshot.state.combat.as_mut().unwrap();
-        let Stance::Dueling(duel) = &mut combat.stance else {
+        let Stance::Realtime(duel) = &mut combat.stance else {
             panic!("dueling");
         };
         edit(duel, &mut combat.vitals);
         Engine::restore(&world, snapshot).is_err()
     };
     let attack = |f: &mut Fighter, to: u64, landed: bool| {
-        let DuelAction::Attack {
+        let RealtimeAction::Attack {
             until, connected, ..
         } = &mut f.action
         else {
@@ -545,9 +546,9 @@ fn saves_with_duel_states_the_rules_cannot_reach_are_refused() {
     ));
     assert!(tamper(&|d, _| d.fighters[1].vitals = None));
     assert!(tamper(&|d, _| d.fighters[1].character = "brigand".into()));
-    assert!(tamper(&|d, _| d.fighters[1].action = DuelAction::Ready));
+    assert!(tamper(&|d, _| d.fighters[1].action = RealtimeAction::Ready));
     assert!(tamper(
-        &|d, _| d.fighters[1].action = DuelAction::Guard { ready_at: 1 }
+        &|d, _| d.fighters[1].action = RealtimeAction::Guard { ready_at: 1 }
     ));
     assert!(tamper(&|d, _| d.fighters[0].mp_remainder = 1_000));
     // The wind-up began at step 0 and ends at 3: not in the past, and no
@@ -561,13 +562,14 @@ fn saves_with_duel_states_the_rules_cannot_reach_are_refused() {
     assert!(tamper(&|d, _| attack(&mut d.fighters[1], 5, false)));
     assert!(tamper(&|d, _| attack(&mut d.fighters[0], 3, true)));
     assert!(tamper(
-        &|d, _| d.fighters[0].action = DuelAction::Retreat { until: 99 }
+        &|d, _| d.fighters[0].action = RealtimeAction::Retreat { until: 99 }
     ));
     assert!(tamper(&|d, _| d.fighters[1].vitals.as_mut().unwrap().hp = 0));
     assert!(tamper(&|d, _| d.fighters[1].yielded = true));
     assert!(tamper(&|d, _| {
-        d.fighters[0].action = DuelAction::Attack {
+        d.fighters[0].action = RealtimeAction::Attack {
             skill: Some("sweep".into()),
+            target: "master".into(),
             phase: AttackPhase::Windup,
             until: 3,
             connected: false,
@@ -594,7 +596,7 @@ fn duel_time_is_neither_world_time_nor_encounter_time() {
     // ends with the duel.
     assert_eq!(vitals(&engine).mp, 12);
     run(&mut engine, &[retreat(), step(6)]);
-    assert!(engine.duel().is_none());
+    assert!(engine.realtime().is_none());
     assert_eq!(engine.state().time, minute);
     // A turn-based encounter in the same world regenerates on its own
     // timeline only, as before.
@@ -610,7 +612,7 @@ fn duel_time_is_neither_world_time_nor_encounter_time() {
         ],
     );
     assert!(engine.encounter().is_some());
-    assert!(engine.duel().is_none());
+    assert!(engine.realtime().is_none());
 }
 
 #[test]
@@ -618,11 +620,10 @@ fn duels_are_offered_only_where_the_world_runs_them() {
     let world = yard();
     let engine = Engine::new(&world).unwrap();
     let offers = offered(&engine);
-    // Fighters who fight alone, beside turn-based engagement.
-    for id in ["master", "brigand"] {
+    // Every fighter, beside turn-based engagement; a twin brings his brother.
+    for id in ["master", "brigand", "left_twin", "right_twin"] {
         assert!(offers.contains(&(Duel(id.into()), true)));
     }
-    assert!(!offers.contains(&(Duel("left_twin".into()), true)));
     // In a duel: the intents that are legal now; contact is never offered.
     let mut engine = Engine::new(&world).unwrap();
     run(&mut engine, &[Duel("brigand".into()), strike()]);
@@ -631,7 +632,7 @@ fn duels_are_offered_only_where_the_world_runs_them() {
     assert!(offers.contains(&(strike(), false)));
     assert!(!offers
         .iter()
-        .any(|(c, _)| matches!(c, Intent(realmkit_engine::Intent::Contact(_)))));
+        .any(|(c, _)| matches!(c, Intent(realmkit_engine::Intent::Contact { .. }))));
     assert!(
         !offers.contains(&(retreat(), true)),
         "the brigand allows no flight"
@@ -657,7 +658,7 @@ fn worlds_without_combat_have_no_duels_and_no_duel_state() {
     let world = archive();
     let mut engine = reader(&world);
     assert!(engine.state().combat.is_none());
-    assert!(engine.duel().is_none());
+    assert!(engine.realtime().is_none());
     let before = engine.snapshot().to_json();
     assert!(engine.execute(Duel("archivist".into())).is_err());
     assert!(matches!(engine.execute(step(1)), Err(EngineError::NoDuels)));
@@ -672,11 +673,11 @@ fn a_clock_at_its_limit_refuses_to_run_on() {
     run(&mut engine, &[Duel("master".into()), step(2)]);
     // A duel one step from the clock's end, its opponent mid-wind-up.
     let mut snapshot = engine.snapshot();
-    let Stance::Dueling(duel) = &mut snapshot.state.combat.as_mut().unwrap().stance else {
+    let Stance::Realtime(duel) = &mut snapshot.state.combat.as_mut().unwrap().stance else {
         panic!("dueling");
     };
     duel.step = u64::MAX - 1;
-    let DuelAction::Attack { until, .. } = &mut duel.fighters[1].action else {
+    let RealtimeAction::Attack { until, .. } = &mut duel.fighters[1].action else {
         panic!("attacking");
     };
     *until = u64::MAX;
@@ -740,7 +741,7 @@ fn a_rank_earned_mid_attack_leaves_a_save_that_loads() {
     }));
     // The lunge is still active, though the player now knows the thrust,
     // and faster: its remaining steps were set at the old speed.
-    let DuelAction::Attack {
+    let RealtimeAction::Attack {
         skill: committed,
         phase,
         ..
@@ -760,10 +761,10 @@ fn a_rank_earned_mid_attack_leaves_a_save_that_loads() {
     assert_eq!(resumed.snapshot().to_json(), whole.snapshot().to_json());
     // A skill the player never knew is still refused.
     let mut snapshot = whole.snapshot();
-    let Stance::Dueling(duel) = &mut snapshot.state.combat.as_mut().unwrap().stance else {
+    let Stance::Realtime(duel) = &mut snapshot.state.combat.as_mut().unwrap().stance else {
         panic!("dueling");
     };
-    let DuelAction::Attack {
+    let RealtimeAction::Attack {
         skill: committed, ..
     } = &mut duel.fighters[0].action
     else {
@@ -780,7 +781,7 @@ fn a_player_who_enters_a_yielding_duel_already_low_can_save_and_yields_when_hit(
     let hit_by_master = |engine: &mut Engine<'_>| loop {
         let active = matches!(
             duel(engine).fighters[1].action,
-            DuelAction::Attack {
+            RealtimeAction::Attack {
                 phase: AttackPhase::Active,
                 connected: false,
                 ..
@@ -793,7 +794,7 @@ fn a_player_who_enters_a_yielding_duel_already_low_can_save_and_yields_when_hit(
         }
     };
     run(&mut engine, &[Duel("master".into())]);
-    while engine.duel().is_some() {
+    while engine.realtime().is_some() {
         hit_by_master(&mut engine);
     }
     assert!(engine.state().flags.contains("spar_lost"));

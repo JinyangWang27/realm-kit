@@ -113,7 +113,7 @@ pub(super) fn defeated(state: &GameState, id: &str) -> bool {
 pub(super) fn fighting(state: &GameState) -> Option<&Encounter> {
     match &state.combat.as_ref()?.stance {
         Stance::Fighting(encounter) => Some(encounter),
-        Stance::Exploring | Stance::Dueling(_) | Stance::Battle(_) => None,
+        Stance::Exploring | Stance::Realtime(_) | Stance::Battle(_) => None,
     }
 }
 
@@ -121,7 +121,7 @@ pub(super) fn dueling(state: &GameState) -> bool {
     state
         .combat
         .as_ref()
-        .is_some_and(|c| matches!(c.stance, Stance::Dueling(_)))
+        .is_some_and(|c| matches!(c.stance, Stance::Realtime(_)))
 }
 
 fn leading(state: &GameState) -> bool {

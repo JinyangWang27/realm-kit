@@ -38,9 +38,10 @@ pub enum Command {
     /// In an encounter: spend this turn turning to run; the escape happens
     /// at the player's next turn if they live.
     Flee,
-    /// Starts a real-time duel with a fighter here who fights alone.
+    /// Starts a real-time fight with a fighter here and whoever engaging it
+    /// would bring in: one opponent, or its whole group.
     Duel(Id),
-    /// In a duel: one input on its fixed-step clock.
+    /// In a real-time fight: one input on its fixed-step clock.
     Intent(Intent),
     /// Restores HP and MP at a safe location.
     Rest,
@@ -102,29 +103,51 @@ pub enum Command {
     Map,
 }
 
-/// The player's input to a real-time duel, applied at the duel's current
-/// step. A host collects input between steps and submits it in order;
-/// replaying the same intents from the same state gives the same duel.
+/// Input to a real-time fight, applied at the fight's current step: the
+/// player's own actions, and what only the host can see (contact and
+/// arrivals). A host collects input between steps and submits it in order;
+/// replaying the same intents from the same state gives the same fight.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Intent {
     /// Runs the clock on by 1 to [`realmkit_spec::ADVANCE_BOUND`] steps,
-    /// stopping early if the duel ends. Splitting an advance anywhere gives
-    /// the same duel.
+    /// stopping early if the fight ends. Splitting an advance anywhere gives
+    /// the same fight.
     Advance(u32),
-    /// Begins a basic attack.
-    Attack,
-    /// Begins a known skill's attack, paying its costs at once.
-    Skill(Id),
+    /// Begins a basic attack at a hostile fighter; `None` aims at the only
+    /// one still fighting, and is refused when there are several.
+    Attack {
+        #[serde(default)]
+        target: Option<Id>,
+    },
+    /// Begins a known skill's attack, paying its costs at once; `target` as
+    /// for [`Intent::Attack`].
+    Skill {
+        skill: Id,
+        #[serde(default)]
+        target: Option<Id>,
+    },
     /// Raises a guard, which stops hits once it is up.
     Guard,
     LowerGuard,
     /// Turns to retreat; the escape happens after the retreat's steps.
     Retreat,
-    /// The host reports that this fighter's attack touched the other one now.
-    /// The engine accepts it only while that attack is active and has not
-    /// landed, and decides the damage itself; it cannot check the geometry.
-    Contact(Id),
+    /// The host reports that `attacker`'s attack touched `target` now
+    /// (`None`: the fighter it was aimed at). The engine accepts it only
+    /// while that attack is active and has not landed, on a fighter still
+    /// fighting and, unless the world allows friendly fire, on another
+    /// team; it decides the damage itself and cannot check the geometry.
+    Contact {
+        attacker: Id,
+        #[serde(default)]
+        target: Option<Id>,
+    },
+    /// The host reports that `character`, here, arrives on `team`: 0 for
+    /// an ally, an opponent's team, or the next unused number for a new one.
+    Join {
+        character: Id,
+        team: u32,
+    },
 }
 
 /// A dialogue choice as the conversation offers it.
@@ -203,21 +226,21 @@ pub enum Event {
     EncounterStarted {
         opponents: Vec<Id>,
     },
-    /// In a duel: `character`'s attack entered `phase`; a wind-up is its start.
+    /// In a real-time fight: `character`'s attack entered `phase`; a wind-up is its start.
     Swing {
         character: Id,
         skill: Option<Id>,
         phase: AttackPhase,
     },
-    /// In a duel: an attack's active window closed without contact.
+    /// In a real-time fight: an attack's active window closed without contact.
     Missed {
         character: Id,
     },
-    /// In a duel: `character` finished recovering and can act again.
+    /// In a real-time fight: `character` finished recovering and can act again.
     Ready {
         character: Id,
     },
-    /// In a duel: `character`'s guard began rising, or is now up.
+    /// In a real-time fight: `character`'s guard began rising, or is now up.
     GuardRaising {
         character: Id,
     },
@@ -227,12 +250,32 @@ pub enum Event {
     GuardLowered {
         character: Id,
     },
-    /// In a duel: a raised guard stopped `prevented` of a hit's damage.
+    /// In a real-time fight: a raised guard stopped `prevented` of a hit's damage.
     Blocked {
         character: Id,
         prevented: u32,
     },
-    /// In a duel: the player turned to retreat.
+    /// In a real-time fight: `character` arrived on `team` at this step.
+    Joined {
+        character: Id,
+        team: u32,
+    },
+    /// In a real-time fight: a hit between two fighters neither of whom is
+    /// the player, who sees [`Event::DamageDealt`] and
+    /// [`Event::DamageReceived`] for their own.
+    Struck {
+        attacker: Id,
+        target: Id,
+        amount: u32,
+        variant: usize,
+        skill: Option<Id>,
+    },
+    /// In a real-time fight: a fighter on the player's team fell. One on
+    /// another team is [`Event::EnemyDefeated`]; the player, [`Event::PlayerDied`].
+    AllyDown {
+        character: Id,
+    },
+    /// In a real-time fight: the player turned to retreat.
     RetreatStarted,
     FleeStarted,
     /// A participant in a yielding group stops fighting, alive.
