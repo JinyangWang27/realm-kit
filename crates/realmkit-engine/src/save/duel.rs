@@ -42,15 +42,26 @@ pub(super) fn check(
     let fighters_ok = duel.fighters.iter().enumerate().all(|(i, f)| {
         let side = &sides[i];
         let v = duel.vitals(i, &combat.vitals);
+        // A fighter yields when a hit leaves it at or below its threshold. The
+        // opponent enters whole; the player may enter already that low, from
+        // an earlier fight, and has not yielded until hit again.
         let yield_ok = match yield_share {
             Some(share) => {
                 let low = v.hp <= encounter::yield_threshold(side.stats.hp, share);
-                v.hp > 0 && (f.yielded == low || (!f.yielded && v.hp == side.stats.hp))
+                let entered_low = i == 0 && !f.yielded;
+                v.hp > 0
+                    && (f.yielded == low || entered_low || (!f.yielded && v.hp == side.stats.hp))
             }
             None => !f.yielded,
         };
+        // A committed attack keeps the skill it began with, which a rank the
+        // attack itself earned may since have replaced.
         let usable = |id: &Id| match i {
-            0 => known.iter().find(|s| &s.id == id).copied(),
+            0 => known
+                .iter()
+                .find(|s| &s.id == id)
+                .copied()
+                .or_else(|| superseded(world, combat, id)),
             _ => profile(world, &f.character)
                 .skills
                 .contains(id)
@@ -69,8 +80,7 @@ pub(super) fn check(
                 let skill = skill.as_ref().map(usable);
                 skill.is_none_or(|s| s.is_some_and(|s| s.level <= side.level))
                     && *until > now
-                    && until - now
-                        <= realtime::attack_steps(realtime, side, skill.flatten(), *phase)
+                    && until - now <= longest(realtime, side, i, skill.flatten(), *phase)
                     && !(*phase == AttackPhase::Windup && *connected)
             }
             DuelAction::Guard { ready_at } => {
@@ -93,4 +103,34 @@ pub(super) fn check(
     } else {
         Err(invalid())
     }
+}
+
+/// A skill of an earlier rank of a technique the player has learned.
+fn superseded<'w>(world: &'w WorldSpec, combat: &CombatState, id: &str) -> Option<&'w Skill> {
+    let earlier = combat.techniques.iter().any(|(technique, learned)| {
+        world.technique(technique).is_some_and(|t| {
+            t.ranks[..learned.rank - 1]
+                .iter()
+                .any(|r| r.skill.as_deref() == Some(id))
+        })
+    });
+    earlier.then(|| world.skill(id)).flatten()
+}
+
+/// The most steps a phase begun earlier in this duel can have left. The
+/// opponent's stats are fixed, so its phases are exact. A rank the player
+/// earns mid-duel can change their speed after a phase began, so theirs is
+/// bounded at the slowest speed instead.
+fn longest(
+    realtime: &realmkit_spec::Realtime,
+    side: &realtime::Side,
+    i: usize,
+    skill: Option<&Skill>,
+    phase: AttackPhase,
+) -> u64 {
+    let mut slowest = *side;
+    if i == 0 {
+        slowest.stats.speed = 1;
+    }
+    realtime::attack_steps(realtime, &slowest, skill, phase)
 }

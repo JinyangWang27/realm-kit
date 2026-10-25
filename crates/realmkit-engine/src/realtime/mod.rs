@@ -337,7 +337,6 @@ fn land(
     i: usize,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
-    let turn = state.turn;
     let rules = world.combat().unwrap();
     let mut ring = dueling(world, &mut state.combat)?;
     let t = 1 - i;
@@ -382,7 +381,7 @@ fn land(
         events.push(Event::DamageDealt {
             target: target.clone(),
             amount: taken,
-            variant: (turn % rules.narrative.attack.len() as u64) as usize,
+            variant: (now % rules.narrative.attack.len() as u64) as usize,
             skill: skill_id,
             critical: false,
         });
@@ -395,7 +394,7 @@ fn land(
         events.push(Event::DamageReceived {
             source,
             amount: taken,
-            variant: (turn % rules.narrative.hurt.len() as u64) as usize,
+            variant: (now % rules.narrative.hurt.len() as u64) as usize,
             skill: skill_id,
             critical: false,
         });

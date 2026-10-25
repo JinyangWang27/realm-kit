@@ -550,9 +550,15 @@ fn saves_with_duel_states_the_rules_cannot_reach_are_refused() {
         &|d, _| d.fighters[1].action = DuelAction::Guard { ready_at: 1 }
     ));
     assert!(tamper(&|d, _| d.fighters[0].mp_remainder = 1_000));
-    // The wind-up began at step 0 and ends at 3: not in the past, not longer.
+    // The wind-up began at step 0 and ends at 3: not in the past, and no
+    // longer than the slowest player could hold it (a rank earned mid-duel
+    // may change their speed), 3 × 100 steps at speed 1. The opponent's
+    // stats never change, so its phases are exact: its wind-up from step 1
+    // ends at 4.
     assert!(tamper(&|d, _| attack(&mut d.fighters[0], 1, false)));
-    assert!(tamper(&|d, _| attack(&mut d.fighters[0], 40, false)));
+    assert!(!tamper(&|d, _| attack(&mut d.fighters[0], 301, false)));
+    assert!(tamper(&|d, _| attack(&mut d.fighters[0], 302, false)));
+    assert!(tamper(&|d, _| attack(&mut d.fighters[1], 5, false)));
     assert!(tamper(&|d, _| attack(&mut d.fighters[0], 3, true)));
     assert!(tamper(
         &|d, _| d.fighters[0].action = DuelAction::Retreat { until: 99 }
@@ -683,4 +689,163 @@ fn a_clock_at_its_limit_refuses_to_run_on() {
         ));
         assert_eq!(engine.snapshot().to_json(), before);
     }
+}
+
+/// The yard with the lunge taught as a technique whose second rank, earned
+/// by one landed lunge, is a faster thrust.
+fn yard_with_lunge_form() -> WorldSpec {
+    let mut world = yard();
+    let combat = world.world.combat.as_mut().unwrap();
+    let mut thrust = combat
+        .skills
+        .iter()
+        .find(|s| s.id == "lunge")
+        .unwrap()
+        .clone();
+    thrust.id = "thrust".into();
+    combat.skills.push(thrust);
+    combat.player_skills.retain(|s| s != "lunge");
+    combat.techniques.push(
+        serde_json::from_value(serde_json::json!({
+            "id": "lunge_form",
+            "name": "Lunge Form",
+            "ranks": [
+                { "name": "First Form", "xp": 0, "skill": "lunge" },
+                { "name": "Second Form", "xp": 10, "skill": "thrust", "passive": { "speed": 50 } }
+            ]
+        }))
+        .unwrap(),
+    );
+    combat.player_techniques.push(TechniqueGrant {
+        technique: "lunge_form".into(),
+        rank: None,
+        xp: 0,
+    });
+    world.validate().unwrap();
+    world
+}
+
+#[test]
+fn a_rank_earned_mid_attack_leaves_a_save_that_loads() {
+    let world = yard_with_lunge_form();
+    let mut engine = Engine::new(&world).unwrap();
+    run(
+        &mut engine,
+        &[Duel("master".into()), skill("lunge"), step(4)],
+    );
+    let events = run(&mut engine, &[contact("trainee")]);
+    assert!(events.contains(&Event::TechniqueRankUp {
+        technique: "lunge_form".into(),
+        rank: 2,
+    }));
+    // The lunge is still active, though the player now knows the thrust,
+    // and faster: its remaining steps were set at the old speed.
+    let DuelAction::Attack {
+        skill: committed,
+        phase,
+        ..
+    } = duel(&engine).fighters[0].action.clone()
+    else {
+        panic!("attacking");
+    };
+    assert_eq!(
+        (committed.as_deref(), phase),
+        (Some("lunge"), AttackPhase::Active)
+    );
+    assert_eq!(engine.player_stats().unwrap().speed, 150);
+    let mut whole = engine.clone();
+    let mut resumed = Engine::restore(&world, engine.snapshot()).unwrap();
+    let rest = [step(1), step(6), skill("thrust"), step(4)];
+    assert_eq!(run(&mut resumed, &rest), run(&mut whole, &rest));
+    assert_eq!(resumed.snapshot().to_json(), whole.snapshot().to_json());
+    // A skill the player never knew is still refused.
+    let mut snapshot = whole.snapshot();
+    let Stance::Dueling(duel) = &mut snapshot.state.combat.as_mut().unwrap().stance else {
+        panic!("dueling");
+    };
+    let DuelAction::Attack {
+        skill: committed, ..
+    } = &mut duel.fighters[0].action
+    else {
+        panic!("attacking");
+    };
+    *committed = Some("sweep".into());
+    assert!(Engine::restore(&world, snapshot).is_err());
+}
+
+#[test]
+fn a_player_who_enters_a_yielding_duel_already_low_can_save_and_yields_when_hit() {
+    let world = yard();
+    let mut engine = Engine::new(&world).unwrap();
+    let hit_by_master = |engine: &mut Engine<'_>| loop {
+        let active = matches!(
+            duel(engine).fighters[1].action,
+            DuelAction::Attack {
+                phase: AttackPhase::Active,
+                connected: false,
+                ..
+            }
+        );
+        let command = if active { contact("master") } else { step(1) };
+        let events = engine.execute(command).unwrap();
+        if active {
+            return events;
+        }
+    };
+    run(&mut engine, &[Duel("master".into())]);
+    while engine.duel().is_some() {
+        hit_by_master(&mut engine);
+    }
+    assert!(engine.state().flags.contains("spar_lost"));
+    // Straight back into the circle at or below half HP.
+    run(&mut engine, &[Duel("master".into())]);
+    assert!(vitals(&engine).hp <= 20);
+    let restored = Engine::restore(&world, engine.snapshot());
+    assert!(restored.is_ok(), "{:?}", restored.err());
+    let events = hit_by_master(&mut engine);
+    assert!(events.contains(&Event::Yielded {
+        character: "trainee".into()
+    }));
+    assert!(events.contains(&Event::EncounterEnded {
+        outcome: Outcome::Yielded
+    }));
+}
+
+#[test]
+fn narrative_variants_follow_the_duel_clock_not_the_command_count() {
+    let mut world = yard();
+    let narrative = &mut world.world.combat.as_mut().unwrap().narrative;
+    narrative.attack.push(TextTemplate(
+        "{attacker} catch {target}: {damage} damage.".into(),
+    ));
+    narrative.hurt.push(TextTemplate(
+        "{attacker} clips {target}: {damage} damage.".into(),
+    ));
+    let variants = |batches: &[u32]| {
+        let mut engine = Engine::new(&world).unwrap();
+        run(&mut engine, &[Duel("master".into()), strike()]);
+        for &n in batches {
+            run(&mut engine, &[step(n)]);
+        }
+        let mut seen: Vec<usize> = run(&mut engine, &[contact("trainee")])
+            .into_iter()
+            .filter_map(|e| match e {
+                Event::DamageDealt { variant, .. } => Some(variant),
+                _ => None,
+            })
+            .collect();
+        // The master's sweep is active at step 4.
+        run(&mut engine, &[step(1), contact("master")])
+            .into_iter()
+            .for_each(|e| {
+                if let Event::DamageReceived { variant, .. } = e {
+                    seen.push(variant);
+                }
+            });
+        seen
+    };
+    let whole = variants(&[3]);
+    assert_eq!(whole, [1, 0], "step 3 then step 4, of two variants each");
+    assert_eq!(variants(&[1, 2]), whole);
+    assert_eq!(variants(&[1, 1, 1]), whole);
 }

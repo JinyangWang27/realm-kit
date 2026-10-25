@@ -248,8 +248,13 @@ leaves it at a step boundary and its whole state (step, actions with their
 snapshot. Loading checks that the rules could have left it: the player and a
 lone opponent who is here and undefeated; vitals within maxima; progress
 below one point; every committed action ending after now and no later than
-its phase allows; a known, unlocked skill; no landed wind-up; a ready
-opponent only at step 0; guards and retreats only for the player, and a
+its phase allows (exactly, for the opponent, whose stats never change; at
+the slowest speed for the player, whom a rank earned mid-duel can make
+faster or slower after a phase began); a known, unlocked skill, or an
+earlier rank's skill of a learned technique, since a committed attack keeps
+the skill it began with; no landed wind-up; a ready opponent only at step 0;
+a yielded fighter at or below its threshold (the player may enter a duel
+already that low and has not yielded until hit again); guards and retreats only for the player, and a
 retreat only where flight is allowed; the duel still open, or the player
 dead. A resumed duel continues exactly as an uninterrupted one would.
 
@@ -257,7 +262,8 @@ dead. A resumed duel continues exactly as an uninterrupted one would.
 
 For the same package, seed and ordered commands (contact reports included),
 duels produce identical events and state, whatever the host's frame rate or
-batching. Refused intents change nothing and draw nothing. No wall clock,
+batching. A landed hit's narrative variant follows the duel step it landed
+at, not the command count, so it too is independent of batching. Refused intents change nothing and draw nothing. No wall clock,
 frame delta or host physics callback is read.
 
 ### Godot and other hosts: what remains
