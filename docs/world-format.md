@@ -764,7 +764,9 @@ while its `requires` condition holds; the player can talk to it if it has a
 optional `skills` (skill IDs, usable once the profile's `level` reaches each
 skill's unlock level), `basic_channel` (`physical` by default), `level`
 (default 1; it also scales the XP the character grants), an optional
-`group`, and an optional `resources` choice (see [MP and Rage](#mp-and-rage)). A defeated character is gone: it is no longer listed and cannot be
+`group`, an optional `resources` choice (see [MP and Rage](#mp-and-rage)), and
+the real-time-only `ally`, `targeting` and `guard_hold` (see
+[Real-time duels](#real-time-duels)). A defeated character is gone: it is no longer listed and cannot be
 talked to. A character with a combat profile is one instance: it may be placed
 at most once, and its defeat is permanent (no respawns) unless its group is
 repeatable. Other
@@ -1154,7 +1156,7 @@ the next), so the choice need not repeat the condition.
 The optional `combat` object in `world.json` holds the level table, skills and
 combat prose. Everything in it except the `timeline` and `realtime` describes
 characters however a fight is run; the `timeline` enables turn-based
-encounters and [`realtime`](#real-time-duels) one-on-one real-time duels. See
+encounters and [`realtime`](#real-time-duels) real-time fights. See
 [Combat architecture](combat.md) for which rules belong to which layer:
 
 ```json
@@ -1590,11 +1592,12 @@ Yielded opponents grant and record nothing. A victory sets the group's
 
 ### Real-time duels
 
-A combat block with `realtime` lets the player duel a fighter in real time,
-alone, on a fixed-step clock inside the engine. It is optional and may sit
-beside a `timeline`; each fighter can then be engaged turn-based or dueled.
-See [Real-time duels](combat.md#real-time-duels) for the step order, the
-host's contact reports and their limits.
+A combat block with `realtime` lets the player fight in real time on a
+fixed-step clock inside the engine: one opponent or a group, with allies and
+foes who can join while the fight runs. It is optional and may sit beside a
+`timeline`; each fighter can then be engaged turn-based or dueled.
+See [Real-time duels](combat.md#real-time-duels) for the step order, teams,
+joins, the host's contact reports and their limits.
 
 ```json
 "realtime": {
@@ -1605,7 +1608,8 @@ host's contact reports and their limits.
   "guard_raise": 1,
   "guard_percent": 25,
   "retreat": 6,
-  "mp_regen_percent": 10
+  "mp_regen_percent": 10,
+  "friendly_fire": false
 }
 ```
 
@@ -1627,13 +1631,38 @@ host's contact reports and their limits.
   second of duel time, carrying the fraction. It is separate from the
   timeline's `resources.mp_regen_percent` and from world-time `mp_recovery`;
   a duel passes no world time.
+- `friendly_fire` (default false): whether a host's contact report may land a
+  blow on a fighter of the attacker's own team. Without it such a report is
+  refused. Nobody ever aims an attack at a teammate.
 
-`duel` starts a duel with a fighter here whom `engage` would bring in alone;
-a member of a group of two or more present cannot be dueled. Groups shape
-duels as they do encounters: `yield_share`, `no_flee`, `repeatable`,
-`victory_flags` and `defeat_flags` mean the same, and a victory grants loot,
-XP and objectives exactly as an encounter's does. Real-time hits never roll
-crits. Invalid bounds are `invalid_realtime`.
+`duel` starts a fight with a fighter here and whoever `engage` would bring
+in: the fighter alone, or every present, undefeated member of its group, all
+on team 1. An `ally` cannot be the one dueled. Groups shape real-time fights
+as they do encounters: the group the fight started with sets `yield_share`,
+`no_flee`, `victory_flags` and `defeat_flags` for everyone in it,
+reinforcements included, while each fallen opponent is recorded unless its
+own group is `repeatable`. A victory grants loot, XP and objectives exactly
+as an encounter's does. Real-time hits never roll crits. Invalid bounds are
+`invalid_realtime`.
+
+A [combat profile](#characters) takes three optional fields that only
+real-time fights read; turn-based encounters ignore them:
+
+```json
+"combat": { "stats": { ... }, "xp": 0, "ally": true, "targeting": "weakest", "guard_hold": 4 }
+```
+
+- `ally` (default false): the character fights beside the player. It can
+  join a fight only on the player's team (0) and is never the one a fight is
+  started with. An ally belongs to no group (`ally_in_group`). Its vitals
+  belong to the fight, like an opponent's: it is whole again next time.
+- `targeting` (`first` by default, or `weakest`): whom it aims each attack
+  at, among the fighters of other teams still fighting. `first` is the
+  earliest to have joined, so the player while they fight; `weakest` the
+  lowest current HP, ties going to the earliest.
+- `guard_hold` (1–10,000 steps, absent by default): it raises its guard
+  whenever it is ready and attacks once the guard has been up this many
+  steps. Absent, it never guards (`invalid_guard_hold` outside the bounds).
 
 ### Critical hits
 

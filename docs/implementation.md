@@ -241,8 +241,15 @@ every capability optional:
   engine, duel-time MP regeneration, mid-duel saves and settlement shared
   with encounters. The `practice-yard` example plays one in line mode.
   Existing packages, saves and walkthroughs are unchanged.
-- [ ] Spatial authority for real-time contact, and real-time fights with
-  groups, allies, dodges, parries and interruption.
+- [x] Multi-participant real-time fights
+  ([combat.md](combat.md#fighters-and-teams)): groups, allies, hostile
+  reinforcements and third teams joining mid-fight without restarting it,
+  explicit targets and team-checked contact with opt-in friendly fire,
+  authored targeting and guard holds for engine-controlled fighters, a fight
+  that ends only when no foe fights, settled once, and mid-fight saves.
+  Existing walkthroughs play the same fights.
+- [ ] Spatial authority for real-time contact, real-time dodges, parries and
+  interruption, and persistent companions.
 - [x] Overland-map authored placement + engine map query, with
   places known by an authored condition.
 - [x] Embeddable graphical-client seam, including a browser/WASM hosting proof
