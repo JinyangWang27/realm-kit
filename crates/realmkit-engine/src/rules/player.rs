@@ -1,47 +1,8 @@
-//! The player's effective stats, stat points, and resting.
+//! The player's stat points and resting; effective stats and vitals are the
+//! character core's.
 
 use super::*;
-
-/// Effective stats: the level table plus allocated stat points plus learned
-/// techniques' current rank bonuses. Derived
-/// whenever needed, never saved, so no bonus can be counted twice.
-pub(crate) fn player_stats(world: &WorldSpec, combat: &CombatState) -> Stats {
-    let rules = world.combat().unwrap();
-    let mut stats = rules.levels[combat.level - 1].stats;
-    if let Some(points) = &rules.stat_points {
-        for (stat, spent) in &combat.allocation {
-            let value = points.values.get(stat).copied().unwrap_or(0);
-            let total = stats.get_mut(*stat);
-            *total = total.saturating_add(spent.saturating_mul(value));
-        }
-    }
-    techniques::add_passives(world, combat, &mut stats);
-    gear::apply(world, combat, &mut stats);
-    stats
-}
-
-/// Maxima can drop (a smaller rank bonus, removed gear), so current HP and
-/// MP never stay above the effective maxima.
-pub(crate) fn clamp_vitals(world: &WorldSpec, state: &mut GameState) {
-    let combat = state.combat.as_mut().unwrap();
-    let max = rules::player_stats(world, combat);
-    let (hp, mp) = match &mut combat.stance {
-        Stance::Exploring(vitals) => (&mut vitals.hp, &mut vitals.mp),
-        Stance::Fighting(encounter) => {
-            let player = &mut encounter.participants[0];
-            // Rage progress is counted in maximum HP: carry whole points over.
-            let whole = player.rage_remainder / u64::from(max.hp);
-            player.rage = player
-                .rage
-                .saturating_add(whole.try_into().unwrap_or(u32::MAX));
-            player.rage_remainder %= u64::from(max.hp);
-            (&mut player.hp, &mut player.mp)
-        }
-        Stance::Battle(battle) => (&mut battle.hp, &mut battle.mp),
-    };
-    *hp = (*hp).min(max.hp);
-    *mp = (*mp).min(max.mp);
-}
+use crate::character::{self, resources};
 
 /// Points granted by every level reached, minus those spent.
 pub(crate) fn granted_points(world: &WorldSpec, level: usize) -> u64 {
@@ -78,12 +39,15 @@ pub(crate) fn allocate(
     }
     combat.allocation.insert(stat, total);
     let gain = points.saturating_mul(value);
-    if let Stance::Exploring(vitals) = &mut combat.stance {
-        match stat {
-            Stat::Hp => vitals.hp = vitals.hp.saturating_add(gain),
-            Stat::Mp => vitals.mp = vitals.mp.saturating_add(gain),
-            _ => {}
-        }
+    // Points are spent only while exploring, so the gain is never mid-fight.
+    let uses_mp = resources::player_pools(world, &player_stats(world, combat))
+        .mp
+        .is_some();
+    let vitals = &mut combat.vitals;
+    match stat {
+        Stat::Hp => vitals.hp = vitals.hp.saturating_add(gain),
+        Stat::Mp if uses_mp => vitals.mp = vitals.mp.saturating_add(gain),
+        _ => {}
     }
     events.push(Event::PointsAllocated { stat, points });
     Ok(())
@@ -103,18 +67,13 @@ pub(crate) fn respec(
     if !allowed || !safe {
         return Err(EngineError::NoRespec);
     }
-    let combat = state.combat.as_mut().unwrap();
-    combat.allocation.clear();
-    let max = player_stats(world, combat);
-    if let Stance::Exploring(vitals) = &mut combat.stance {
-        vitals.hp = vitals.hp.min(max.hp);
-        vitals.mp = vitals.mp.min(max.mp);
-    }
+    state.combat.as_mut().unwrap().allocation.clear();
+    clamp_vitals(world, state);
     events.push(Event::PointsRefunded);
     Ok(())
 }
 
-/// Restores HP and MP at a safe location.
+/// Restores HP and MP at a safe location, then the world's rest time passes.
 pub(crate) fn rest(
     world: &WorldSpec,
     state: &mut GameState,
@@ -124,11 +83,7 @@ pub(crate) fn rest(
     let Some(combat) = state.combat.as_mut().filter(|_| safe) else {
         return Err(EngineError::NotSafe);
     };
-    let stats = player_stats(world, combat);
-    combat.stance = Stance::Exploring(Vitals {
-        hp: stats.hp,
-        mp: stats.mp,
-    });
+    character::restore(world, combat);
     state.dialogue = None;
     events.push(Event::Rested);
     if let Some(retinue) = state.retinue.as_mut() {

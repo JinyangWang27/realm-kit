@@ -15,6 +15,7 @@ fn profile() -> CombatProfile {
         basic_crit: None,
         level: 1,
         group: None,
+        resources: None,
     }
 }
 

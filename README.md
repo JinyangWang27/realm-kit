@@ -151,8 +151,11 @@ example magic or 内力) through one formula in which defence reduces damage
 gradually. Fights are encounters on a paused initiative timeline: speed decides
 who acts first and how often, and the game waits for each of your commands.
 Skills spend MP, which regenerates as the fight goes on, or rage, which builds
-from acting and being hit; opponents answer with their own skills, and the
-player can rest at safe places (`examples/duel`). Packs fight together, some
+from acting and being hit, or both; a world chooses who uses which, and may let
+rage carry between fights and fade with time while MP recovers over the hours.
+Opponents answer with their own skills, and the player can rest at safe places
+(`examples/duel`). These character rules do not depend on the turn-based
+timeline, which is one optional way to run a fight ([docs/combat.md](docs/combat.md)). Packs fight together, some
 fights can be repeated for grinding, you can flee most of them, and sparring
 partners yield instead of dying (`examples/arena`). Worlds can also grant stat
 points on levelling up, which you spend to shape your own build, and

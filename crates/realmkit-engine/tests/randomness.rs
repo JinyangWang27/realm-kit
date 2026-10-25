@@ -52,7 +52,7 @@ fn swings(world: &WorldSpec, seed: u64) -> (Vec<Event>, GameState) {
     engine.execute(Engage("ogre".into())).unwrap();
     let mut events = Vec::new();
     while engine.encounter().is_some() && !engine.is_dead() {
-        let player = &engine.encounter().unwrap().participants[0];
+        let player = engine.player_vitals().unwrap();
         let command = if player.rage >= 5 {
             UseSkill {
                 skill: "heavy_blow".into(),

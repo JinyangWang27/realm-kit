@@ -2,6 +2,7 @@
 //! occurrence it crosses happens in order.
 
 use super::*;
+use crate::character::resources;
 use realmkit_spec::{Payroll, Schedule, DURATION_BOUND, MINUTES_PER_DAY, WORLD_TIME_BOUND};
 
 /// Something that happens on a schedule. Occurrences at the same minute go
@@ -81,7 +82,9 @@ fn schedules(world: &WorldSpec) -> Vec<(Schedule, Due<'_>)> {
 
 /// Moves world time on by `minutes` while the player stays where they are,
 /// resolving every occurrence it crosses in chronological order, ties in
-/// schedule order. A world without a clock ignores it.
+/// schedule order. The player's MP recovers and Rage decays as it passes,
+/// before anything else due at the same minute. A world without a clock
+/// ignores it.
 pub(crate) fn advance(
     world: &WorldSpec,
     state: &mut GameState,
@@ -111,6 +114,7 @@ fn pass(
     let before = events.len();
     // Everything up to (minute, index) has happened; at `start`, all of it.
     let mut cursor = (start, usize::MAX);
+    let mut elapsed = start;
     loop {
         let next = due
             .iter()
@@ -125,6 +129,8 @@ fn pass(
             break;
         };
         cursor = (minute, index);
+        resources::elapse(world, state, elapsed, minute);
+        elapsed = minute;
         state.time = Some(minute);
         match due[index].1 {
             Due::Midnight => midnight(world, state, events),
@@ -142,6 +148,7 @@ fn pass(
             Due::Refill(location) => retinue::refill(world, state, &location.id),
         }
     }
+    resources::elapse(world, state, elapsed, end);
     state.time = Some(end);
     if minutes > 0 {
         events.push(Event::TimePassed {

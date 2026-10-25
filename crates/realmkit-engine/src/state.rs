@@ -9,7 +9,9 @@ pub struct PlayerState {
     pub inventory: BTreeMap<Id, u64>,
 }
 
-/// Fighting progress; exists only in worlds with a combat block.
+/// The player as a fighting character: progression, gear and vitals, which
+/// hold however a fight is run, and the stance, which is how one is being
+/// run now. Exists only in worlds with a combat block.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CombatState {
@@ -25,17 +27,20 @@ pub struct CombatState {
     pub gear: BTreeMap<u64, Gear>,
     /// The next instance ID; IDs are never reused.
     pub next_gear: u64,
+    /// The player's HP, MP and Rage: their only copy, whatever the stance.
+    pub vitals: Vitals,
     pub stance: Stance,
 }
 
-/// Where the player's HP and MP live: exactly one owner at a time, so a save
-/// never holds two copies.
+/// How the player is fighting, if at all. A stance never holds the player's
+/// vitals; fights read and change [`CombatState::vitals`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Stance {
-    Exploring(Vitals),
+    Exploring,
+    /// A personal fight on the turn-based initiative timeline.
     Fighting(Encounter),
-    /// Leading a mass battle; it holds the player's HP and MP until it ends.
+    /// Leading a mass battle.
     Battle(BattleState),
 }
 
@@ -47,11 +52,9 @@ pub struct BattleState {
     pub army: Id,
     /// Armies that joined the player, in the order they did.
     pub allies: Vec<Id>,
-    /// Rounds fought so far.
+    /// Rounds fought so far. At 0 HP the player is knocked out of the
+    /// battle, which goes on without them.
     pub round: u32,
-    /// The player's HP and MP; at 0 HP the player is knocked out of the fight.
-    pub hp: u32,
-    pub mp: u32,
     /// Side 0: the roster's healthy squads (lines as authored, levels from
     /// the highest), then each ally's troops. Side 1: the army's troops.
     pub sides: [BattleSide; 2],
@@ -98,15 +101,20 @@ pub struct TechniqueState {
     pub xp: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// A fighting character's current HP and resources. Maxima are derived
+/// from stats, never saved; a resource the character does not use stays 0.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Vitals {
     pub hp: u32,
     pub mp: u32,
+    pub rage: u32,
+    /// Damage-rage progress toward the next point, in units of maximum HP.
+    pub rage_remainder: u64,
 }
 
-/// A fight on the paused initiative timeline. It owns every participant's
-/// vitals until it ends.
+/// A fight on the paused initiative timeline: the turn-based layer's
+/// schedule over characters whose vitals it does not copy.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Encounter {
@@ -133,22 +141,25 @@ pub struct Participant {
     /// 0 is the player's side.
     pub side: u32,
     pub control: Control,
-    pub hp: u32,
-    pub mp: u32,
-    pub rage: u32,
-    /// Regeneration progress toward the next MP point, so rounding loses nothing.
+    /// An opponent's vitals, which last only as long as the encounter.
+    /// `None` for the player, whose vitals stay in [`CombatState::vitals`].
+    pub vitals: Option<Vitals>,
+    /// Timeline regeneration progress toward the next MP point, so rounding
+    /// loses nothing; it belongs to encounter time and ends with it.
     pub mp_remainder: u64,
-    /// Damage-rage progress toward the next rage point.
-    pub rage_remainder: u64,
     pub next_time: u64,
     /// Stopped fighting, alive, in a yielding group; out of the schedule.
     pub yielded: bool,
 }
 
-impl Participant {
-    /// Still taking turns: alive and not yielded.
-    pub fn fighting(&self) -> bool {
-        self.hp > 0 && !self.yielded
+impl Encounter {
+    /// Participant `i`'s vitals: an opponent's own, or the player's.
+    pub fn vitals<'a>(&'a self, i: usize, player: &'a Vitals) -> &'a Vitals {
+        self.participants[i].vitals.as_ref().unwrap_or(player)
+    }
+    /// Whether participant `i` still takes turns: alive and not yielded.
+    pub fn fighting(&self, i: usize, player: &Vitals) -> bool {
+        self.vitals(i, player).hp > 0 && !self.participants[i].yielded
     }
 }
 
@@ -359,7 +370,8 @@ pub struct SaveSnapshot {
 
 impl SaveSnapshot {
     /// Reads a snapshot from JSON, rejecting another save format by its
-    /// version before the typed parse, which would fail obscurely.
+    /// version, and the earlier vitals layout by its shape, before the typed
+    /// parse, which would fail obscurely.
     pub fn from_json(bytes: &[u8]) -> Result<Self, EngineError> {
         let invalid = |e: serde_json::Error| EngineError::InvalidSave(e.to_string());
         let value: serde_json::Value = serde_json::from_slice(bytes).map_err(invalid)?;
@@ -367,6 +379,15 @@ impl SaveSnapshot {
             Some(version) if version != u64::from(SAVE_FORMAT_VERSION) => Err(
                 EngineError::InvalidSave(format!("unsupported save format version {version}")),
             ),
+            // Saves from before the character core kept the player's vitals
+            // in the stance. They are refused by name, never reinterpreted.
+            _ if value["state"]["combat"].is_object()
+                && value["state"]["combat"].get("vitals").is_none() =>
+            {
+                Err(EngineError::InvalidSave(
+                    "this save keeps the player's vitals in the stance, an earlier layout that is not migrated; start a new playthrough".into(),
+                ))
+            }
             _ => serde_json::from_value(value).map_err(invalid),
         }
     }

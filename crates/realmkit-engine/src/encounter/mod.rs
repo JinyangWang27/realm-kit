@@ -1,7 +1,11 @@
-//! Encounters on the paused initiative timeline. Every rule here mirrors
+//! The optional turn-based layer: encounters on the paused initiative
+//! timeline. It owns who acts when (initiative, action delays, opponents'
+//! policy) and how an encounter starts and ends; what an action does comes
+//! from the character core. Every rule here mirrors
 //! `scripts/combat_sim/encounter.py`; tests hold the two to the same numbers.
 
 use super::*;
+use crate::character::{profile, resources, Pools};
 use realmkit_spec::{Group, Timeline};
 
 mod action;
@@ -12,12 +16,13 @@ use action::{act, choose};
 pub(super) use timeline::{baseline_turn, delay, turn_order};
 use timeline::{next_actor, tick};
 
-/// The player during an encounter: level (for skill unlocks) and effective
-/// stats, which cannot change until the encounter ends.
+/// The player during an encounter: level (for skill unlocks), effective
+/// stats and pools, which cannot change until the encounter ends.
 #[derive(Clone, Copy)]
 pub(super) struct Me {
     pub level: usize,
     pub stats: Stats,
+    pub pools: Pools,
     /// A worn weapon's basic-attack channel and time, if any.
     pub basic: (Option<Channel>, Option<u32>),
     /// Worn damage modifiers for physical and special hits on the player.
@@ -33,6 +38,31 @@ impl Me {
     }
 }
 
+/// The encounter beside the player's vitals, so each participant's vitals
+/// have one owner: the encounter for opponents, the character for the player.
+pub(super) struct Board<'s> {
+    pub encounter: &'s mut Encounter,
+    pub player: &'s mut Vitals,
+}
+
+impl Board<'_> {
+    pub(super) fn vitals(&self, i: usize) -> &Vitals {
+        self.encounter.vitals(i, self.player)
+    }
+    pub(super) fn vitals_mut(&mut self, i: usize) -> &mut Vitals {
+        match self.encounter.participants[i].vitals.as_mut() {
+            Some(vitals) => vitals,
+            None => self.player,
+        }
+    }
+    pub(super) fn fighting(&self, i: usize) -> bool {
+        self.encounter.fighting(i, self.player)
+    }
+    pub(super) fn pools(&self, world: &WorldSpec, me: Me, i: usize) -> Pools {
+        pools(world, me, &self.encounter.participants[i])
+    }
+}
+
 /// A participant's stats: the player's effective stats, anyone else's
 /// from their combat profile.
 pub(super) fn stats(world: &WorldSpec, player: Stats, p: &Participant) -> Stats {
@@ -42,11 +72,25 @@ pub(super) fn stats(world: &WorldSpec, player: Stats, p: &Participant) -> Stats 
     }
 }
 
-fn profile<'w>(world: &'w WorldSpec, id: &str) -> &'w realmkit_spec::CombatProfile {
-    world.character(id).unwrap().combat.as_ref().unwrap()
+/// A participant's pools, as [`stats`].
+pub(super) fn pools(world: &WorldSpec, me: Me, p: &Participant) -> Pools {
+    match p.control {
+        Control::Player => me.pools,
+        Control::Policy => resources::profile_pools(world, profile(world, &p.character)),
+    }
 }
 
-/// Starts an encounter with `id`, then lets opponents act until the player's turn.
+/// The world's timeline; a world without one has no turn-based fights.
+pub(super) fn timeline(world: &WorldSpec) -> Result<&Timeline, EngineError> {
+    world
+        .combat()
+        .and_then(|c| c.timeline.as_ref())
+        .ok_or(EngineError::NoEncounters)
+}
+
+/// Starts an encounter with `id`, then lets opponents act until the player's
+/// turn. The player brings their own vitals; Rage that belongs to one fight
+/// starts from 0.
 pub(super) fn engage(
     world: &WorldSpec,
     state: &mut GameState,
@@ -54,34 +98,28 @@ pub(super) fn engage(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let fighter = rules::character_here(world, state, &id).and_then(|c| c.combat.as_ref());
-    let (Some(_), Some(rules), Some(combat)) = (fighter, world.combat(), state.combat.as_ref())
-    else {
+    let (Some(_), Some(_), Some(combat)) = (fighter, world.combat(), state.combat.as_ref()) else {
         return Err(EngineError::NotHere(id));
     };
     if combat.defeated.contains(&id) {
         return Err(EngineError::AlreadyDefeated(id));
     }
-    let Stance::Exploring(vitals) = combat.stance else {
+    let Stance::Exploring = combat.stance else {
         return Err(EngineError::InEncounter);
     };
-    let player = rules::player_stats(world, combat);
-    let opponents: Vec<(Id, Stats)> = opponents_for(world, state, &id)
-        .into_iter()
-        .map(|c| (c.clone(), profile(world, &c).stats))
-        .collect();
+    let timeline = timeline(world)?;
+    let player = character::player_stats(world, combat);
+    let opponents: Vec<Id> = opponents_for(world, state, &id);
     let combat = state.combat.as_mut().unwrap();
     // Everyone's first action comes after one opening delay, so speed matters at once.
-    let joiner = |character: Id, side, control, hp, mp, speed| -> Result<_, EngineError> {
+    let joiner = |character: Id, side, control, vitals, speed| -> Result<_, EngineError> {
         Ok(Participant {
             character,
             side,
             control,
-            hp,
-            mp,
-            rage: 0,
+            vitals,
             mp_remainder: 0,
-            rage_remainder: 0,
-            next_time: delay(&rules.timeline, speed, 100)?,
+            next_time: delay(timeline, speed, 100)?,
             yielded: false,
         })
     };
@@ -89,28 +127,27 @@ pub(super) fn engage(
         world.world.player.clone(),
         0,
         Control::Player,
-        vitals.hp,
-        vitals.mp,
+        None,
         player.speed,
     )?];
-    for (character, stats) in &opponents {
+    for character in &opponents {
+        let profile = profile(world, character);
+        let pools = resources::profile_pools(world, profile);
         participants.push(joiner(
             character.clone(),
             1,
             Control::Policy,
-            stats.hp,
-            stats.mp,
-            stats.speed,
+            Some(resources::full(&profile.stats, pools)),
+            profile.stats.speed,
         )?);
     }
+    resources::after_fight(world, &mut combat.vitals);
     combat.stance = Stance::Fighting(Encounter {
         now: 0,
         participants,
     });
     state.dialogue = None;
-    events.push(Event::EncounterStarted {
-        opponents: opponents.into_iter().map(|(id, _)| id).collect(),
-    });
+    events.push(Event::EncounterStarted { opponents });
     advance(world, state, events, false)
 }
 
@@ -163,13 +200,13 @@ pub(super) fn flee(
     state: &mut GameState,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
-    let (encounter, me) = fighting(world, &mut state.combat)?;
-    if group(world, encounter).is_some_and(|g| g.no_flee) {
+    let (board, me) = fighting(world, &mut state.combat)?;
+    if group(world, board.encounter).is_some_and(|g| g.no_flee) {
         return Err(EngineError::NoFlee);
     }
     let speed = me.stats.speed;
-    let step = delay(&world.combat().unwrap().timeline, speed, 100)?;
-    let player = &mut encounter.participants[0];
+    let step = delay(timeline(world)?, speed, 100)?;
+    let player = &mut board.encounter.participants[0];
     player.next_time = player
         .next_time
         .checked_add(step)
@@ -188,11 +225,11 @@ pub(super) fn consume_turn(
     mp: u32,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
-    let (encounter, me) = fighting(world, &mut state.combat)?;
-    let step = delay(&world.combat().unwrap().timeline, me.stats.speed, 100)?;
-    let player = &mut encounter.participants[0];
-    player.hp += hp;
-    player.mp += mp;
+    let (board, me) = fighting(world, &mut state.combat)?;
+    let step = delay(timeline(world)?, me.stats.speed, 100)?;
+    board.player.hp += hp;
+    board.player.mp += mp;
+    let player = &mut board.encounter.participants[0];
     player.next_time = player
         .next_time
         .checked_add(step)
@@ -203,11 +240,13 @@ pub(super) fn consume_turn(
 fn fighting<'s>(
     world: &WorldSpec,
     combat: &'s mut Option<CombatState>,
-) -> Result<(&'s mut Encounter, Me), EngineError> {
+) -> Result<(Board<'s>, Me), EngineError> {
     let combat = combat.as_mut().ok_or(EngineError::NotFighting)?;
+    let stats = character::player_stats(world, combat);
     let me = Me {
         level: combat.level,
-        stats: rules::player_stats(world, combat),
+        stats,
+        pools: resources::player_pools(world, &stats),
         basic: gear::basic(world, combat),
         guard: [
             gear::modifier(world, combat, Channel::Physical),
@@ -215,8 +254,14 @@ fn fighting<'s>(
         ],
     };
     match &mut combat.stance {
-        Stance::Fighting(encounter) => Ok((encounter, me)),
-        Stance::Exploring(_) | Stance::Battle(_) => Err(EngineError::NotFighting),
+        Stance::Fighting(encounter) => Ok((
+            Board {
+                encounter,
+                player: &mut combat.vitals,
+            },
+            me,
+        )),
+        Stance::Exploring | Stance::Battle(_) => Err(EngineError::NotFighting),
     }
 }
 
@@ -230,20 +275,21 @@ pub(super) fn player_action(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let turn = state.turn;
-    let (encounter, me) = fighting(world, &mut state.combat)?;
-    let index = encounter
-        .participants
-        .iter()
-        .position(|p| p.character == target && p.side != 0 && p.fighting())
+    let (mut board, me) = fighting(world, &mut state.combat)?;
+    let index = (0..board.encounter.participants.len())
+        .find(|&i| {
+            let p = &board.encounter.participants[i];
+            p.character == target && p.side != 0 && board.fighting(i)
+        })
         .ok_or_else(|| EngineError::NotHere(target.clone()))?;
     // Advancing stops at the player's turn, already regenerated, so the
     // player acts now with the MP they see.
     if let Some(skill) = skill {
-        check_skill(&encounter.participants[0], me.level, skill)?;
+        check_skill(board.player, me.pools, me.level, skill)?;
     }
     act(
         world,
-        encounter,
+        &mut board,
         me,
         turn,
         &mut state.rng,
@@ -272,42 +318,36 @@ fn advance(
 ) -> Result<(), EngineError> {
     let turn = state.turn;
     loop {
-        let (encounter, me) = fighting(world, &mut state.combat)?;
-        let player = &encounter.participants[0];
-        if player.hp == 0 {
+        let (mut board, me) = fighting(world, &mut state.combat)?;
+        if board.player.hp == 0 {
             return Ok(());
         }
-        if player.yielded {
+        if board.encounter.participants[0].yielded {
             return end(world, state, Outcome::Yielded, events);
         }
-        if !encounter.participants[1..]
-            .iter()
-            .any(Participant::fighting)
-        {
+        if !(1..board.encounter.participants.len()).any(|i| board.fighting(i)) {
             return end(world, state, Outcome::Victory, events);
         }
-        let actor = next_actor(encounter).unwrap();
+        let actor = next_actor(board.encounter, board.player).unwrap();
         // Everyone regenerates up to the next turn before it is taken; the
         // player's turn then waits for a command.
-        tick(world, encounter, me, actor)?;
-        if encounter.participants[actor].control == Control::Player {
+        tick(world, &mut board, me, actor)?;
+        if board.encounter.participants[actor].control == Control::Player {
             return if fleeing {
                 end(world, state, Outcome::Fled, events)
             } else {
                 Ok(())
             };
         }
-        let side = encounter.participants[actor].side;
-        let target = (0..encounter.participants.len())
-            .find(|&i| {
-                let p = &encounter.participants[i];
-                p.side != side && p.fighting()
-            })
+        let side = board.encounter.participants[actor].side;
+        let target = (0..board.encounter.participants.len())
+            .find(|&i| board.encounter.participants[i].side != side && board.fighting(i))
             .unwrap();
-        let skill = choose(world, &encounter.participants[actor]);
+        let character = &board.encounter.participants[actor].character;
+        let skill = choose(world, board.vitals(actor), character);
         act(
             world,
-            encounter,
+            &mut board,
             me,
             turn,
             &mut state.rng,
@@ -319,7 +359,8 @@ fn advance(
     }
 }
 
-/// The player's vitals return to exploring. A victory then grants each
+/// The player returns to exploring, with any Rage that belongs to one fight
+/// gone. A victory then grants each
 /// opponent that died its loot and XP (scaled by level difference), records it
 /// unless its group is repeatable, advances defeat objectives and sets the
 /// group's victory flags; the player's yield sets its defeat flags; a flight
@@ -335,17 +376,13 @@ fn end(
         unreachable!("only a running encounter ends");
     };
     let group = group(world, encounter);
-    let player = &encounter.participants[0];
-    let vitals = Vitals {
-        hp: player.hp,
-        mp: player.mp,
-    };
     let fallen: Vec<Id> = encounter.participants[1..]
         .iter()
-        .filter(|p| p.hp == 0)
+        .filter(|p| p.vitals.is_some_and(|v| v.hp == 0))
         .map(|p| p.character.clone())
         .collect();
-    combat.stance = Stance::Exploring(vitals);
+    resources::after_fight(world, &mut combat.vitals);
+    combat.stance = Stance::Exploring;
     events.push(Event::EncounterEnded { outcome });
     let flags = match outcome {
         Outcome::Victory => group.map_or(&[][..], |g| &g.victory_flags[..]),

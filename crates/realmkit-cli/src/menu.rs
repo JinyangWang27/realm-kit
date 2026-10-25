@@ -179,8 +179,6 @@ fn encounter_lines(engine: &Engine<'_>) -> Vec<String> {
     };
     let world = engine.world();
     let name = |id: &str| world.character(id).unwrap().name.as_str();
-    let resources = world.combat().unwrap().resources;
-    let rage = resources.rage_per_action > 0 || resources.rage_per_max_hp > 0;
     let vitals: Vec<_> = encounter
         .participants
         .iter()
@@ -189,12 +187,16 @@ fn encounter_lines(engine: &Engine<'_>) -> Vec<String> {
                 Some(profile) => profile.stats,
                 None => engine.player_stats().unwrap(),
             };
-            let mut line = format!("{} HP {}/{}", name(&p.character), p.hp, max.hp);
-            if max.mp > 0 {
-                line += &format!(" · {MP} {}/{}", p.mp, max.mp);
+            let (v, pools) = (
+                engine.vitals_of(p).unwrap(),
+                engine.pools_of(&p.character).unwrap(),
+            );
+            let mut line = format!("{} HP {}/{}", name(&p.character), v.hp, max.hp);
+            if let Some(max) = pools.mp.filter(|max| *max > 0) {
+                line += &format!(" · {MP} {}/{max}", v.mp);
             }
-            if rage {
-                line += &format!(" · {RAGE} {}", p.rage);
+            if pools.rage.is_some() {
+                line += &format!(" · {RAGE} {}", v.rage);
             }
             if p.yielded {
                 line += &format!(" · {YIELDED}");
@@ -219,8 +221,9 @@ fn battle_lines(engine: &Engine<'_>) -> Vec<String> {
     let world = engine.world();
     let player = &world.character(&world.world.player).unwrap().name;
     let max = engine.player_stats().unwrap().hp;
-    let you = if battle.hp > 0 {
-        format!("{player} HP {}/{max}", battle.hp)
+    let hp = engine.player_vitals().unwrap().hp;
+    let you = if hp > 0 {
+        format!("{player} HP {hp}/{max}")
     } else {
         format!("{player} {KNOCKED_OUT}")
     };
@@ -347,23 +350,41 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 Some(rank) => format!("{} · {rank}", skill.name),
                 None => skill.name.clone(),
             };
-            let resource = match skill.resource {
+            let named = |resource| match resource {
                 Resource::Mp => MP,
                 Resource::Rage => RAGE,
             };
+            // Every cost, MP first, as the engine checks and spends them.
+            let costs: Vec<_> = [Resource::Mp, Resource::Rage]
+                .into_iter()
+                .filter(|r| skill.cost_in(*r) > 0)
+                .collect();
+            let listed: Vec<_> = costs
+                .iter()
+                .map(|r| format!("{} {}", skill.cost_in(*r), named(*r)))
+                .collect();
+            // The first cost the player cannot cover is the one named.
+            let (vitals, pools) = (engine.player_vitals(), engine.player_pools());
+            let short = costs.iter().copied().find(|r| match (vitals, pools) {
+                (Some(v), Some(p)) => match r {
+                    Resource::Mp => p.mp.is_none() || v.mp < skill.cost_in(*r),
+                    Resource::Rage => p.rage.is_none() || v.rage < skill.cost_in(*r),
+                },
+                _ => true,
+            });
             format!(
                 "{} {ON} {}{}{}",
                 name,
                 world.character(target).unwrap().name,
-                if skill.cost > 0 {
-                    format!(" — {} {resource}", skill.cost)
-                } else {
+                if listed.is_empty() {
                     String::new()
+                } else {
+                    format!(" — {}", listed.join(", "))
                 },
-                if action.available {
-                    String::new()
-                } else {
-                    format!(" [not enough {resource}]")
+                match short.filter(|_| !action.available) {
+                    Some(resource) => format!(" [not enough {}]", named(resource)),
+                    None if action.available => String::new(),
+                    None => format!(" [not enough {}]", named(skill.resource)),
                 }
             )
         }
@@ -1023,6 +1044,33 @@ mod tests {
             engine.execute(Command::Move(Direction::East)),
             Err(realmkit_engine::EngineError::NoExit)
         ));
+    }
+
+    #[test]
+    fn skill_labels_list_every_cost_and_name_the_short_resource() {
+        let mut world =
+            WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/duel")).unwrap();
+        let combat = world.world.combat.as_mut().unwrap();
+        combat.resources.rage_per_action = 1;
+        let mut storm = combat.skills[1].clone();
+        (storm.id, storm.name, storm.cost) = ("storm".into(), "Storm".into(), 0);
+        storm.costs = Some(realmkit_spec::Costs { mp: 6, rage: 3 });
+        combat.skills.push(storm);
+        combat.player_skills.push("storm".into());
+        let mut engine = Engine::new(&world).unwrap();
+        engine.execute(Command::Move(Direction::North)).unwrap();
+        engine.execute(Command::Engage("witch".into())).unwrap();
+        // The witch's opening hex builds no rage here; the player has not acted.
+        let menu = Menu::new(&engine, false, None);
+        let labels: Vec<_> = menu.entries().iter().map(|e| e.label.clone()).collect();
+        assert!(
+            labels.contains(&"Storm on The Hedge Witch — 6 MP, 3 rage [not enough rage]".into()),
+            "{labels:?}"
+        );
+        assert!(
+            labels.contains(&"Bolt on The Hedge Witch — 12 MP".into()),
+            "{labels:?}"
+        );
     }
 
     #[test]

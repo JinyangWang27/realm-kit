@@ -66,7 +66,7 @@ Where knowledge/news capabilities exist, queries should expose only legitimately
 
 A **battle site** is an authored *reference to a real world location/region and its strategic context*. A 3D host may visualize it as a bounded subset of the surrounding terrain, complete with deployment, exit, navigation, siege overlays, and collision data. **These assets and continuous coordinates belong to the game/host**, unless an engine rule later demonstrates a need for typed spatial fields.
 
-An **active battle** is a canonical engine-owned conflict over stable participant/force IDs. A **battle rendering instance** is the host's temporary high-detail presentation of that conflict. They are not different worlds with independent economies, rosters, time, or saves. Existing discrete mass battle remains valid, including CLI and off-screen autoresolve; a real-time first-person implementation would require a separately specified, authoritative combat and reconciliation contract.
+An **active battle** is a canonical engine-owned conflict over stable participant/force IDs. A **battle rendering instance** is the host's temporary high-detail presentation of that conflict. They are not different worlds with independent economies, rosters, time, or saves. Existing discrete mass battle remains valid, including CLI and off-screen autoresolve; a real-time first-person implementation would require a separately specified, authoritative combat and reconciliation contract. Personal combat already separates the universal character core from the turn-based layer, so such a contract builds on the same vitals and rules ([Combat architecture](combat.md#a-future-real-time-layer)).
 
 ### Proposed lifecycle and guarantees
 

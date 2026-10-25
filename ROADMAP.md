@@ -259,6 +259,31 @@ tie order. Tests cover formulas, scheduling, ties, death, resource rejection,
 replay and save/load, including a save made mid-encounter. A combat-free fixture
 validates and plays through a main quest without combat data, levels or menus.
 
+### Combat layers · delivered
+
+RealmKit is an RPG engine first: turn-based encounters are one optional way
+to run a fight over a universal character core ([combat.md](docs/combat.md)).
+
+- **Core:** levels, XP, stat points, effective stats, gear, techniques, HP, MP
+  and Rage, skill costs, damage and crits, Rage from acting and being hit, and
+  regeneration and decay. It knows no initiative, turns or frames.
+- **Turn-based layer:** the initiative timeline (now optional in content),
+  action delays, opponents' policy, attack, skill, flee and item turns, and
+  encounter start and end. Mass battles stay a separate strategic system.
+- **One owner per character's vitals:** the player's in `CombatState::vitals`
+  whatever the stance; an opponent's in its encounter. No stance copies them.
+- **Two resources for every fighter,** each used or not by authored choice
+  (`player_resources`, a profile's `resources`) or as before by default. MP is a
+  reserve that time refills; Rage is momentum that fighting builds, optionally
+  capped, carried and decayed. Skills may cost both.
+- **Clocks never overlap:** fights pass no world time, so timeline and
+  world-time regeneration never cover the same span.
+
+Next, when a client needs it: a real-time layer beside `encounter/` with its
+own engine-side fixed-step clock and validated commands, reusing the core's
+vitals and rules; then companions with their own vitals. See
+[Not supported yet](docs/combat.md#not-supported-yet).
+
 ### Optional parts of combat · proposed
 
 Combat is optional, and so are most of its parts. A world uses a part by
@@ -568,14 +593,15 @@ different limits:
   how fast maximum MP grows in the level table, and each tier's cost. An
   earlier proposal scaled costs with the level table's MP pool; see
   [Findings](#findings) for why authored MP growth replaces it.
-- **Rage never persists outside an encounter** and is not saved between fights.
-  It is part of the saved encounter state during one.
+- **Rage never persists outside an encounter** and is not saved between fights,
+  unless a world sets `rage_carries`; then it decays over world time
+  ([Combat layers](#combat-layers--delivered)).
 - **Rage from an action is credited after the action resolves.** A skill's cost
   is checked before it resolves, so an actor one point short cannot spend the
   point its own action is about to earn. Damage rage is credited when the hit
   lands. The ordering changes balance, so `check` tests it through a real action.
-- **Outside encounters,** MP refills only by resting in M3. Regeneration over
-  World Time can follow when a world enables it (M5).
+- **Outside encounters,** MP refills by resting, and over World Time where a
+  world sets `mp_recovery` ([Combat layers](#combat-layers--delivered)).
 - Resources are authored per skill as one of a closed set. Do not build a
   general resource framework before a world needs a third resource.
 

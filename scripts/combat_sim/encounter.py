@@ -20,42 +20,60 @@ class Fighter:
     rage: int = 0
     mp_remainder: int = 0  # regeneration carried between ticks so rounding loses nothing
     rage_remainder: int = 0  # damage-rage carried between hits, for the same reason
+    uses_mp: bool = True
+    uses_rage: bool = True
 
     @property
     def alive(self) -> bool:
         return self.hp > 0
 
+    @property
+    def mp_max(self) -> int:
+        return self.combatant.mp if self.uses_mp else 0
+
+    def gain_rage(self, rules: Rules, points: int) -> None:
+        """Rage up to the world's cap; at a cap, nothing is banked toward the next point."""
+        self.rage += points
+        if rules.rage_cap is not None and self.rage >= rules.rage_cap:
+            self.rage, self.rage_remainder = rules.rage_cap, 0
+
+    def act_rage(self, rules: Rules) -> None:
+        if self.uses_rage:
+            self.gain_rage(rules, rules.rage_per_action)
+
     def take_hit(self, rules: Rules, damage: int) -> None:
         """Rage proportional to damage taken: `rage_per_max_hp` for a full HP bar, cumulatively."""
+        if not self.uses_rage:
+            return
         self.rage_remainder += rules.rage_per_max_hp * damage
         gained, self.rage_remainder = divmod(self.rage_remainder, self.combatant.hp)
-        self.rage += gained
+        self.gain_rage(rules, gained)
 
     def regenerate(self, rules: Rules, elapsed: int) -> None:
         """MP regained over encounter time; speed does not change the rate. Time spent at
         full MP banks nothing, so the carried remainder is dropped at the cap."""
-        self.mp_remainder += self.combatant.mp * rules.mp_regen_percent * elapsed
+        self.mp_remainder += self.mp_max * rules.mp_regen_percent * elapsed
         gained, self.mp_remainder = divmod(self.mp_remainder, 100 * rules.baseline_turn)
-        if self.mp + gained >= self.combatant.mp:
-            self.mp, self.mp_remainder = self.combatant.mp, 0
+        if self.mp + gained >= self.mp_max:
+            self.mp, self.mp_remainder = self.mp_max, 0
         else:
             self.mp += gained
 
     def can_afford(self, skill: Skill) -> bool:
-        return (self.mp if skill.resource is Resource.MP else self.rage) >= skill.cost
+        """Every cost covered; a resource the fighter does not use pays for nothing."""
+        mp, rage = skill.cost_in(Resource.MP), skill.cost_in(Resource.RAGE)
+        return (mp == 0 or (self.uses_mp and self.mp >= mp)) and (rage == 0 or (self.uses_rage and self.rage >= rage))
 
     def choose_skill(self) -> Skill:
         """The strongest affordable skill, falling back to a basic attack. Equal power prefers
         the cheaper skill, then the later tier, so a cheaper later tier is actually used."""
         affordable = [s for s in self.combatant.skills if self.can_afford(s)]
-        best = max(affordable, key=lambda s: (s.power, -s.cost, s.level), default=None)
+        best = max(affordable, key=lambda s: (s.power, -s.total_cost, s.level), default=None)
         return self.combatant.basic if best is None else best
 
     def pay(self, skill: Skill) -> None:
-        if skill.resource is Resource.MP:
-            self.mp -= skill.cost
-        else:
-            self.rage -= skill.cost
+        self.mp -= skill.cost_in(Resource.MP)
+        self.rage -= skill.cost_in(Resource.RAGE)
 
 
 @dataclass(frozen=True)
@@ -75,7 +93,16 @@ class Encounter:
     ) -> None:
         self.rules = rules
         self.fighters = [
-            Fighter(c, side=0 if i == 0 else 1, order=i, hp=c.hp, mp=c.mp, next_time=rules.delay(c.speed))
+            Fighter(
+                c,
+                side=0 if i == 0 else 1,
+                order=i,
+                hp=c.hp,
+                mp=c.mp if rules.uses(c).mp else 0,
+                next_time=rules.delay(c.speed),
+                uses_mp=rules.uses(c).mp,
+                uses_rage=rules.uses(c).rage,
+            )
             for i, c in enumerate([player, *enemies])
         ]
         self.player = self.fighters[0]
@@ -105,7 +132,7 @@ class Encounter:
         actor.pay(skill)
         dealt = self.rules.damage(attacker, defender, skill)
         target.hp -= min(dealt, target.hp)
-        actor.rage += self.rules.rage_per_action
+        actor.act_rage(self.rules)
         target.take_hit(self.rules, dealt)
         if actor is self.player:
             self.player_actions += 1

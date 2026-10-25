@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod battle;
+mod character;
 mod command;
 mod encounter;
 mod error;
@@ -20,6 +21,7 @@ mod save;
 mod state;
 mod techniques;
 
+pub use character::Pools;
 pub use command::*;
 pub use error::EngineError;
 pub use formulas::*;
@@ -68,11 +70,7 @@ impl<'w> Engine<'w> {
         engine.state.start_choices = choices.to_vec();
         // Vitals start at the maxima that techniques' passives give.
         if let Some(combat) = engine.state.combat.as_mut() {
-            let max = rules::player_stats(world, combat);
-            combat.stance = Stance::Exploring(Vitals {
-                hp: max.hp,
-                mp: max.mp,
-            });
+            character::restore(world, combat);
         }
         Ok(engine)
     }
@@ -82,6 +80,7 @@ impl<'w> Engine<'w> {
         world.validate()?;
         let combat = world.combat().map(|combat| {
             let stats = combat.levels[0].stats;
+            let pools = character::resources::player_pools(world, &stats);
             CombatState {
                 xp: 0,
                 level: 1,
@@ -90,10 +89,8 @@ impl<'w> Engine<'w> {
                 techniques: BTreeMap::new(),
                 gear: BTreeMap::new(),
                 next_gear: 1,
-                stance: Stance::Exploring(Vitals {
-                    hp: stats.hp,
-                    mp: stats.mp,
-                }),
+                vitals: character::resources::full(&stats, pools),
+                stance: Stance::Exploring,
             }
         });
         let mut engine = Self {
@@ -216,7 +213,22 @@ impl<'w> Engine<'w> {
     /// `None` without combat.
     pub fn player_stats(&self) -> Option<Stats> {
         let combat = self.state.combat.as_ref()?;
-        Some(rules::player_stats(self.world, combat))
+        Some(character::player_stats(self.world, combat))
+    }
+    /// The resources the player uses and their ceilings; `None` without combat.
+    pub fn player_pools(&self) -> Option<Pools> {
+        let stats = self.player_stats()?;
+        Some(character::resources::player_pools(self.world, &stats))
+    }
+    /// The resources a fighter (the player or a character with a combat
+    /// profile) uses, and their ceilings at its own stats.
+    pub fn pools_of(&self, character: &str) -> Option<Pools> {
+        if character == self.world.world.player {
+            return self.player_pools();
+        }
+        let profile = self.world.character(character)?.combat.as_ref()?;
+        self.world.combat()?;
+        Some(character::resources::profile_pools(self.world, profile))
     }
     /// Stat points granted so far and not yet spent; `None` without combat.
     pub fn unspent_points(&self) -> Option<u32> {
@@ -231,9 +243,14 @@ impl<'w> Engine<'w> {
     pub fn unspent_proficiency_points(&self) -> u32 {
         rules::unspent_proficiency_points(self.world, &self.state)
     }
-    /// The player's current HP and MP, wherever they live; `None` without combat.
+    /// The player's current HP, MP and Rage; `None` without combat.
     pub fn player_vitals(&self) -> Option<Vitals> {
         rules::player_vitals(&self.state)
+    }
+    /// A participant's current vitals in the active encounter: the
+    /// player's own, or an opponent's for this fight.
+    pub fn vitals_of(&self, participant: &Participant) -> Option<Vitals> {
+        participant.vitals.or_else(|| self.player_vitals())
     }
     /// The active encounter, if any.
     pub fn encounter(&self) -> Option<&Encounter> {
@@ -243,7 +260,7 @@ impl<'w> Engine<'w> {
     pub fn battle(&self) -> Option<&BattleState> {
         match &self.state.combat.as_ref()?.stance {
             Stance::Battle(battle) => Some(battle),
-            Stance::Exploring(_) | Stance::Fighting(_) => None,
+            Stance::Exploring | Stance::Fighting(_) => None,
         }
     }
     /// The next `n` actors, projected as if every action took a basic

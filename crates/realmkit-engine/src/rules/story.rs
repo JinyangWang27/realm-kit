@@ -224,14 +224,10 @@ pub(crate) fn grant_xp(
         }
         // Levelling up restores HP and MP fully, to the effective maxima.
         combat.level += 1;
-        let max = player_stats(world, combat);
-        combat.stance = Stance::Exploring(Vitals {
-            hp: max.hp,
-            mp: max.mp,
-        });
+        crate::character::restore(world, combat);
         events.push(Event::LevelUp {
             level: combat.level,
-            mp_restored: max.mp > 0,
+            mp_restored: combat.vitals.mp > 0,
         });
     }
     Ok(())

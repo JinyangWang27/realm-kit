@@ -64,7 +64,8 @@ pub fn location(
             .encounter()
             .and_then(|e| e.participants.iter().find(|p| p.character == character.id));
         let hp = fighting
-            .map(|p| p.hp)
+            .and_then(|p| engine.vitals_of(p))
+            .map(|v| v.hp)
             .or(character.combat.as_ref().map(|c| c.stats.hp));
         if hp == Some(0) {
             continue;
@@ -308,12 +309,17 @@ pub fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
     }
     writeln!(output, "{}", paint.title(&heading))?;
     answers(output, engine)?;
-    // Vitals; a world or build without MP shows none.
+    // Vitals; a world or build without MP shows none, and Rage shows only
+    // where it outlasts a fight.
+    let pools = engine.player_pools().unwrap();
     write!(output, "  HP {}/{}", vitals.hp, stats.hp)?;
-    match stats.mp {
-        0 => writeln!(output)?,
-        max => writeln!(output, " · MP {}/{max}", vitals.mp)?,
+    if let Some(max) = pools.mp.filter(|max| *max > 0) {
+        write!(output, " · MP {}/{max}", vitals.mp)?;
     }
+    if pools.rage.is_some() && rules.resources.rage_carries {
+        write!(output, " · Rage {}", vitals.rage)?;
+    }
+    writeln!(output)?;
     let shown: Vec<String> = [Stat::Patk, Stat::Pdef, Stat::Satk, Stat::Sdef, Stat::Speed]
         .into_iter()
         .map(|s| format!("{} {}", stat_name(world, s), stats.get(s)))

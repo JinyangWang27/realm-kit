@@ -1,4 +1,7 @@
-//! A world's fighting rules: timeline, resources, levels, skills and groups.
+//! A world's fighting rules. Most of them belong to the universal character
+//! core: levels, stats, skills, resources, gear and techniques, which hold
+//! however a fight is run. The timeline alone is the optional turn-based
+//! layer's; groups and the narrative are read by whichever fights.
 
 use crate::*;
 
@@ -10,9 +13,15 @@ pub struct Combat {
     /// Percentage of the other channel's attack and defence added to a hit.
     #[serde(default = "default_cross_share")]
     pub cross_share: u32,
-    pub timeline: Timeline,
+    /// Turn-based encounters on the initiative timeline; without one, nobody
+    /// can be engaged in a personal fight, while everything else stays.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeline: Option<Timeline>,
     #[serde(default)]
     pub resources: Resources,
+    /// Which resources the player uses; absent, they follow from the world.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_resources: Option<ResourceUse>,
     pub levels: Vec<Level>,
     #[serde(default)]
     pub skills: Vec<Skill>,
@@ -61,7 +70,7 @@ fn default_cross_share() -> u32 {
     25
 }
 
-/// Encounter scheduling: an action at speed `s` and time `t`% delays the actor's
+/// Turn-based encounter scheduling: an action at speed `s` and time `t`% delays the actor's
 /// next turn by `ceil(action_cost × t / (100 × min(s, speed_cap)))` ticks.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -71,28 +80,89 @@ pub struct Timeline {
     pub speed_cap: u32,
 }
 
-/// Skill resources during encounters; zero leaves a resource unused.
+/// MP and Rage: what builds, restores and drains them. Every field is
+/// optional, and zero or absent leaves that rule out.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Resources {
-    /// Percent of maximum MP regained per baseline turn of encounter time.
+    /// Turn-based only: percent of maximum MP regained per baseline turn of
+    /// encounter time. Encounter time is not world time.
     #[serde(default)]
     pub mp_regen_percent: u32,
+    /// Rage gained by each attack or skill the character resolves.
     #[serde(default)]
     pub rage_per_action: u32,
     /// Rage gained from taking damage equal to maximum HP, proportionally.
     #[serde(default)]
     pub rage_per_max_hp: u32,
+    /// The most Rage a character can hold; absent, it saturates instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rage_cap: Option<u32>,
+    /// Rage is kept after a fight and drains by `rage_decay`. Otherwise it
+    /// belongs to one fight: it clears when the fight ends.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rage_carries: bool,
+    /// MP regained over world time, at fixed minutes of the clock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mp_recovery: Option<Recovery>,
+    /// Rage lost over world time, at fixed minutes of the clock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rage_decay: Option<Decay>,
+}
+
+impl Resources {
+    /// Whether anything in the world builds Rage.
+    pub fn gains_rage(&self) -> bool {
+        self.rage_per_action > 0 || self.rage_per_max_hp > 0
+    }
+}
+
+/// `percent` of maximum MP, rounded down but at least 1, each time world time
+/// reaches a multiple of `every` minutes.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Recovery {
+    pub percent: u32,
+    pub every: u64,
+}
+
+/// `points` of Rage lost each time world time reaches a multiple of `every`
+/// minutes.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Decay {
+    pub points: u32,
+    pub every: u64,
+}
+
+/// Which of the two resources a character uses. A resource it does not use
+/// stays at 0, gains and regains nothing, and pays for nothing.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceUse {
+    pub mp: bool,
+    pub rage: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Resource {
-    /// Kept between encounters; regenerates over encounter time and by resting.
+    /// A reserve: starts full, regenerates over time and by resting, and is
+    /// kept between fights.
     #[default]
     Mp,
-    /// Starts at 0 in every encounter; builds from acting and being hit.
+    /// Momentum: starts at 0 and builds from acting and being hit.
     Rage,
+}
+
+/// What one use of a skill spends from each resource.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Costs {
+    #[serde(default)]
+    pub mp: u32,
+    #[serde(default)]
+    pub rage: u32,
 }
 
 /// Engine bound for every authored stat; keeps damage arithmetic small.
@@ -117,12 +187,16 @@ pub struct Skill {
     pub name: String,
     pub power: u32,
     pub channel: Channel,
-    /// Spent per use, exactly as authored.
+    /// Spent per use from `resource`, exactly as authored.
     #[serde(default)]
     pub cost: u32,
     #[serde(default)]
     pub resource: Resource,
-    /// Action length in percent of a basic attack; delays the user's next turn.
+    /// Costs in both resources, in place of `cost` and `resource`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub costs: Option<Costs>,
+    /// Action length in percent of a basic attack. The turn-based timeline
+    /// delays the user's next turn by it.
     #[serde(default = "full_time")]
     pub time: u32,
     /// Character level at which the player can use it.
@@ -146,6 +220,18 @@ pub struct Crit {
     pub chance_percent: u32,
     /// Damage in percent of a normal hit, 101 to 1,000.
     pub multiplier_percent: u32,
+}
+
+impl Skill {
+    /// What one use spends from `resource`.
+    pub fn cost_in(&self, resource: Resource) -> u32 {
+        match (self.costs, resource) {
+            (Some(costs), Resource::Mp) => costs.mp,
+            (Some(costs), Resource::Rage) => costs.rage,
+            (None, r) if r == self.resource => self.cost,
+            (None, _) => 0,
+        }
+    }
 }
 
 fn full_time() -> u32 {

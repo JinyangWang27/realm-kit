@@ -166,7 +166,13 @@ fn saves_reject_allocations_the_rules_could_not_make() {
                 .allocation
                 .insert(Stat::Speed, 11);
         },
-        |s| s.state.combat.as_mut().unwrap().stance = Stance::Exploring(Vitals { hp: 61, mp: 0 }),
+        |s| {
+            s.state.combat.as_mut().unwrap().vitals = Vitals {
+                hp: 61,
+                mp: 0,
+                ..Vitals::default()
+            }
+        },
     ];
     for (i, corrupt) in broken.into_iter().enumerate() {
         let mut snapshot = good.clone();

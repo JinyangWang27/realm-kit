@@ -17,38 +17,37 @@ pub(crate) fn baseline_turn(timeline: &Timeline) -> Result<u64, EngineError> {
     delay(timeline, 100, 100)
 }
 
-/// Regenerates everyone for the time until `actor`'s turn, then moves there.
+/// Regenerates everyone's MP for the encounter time until `actor`'s turn,
+/// then moves there. Only MP regenerates on this clock; the timeline's
+/// progress toward each point stays with the encounter.
 pub(super) fn tick(
     world: &WorldSpec,
-    encounter: &mut Encounter,
+    board: &mut Board,
     me: Me,
     actor: usize,
 ) -> Result<(), EngineError> {
-    let rules = world.combat().unwrap();
+    let rate = world.combat().unwrap().resources.mp_regen_percent;
+    let encounter = &mut *board.encounter;
     let at = encounter.participants[actor].next_time;
     let elapsed = at - encounter.now;
-    let per_point = 100 * u128::from(baseline_turn(&rules.timeline)?);
-    for p in &mut encounter.participants {
-        let max = stats(world, me.stats, p).mp;
-        // Time spent at full MP banks nothing, so the remainder drops at the cap.
-        let progress = u128::from(p.mp_remainder)
-            + u128::from(max) * u128::from(rules.resources.mp_regen_percent) * u128::from(elapsed);
-        let gained = progress / per_point;
-        if u128::from(p.mp) + gained >= u128::from(max) {
-            (p.mp, p.mp_remainder) = (max, 0);
-        } else {
-            p.mp += gained as u32;
-            p.mp_remainder = (progress % per_point) as u64;
-        }
+    let per_point = 100 * u128::from(baseline_turn(timeline(world)?)?);
+    for i in 0..encounter.participants.len() {
+        let p = &mut encounter.participants[i];
+        let max = pools(world, me, p).mp_max();
+        let mp = match p.vitals.as_mut() {
+            Some(vitals) => &mut vitals.mp,
+            None => &mut board.player.mp,
+        };
+        resources::regenerate(mp, &mut p.mp_remainder, max, rate, elapsed, per_point);
     }
     encounter.now = at;
     Ok(())
 }
 
 /// The living participant who acts next: `(next_time, side, position)`.
-pub(super) fn next_actor(encounter: &Encounter) -> Option<usize> {
+pub(super) fn next_actor(encounter: &Encounter, player: &Vitals) -> Option<usize> {
     (0..encounter.participants.len())
-        .filter(|&i| encounter.participants[i].fighting())
+        .filter(|&i| encounter.fighting(i, player))
         .min_by_key(|&i| {
             let p = &encounter.participants[i];
             (p.next_time, p.side, i)
@@ -63,21 +62,23 @@ pub(crate) fn turn_order(world: &WorldSpec, state: &GameState, n: usize) -> Vec<
     let Stance::Fighting(encounter) = &combat.stance else {
         return Vec::new();
     };
-    let timeline = world.combat().unwrap().timeline;
+    let Ok(timeline) = timeline(world) else {
+        return Vec::new();
+    };
     let mut projected = encounter.clone();
     let mut order = Vec::new();
     while order.len() < n {
-        let Some(i) = next_actor(&projected) else {
+        let Some(i) = next_actor(&projected, &combat.vitals) else {
             break;
         };
         let p = &projected.participants[i];
-        let player = rules::player_stats(world, combat);
+        let player = character::player_stats(world, combat);
         // The player's basic action may be a heavy weapon's slower swing.
         let time = match p.control {
             Control::Player => gear::basic(world, combat).1.unwrap_or(100),
             Control::Policy => 100,
         };
-        let Ok(step) = delay(&timeline, stats(world, player, p).speed, time) else {
+        let Ok(step) = delay(timeline, stats(world, player, p).speed, time) else {
             break;
         };
         order.push(p.character.clone());

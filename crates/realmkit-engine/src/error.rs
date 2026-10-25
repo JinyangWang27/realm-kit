@@ -60,6 +60,8 @@ pub enum EngineError {
     NotEnoughMp(Id),
     #[error("not enough rage for {0}")]
     NotEnoughRage(Id),
+    #[error("this world has no turn-based fights")]
+    NoEncounters,
     #[error("finish the fight first")]
     InEncounter,
     #[error("there is no running from this fight")]
