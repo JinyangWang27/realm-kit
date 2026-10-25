@@ -18,6 +18,7 @@ mod gear;
 mod rng;
 mod rules;
 mod save;
+mod settle;
 mod state;
 mod techniques;
 
