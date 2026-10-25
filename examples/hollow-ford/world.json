@@ -1,0 +1,73 @@
+{
+  "format_version": 19,
+  "id": "hollow_ford",
+  "name": "Hollow Ford",
+  "language": "en",
+  "start": "inn",
+  "player": "traveller",
+  "flags": ["vouched", "ford_cleared"],
+  "time": { "start": 480, "clock": "Day {day}, {hour}:{minute}", "wait": 30, "rest": 480 },
+  "roads": [
+    { "id": "inn-crossroads", "between": ["inn", "crossroads"], "minutes": 60 },
+    { "id": "crossroads-ford", "between": ["crossroads", "ford"], "minutes": 45 }
+  ],
+  "combat": {
+    "special_name": "Focus",
+    "realtime": {
+      "steps_per_second": 10,
+      "windup": 3,
+      "active": 2,
+      "recovery": 4,
+      "guard_raise": 1,
+      "guard_percent": 25,
+      "retreat": 6,
+      "mp_regen_percent": 5
+    },
+    "resources": {
+      "rage_per_action": 1,
+      "rage_per_max_hp": 10,
+      "rage_cap": 10,
+      "mp_recovery": { "percent": 25, "every": 60 }
+    },
+    "levels": [
+      { "xp": 0, "stats": { "hp": 60, "mp": 10, "patk": 10, "pdef": 6, "satk": 0, "sdef": 4, "speed": 100 } },
+      { "xp": 20, "stats": { "hp": 68, "mp": 12, "patk": 11, "pdef": 7, "satk": 0, "sdef": 5, "speed": 100 } }
+    ],
+    "skills": [
+      {
+        "id": "lunge",
+        "name": "Lunge",
+        "power": 150,
+        "channel": "physical",
+        "cost": 4,
+        "time": 120,
+        "text": "A lunge from {attacker} finds {target}: {damage} damage."
+      },
+      {
+        "id": "quick_thrust",
+        "name": "Quick Thrust",
+        "power": 140,
+        "channel": "physical",
+        "cost": 3,
+        "text": "A quick thrust from {attacker} finds {target}: {damage} damage."
+      },
+      {
+        "id": "shield_bash",
+        "name": "Shield Bash",
+        "power": 170,
+        "channel": "physical",
+        "cost": 3,
+        "resource": "rage",
+        "text": "A shield bash from {attacker} slams into {target}: {damage} damage."
+      }
+    ],
+    "player_skills": ["lunge"],
+    "groups": [{ "id": "ford_bandits", "victory_flags": ["ford_cleared"] }],
+    "narrative": {
+      "attack": ["A cut from {attacker} finds {target}: {damage} damage."],
+      "hurt": ["A blow from {attacker} finds {target}: {damage} damage."],
+      "victory": "{target} is down.",
+      "death": "The river takes the rest.\nStart a new game to try again."
+    }
+  }
+}

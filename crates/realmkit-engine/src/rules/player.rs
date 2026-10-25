@@ -73,7 +73,8 @@ pub(crate) fn respec(
     Ok(())
 }
 
-/// Restores HP and MP at a safe location, then the world's rest time passes.
+/// Restores HP and MP at a safe location, the party's included, then the
+/// world's rest time passes.
 pub(crate) fn rest(
     world: &WorldSpec,
     state: &mut GameState,
@@ -84,6 +85,7 @@ pub(crate) fn rest(
         return Err(EngineError::NotSafe);
     };
     character::restore(world, combat);
+    party::rest(world, state);
     state.dialogue = None;
     events.push(Event::Rested);
     if let Some(retinue) = state.retinue.as_mut() {

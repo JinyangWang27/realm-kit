@@ -2,7 +2,8 @@ use crate::{
     input,
     render::Paint,
     render::{
-        direction_name, duration, gear_name, money, piece_name, soldier, stat_name, travel_time,
+        direction_name, duration, gear_name, money, order_text, piece_name, soldier, stat_name,
+        travel_time,
     },
 };
 use realmkit_engine::{AttackPhase, BattleOrder, Command, Engine, Intent, RealtimeAction, Vitals};
@@ -78,6 +79,8 @@ const DEPOSIT: &str = "Deposit";
 const WITHDRAW: &str = "Withdraw";
 const ALL: &str = "all";
 const ENCHANTING_GROUP: &str = "Enchanting";
+const ORDERS_GROUP: &str = "Orders";
+const ORDER: &str = "Order";
 const ENCHANT: &str = "Enchant";
 const FORGE: &str = "Forge";
 const IMPROVE: &str = "Improve";
@@ -139,6 +142,7 @@ pub enum Group {
     Consume,
     Recruit,
     Upgrade,
+    Orders,
 }
 
 impl Group {
@@ -154,6 +158,7 @@ impl Group {
             Command::Use(_) => Some(Self::Consume),
             Command::Recruit { .. } => Some(Self::Recruit),
             Command::Upgrade { .. } => Some(Self::Upgrade),
+            Command::Tactic { .. } => Some(Self::Orders),
             _ => None,
         }
     }
@@ -245,7 +250,6 @@ fn duel_lines(engine: &Engine<'_>) -> Vec<String> {
     let Some(duel) = engine.realtime() else {
         return Vec::new();
     };
-    let player = engine.player_vitals().unwrap();
     let mut parts = vec![format!("{STEP_NOW} {}", duel.step)];
     for (i, f) in duel.fighters.iter().enumerate() {
         let doing = match &f.action {
@@ -262,10 +266,16 @@ fn duel_lines(engine: &Engine<'_>) -> Vec<String> {
             RealtimeAction::Guard { ready_at } => format!("{GUARD_RAISING} {UNTIL} {ready_at}"),
             RealtimeAction::Retreat { until } => format!("{DISENGAGING} {UNTIL} {until}"),
         };
-        let v = *duel.vitals(i, &player);
-        // Only fights that grew beyond the player and their foes say whose side.
+        let v = *duel.vitals(i, engine.state());
+        // Only fights that grew beyond the player and their foes say whose
+        // side; a named companion also says its order.
         let side = match f.team {
-            0 if i > 0 => format!(" · {ALLY}"),
+            0 if i > 0 => match engine.companion(&f.character) {
+                Some(c) if f.vitals.is_none() => {
+                    format!(" · {ALLY} · {}", order_text(engine.world(), &c.order))
+                }
+                _ => format!(" · {ALLY}"),
+            },
             0 | 1 => String::new(),
             team => format!(" · {TEAM} {team}"),
         };
@@ -370,6 +380,7 @@ fn group_label(engine: &Engine<'_>, group: Group) -> String {
         Group::Consume => format!("{CONSUME_GROUP} {OPENS}"),
         Group::Recruit => format!("{RECRUIT_GROUP} {OPENS}"),
         Group::Upgrade => format!("{UPGRADE_GROUP} {OPENS}"),
+        Group::Orders => format!("{ORDERS_GROUP} {OPENS}"),
     }
 }
 
@@ -639,6 +650,12 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Wait(minutes) => format!("{WAIT} — {}", duration(*minutes)),
         Command::Flee => FLEE.into(),
         Command::Duel(id) => format!("{DUEL} {}", world.character(id)?.name),
+        // "Order Wren: attack The Lookout".
+        Command::Tactic { companion, order } => format!(
+            "{ORDER} {}: {}",
+            world.character(companion)?.name,
+            order_text(world, order)
+        ),
         // Contact and arrivals are the host's reports, never a choice.
         // "Strike: Lunge at The Left Twin" when there is more than one foe.
         Command::Intent(intent) => {

@@ -9,6 +9,7 @@ mod crafting;
 mod economy;
 mod factions;
 mod map;
+mod party;
 mod player;
 mod proficiency;
 mod retinue;
@@ -20,6 +21,7 @@ pub(super) use actions::actions;
 pub(super) use economy::{quote, stock_up, ware_price};
 pub(super) use factions::initial as initial_standing;
 pub(super) use map::{known, map_view};
+pub(crate) use party::in_party;
 pub(super) use player::{granted_points, unspent_points};
 pub(super) use proficiency::{
     granted_points as granted_proficiency_points, rank, unspent_proficiency_points,
@@ -74,6 +76,7 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
         Condition::AtWar { factions } => state
             .at_war
             .contains(&realmkit_spec::faction_pair(factions)),
+        Condition::Companion { character } => in_party(state, character),
         Condition::TimeOfDay { from, to } => state.time.is_some_and(|now| {
             let minute = now % realmkit_spec::MINUTES_PER_DAY;
             if from < to {
@@ -132,7 +135,8 @@ fn leading(state: &GameState) -> bool {
 }
 
 /// Characters at the player's location, whatever their conditions: those
-/// placed here in the location's order, then movers who are here now.
+/// placed here in the location's order, then movers who are here now, then
+/// recruited companions, in the party or parted here, by ID.
 pub(super) fn placed_here<'a>(world: &'a WorldSpec, state: &GameState) -> Vec<&'a Id> {
     let here = &state.player.location;
     let placed = world
@@ -140,13 +144,18 @@ pub(super) fn placed_here<'a>(world: &'a WorldSpec, state: &GameState) -> Vec<&'
         .unwrap()
         .characters
         .iter()
-        .filter(|id| !state.whereabouts.contains_key(*id));
+        .filter(|id| !state.whereabouts.contains_key(*id) && !state.companions.contains_key(*id));
     let movers = world
         .characters
         .iter()
         .filter(|c| state.whereabouts.get(&c.id) == Some(here))
         .map(|c| &c.id);
-    placed.chain(movers).collect()
+    let companions = state
+        .companions
+        .iter()
+        .filter(|(_, c)| c.parted_at.as_ref().is_none_or(|at| at == here))
+        .filter_map(|(id, _)| world.character(id).map(|c| &c.id));
+    placed.chain(movers).chain(companions).collect()
 }
 
 /// Who is at the player's location now: placed or moved here, present
@@ -165,7 +174,14 @@ pub(super) fn character_here<'a>(
     state: &GameState,
     id: &str,
 ) -> Option<&'a Character> {
-    let here = match state.whereabouts.get(id) {
+    // A companion in the party is with the player whatever its conditions;
+    // one that parted stays where it did, under them.
+    let parted = match state.companions.get(id) {
+        Some(c) if c.in_party() => return world.character(id),
+        Some(c) => c.parted_at.as_ref(),
+        None => None,
+    };
+    let here = match parted.or(state.whereabouts.get(id)) {
         Some(at) => *at == state.player.location,
         None => world
             .location(&state.player.location)
@@ -216,8 +232,9 @@ pub(super) fn execute(
     if fighting(state).is_some() && !panel && !combat_action {
         return Err(EngineError::InEncounter);
     }
-    // In a duel only intents and panels are possible.
-    if dueling(state) && !panel && !matches!(command, Command::Intent(_)) {
+    // In a duel only intents, orders and panels are possible.
+    let realtime = matches!(command, Command::Intent(_) | Command::Tactic { .. });
+    if dueling(state) && !panel && !realtime {
         return Err(EngineError::InEncounter);
     }
     // In a battle only orders and panels are possible.
@@ -285,6 +302,9 @@ pub(super) fn execute(
         Command::Engage(id) => encounter::engage(world, state, id, &mut events)?,
         Command::Duel(id) => realtime::start(world, state, id, &mut events)?,
         Command::Intent(intent) => realtime::intent(world, state, intent, &mut events)?,
+        Command::Tactic { companion, order } => {
+            party::tactic(world, state, companion, order, &mut events)?
+        }
         Command::Order(order) => battle::command(world, state, order, &mut events)?,
         Command::Autoresolve => battle::autoresolve(world, state, &mut events)?,
         Command::Flee => encounter::flee(world, state, &mut events)?,

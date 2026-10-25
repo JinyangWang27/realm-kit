@@ -29,7 +29,7 @@ fn step(
     events: &mut Vec<Event>,
 ) -> Result<bool, EngineError> {
     let realtime = *rules(world)?;
-    let mut ring = ring(world, &mut state.combat)?;
+    let mut ring = ring(world, state)?;
     ring.fight.step = ring
         .fight
         .step
@@ -43,13 +43,11 @@ fn step(
             continue;
         }
         let max = ring.sides[i].pools.mp_max();
-        let fighter = &mut ring.fight.fighters[i];
-        let mp = match fighter.vitals.as_mut() {
-            Some(vitals) => &mut vitals.mp,
-            None => &mut ring.player.mp,
-        };
+        let mut remainder = ring.fight.fighters[i].mp_remainder;
         let rate = realtime.mp_regen_percent;
-        resources::regenerate(mp, &mut fighter.mp_remainder, max, rate, 1, per_point);
+        let mp = &mut ring.vitals_mut(i).mp;
+        resources::regenerate(mp, &mut remainder, max, rate, 1, per_point);
+        ring.fight.fighters[i].mp_remainder = remainder;
     }
     for i in 0..ring.fight.fighters.len() {
         if phase(world, &realtime, &mut ring, i, now, events)? {
@@ -67,8 +65,10 @@ fn step(
 /// An engine-controlled fighter's authored policy: with a `guard_hold`, it
 /// raises its guard whenever it is ready and attacks once the guard has
 /// been up that many steps; without one, it attacks whenever it is ready.
-/// Each attack aims by its `targeting` and uses the strongest skill it can
-/// pay for, else a basic attack, chosen as in turn-based encounters.
+/// Each attack aims by its `targeting` (a named companion's by its order
+/// first) and uses the strongest skill it can pay for, else a basic attack,
+/// chosen as in turn-based encounters. A companion with nobody it would
+/// strike now waits as it is, ready or behind its guard.
 fn policy(
     world: &WorldSpec,
     realtime: &Realtime,
@@ -87,7 +87,6 @@ fn policy(
         }
         _ => false,
     };
-    // Someone always fights against it while the fight runs.
     let Some(t) = pick(world, ring, i).filter(|_| attack) else {
         return Ok(());
     };

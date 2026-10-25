@@ -168,8 +168,8 @@ impl Encounter {
 /// A fight on the real-time layer's clock: the steps it has run and what
 /// each fighter is doing. Fighters on different teams are hostile; fighters
 /// can join while it runs. Like an encounter, it copies no vitals but those
-/// of the characters who are not the player, which last only as long as the
-/// fight.
+/// of the characters who are neither the player nor a named companion,
+/// which last only as long as the fight.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RealtimeEncounter {
@@ -191,7 +191,8 @@ pub struct Fighter {
     /// The step it joined at; 0 for those the fight started with.
     pub joined: u64,
     /// This fighter's vitals for this fight; `None` for the player, whose
-    /// vitals stay in [`CombatState::vitals`].
+    /// vitals stay in [`CombatState::vitals`], and for a named companion,
+    /// whose vitals stay in its [`CompanionState`].
     pub vitals: Option<Vitals>,
     /// Fight-time regeneration progress toward the next MP point; it ends
     /// with the fight.
@@ -237,13 +238,19 @@ pub enum AttackPhase {
 }
 
 impl RealtimeEncounter {
-    /// Fighter `i`'s vitals: its own, or the player's.
-    pub fn vitals<'a>(&'a self, i: usize, player: &'a Vitals) -> &'a Vitals {
-        self.fighters[i].vitals.as_ref().unwrap_or(player)
+    /// Fighter `i`'s vitals: its own for this fight, or, for the player and
+    /// named companions, their only copy, which `state` holds outside it.
+    pub fn vitals<'a>(&'a self, i: usize, state: &'a GameState) -> &'a Vitals {
+        let fighter = &self.fighters[i];
+        match (&fighter.vitals, i) {
+            (Some(vitals), _) => vitals,
+            (None, 0) => &state.combat.as_ref().unwrap().vitals,
+            (None, _) => &state.companions[&fighter.character].vitals,
+        }
     }
     /// Whether fighter `i` still fights: alive and not yielded.
-    pub fn fighting(&self, i: usize, player: &Vitals) -> bool {
-        self.vitals(i, player).hp > 0 && !self.fighters[i].yielded
+    pub fn fighting(&self, i: usize, state: &GameState) -> bool {
+        self.vitals(i, state).hp > 0 && !self.fighters[i].yielded
     }
     /// The fighter playing `character`, if it is in this fight.
     pub fn index(&self, character: &str) -> Option<usize> {
@@ -251,8 +258,34 @@ impl RealtimeEncounter {
     }
     /// Whether anyone off the player's team still fights; the fight goes
     /// on while someone does.
-    pub fn contested(&self, player: &Vitals) -> bool {
-        (1..self.fighters.len()).any(|i| self.fighters[i].team != 0 && self.fighting(i, player))
+    pub fn contested(&self, state: &GameState) -> bool {
+        (1..self.fighters.len()).any(|i| self.fighters[i].team != 0 && self.fighting(i, state))
+    }
+}
+
+/// A named companion once recruited: whether it travels with the player,
+/// its HP, MP and Rage, and its standing tactical order. This is the
+/// companion's only copy of its vitals; a fight it joins reads and changes
+/// them here, so nothing it lost or regained is undone when the fight ends,
+/// and leaving the party or joining it again restores nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompanionState {
+    /// `None` while the companion travels in the party, wherever the player
+    /// is; otherwise the location where it parted from the player and stays.
+    pub parted_at: Option<Id>,
+    pub vitals: Vitals,
+    pub order: TacticalOrder,
+}
+
+impl CompanionState {
+    /// Whether it travels with the player now.
+    pub fn in_party(&self) -> bool {
+        self.parted_at.is_none()
+    }
+    /// At 0 HP: it cannot join a fight until it recovers.
+    pub fn downed(&self) -> bool {
+        self.vitals.hp == 0
     }
 }
 
@@ -321,6 +354,9 @@ pub struct GameState {
     /// order; every other pair is at peace. Only worlds with diplomacy have any.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub at_war: BTreeSet<[Id; 2]>,
+    /// Every named companion ever recruited, in the party or parted from it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub companions: BTreeMap<Id, CompanionState>,
 }
 
 /// A track's value: one for a global track, one per faction for a faction track.

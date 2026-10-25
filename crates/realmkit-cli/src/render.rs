@@ -1,6 +1,6 @@
 use crate::panels;
 use crossterm::style::Stylize;
-use realmkit_engine::{AttackPhase, BattleOutcome, Engine, Event, Outcome};
+use realmkit_engine::{AttackPhase, BattleOutcome, Engine, Event, Outcome, TacticalOrder};
 use realmkit_spec::{CharacterKind, Direction, Id, Stat, TextTemplate};
 use std::io::{self, Write};
 
@@ -214,6 +214,20 @@ pub fn faction_name<'w>(world: &'w realmkit_spec::WorldSpec, faction: &str) -> &
 /// "Hollin Keep and the fen bands".
 pub fn faction_pair(world: &realmkit_spec::WorldSpec, [a, b]: &[Id; 2]) -> String {
     format!("{} and {}", faction_name(world, a), faction_name(world, b))
+}
+
+/// "follow you", "hold position", "defend Oake", "attack The Lookout".
+pub fn order_text(world: &realmkit_spec::WorldSpec, order: &TacticalOrder) -> String {
+    let name = |id: &str| match id == world.world.player {
+        true => "you".to_string(),
+        false => world.character(id).map_or(id.into(), |c| c.name.clone()),
+    };
+    match order {
+        TacticalOrder::Follow => "follow you".into(),
+        TacticalOrder::Hold => "hold position".into(),
+        TacticalOrder::Defend { ally } => format!("defend {}", name(ally)),
+        TacticalOrder::Attack { target } => format!("attack {}", name(target)),
+    }
 }
 
 pub fn direction_name(direction: Direction) -> &'static str {
@@ -523,6 +537,20 @@ pub fn events(
                 name(character)
             )?,
             Event::RetreatStarted => writeln!(output, "You turn to disengage.")?,
+            Event::JoinedParty { character } => {
+                writeln!(output, "{} joins your party.", name(character))?
+            }
+            Event::LeftParty { character } => writeln!(
+                output,
+                "{} leaves your party and stays here.",
+                name(character)
+            )?,
+            Event::OrderGiven { companion, order } => writeln!(
+                output,
+                "{} will {}.",
+                name(companion),
+                order_text(world, order)
+            )?,
             Event::Joined { character, team: 0 } => {
                 writeln!(output, "{} joins the fight at your side.", name(character))?
             }

@@ -33,6 +33,8 @@ pub(super) fn check(
     let progress = Progress::of(world, state)?;
     // The roster first: a battle's check sums its bounded squads.
     retinue::check(world, state)?;
+    // Companions before a fight's check, which reads their vitals.
+    companions(world, state)?;
     if let (Some(combat), Some(rules)) = (&state.combat, world.combat()) {
         combat::check(world, state, combat, rules, &progress)?;
     }
@@ -295,6 +297,63 @@ fn economy(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                 && kinds.iter().all(|(kind, n)| *n > 0 && sold.contains(&kind))
         }),
         "workshops do not match the world",
+    )
+}
+
+/// Recruited companions are companions a dialogue choice could have
+/// recruited, parted at a real place, with vitals within their maxima and
+/// Rage only where it may outlast a fight. Out of the party they follow;
+/// in it they defend only the player or another companion in it, and
+/// attack only someone of another team in the current real-time fight.
+fn companions(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let (Some(rules), false) = (world.combat(), state.companions.is_empty()) else {
+        return ensure(
+            state.companions.is_empty(),
+            "companions in a world without combat",
+        );
+    };
+    let fired = fired(world, state);
+    let fight = match state.combat.as_ref().map(|c| &c.stance) {
+        Some(Stance::Realtime(fight)) => Some(fight),
+        _ => None,
+    };
+    ensure(
+        state.companions.iter().all(|(id, c)| {
+            let Some(profile) = world
+                .character(id)
+                .filter(|c| c.companion.is_some())
+                .and_then(|c| c.combat.as_ref())
+            else {
+                return false;
+            };
+            let recruited = fired
+                .iter()
+                .any(|e| matches!(e, Effect::JoinParty { character } if character == id));
+            let pools = crate::character::resources::profile_pools(world, profile);
+            let fighting = fight.is_some_and(|f| f.index(id).is_some());
+            let vitals_ok = combat::within(rules, &c.vitals, &profile.stats, pools)
+                && (fighting
+                    || rules.resources.rage_carries
+                    || (c.vitals.rage == 0 && c.vitals.rage_remainder == 0));
+            let parted_ok = c
+                .parted_at
+                .as_ref()
+                .is_none_or(|at| world.location(at).is_some());
+            let order_ok = match &c.order {
+                TacticalOrder::Follow => true,
+                _ if !c.in_party() => false,
+                TacticalOrder::Hold => true,
+                TacticalOrder::Defend { ally } => {
+                    *ally == world.world.player || (ally != id && rules::in_party(state, ally))
+                }
+                TacticalOrder::Attack { target } => fight.is_some_and(|f| {
+                    f.index(target)
+                        .is_some_and(|t| t > 0 && f.fighters[t].team != 0)
+                }),
+            };
+            recruited && vitals_ok && parted_ok && order_ok
+        }),
+        "invalid companions",
     )
 }
 

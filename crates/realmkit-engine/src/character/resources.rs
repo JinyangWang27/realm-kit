@@ -169,8 +169,9 @@ fn crossings(from: u64, to: u64, every: u64) -> u64 {
     to / every - from / every
 }
 
-/// What world time from minute `from` to `to` does to the player: MP
-/// recovers and Rage decays at each boundary it crosses.
+/// What world time from minute `from` to `to` does to the player and to
+/// every recruited companion, each at its own maxima: MP recovers and Rage
+/// decays at each boundary it crosses.
 pub(crate) fn elapse(world: &WorldSpec, state: &mut GameState, from: u64, to: u64) {
     let (Some(combat), Some(rules)) = (state.combat.as_mut(), world.combat()) else {
         return;
@@ -178,7 +179,21 @@ pub(crate) fn elapse(world: &WorldSpec, state: &mut GameState, from: u64, to: u6
     let rules = rules.resources;
     let max = player_stats(world, combat);
     let pools = player_pools(world, &max);
-    let vitals = &mut combat.vitals;
+    elapse_vitals(rules, pools, &mut combat.vitals, from, to);
+    for (id, companion) in state.companions.iter_mut() {
+        let pools = profile_pools(world, super::profile(world, id));
+        elapse_vitals(rules, pools, &mut companion.vitals, from, to);
+    }
+}
+
+/// [`elapse`] for one character's vitals at `pools`.
+fn elapse_vitals(
+    rules: realmkit_spec::Resources,
+    pools: Pools,
+    vitals: &mut Vitals,
+    from: u64,
+    to: u64,
+) {
     if let (Some(recovery), Some(mp_max)) = (rules.mp_recovery, pools.mp) {
         let times = crossings(from, to, recovery.every);
         let each = (u64::from(mp_max) * u64::from(recovery.percent) / 100).max(1);

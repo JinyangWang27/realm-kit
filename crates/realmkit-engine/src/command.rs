@@ -43,6 +43,13 @@ pub enum Command {
     Duel(Id),
     /// In a real-time fight: one input on its fixed-step clock.
     Intent(Intent),
+    /// Gives a named companion in the party a standing tactical order,
+    /// while exploring or in a real-time fight. An order changes what the
+    /// companion aims its next attacks at; it never starts or lands one.
+    Tactic {
+        companion: Id,
+        order: TacticalOrder,
+    },
     /// Restores HP and MP at a safe location.
     Rest,
     /// Raises soldiers of a line from this location's pool.
@@ -148,6 +155,30 @@ pub enum Intent {
         character: Id,
         team: u32,
     },
+}
+
+/// A named companion's standing order: a high-level objective, never a
+/// single attack. RealmKit has no geometry, so Follow and Hold name the
+/// objective a host moves the companion by; the engine decides only whom
+/// its attacks aim at. Without a valid preferred foe, every order falls
+/// back to the companion's authored `targeting` over every foe it may aim
+/// at, so an order never stops a fight.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TacticalOrder {
+    /// Go with the player; aim by the authored `targeting`.
+    #[default]
+    Follow,
+    /// Hold position: stay at the objective the host keeps, and strike only
+    /// at foes whose attack is aimed at the companion.
+    Hold,
+    /// Protect `ally`, the player or another companion in the party: aim at
+    /// a foe whose attack is aimed at them, else as Follow.
+    Defend { ally: Id },
+    /// Aim at `target`, a hostile fighter in the current real-time fight,
+    /// while it still fights, else as Follow. Lapses to Follow when the
+    /// fight ends.
+    Attack { target: Id },
 }
 
 /// A dialogue choice as the conversation offers it.
@@ -277,6 +308,19 @@ pub enum Event {
     },
     /// In a real-time fight: the player turned to retreat.
     RetreatStarted,
+    /// A named companion joined the player's party.
+    JoinedParty {
+        character: Id,
+    },
+    /// A named companion left the party, staying where the player is.
+    LeftParty {
+        character: Id,
+    },
+    /// A companion took a standing order.
+    OrderGiven {
+        companion: Id,
+        order: TacticalOrder,
+    },
     FleeStarted,
     /// A participant in a yielding group stops fighting, alive.
     Yielded {

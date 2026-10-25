@@ -72,6 +72,16 @@ pub enum EngineError {
     InvalidTeam { character: Id, team: u32 },
     #[error("choose whom to strike")]
     NeedTarget,
+    #[error("{0} is not someone who can travel with you")]
+    NotACompanion(Id),
+    #[error("{0} already travels with you")]
+    AlreadyInParty(Id),
+    #[error("{0} does not travel with you")]
+    NotInParty(Id),
+    #[error("{0} is down and must recover first")]
+    Downed(Id),
+    #[error("{0} cannot be defended")]
+    InvalidWard(Id),
     #[error("{0} cannot be struck now")]
     InvalidTarget(Id),
     #[error("finish what you are doing first")]

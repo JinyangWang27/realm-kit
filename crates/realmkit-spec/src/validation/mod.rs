@@ -232,6 +232,7 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
             at_least,
         } => factions::at_least(out, w, owner, track, faction.as_ref(), *at_least),
         Condition::AtWar { factions: pair } => factions::pair(out, w, owner, pair),
+        Condition::Companion { character } => story::companion(out, w, owner, character),
     }
 }
 

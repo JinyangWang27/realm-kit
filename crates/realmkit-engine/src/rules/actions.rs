@@ -44,8 +44,10 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         // Fighters, where the world runs turn-based fights, and armies that
         // are not on the player's side.
         let turn_based = world.combat().is_some_and(|c| c.timeline.is_some());
+        // A named companion is never anyone's foe.
         let foe = |c: &Character| {
-            (c.combat.is_some() && turn_based) || c.army.as_ref().is_some_and(|a| a.joins.is_none())
+            (c.combat.is_some() && turn_based && c.companion.is_none())
+                || c.army.as_ref().is_some_and(|a| a.joins.is_none())
         };
         actions.extend(
             here.iter()
@@ -342,12 +344,12 @@ fn duel_actions(
         available,
     };
     let foes: Vec<_> = (1..fight.fighters.len())
-        .filter(|&i| fight.fighters[i].team != 0 && fight.fighting(i, &combat.vitals))
+        .filter(|&i| fight.fighters[i].team != 0 && fight.fighting(i, state))
         .map(|i| fight.fighters[i].character.clone())
         .collect();
     let targets: Vec<Option<Id>> = match foes.len() {
         1 => vec![None],
-        _ => foes.into_iter().map(Some).collect(),
+        _ => foes.iter().cloned().map(Some).collect(),
     };
     let skills: Vec<_> = techniques::player_skills(world, combat)
         .into_iter()
@@ -376,7 +378,48 @@ fn duel_actions(
     if !realtime::group(world, fight).is_some_and(|g| g.no_flee) {
         actions.push(intent(Intent::Retreat, free));
     }
+    actions.extend(orders(world, state, fight, &foes));
     actions.extend(panels);
+    actions
+}
+
+/// The orders each named companion still fighting can take: follow, hold,
+/// defend the player or another companion here, and attack each foe; the
+/// order it already has is left out.
+fn orders(
+    world: &WorldSpec,
+    state: &GameState,
+    fight: &RealtimeEncounter,
+    foes: &[Id],
+) -> Vec<Action> {
+    let companions: Vec<&Id> = (1..fight.fighters.len())
+        .filter(|&i| fight.fighters[i].vitals.is_none() && fight.fighting(i, state))
+        .map(|i| &fight.fighters[i].character)
+        .collect();
+    let mut actions = Vec::new();
+    for companion in &companions {
+        let wards = std::iter::once(&world.world.player)
+            .chain(companions.iter().copied().filter(|c| c != companion))
+            .map(|ally| TacticalOrder::Defend { ally: ally.clone() });
+        let attacks = foes.iter().map(|target| TacticalOrder::Attack {
+            target: target.clone(),
+        });
+        let current = &state.companions[*companion].order;
+        actions.extend(
+            [TacticalOrder::Follow, TacticalOrder::Hold]
+                .into_iter()
+                .chain(wards)
+                .chain(attacks)
+                .filter(|order| order != current)
+                .map(|order| Action {
+                    command: Command::Tactic {
+                        companion: (*companion).clone(),
+                        order,
+                    },
+                    available: true,
+                }),
+        );
+    }
     actions
 }
 

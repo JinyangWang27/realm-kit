@@ -111,6 +111,23 @@ pub struct Character {
     /// The faction the character belongs to, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub faction: Option<Id>,
+    /// A named companion: one who can travel in the player's party, keep
+    /// their own vitals between fights and take tactical orders.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub companion: Option<Companion>,
+}
+
+/// What makes a character a named companion: unique, never a copy, joining
+/// and leaving the party only by authored effects. Its numbers and policy
+/// are its combat profile's, which must be an ally's.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Companion {
+    /// Percent of maximum HP at or below which the companion fights warily,
+    /// whatever its order: it strikes only at foes whose attack is aimed at
+    /// it. Absent, it never does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caution: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

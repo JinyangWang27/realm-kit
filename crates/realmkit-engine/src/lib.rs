@@ -190,6 +190,7 @@ impl<'w> Engine<'w> {
                     .flat_map(|d| &d.at_war)
                     .map(realmkit_spec::faction_pair)
                     .collect(),
+                companions: BTreeMap::new(),
             },
         };
         // Merchants open with their stock at its targets, drawing nothing.
@@ -264,6 +265,22 @@ impl<'w> Engine<'w> {
             Stance::Realtime(duel) => Some(duel),
             Stance::Exploring | Stance::Fighting(_) | Stance::Battle(_) => None,
         }
+    }
+    /// The named companions travelling with the player now, by ID.
+    pub fn party(&self) -> Vec<&Id> {
+        let party = self.state.companions.iter().filter(|(_, c)| c.in_party());
+        party.map(|(id, _)| id).collect()
+    }
+    /// A recruited companion's record: where it is, its vitals and its
+    /// standing order. `None` for a companion never recruited.
+    pub fn companion(&self, id: &str) -> Option<&CompanionState> {
+        self.state.companions.get(id)
+    }
+    /// A real-time fighter's current vitals: its own for the fight, or the
+    /// player's or a named companion's only copy.
+    pub fn fighter_vitals(&self, i: usize) -> Option<Vitals> {
+        let fight = self.realtime()?;
+        (i < fight.fighters.len()).then(|| *fight.vitals(i, &self.state))
     }
     /// The battle the player is leading, if any.
     pub fn battle(&self) -> Option<&BattleState> {
