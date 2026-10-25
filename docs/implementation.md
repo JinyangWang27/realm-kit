@@ -234,8 +234,15 @@ every capability optional:
   and decayed, and MP recovers over world time. Existing packages and
   walkthroughs are unchanged; saves in the earlier vitals layout are refused
   by name.
-- [ ] A real-time combat layer over the same core, with its own fixed-step
-  clock and commands, once a client needs one.
+- [x] A minimal real-time combat layer over the same core
+  ([combat.md](combat.md#real-time-duels)): optional `realtime` one-on-one
+  duels on their own fixed-step clock, with attack phases, a timed guard and
+  retreat, an authored opponent policy, host-reported contact bounded by the
+  engine, duel-time MP regeneration, mid-duel saves and settlement shared
+  with encounters. The `practice-yard` example plays one in line mode.
+  Existing packages, saves and walkthroughs are unchanged.
+- [ ] Spatial authority for real-time contact, and real-time fights with
+  groups, allies, dodges, parries and interruption.
 - [x] Overland-map authored placement + engine map query, with
   places known by an authored condition.
 - [x] Embeddable graphical-client seam, including a browser/WASM hosting proof

@@ -157,7 +157,15 @@ Opponents answer with their own skills, and the player can rest at safe places
 (`examples/duel`). These character rules do not depend on the turn-based
 timeline, which is one optional way to run a fight ([docs/combat.md](docs/combat.md)). Packs fight together, some
 fights can be repeated for grinding, you can flee most of them, and sparring
-partners yield instead of dying (`examples/arena`). Worlds can also grant stat
+partners yield instead of dying (`examples/arena`). A world may also run
+one-on-one duels in real time on a fixed-step clock inside the engine
+(`Duel The Sparring Master`, or `duel master`): attacks wind up, strike and
+recover over steps, a raised guard lets only part of a hit through, and a
+retreat takes time. In the terminal you step the clock yourself (`step 3`,
+`strike`, `strike lunge`, `guard`, `lower`, `disengage`) and play the host's
+part by reporting that an active attack touched (`contact master`); the
+engine decides whether it could and what it does (`examples/practice-yard`).
+Worlds can also grant stat
 points on levelling up, which you spend to shape your own build, and
 techniques mastered rank by rank, each rank named by the world
 (`examples/sect`). Equipment is worn in slots, each piece its own item, with
