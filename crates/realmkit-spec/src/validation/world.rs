@@ -274,6 +274,19 @@ fn combat_profile(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, profile
     if let Some(group) = &profile.group {
         reference(out, owner, "group", group, w.group(group).is_some());
     }
+    // Engaging a group member brings in the whole group as opponents, so an
+    // ally in one would be fought; a held guard needs at least a step.
+    if profile.ally && profile.group.is_some() {
+        issue(out, owner, "ally_in_group", "an ally belongs to no group");
+    }
+    if profile.guard_hold.is_some_and(|h| !(1..=PHASE_BOUND).contains(&h)) {
+        issue(
+            out,
+            owner,
+            "invalid_guard_hold",
+            format!("a guard is held 1 to {PHASE_BOUND} steps"),
+        );
+    }
     if let Some(rules) = w.combat() {
         ids(
             out,

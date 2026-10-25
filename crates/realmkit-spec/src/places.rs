@@ -136,6 +136,36 @@ pub struct CombatProfile {
     /// Which resources this character uses; absent, they follow from the world.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<ResourceUse>,
+    /// Real-time only: fights beside the player. An ally joins only the
+    /// player's team and cannot be the one a real-time fight is started with.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub ally: bool,
+    /// Real-time only: whom this character aims each attack at.
+    #[serde(default, skip_serializing_if = "Targeting::is_first")]
+    pub targeting: Targeting,
+    /// Real-time only: steps it holds a raised guard before each attack;
+    /// absent, it never guards.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guard_hold: Option<u32>,
+}
+
+/// How an engine-controlled fighter picks its target from the hostile
+/// fighters still fighting, each time it begins an attack.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Targeting {
+    /// The earliest in join order: the player first, then reinforcements in
+    /// the order they arrived.
+    #[default]
+    First,
+    /// The lowest current HP; ties go to the earliest in join order.
+    Weakest,
+}
+
+impl Targeting {
+    fn is_first(&self) -> bool {
+        *self == Targeting::First
+    }
 }
 
 fn is_person(kind: &CharacterKind) -> bool {
