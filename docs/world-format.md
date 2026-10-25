@@ -247,6 +247,9 @@ composition of others:
   faction on a faction track, is at least `at_least`; `at_war` (`{ "kind":
   "at_war", "factions": ["keep", "fen"] }`) holds while the two are at war, in
   either order. See [Factions](#factions-diplomacy-and-standing).
+- `companion` (`{ "kind": "companion", "character": "wren" }`) holds while
+  that named companion travels in the player's party; see
+  [Named companions](#named-companions).
 - `all` holds when every condition in `of` does, `any` when at least one
   does, and `not` when its `condition` does not. `of` must not be empty.
 - `at_least` holds when at least `count` of the conditions in `of` do, so
@@ -783,6 +786,9 @@ A character may name the `faction` it belongs to, which must exist
 (`missing_reference`). Clients show it beside the name; nothing in the
 rules follows from it yet.
 
+A character with a `companion` block is a named companion who can travel in
+the player's party; see [Named companions](#named-companions).
+
 ## Factions, diplomacy and standing
 
 Three optional, separate parts of `world.json`. A world may author factions
@@ -1052,6 +1058,8 @@ Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 { "kind": "change_standing", "track": "favour", "faction": "keep", "by": 20 }
 { "kind": "declare_war", "factions": ["fen", "guild"] }
 { "kind": "make_peace", "factions": ["keep", "fen"] }
+{ "kind": "join_party", "character": "wren" }
+{ "kind": "leave_party", "character": "wren" }
 ```
 
 Effects apply in authored order to the staged state, and the choice commits
@@ -1065,7 +1073,9 @@ town where the player stands ([Workshops](#workshops)), and
 `raise_proficiency` teaches ranks without spending points, up to the top
 rank ([Proficiencies](#proficiencies)). Events cannot
 use these three. `change_standing`, `declare_war` and `make_peace` are
-described under [Factions](#factions-diplomacy-and-standing).
+described under [Factions](#factions-diplomacy-and-standing), and
+`join_party` and `leave_party` under [Named companions](#named-companions);
+only dialogue choices may change the party.
 A choice can be taken again while its condition holds, so a one-time gift
 pairs `grant_items` with `set_flag` under a `not` condition on that flag.
 
@@ -1663,6 +1673,66 @@ real-time fights read; turn-based encounters ignore them:
 - `guard_hold` (1–10,000 steps, absent by default): it raises its guard
   whenever it is ready and attacks once the guard has been up this many
   steps. Absent, it never guards (`invalid_guard_hold` outside the bounds).
+
+### Named companions
+
+A character becomes a named companion with a `companion` block. It needs a
+combat profile with `"ally": true` (`companion_not_ally`), in a world whose
+combat block has `realtime` (`companion_without_realtime`); it neither moves
+on a schedule nor leads an army (`companion_moves`), and is placed at exactly
+one location, where it can first be recruited (`companion_placement`).
+
+```json
+{
+  "id": "oake",
+  "name": "Brother Oake",
+  "description": "…",
+  "dialogue": "oake",
+  "combat": {
+    "stats": { "hp": 36, "patk": 7, "pdef": 8, "satk": 0, "sdef": 5, "speed": 90 },
+    "xp": 0,
+    "skills": ["shield_bash"],
+    "resources": { "mp": false, "rage": true },
+    "ally": true,
+    "guard_hold": 2
+  },
+  "companion": { "caution": 40 }
+}
+```
+
+- `caution` (1–100, absent by default; `invalid_caution` outside it): at or
+  below this percent of maximum HP the companion fights warily, whatever its
+  order, striking only at foes whose attack is aimed at it.
+
+A dialogue choice's `join_party` effect brings a companion who is here into
+the party; one already in it refuses the whole choice. `leave_party` leaves
+a companion of the party where the player stands. Both name a companion
+(`not_a_companion`, `missing_reference`), and only dialogue choices may use
+them: an event or start option that does is `invalid_effect`. The `companion`
+condition holds while one travels in the party, so a recruiting choice is
+usually gated on it with `not`, and a parting choice on it:
+
+```json
+{
+  "text": "Mara sent me. Ride with me to the ford.",
+  "next": "joined",
+  "requires": {
+    "kind": "all",
+    "of": [
+      { "kind": "flag", "flag": "vouched" },
+      { "kind": "not", "condition": { "kind": "companion", "character": "wren" } }
+    ]
+  },
+  "effects": [{ "kind": "join_party", "character": "wren" }]
+}
+```
+
+The companion's numbers, skills, `targeting` and `guard_hold` are its combat
+profile's. Its HP, MP and Rage, where it stays once parted, and its standing
+tactical order are saved state that only play changes. See
+[Named companions and tactical orders](combat.md#named-companions-and-tactical-orders)
+for the party's rules, real-time joins, orders and their limits, and
+`examples/hollow-ford` for a world that uses them.
 
 ### Critical hits
 

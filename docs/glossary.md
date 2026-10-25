@@ -330,8 +330,18 @@ Monthly payroll needs no upkeep.
 The player's troops, held per troop line and level as squads of healthy and
 wounded soldiers sharing an XP pool. An authored limit caps its size, and
 wages fall due on a recurring schedule or at each month end
-([Payroll](#payroll)). Proposed for later: companions, unique characters
-wearing gear from a shared stash, and a limit the engine computes.
+([Payroll](#payroll)). Named companions are not part of it (see
+[Named companion](#named-companion)). Proposed for later: companions wearing
+gear from a shared stash, and a limit the engine computes.
+
+## Named companion
+
+A unique character with a `companion` block who can travel in the player's
+party, recruited and dismissed by dialogue effects. It keeps one persistent
+copy of its HP, MP and Rage, fights beside the player in real-time fights
+the host brings it into, and takes a standing tactical order (follow, hold,
+defend, attack). It is never a troop and draws no wages. See
+[combat.md](combat.md#named-companions-and-tactical-orders).
 
 ## Adventuring Party / Escort Deployment
 

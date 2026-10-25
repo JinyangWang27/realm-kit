@@ -169,7 +169,12 @@ A real-time fight can be a group (`duel left_twin` brings in both twins, and
 `strike at right_twin` picks one), and can grow while it runs: the host
 reports arrivals (`join brigand 1` for another foe, `join <ally> 0` for a
 friend at your side), allies fight by the same rules as foes, and the fight
-ends only when the last foe falls or yields.
+ends only when the last foe falls or yields. Named companions join your party
+through conversation, travel with you, and keep their own wounds, MP and Rage
+from one fight to the next until you rest; bring them into a fight with
+`join wren 0` and give standing orders (`order wren attack ford_lookout`,
+`order oake defend`, `order wren hold`, `order wren follow`, or the Orders
+menu) while they choose their own blows (`examples/hollow-ford`).
 Worlds can also grant stat
 points on levelling up, which you spend to shape your own build, and
 techniques mastered rank by rank, each rank named by the world

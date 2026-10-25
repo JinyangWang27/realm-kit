@@ -295,12 +295,22 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   target, `friendly_fire` is opt-in, and engine-controlled fighters aim by
   authored `targeting` and may hold a guard (`guard_hold`). The fight ends
   when nobody off the player's team fights, settling every fallen foe once.
+- **Named companions and tactical orders (Combat-RT-03):** optional
+  `companion` characters join and leave the party only through authored
+  dialogue effects, travel with the player, and keep one persistent copy of
+  their HP, MP and Rage that real-time fights read and change in place. They
+  join a fight from the party (never while down), recover by resting and
+  world-time MP recovery, and take saved Follow, Hold, Defend and Attack
+  orders that decide only whom they aim at, with deterministic fallbacks.
+  Follow and Hold are host objectives; the engine simulates no movement.
+  Companion progression stays authored for now.
 
 Next, when a client needs it: spatial authority for real-time contact
 (positions, reach and hit volumes on the fixed step, or a validated spatial
 record), a host bridge for a 3D client, spacing and retreat for
-engine-controlled fighters, interruption and poise, dodges and parries; then
-persistent named companions with their own vitals and world-level lifecycle. See [Not supported yet](docs/combat.md#not-supported-yet).
+engine-controlled fighters, interruption and poise, dodges and parries;
+companion progression (XP, ranks, gear and the weapon, style and cultivation
+dimensions) and companions in turn-based encounters and battles. See [Not supported yet](docs/combat.md#not-supported-yet).
 
 ### Optional parts of combat · proposed
 
