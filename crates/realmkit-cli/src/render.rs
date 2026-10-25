@@ -1,6 +1,6 @@
 use crate::panels;
 use crossterm::style::Stylize;
-use realmkit_engine::{BattleOutcome, Engine, Event, Outcome};
+use realmkit_engine::{AttackPhase, BattleOutcome, Engine, Event, Outcome};
 use realmkit_spec::{CharacterKind, Direction, Id, Stat, TextTemplate};
 use std::io::{self, Write};
 
@@ -487,6 +487,42 @@ pub fn events(
                 writeln!(output, "You face {}.", names.join(", "))?
             }
             Event::FleeStarted => writeln!(output, "You turn to run.")?,
+            Event::Swing {
+                character,
+                skill,
+                phase,
+            } => {
+                let what = match phase {
+                    AttackPhase::Windup => "winding up",
+                    AttackPhase::Active => "striking",
+                    AttackPhase::Recovery => "recovering",
+                };
+                let with = skill
+                    .as_ref()
+                    .map(|s| format!(" ({})", world.skill(s).unwrap().name))
+                    .unwrap_or_default();
+                writeln!(output, "{}: {what}{with}.", name(character))?
+            }
+            Event::Missed { character } => {
+                writeln!(output, "{}: the blow finds nothing.", name(character))?
+            }
+            Event::Ready { character } => writeln!(output, "{}: ready.", name(character))?,
+            Event::GuardRaising { character } => {
+                writeln!(output, "{}: raising guard.", name(character))?
+            }
+            Event::GuardUp { character } => writeln!(output, "{}: guard up.", name(character))?,
+            Event::GuardLowered { character } => {
+                writeln!(output, "{}: guard down.", name(character))?
+            }
+            Event::Blocked {
+                character,
+                prevented,
+            } => writeln!(
+                output,
+                "{}: the guard stops {prevented} damage.",
+                name(character)
+            )?,
+            Event::RetreatStarted => writeln!(output, "You turn to disengage.")?,
             Event::Yielded { character } if *character == world.world.player => {
                 writeln!(output, "You yield.")?
             }

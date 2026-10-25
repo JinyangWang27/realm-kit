@@ -1,0 +1,44 @@
+look
+duel master
+guard
+step 4
+contact master
+lower
+strike
+step 3
+contact trainee
+step 6
+strike lunge
+step 4
+contact trainee
+step 8
+strike
+step 3
+contact trainee
+step 6
+strike
+step 3
+contact trainee
+status
+duel brigand
+disengage
+strike
+step 3
+contact trainee
+step 2
+contact brigand
+step 4
+strike
+step 3
+contact trainee
+step 6
+strike
+step 3
+contact trainee
+step 6
+strike
+step 3
+contact trainee
+status
+rest
+quit

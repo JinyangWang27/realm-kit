@@ -113,8 +113,15 @@ pub(super) fn defeated(state: &GameState, id: &str) -> bool {
 pub(super) fn fighting(state: &GameState) -> Option<&Encounter> {
     match &state.combat.as_ref()?.stance {
         Stance::Fighting(encounter) => Some(encounter),
-        Stance::Exploring | Stance::Battle(_) => None,
+        Stance::Exploring | Stance::Dueling(_) | Stance::Battle(_) => None,
     }
+}
+
+pub(super) fn dueling(state: &GameState) -> bool {
+    state
+        .combat
+        .as_ref()
+        .is_some_and(|c| matches!(c.stance, Stance::Dueling(_)))
 }
 
 fn leading(state: &GameState) -> bool {
@@ -209,6 +216,10 @@ pub(super) fn execute(
     if fighting(state).is_some() && !panel && !combat_action {
         return Err(EngineError::InEncounter);
     }
+    // In a duel only intents and panels are possible.
+    if dueling(state) && !panel && !matches!(command, Command::Intent(_)) {
+        return Err(EngineError::InEncounter);
+    }
     // In a battle only orders and panels are possible.
     let order = matches!(command, Command::Order(_) | Command::Autoresolve);
     if leading(state) && !panel && !order {
@@ -272,6 +283,8 @@ pub(super) fn execute(
             battle::engage(world, state, id, &mut events)?
         }
         Command::Engage(id) => encounter::engage(world, state, id, &mut events)?,
+        Command::Duel(id) => realtime::start(world, state, id, &mut events)?,
+        Command::Intent(intent) => realtime::intent(world, state, intent, &mut events)?,
         Command::Order(order) => battle::command(world, state, order, &mut events)?,
         Command::Autoresolve => battle::autoresolve(world, state, &mut events)?,
         Command::Flee => encounter::flee(world, state, &mut events)?,

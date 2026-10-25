@@ -64,6 +64,21 @@ pub enum EngineError {
     NoEncounters,
     #[error("finish the fight first")]
     InEncounter,
+    #[error("this world has no real-time duels")]
+    NoDuels,
+    #[error("{0} does not fight alone")]
+    NotOneOnOne(Id),
+    #[error("finish what you are doing first")]
+    Committed,
+    #[error("you are not guarding")]
+    NotGuarding,
+    #[error("{0} has no attack that can land now")]
+    NoContact(Id),
+    #[error(
+        "a duel advances 1 to {} steps at a time",
+        realmkit_spec::ADVANCE_BOUND
+    )]
+    InvalidSteps,
     #[error("there is no running from this fight")]
     NoFlee,
     #[error("you cannot spend points on that stat")]

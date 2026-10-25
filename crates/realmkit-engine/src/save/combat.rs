@@ -26,7 +26,7 @@ pub(super) fn check(
         "player vitals exceed their maximums",
     )?;
     // Rage that belongs to one fight is gone outside it.
-    let fighting = matches!(combat.stance, Stance::Fighting(_));
+    let fighting = matches!(combat.stance, Stance::Fighting(_) | Stance::Dueling(_));
     ensure(
         fighting
             || rules.resources.rage_carries
@@ -36,6 +36,7 @@ pub(super) fn check(
     match &combat.stance {
         Stance::Exploring => {}
         Stance::Fighting(encounter) => encounter_state(world, state, combat, rules, encounter)?,
+        Stance::Dueling(duel) => super::duel::check(world, state, combat, rules, duel)?,
         Stance::Battle(battle) => super::battle::check(world, state, combat, battle)?,
     }
     ensure(
@@ -48,7 +49,7 @@ pub(super) fn check(
 /// Vitals the rules could leave at stats `max` and `pools`: HP and each
 /// resource within its ceiling, nothing in a resource the character does not
 /// use, and damage-rage progress below one point (none at a world's cap).
-fn within(rules: &Combat, v: &Vitals, max: &Stats, pools: Pools) -> bool {
+pub(super) fn within(rules: &Combat, v: &Vitals, max: &Stats, pools: Pools) -> bool {
     let capped = rules.resources.rage_cap.is_some() && v.rage == pools.rage_cap();
     v.hp <= max.hp
         && v.mp <= pools.mp_max()

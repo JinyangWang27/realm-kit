@@ -11,8 +11,8 @@ use realmkit_spec::{Group, Timeline};
 mod action;
 mod timeline;
 
-pub(super) use action::check_skill;
-use action::{act, choose};
+use action::act;
+pub(crate) use action::{check_skill, choose};
 pub(super) use timeline::{baseline_turn, delay, turn_order};
 use timeline::{next_actor, tick};
 
@@ -261,7 +261,7 @@ fn fighting<'s>(
             },
             me,
         )),
-        Stance::Exploring | Stance::Battle(_) => Err(EngineError::NotFighting),
+        Stance::Exploring | Stance::Dueling(_) | Stance::Battle(_) => Err(EngineError::NotFighting),
     }
 }
 

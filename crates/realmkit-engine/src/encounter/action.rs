@@ -34,7 +34,7 @@ pub(crate) fn check_skill(
 
 /// The strongest affordable skill, else the basic attack. Equal power prefers
 /// the cheaper skill, then the later tier; the first listed wins a full tie.
-pub(super) fn choose<'w>(world: &'w WorldSpec, vitals: &Vitals, id: &str) -> Option<&'w Skill> {
+pub(crate) fn choose<'w>(world: &'w WorldSpec, vitals: &Vitals, id: &str) -> Option<&'w Skill> {
     let profile = profile(world, id);
     let pools = resources::profile_pools(world, profile);
     // Wide enough that two authored costs never overflow.

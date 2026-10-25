@@ -884,3 +884,33 @@ fn text_lists_every_prose_key_an_overlay_needs() {
         .unwrap()
         .contains("Language: en, zh-Hans\n"));
 }
+
+const YARD: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/practice-yard");
+
+#[test]
+fn a_line_host_steps_real_time_duels_and_reports_contact() {
+    let walkthrough = std::fs::read_to_string(format!("{YARD}/walkthrough.txt")).unwrap();
+    let play = || run(&["play", YARD, "--seed", "7", "--line"], &walkthrough);
+    let output = play();
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    // The same intents replay the same duels.
+    assert_eq!(String::from_utf8(play().stdout).unwrap(), text);
+    for passage in [
+        "Duel The Sparring Master",
+        "Step 0 | You HP 40/40 · MP 12/12 · rage 0 · ready | The Sparring Master HP 40/40 · MP 6/6 · rage 0 · ready",
+        "Wait a step",
+        "Raise guard",
+        "You: the guard stops 4 damage.\nThe Sparring Master sweeps at You: 1 damage.",
+        "You: winding up (Lunge).",
+        "The Sparring Master: the blow finds nothing.",
+        "The Sparring Master yields.\nThe fight is over.",
+        "there is no running from this fight",
+        "A Brigand catches You: 3 damage.",
+        "A Brigand is down.\nThe fight is over.\nReceived: Coin purse ×1\n+10 XP",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    // Contact is the host's report, never a menu choice.
+    assert!(!text.contains("Contact"), "{text}");
+}

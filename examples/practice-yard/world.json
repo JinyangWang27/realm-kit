@@ -1,0 +1,75 @@
+{
+  "format_version": 19,
+  "id": "practice_yard",
+  "name": "The Practice Yard",
+  "language": "en",
+  "start": "yard",
+  "player": "trainee",
+  "flags": ["spar_won", "spar_lost"],
+  "time": { "start": 480, "clock": "Day {day}, {hour}:{minute}", "wait": 30, "rest": 480 },
+  "combat": {
+    "special_name": "Focus",
+    "timeline": { "action_cost": 1000, "speed_cap": 200 },
+    "realtime": {
+      "steps_per_second": 10,
+      "windup": 3,
+      "active": 2,
+      "recovery": 4,
+      "guard_raise": 1,
+      "guard_percent": 25,
+      "retreat": 6,
+      "mp_regen_percent": 10
+    },
+    "resources": {
+      "mp_regen_percent": 5,
+      "rage_per_action": 1,
+      "rage_per_max_hp": 10,
+      "rage_cap": 10,
+      "mp_recovery": { "percent": 25, "every": 60 }
+    },
+    "player_basic_crit": { "chance_percent": 20, "multiplier_percent": 150 },
+    "levels": [
+      { "xp": 0, "stats": { "hp": 40, "mp": 12, "patk": 9, "pdef": 5, "satk": 0, "sdef": 4, "speed": 100 } },
+      { "xp": 10, "stats": { "hp": 46, "mp": 14, "patk": 10, "pdef": 6, "satk": 0, "sdef": 5, "speed": 100 } }
+    ],
+    "skills": [
+      {
+        "id": "lunge",
+        "name": "Lunge",
+        "power": 150,
+        "channel": "physical",
+        "cost": 4,
+        "time": 120,
+        "text": "{attacker} lunge at {target}: {damage} damage."
+      },
+      {
+        "id": "rush",
+        "name": "Rush",
+        "power": 200,
+        "channel": "physical",
+        "costs": { "mp": 2, "rage": 3 },
+        "text": "{attacker} rush {target}: {damage} damage."
+      },
+      {
+        "id": "sweep",
+        "name": "Sweep",
+        "power": 120,
+        "channel": "physical",
+        "cost": 3,
+        "text": "{attacker} sweeps at {target}: {damage} damage."
+      }
+    ],
+    "player_skills": ["lunge", "rush"],
+    "groups": [
+      { "id": "spar", "yield_share": 50, "victory_flags": ["spar_won"], "defeat_flags": ["spar_lost"] },
+      { "id": "cornered", "no_flee": true },
+      { "id": "twins" }
+    ],
+    "narrative": {
+      "attack": ["{attacker} cut at {target}: {damage} damage."],
+      "hurt": ["{attacker} catches {target}: {damage} damage."],
+      "victory": "{target} is down.",
+      "death": "The yard goes quiet.\nStart a new game to try again."
+    }
+  }
+}

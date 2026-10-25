@@ -1,4 +1,4 @@
-use realmkit_engine::{BattleOrder, Command};
+use realmkit_engine::{BattleOrder, Command, Intent};
 use realmkit_spec::{CharacterKind, Direction, Proficiency, Stat, WorldSpec};
 
 /// A proficiency's typed token.
@@ -48,6 +48,9 @@ pub fn help(world: &WorldSpec) -> String {
     }
     if world.troops().is_some() {
         attack += "retinue — your soldiers\nrecruit <line> [count] — where soldiers are raised\nupgrade <line> <to-line> [count]\n";
+    }
+    if combat.is_some_and(|c| c.realtime.is_some()) {
+        attack += "duel <character-id> — a real-time duel on a fixed-step clock\nstep [steps] — run the duel's clock on\nstrike [skill-id] | guard | lower | disengage\ncontact <character-id> — that fighter's active attack touched, as a host reports it\n";
     }
     if world.battle().is_some() {
         attack += "engage <army-id> — start a battle\ncharge | hold | flank | retreat — order a round\nautoresolve — charge to the end\n";
@@ -233,6 +236,17 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
         ("wait", []) => Command::Wait(context.wait_step.ok_or("this world has no waiting")?),
         ("wait", [value]) => Command::Wait(minutes(&value.to_ascii_lowercase())?),
         ("engage", [id]) => Command::Engage((*id).into()),
+        ("duel", [id]) => Command::Duel((*id).into()),
+        ("step", []) => Command::Intent(Intent::Advance(1)),
+        ("step", [n]) => Command::Intent(Intent::Advance(
+            n.parse().map_err(|_| "expected a number of steps")?,
+        )),
+        ("strike", []) => Command::Intent(Intent::Attack),
+        ("strike", [skill]) => Command::Intent(Intent::Skill((*skill).into())),
+        ("guard", []) => Command::Intent(Intent::Guard),
+        ("lower", []) => Command::Intent(Intent::LowerGuard),
+        ("disengage", []) => Command::Intent(Intent::Retreat),
+        ("contact", [id]) => Command::Intent(Intent::Contact((*id).into())),
         ("attack", [id]) => Command::Attack((*id).into()),
         ("use", [item]) => Command::Use((*item).into()),
         ("use", [skill, target]) => Command::UseSkill {

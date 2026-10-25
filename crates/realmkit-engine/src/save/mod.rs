@@ -5,6 +5,7 @@ use super::*;
 
 mod battle;
 mod combat;
+mod duel;
 mod retinue;
 
 fn ensure(ok: bool, problem: &str) -> Result<(), String> {

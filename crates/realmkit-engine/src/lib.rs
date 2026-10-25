@@ -15,6 +15,7 @@ mod encounter;
 mod error;
 mod formulas;
 mod gear;
+mod realtime;
 mod rng;
 mod rules;
 mod save;
@@ -257,11 +258,18 @@ impl<'w> Engine<'w> {
     pub fn encounter(&self) -> Option<&Encounter> {
         rules::fighting(&self.state)
     }
+    /// The real-time duel, if any.
+    pub fn duel(&self) -> Option<&Duel> {
+        match &self.state.combat.as_ref()?.stance {
+            Stance::Dueling(duel) => Some(duel),
+            Stance::Exploring | Stance::Fighting(_) | Stance::Battle(_) => None,
+        }
+    }
     /// The battle the player is leading, if any.
     pub fn battle(&self) -> Option<&BattleState> {
         match &self.state.combat.as_ref()?.stance {
             Stance::Battle(battle) => Some(battle),
-            Stance::Exploring | Stance::Fighting(_) => None,
+            Stance::Exploring | Stance::Fighting(_) | Stance::Dueling(_) => None,
         }
     }
     /// The next `n` actors, projected as if every action took a basic
