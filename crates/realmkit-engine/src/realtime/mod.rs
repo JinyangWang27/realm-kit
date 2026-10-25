@@ -515,7 +515,11 @@ fn land(
         dealt = through;
     }
     let source = ring.fight.fighters[i].character.clone();
-    resources::on_action(world, ring.vitals_mut(i), attacker.pools);
+    // A stray blow on a teammate earns neither Rage for acting nor training.
+    let hostile = ring.fight.fighters[i].team != ring.fight.fighters[t].team;
+    if hostile {
+        resources::on_action(world, ring.vitals_mut(i), attacker.pools);
+    }
     if let RealtimeAction::Attack { connected, .. } = &mut ring.fight.fighters[i].action {
         *connected = true;
     }
@@ -579,7 +583,7 @@ fn land(
     // A technique that lands trains, less so against much weaker opponents.
     let combat = state.combat.as_ref().unwrap();
     if let Some(technique) = skill
-        .filter(|_| i == 0)
+        .filter(|_| i == 0 && hostile)
         .and_then(|s| techniques::of_skill(world, combat, &s.id))
     {
         let per_use = u64::from(rules.technique_xp_per_use);

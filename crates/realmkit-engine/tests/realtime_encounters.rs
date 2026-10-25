@@ -487,6 +487,58 @@ fn friendly_fire_is_refused_unless_the_world_allows_it() {
 }
 
 #[test]
+fn a_blow_on_a_teammate_trains_nothing_and_earns_no_rage() {
+    let mut world = yard_with_warden(json!({}));
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.realtime.as_mut().unwrap().friendly_fire = true;
+    combat.player_skills.retain(|s| s != "lunge");
+    combat.techniques.push(
+        serde_json::from_value(json!({
+            "id": "lunge_form",
+            "name": "Lunge Form",
+            "ranks": [
+                { "name": "First Form", "xp": 0, "skill": "lunge" },
+                { "name": "Second Form", "xp": 1000, "skill": "lunge" }
+            ]
+        }))
+        .unwrap(),
+    );
+    combat.player_techniques.push(TechniqueGrant {
+        technique: "lunge_form".into(),
+        rank: None,
+        xp: 0,
+    });
+    world.validate().unwrap();
+    let lunge = |target: &str| {
+        Intent(realmkit_engine::Intent::Skill {
+            skill: "lunge".into(),
+            target: Some(target.into()),
+        })
+    };
+    // The lunge's wind-up is 4 steps at 120% time; the host reports it on
+    // the warden, then on the brigand, as two separate fights.
+    for (on, trains) in [("warden", false), ("brigand", true)] {
+        let mut engine = Engine::new(&world).unwrap();
+        run(
+            &mut engine,
+            &[
+                Duel("brigand".into()),
+                join("warden", 0),
+                lunge("brigand"),
+                step(4),
+            ],
+        );
+        let rage = vitals(&engine).rage;
+        let events = run(&mut engine, &[contact_on("trainee", on)]);
+        let trained = events
+            .iter()
+            .any(|e| matches!(e, Event::TechniqueXpGained { .. }));
+        assert_eq!(trained, trains, "{on}");
+        assert_eq!(vitals(&engine).rage > rage, trains, "{on}");
+    }
+}
+
+#[test]
 fn the_first_foe_to_fall_does_not_end_the_fight() {
     let world = yard();
     let mut engine = Engine::new(&world).unwrap();
@@ -815,15 +867,33 @@ fn saves_with_fight_states_the_rules_cannot_reach_are_refused() {
     assert!(tamper(&|f| f.fighters[3].joined = 4), "joined after now");
     assert!(tamper(&|f| f.fighters[3].joined = 1), "joined out of order");
     assert!(tamper(&|f| f.fighters[2].vitals = None));
+    // A newcomer is idle and has regenerated nothing at the step it joined.
+    assert!(tamper(&|f| f.fighters[3].mp_remainder = 1));
+    assert!(tamper(&|f| {
+        f.fighters[3].action = RealtimeAction::Attack {
+            skill: None,
+            target: "trainee".into(),
+            phase: AttackPhase::Windup,
+            until: 6,
+            connected: false,
+        }
+    }));
     // A twin cannot be in the fight without his brother if they started it.
     let mut twins = Engine::new(&world).unwrap();
     run(&mut twins, &[Duel("left_twin".into())]);
     let mut snapshot = twins.snapshot();
+    let mut split = twins.snapshot();
     let Stance::Realtime(fight) = &mut snapshot.state.combat.as_mut().unwrap().stance else {
         panic!("fighting");
     };
     fight.fighters.pop();
     assert!(Engine::restore(&world, snapshot).is_err());
+    // Nor on another team: the whole group starts on team 1.
+    let Stance::Realtime(fight) = &mut split.state.combat.as_mut().unwrap().stance else {
+        panic!("fighting");
+    };
+    fight.fighters[2].team = 2;
+    assert!(Engine::restore(&world, split).is_err());
     // Actions: aimed at a foe, out fighters idle, guards only by policy.
     assert!(tamper(&|f| {
         if let RealtimeAction::Attack { target, .. } = &mut f.fighters[1].action {

@@ -69,7 +69,7 @@ pub(super) fn check(
             .all(|c| {
                 fight
                     .index(c)
-                    .is_some_and(|t| fight.fighters[t].joined == 0)
+                    .is_some_and(|t| fight.fighters[t].joined == 0 && fight.fighters[t].team == 1)
             });
     // Identities first: stats exist only for characters that can fight.
     if !started {
@@ -146,7 +146,11 @@ pub(super) fn check(
                 i == 0 && !no_flee && *until > now && until - now <= u64::from(realtime.retreat)
             }
         };
+        // A newcomer acts and regenerates from the step after it joined.
+        let fresh =
+            i == 0 || f.joined < now || (f.action == RealtimeAction::Ready && f.mp_remainder == 0);
         yield_ok
+            && fresh
             && action_ok
             && combat::within(rules, v, &side.stats, side.pools)
             && u128::from(f.mp_remainder) < per_point

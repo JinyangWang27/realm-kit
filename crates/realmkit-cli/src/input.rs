@@ -50,7 +50,7 @@ pub fn help(world: &WorldSpec) -> String {
         attack += "retinue — your soldiers\nrecruit <line> [count] — where soldiers are raised\nupgrade <line> <to-line> [count]\n";
     }
     if combat.is_some_and(|c| c.realtime.is_some()) {
-        attack += "duel <character-id> — a real-time duel on a fixed-step clock\nstep [steps] — run the duel's clock on\nstrike [skill-id] [at <character-id>] | guard | lower | disengage\ncontact <character-id> [target-id] — that fighter's active attack touched, as a host reports it\njoin <character-id> <team> — that fighter arrives, as a host reports it (0 is your side)\n";
+        attack += "duel <character-id> — a real-time fight on a fixed-step clock, with its group\nstep [steps] — run the duel's clock on\nstrike [skill-id] [at <character-id>] | guard | lower | disengage\ncontact <character-id> [target-id] — that fighter's active attack touched, as a host reports it\njoin <character-id> <team> — that fighter arrives, as a host reports it (0 is your side)\n";
     }
     if world.battle().is_some() {
         attack += "engage <army-id> — start a battle\ncharge | hold | flank | retreat — order a round\nautoresolve — charge to the end\n";
@@ -242,6 +242,7 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
             n.parse().map_err(|_| "expected a number of steps")?,
         )),
         ("strike", []) => Command::Intent(Intent::Attack { target: None }),
+        ("strike", ["at"]) => return Err("expected a fighter to strike at"),
         ("strike", ["at", target]) => Command::Intent(Intent::Attack {
             target: Some((*target).into()),
         }),
@@ -401,6 +402,7 @@ mod tests {
             }
         );
         assert!(parse("join warden ours").is_err());
+        assert_eq!(parse("strike at"), Err("expected a fighter to strike at"));
     }
 
     #[test]

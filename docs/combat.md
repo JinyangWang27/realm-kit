@@ -163,7 +163,8 @@ blow).
    player yielding is `Yielded` and a completed retreat `Fled`, whoever else
    still fights: allies leave with the player. The player's death leaves the
    fight open, as it does an encounter, and every later command but a panel
-   is refused.
+   is refused. This is deliberate: the player's death is the game's end, so
+   allies still standing do not fight on to a victory.
 5. **Settle once.** Turn-based encounters and real-time fights end in the
    same `settle` (crate `settle.rs`): the stance returns to `Exploring`
    first, then loot, XP, recorded defeats, defeat objectives, technique
@@ -230,7 +231,9 @@ someone else, since only the host knows where everyone stood. The engine
 accepts it only while the attacker's attack is active and has not landed,
 on a fighter other than the attacker who is still fighting
 (`InvalidTarget`), and on another team unless the world sets
-`friendly_fire` (`NotHostile`). A blow aimed at someone who fell before it
+`friendly_fire` (`NotHostile`). A blow on a teammate deals its damage and
+the target's Rage for being hit, but earns the attacker no Rage for acting
+and trains no technique. A blow aimed at someone who fell before it
 landed lands on nobody unless the host reports another target.
 
 ### The clock
@@ -367,7 +370,9 @@ snapshot. Loading checks that the rules could have left it:
   with vitals. The first of them is on team 1 at step 0, with every present
   member of its group beside it from step 0. Allies are only on team 0 and
   nobody else is; teams are numbered in the order they appeared, so none is
-  skipped; join steps never go back and are not after now.
+  skipped; join steps never go back and are not after now. The whole
+  starting group is on team 1, and a fighter at the step it joined is still
+  `Ready` with no regeneration progress.
 - **Vitals and progress** within maxima, progress below one point; a
   yielded fighter at or below its threshold (the player may enter a fight
   already that low and has not yielded until hit again).
