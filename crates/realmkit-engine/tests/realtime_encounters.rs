@@ -790,6 +790,9 @@ fn saves_with_fight_states_the_rules_cannot_reach_are_refused() {
     };
     // Fighters: trainee, brigand (1), warden (0, joined at 2), left twin (1, at 3).
     assert!(!tamper(&|_| {}));
+    // A corrupt list is refused, never a panic.
+    assert!(tamper(&|f| f.fighters.clear()));
+    assert!(tamper(&|f| f.fighters.truncate(1)));
     assert!(tamper(&|f| f.fighters.swap(0, 1)));
     assert!(tamper(&|f| f.fighters[3].character = "brigand".into()));
     assert!(tamper(&|f| f.fighters[3].character = "trainee".into()));

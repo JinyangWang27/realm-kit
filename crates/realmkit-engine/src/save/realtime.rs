@@ -26,6 +26,10 @@ pub(super) fn check(
     let invalid = || "invalid real-time fight state".to_string();
     let realtime = rules.realtime.as_ref().ok_or_else(invalid)?;
     let now = fight.step;
+    // The player and at least the opponent it started with, before any index.
+    if fight.fighters.len() < 2 {
+        return Err(invalid());
+    }
     let player = &fight.fighters[0];
     let mut seen = BTreeSet::new();
     let mut last_team = 0;
