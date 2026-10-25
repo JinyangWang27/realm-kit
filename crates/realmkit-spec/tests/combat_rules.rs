@@ -373,3 +373,55 @@ fn a_world_may_leave_out_the_timeline() {
         .iter()
         .all(|s| s.get("costs").is_none()));
 }
+
+fn realtime() -> Realtime {
+    Realtime {
+        steps_per_second: 60,
+        windup: 12,
+        active: 6,
+        recovery: 18,
+        guard_raise: 6,
+        guard_percent: 25,
+        retreat: 90,
+        mp_regen_percent: 2,
+    }
+}
+
+#[test]
+fn real_time_rules_are_optional_and_bounded() {
+    let mut world = duel();
+    world.world.combat.as_mut().unwrap().realtime = Some(realtime());
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    // A guard may rise at once and regeneration may be off.
+    world.world.combat.as_mut().unwrap().realtime = Some(Realtime {
+        guard_raise: 0,
+        mp_regen_percent: 0,
+        ..realtime()
+    });
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    let changes: Vec<fn(&mut Realtime)> = vec![
+        |r| r.steps_per_second = 0,
+        |r| r.steps_per_second = STEP_RATE_BOUND + 1,
+        |r| r.windup = 0,
+        |r| r.active = 0,
+        |r| r.recovery = PHASE_BOUND + 1,
+        |r| r.retreat = 0,
+        |r| r.guard_raise = PHASE_BOUND + 1,
+        |r| r.guard_percent = 101,
+        |r| r.mp_regen_percent = 101,
+    ];
+    for (i, change) in changes.into_iter().enumerate() {
+        let mut world = duel();
+        let mut rules = realtime();
+        change(&mut rules);
+        world.world.combat.as_mut().unwrap().realtime = Some(rules);
+        assert!(
+            codes(&world).contains(&"invalid_realtime".to_string()),
+            "change {i} was accepted"
+        );
+    }
+    // A world without it serializes exactly as before, so its rules
+    // revision, and the saves bound to it, stay the same.
+    let json = serde_json::to_value(&duel().world.combat).unwrap();
+    assert!(json.get("realtime").is_none());
+}

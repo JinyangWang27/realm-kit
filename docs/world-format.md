@@ -1152,8 +1152,9 @@ the next), so the choice need not repeat the condition.
 ## Combat block, numeric rules and templates
 
 The optional `combat` object in `world.json` holds the level table, skills and
-combat prose. Everything in it except the `timeline` describes characters
-however a fight is run; the `timeline` enables turn-based encounters. See
+combat prose. Everything in it except the `timeline` and `realtime` describes
+characters however a fight is run; the `timeline` enables turn-based
+encounters and [`realtime`](#real-time-duels) one-on-one real-time duels. See
 [Combat architecture](combat.md) for which rules belong to which layer:
 
 ```json
@@ -1586,6 +1587,53 @@ recorded as defeated unless its group is `repeatable`, which can be fought
 again at once and rewards every victory (a defeat objective counts the first).
 Yielded opponents grant and record nothing. A victory sets the group's
 `victory_flags`. The player dying is ordinary death.
+
+### Real-time duels
+
+A combat block with `realtime` lets the player duel a fighter in real time,
+alone, on a fixed-step clock inside the engine. It is optional and may sit
+beside a `timeline`; each fighter can then be engaged turn-based or dueled.
+See [Real-time duels](combat.md#real-time-duels) for the step order, the
+host's contact reports and their limits.
+
+```json
+"realtime": {
+  "steps_per_second": 10,
+  "windup": 3,
+  "active": 2,
+  "recovery": 4,
+  "guard_raise": 1,
+  "guard_percent": 25,
+  "retreat": 6,
+  "mp_regen_percent": 10
+}
+```
+
+- `steps_per_second` (1–1,000): how many steps make one second of duel time.
+  Hosts step at this rate to show the duel at its pace; the engine reads no
+  clock. MP regeneration is measured per second of steps.
+- `windup`, `active`, `recovery` (1–10,000 steps each): a basic attack's
+  phases at speed 100. For a fighter at effective speed `s` (at least 1)
+  doing an action of `time` percent (a skill's `time`, else a worn weapon's
+  `basic_time`, else 100) each phase lasts
+  `max(1, ceil(length × time / s))` steps. Nothing else can be started during
+  any phase; an attack can land only while active, and at most once.
+- `guard_raise` (0–10,000 steps, default 0): how long a guard takes to rise.
+  A hit landing on a raised guard deals `guard_percent` (0–100) of its
+  damage, rounded down.
+- `retreat` (1–10,000 steps): how long turning to retreat takes before the
+  player is away; a `no_flee` group forbids it.
+- `mp_regen_percent` (0–100, default 0): percent of maximum MP regained per
+  second of duel time, carrying the fraction. It is separate from the
+  timeline's `resources.mp_regen_percent` and from world-time `mp_recovery`;
+  a duel passes no world time.
+
+`duel` starts a duel with a fighter here whom `engage` would bring in alone;
+a member of a group of two or more present cannot be dueled. Groups shape
+duels as they do encounters: `yield_share`, `no_flee`, `repeatable`,
+`victory_flags` and `defeat_flags` mean the same, and a victory grants loot,
+XP and objectives exactly as an encounter's does. Real-time hits never roll
+crits. Invalid bounds are `invalid_realtime`.
 
 ### Critical hits
 

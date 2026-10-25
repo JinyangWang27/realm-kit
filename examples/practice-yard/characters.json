@@ -1,0 +1,45 @@
+[
+  { "id": "trainee", "name": "You", "description": "A trainee with a wooden blade." },
+  {
+    "id": "master",
+    "name": "The Sparring Master",
+    "description": "She waits in the chalk circle, blade low.",
+    "combat": {
+      "stats": { "hp": 40, "mp": 6, "patk": 8, "pdef": 6, "satk": 0, "sdef": 4, "speed": 100 },
+      "xp": 0,
+      "skills": ["sweep"],
+      "group": "spar"
+    }
+  },
+  {
+    "id": "brigand",
+    "name": "A Brigand",
+    "description": "He came over the wall for the strongbox and found you.",
+    "combat": {
+      "stats": { "hp": 20, "patk": 7, "pdef": 3, "satk": 0, "sdef": 3, "speed": 80 },
+      "xp": 10,
+      "loot": [{ "item": "coin_purse", "quantity": 1 }],
+      "group": "cornered"
+    }
+  },
+  {
+    "id": "left_twin",
+    "name": "The Left Twin",
+    "description": "Never far from his brother.",
+    "combat": {
+      "stats": { "hp": 16, "patk": 6, "pdef": 3, "satk": 0, "sdef": 3, "speed": 100 },
+      "xp": 4,
+      "group": "twins"
+    }
+  },
+  {
+    "id": "right_twin",
+    "name": "The Right Twin",
+    "description": "Never far from his brother.",
+    "combat": {
+      "stats": { "hp": 16, "patk": 6, "pdef": 3, "satk": 0, "sdef": 3, "speed": 100 },
+      "xp": 4,
+      "group": "twins"
+    }
+  }
+]

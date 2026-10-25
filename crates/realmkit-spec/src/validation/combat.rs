@@ -31,6 +31,7 @@ fn basics(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
     }
     share(out, owner, combat.cross_share);
     crit(out, owner, combat.player_basic_crit);
+    realtime(out, owner, combat.realtime);
     let Some(timeline) = combat.timeline else {
         return;
     };
@@ -43,6 +44,27 @@ fn basics(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
             owner,
             "invalid_timeline",
             format!("action cost must be from 1 to {ACTION_COST_BOUND} and the speed cap from 1 to {STAT_BOUND}"),
+        );
+    }
+}
+
+/// Real-time timing within its bounds, so the duel clock's arithmetic stays small.
+fn realtime(out: &mut Vec<Diagnostic>, owner: &str, realtime: Option<Realtime>) {
+    let Some(r) = realtime else {
+        return;
+    };
+    let phase = |steps: u32| (1..=PHASE_BOUND).contains(&steps);
+    if !(1..=STEP_RATE_BOUND).contains(&r.steps_per_second)
+        || !(phase(r.windup) && phase(r.active) && phase(r.recovery) && phase(r.retreat))
+        || r.guard_raise > PHASE_BOUND
+        || r.guard_percent > 100
+        || r.mp_regen_percent > 100
+    {
+        issue(
+            out,
+            owner,
+            "invalid_realtime",
+            format!("steps per second are 1 to {STEP_RATE_BOUND}; wind-up, active, recovery and retreat 1 to {PHASE_BOUND} steps, a guard's raise 0 to {PHASE_BOUND}; guard and regeneration percentages 0 to 100"),
         );
     }
 }
@@ -69,7 +91,9 @@ fn resources(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, combat: &Com
     }
     for (set, used, what) in [
         (
-            r.mp_regen_percent > 0 || r.mp_recovery.is_some(),
+            r.mp_regen_percent > 0
+                || r.mp_recovery.is_some()
+                || combat.realtime.is_some_and(|t| t.mp_regen_percent > 0),
             uses(Resource::Mp),
             "MP regeneration",
         ),

@@ -276,13 +276,22 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   (`player_resources`, a profile's `resources`) or as before by default. MP is a
   reserve that time refills; Rage is momentum that fighting builds, optionally
   capped, carried and decayed. Skills may cost both.
-- **Clocks never overlap:** fights pass no world time, so timeline and
+- **Clocks never overlap:** fights pass no world time, so timeline, duel and
   world-time regeneration never cover the same span.
+- **Real-time layer (minimal slice):** optional `realtime` one-on-one duels
+  beside `encounter/`, on an engine-side fixed-step clock moved only by
+  explicit advances. Attacks run wind-up, active and recovery phases scaled by
+  speed and skill time; a guard with a raise time and a damage share; a
+  timed retreat; an authored opponent policy; yielding and `no_flee` from
+  groups; duel-time MP regeneration; saves at any step; settlement shared
+  with encounters, exactly once. Contact is host-reported and only bounded by
+  the engine (active window, once per attack), with no accuracy or crit roll.
 
-Next, when a client needs it: a real-time layer beside `encounter/` with its
-own engine-side fixed-step clock and validated commands, reusing the core's
-vitals and rules; then companions with their own vitals. See
-[Not supported yet](docs/combat.md#not-supported-yet).
+Next, when a client needs it: spatial authority for real-time contact
+(positions, reach and hit volumes on the fixed step, or a validated spatial
+record), a host bridge for a 3D client, opponent defence and spacing,
+interruption and poise, dodges and parries; then companions with their own
+vitals. See [Not supported yet](docs/combat.md#not-supported-yet).
 
 ### Optional parts of combat · proposed
 

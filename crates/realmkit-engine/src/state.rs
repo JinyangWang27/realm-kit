@@ -40,6 +40,8 @@ pub enum Stance {
     Exploring,
     /// A personal fight on the turn-based initiative timeline.
     Fighting(Encounter),
+    /// A one-on-one real-time duel on its own fixed-step clock.
+    Dueling(Duel),
     /// Leading a mass battle.
     Battle(BattleState),
 }
@@ -160,6 +162,77 @@ impl Encounter {
     /// Whether participant `i` still takes turns: alive and not yielded.
     pub fn fighting(&self, i: usize, player: &Vitals) -> bool {
         self.vitals(i, player).hp > 0 && !self.participants[i].yielded
+    }
+}
+
+/// A one-on-one fight on the real-time layer's clock: the steps it has run
+/// and what each fighter is doing. Like an encounter, it copies no vitals
+/// but the opponent's, which last only as long as the duel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Duel {
+    /// Steps of duel time so far. Only an advance moves it; it is neither
+    /// world time nor encounter time.
+    pub step: u64,
+    /// The player, then the opponent.
+    pub fighters: [Fighter; 2],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Fighter {
+    pub character: Id,
+    /// The opponent's vitals for this duel; `None` for the player, whose
+    /// vitals stay in [`CombatState::vitals`].
+    pub vitals: Option<Vitals>,
+    /// Duel-time regeneration progress toward the next MP point; it ends
+    /// with the duel.
+    pub mp_remainder: u64,
+    pub action: DuelAction,
+    /// Stopped fighting, alive, in a yielding group.
+    pub yielded: bool,
+}
+
+/// What a fighter is committed to. Each timed state ends when the clock
+/// reaches its `until` step; the fighter is then in the next one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum DuelAction {
+    /// Free to act.
+    Ready,
+    /// A basic attack (`skill` is `None`) or a skill, already paid for.
+    Attack {
+        skill: Option<Id>,
+        phase: AttackPhase,
+        until: u64,
+        /// Whether this attack has landed; each lands at most once.
+        connected: bool,
+    },
+    /// A guard, which stops hits from step `ready_at` until it is lowered.
+    Guard { ready_at: u64 },
+    /// Turning away: the player is gone at step `until` if still fighting.
+    Retreat { until: u64 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AttackPhase {
+    /// Committed; cannot connect yet.
+    Windup,
+    /// Can connect once, when the host reports contact.
+    Active,
+    /// Committed; can no longer connect.
+    Recovery,
+}
+
+impl Duel {
+    /// Fighter `i`'s vitals: the opponent's own, or the player's.
+    pub fn vitals<'a>(&'a self, i: usize, player: &'a Vitals) -> &'a Vitals {
+        self.fighters[i].vitals.as_ref().unwrap_or(player)
+    }
+    /// Whether fighter `i` still fights: alive and not yielded.
+    pub fn fighting(&self, i: usize, player: &Vitals) -> bool {
+        self.vitals(i, player).hp > 0 && !self.fighters[i].yielded
     }
 }
 

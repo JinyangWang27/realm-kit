@@ -1,0 +1,9 @@
+[
+  {
+    "id": "yard",
+    "name": "The Practice Yard",
+    "description": "Packed earth, a chalk circle, and a wall someone has just climbed.",
+    "characters": ["master", "brigand", "left_twin", "right_twin"],
+    "safe": true
+  }
+]

@@ -5,7 +5,7 @@ use crate::{
         direction_name, duration, gear_name, money, piece_name, soldier, stat_name, travel_time,
     },
 };
-use realmkit_engine::{BattleOrder, Command, Engine};
+use realmkit_engine::{AttackPhase, BattleOrder, Command, DuelAction, Engine, Intent, Vitals};
 use realmkit_spec::{CharacterKind, Resource, StartQuestion, Stat};
 use std::io::{self, Write};
 
@@ -24,6 +24,21 @@ const MP: &str = "MP";
 const RAGE: &str = "rage";
 const REST: &str = "Rest";
 const FLEE: &str = "Flee";
+const DUEL: &str = "Duel";
+const STEP: &str = "Wait a step";
+const STRIKE: &str = "Strike";
+const GUARD: &str = "Raise guard";
+const LOWER: &str = "Lower guard";
+const DISENGAGE: &str = "Disengage";
+const STEP_NOW: &str = "Step";
+const READY: &str = "ready";
+const WINDING_UP: &str = "winding up";
+const STRIKING: &str = "striking";
+const RECOVERING: &str = "recovering";
+const GUARD_UP: &str = "guard up";
+const GUARD_RAISING: &str = "raising guard";
+const DISENGAGING: &str = "disengaging";
+const UNTIL: &str = "until";
 const TRAIN: &str = "Train";
 const RESPEC: &str = "Refund stat points";
 const TRAIN_GROUP: &str = "Train stats";
@@ -183,25 +198,12 @@ fn encounter_lines(engine: &Engine<'_>) -> Vec<String> {
         .participants
         .iter()
         .map(|p| {
-            let max = match &world.character(&p.character).unwrap().combat {
-                Some(profile) => profile.stats,
-                None => engine.player_stats().unwrap(),
-            };
-            let (v, pools) = (
+            fighter_line(
+                engine,
+                &p.character,
                 engine.vitals_of(p).unwrap(),
-                engine.pools_of(&p.character).unwrap(),
-            );
-            let mut line = format!("{} HP {}/{}", name(&p.character), v.hp, max.hp);
-            if let Some(max) = pools.mp.filter(|max| *max > 0) {
-                line += &format!(" · {MP} {}/{max}", v.mp);
-            }
-            if pools.rage.is_some() {
-                line += &format!(" · {RAGE} {}", v.rage);
-            }
-            if p.yielded {
-                line += &format!(" · {YIELDED}");
-            }
-            line
+                p.yielded,
+            )
         })
         .collect();
     let order: Vec<_> = engine
@@ -210,6 +212,60 @@ fn encounter_lines(engine: &Engine<'_>) -> Vec<String> {
         .map(|id| name(id))
         .collect();
     vec![vitals.join(" | "), format!("{NEXT}: {}", order.join(", "))]
+}
+
+/// "You HP 36/40 · rage 2": a fighter's vitals, as the engine holds them.
+fn fighter_line(engine: &Engine<'_>, character: &str, v: Vitals, yielded: bool) -> String {
+    let world = engine.world();
+    let max = match &world.character(character).unwrap().combat {
+        Some(profile) => profile.stats,
+        None => engine.player_stats().unwrap(),
+    };
+    let pools = engine.pools_of(character).unwrap();
+    let name = &world.character(character).unwrap().name;
+    let mut line = format!("{name} HP {}/{}", v.hp, max.hp);
+    if let Some(max) = pools.mp.filter(|max| *max > 0) {
+        line += &format!(" · {MP} {}/{max}", v.mp);
+    }
+    if pools.rage.is_some() {
+        line += &format!(" · {RAGE} {}", v.rage);
+    }
+    if yielded {
+        line += &format!(" · {YIELDED}");
+    }
+    line
+}
+
+/// "Step 12 | You HP 40/40 · ready | The Master HP 30/30 · striking until 15":
+/// each fighter's vitals and what they are committed to, and until when.
+fn duel_lines(engine: &Engine<'_>) -> Vec<String> {
+    let Some(duel) = engine.duel() else {
+        return Vec::new();
+    };
+    let player = engine.player_vitals().unwrap();
+    let mut parts = vec![format!("{STEP_NOW} {}", duel.step)];
+    for (i, f) in duel.fighters.iter().enumerate() {
+        let doing = match &f.action {
+            DuelAction::Ready => READY.to_string(),
+            DuelAction::Attack { phase, until, .. } => {
+                let phase = match phase {
+                    AttackPhase::Windup => WINDING_UP,
+                    AttackPhase::Active => STRIKING,
+                    AttackPhase::Recovery => RECOVERING,
+                };
+                format!("{phase} {UNTIL} {until}")
+            }
+            DuelAction::Guard { ready_at } if *ready_at <= duel.step => GUARD_UP.to_string(),
+            DuelAction::Guard { ready_at } => format!("{GUARD_RAISING} {UNTIL} {ready_at}"),
+            DuelAction::Retreat { until } => format!("{DISENGAGING} {UNTIL} {until}"),
+        };
+        let v = *duel.vitals(i, &player);
+        parts.push(format!(
+            "{} · {doing}",
+            fighter_line(engine, &f.character, v, f.yielded)
+        ));
+    }
+    vec![parts.join(" | ")]
 }
 
 /// "Yours: You HP 40/40 · Levy 6 | Theirs: Outlaw 8 · Poacher 4": who still
@@ -573,6 +629,17 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Rest => REST.into(),
         Command::Wait(minutes) => format!("{WAIT} — {}", duration(*minutes)),
         Command::Flee => FLEE.into(),
+        Command::Duel(id) => format!("{DUEL} {}", world.character(id)?.name),
+        // Contact is the host's report, never a choice.
+        Command::Intent(intent) => match intent {
+            Intent::Advance(_) => STEP.into(),
+            Intent::Attack => STRIKE.into(),
+            Intent::Skill(skill) => format!("{STRIKE}: {}", world.skill(skill)?.name),
+            Intent::Guard => GUARD.into(),
+            Intent::LowerGuard => LOWER.into(),
+            Intent::Retreat => DISENGAGE.into(),
+            Intent::Contact(_) => return None,
+        },
         // "Train Attack: 12 → 13", from the same effective stats the engine uses.
         Command::Allocate { stat, .. } => {
             let now = engine.player_stats().unwrap().get(*stat);
@@ -799,6 +866,8 @@ impl Menu {
             dialogue,
             header: if engine.battle().is_some() {
                 battle_lines(engine)
+            } else if engine.duel().is_some() {
+                duel_lines(engine)
             } else {
                 encounter_lines(engine)
             },

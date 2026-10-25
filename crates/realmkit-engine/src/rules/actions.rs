@@ -28,8 +28,10 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     if let Some(encounter) = fighting(state) {
         return fight_actions(world, state, encounter, panels);
     }
-    if let Some(Stance::Battle(battle)) = state.combat.as_ref().map(|c| &c.stance) {
-        return battle_actions(world, battle, panels);
+    match state.combat.as_ref().map(|c| &c.stance) {
+        Some(Stance::Battle(battle)) => return battle_actions(world, battle, panels),
+        Some(Stance::Dueling(duel)) => return duel_actions(world, state, duel, panels),
+        _ => {}
     }
     let location = world.location(&state.player.location).unwrap();
     let here = placed_here(world, state);
@@ -51,6 +53,18 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 .filter(|id| character_here(world, state, id).is_some_and(foe))
                 .map(|id| available(Command::Engage((*id).clone()))),
         );
+        // Fighters who fight alone, where the world runs real-time duels.
+        if world.combat().is_some_and(|c| c.realtime.is_some()) {
+            actions.extend(
+                here.iter()
+                    .filter(|id| !defeated(state, id))
+                    .filter(|id| {
+                        character_here(world, state, id).is_some_and(|c| c.combat.is_some())
+                    })
+                    .filter(|id| encounter::opponents_for(world, state, id).len() == 1)
+                    .map(|id| available(Command::Duel((*id).clone()))),
+            );
+        }
     }
     // An exit, like a road, to a place the player does not know of is not offered.
     let exits = location.exits.iter();
@@ -312,6 +326,47 @@ fn battle_actions(world: &WorldSpec, battle: &BattleState, panels: Vec<Action>) 
 
 /// Attacks and skills on every opponent still fighting, then flight if the
 /// group allows it.
+/// The intents a duel takes at its current step. Contact is the host's to
+/// report, never offered.
+fn duel_actions(
+    world: &WorldSpec,
+    state: &GameState,
+    duel: &Duel,
+    panels: Vec<Action>,
+) -> Vec<Action> {
+    let combat = state.combat.as_ref().unwrap();
+    let action = &duel.fighters[0].action;
+    let free = matches!(action, DuelAction::Ready | DuelAction::Guard { .. });
+    let pools = crate::character::resources::player_pools(world, &player_stats(world, combat));
+    let intent = |intent, available| Action {
+        command: Command::Intent(intent),
+        available,
+    };
+    let mut actions = vec![
+        intent(Intent::Advance(1), true),
+        intent(Intent::Attack, free),
+    ];
+    // Unaffordable skills stay listed, so the player sees why they are not usable.
+    actions.extend(
+        techniques::player_skills(world, combat)
+            .into_iter()
+            .filter(|s| s.level <= combat.level)
+            .map(|s| {
+                let usable = encounter::check_skill(&combat.vitals, pools, combat.level, s).is_ok();
+                intent(Intent::Skill(s.id.clone()), free && usable)
+            }),
+    );
+    match action {
+        DuelAction::Guard { .. } => actions.push(intent(Intent::LowerGuard, true)),
+        _ => actions.push(intent(Intent::Guard, *action == DuelAction::Ready)),
+    }
+    if !realtime::group(world, duel).is_some_and(|g| g.no_flee) {
+        actions.push(intent(Intent::Retreat, free));
+    }
+    actions.extend(panels);
+    actions
+}
+
 fn fight_actions(
     world: &WorldSpec,
     state: &GameState,
