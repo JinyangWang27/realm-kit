@@ -366,6 +366,44 @@ mod tests {
     }
 
     #[test]
+    fn real_time_strikes_contacts_and_joins_name_their_fighters() {
+        let intent = |line| match parse(line) {
+            Ok(Input::Command(Command::Intent(intent))) => intent,
+            other => panic!("{line}: {other:?}"),
+        };
+        let id = |s: &str| Some(s.to_string());
+        assert_eq!(intent("strike"), Intent::Attack { target: None });
+        assert_eq!(
+            intent("strike at left_twin"),
+            Intent::Attack {
+                target: id("left_twin")
+            }
+        );
+        assert_eq!(
+            intent("strike lunge at left_twin"),
+            Intent::Skill {
+                skill: "lunge".into(),
+                target: id("left_twin")
+            }
+        );
+        assert_eq!(
+            intent("contact warden brigand"),
+            Intent::Contact {
+                attacker: "warden".into(),
+                target: id("brigand")
+            }
+        );
+        assert_eq!(
+            intent("join warden 0"),
+            Intent::Join {
+                character: "warden".into(),
+                team: 0
+            }
+        );
+        assert!(parse("join warden ours").is_err());
+    }
+
+    #[test]
     fn train_names_a_proficiency_and_optional_points() {
         assert_eq!(
             parse("train Trading"),
