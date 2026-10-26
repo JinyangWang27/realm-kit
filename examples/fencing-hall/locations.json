@@ -1,0 +1,9 @@
+[
+  {
+    "id": "hall",
+    "name": "The Fencing Hall",
+    "description": "Chalk lines on a boarded floor, and three people waiting to teach you something.",
+    "characters": ["duelist", "bruiser", "swordmaster"],
+    "safe": true
+  }
+]

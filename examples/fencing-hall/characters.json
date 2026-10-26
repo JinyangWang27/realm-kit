@@ -1,0 +1,37 @@
+[
+  { "id": "fencer", "name": "You", "description": "A fencer with a practice blade." },
+  {
+    "id": "duelist",
+    "name": "The Duelist",
+    "description": "Quick hands, a straight thrust, nothing held back.",
+    "combat": {
+      "stats": { "hp": 40, "patk": 8, "pdef": 5, "satk": 0, "sdef": 4, "speed": 100 },
+      "xp": 0,
+      "skills": ["thrust"],
+      "group": "bout"
+    }
+  },
+  {
+    "id": "bruiser",
+    "name": "The Bruiser",
+    "description": "He swings a training maul and does not flinch while he does.",
+    "combat": {
+      "stats": { "hp": 50, "patk": 9, "pdef": 6, "satk": 0, "sdef": 4, "speed": 100 },
+      "xp": 0,
+      "skills": ["maul"],
+      "group": "brawl"
+    }
+  },
+  {
+    "id": "swordmaster",
+    "name": "The Swordmaster",
+    "description": "She waits behind her guard and turns aside whatever comes.",
+    "combat": {
+      "stats": { "hp": 40, "patk": 8, "pdef": 6, "satk": 0, "sdef": 4, "speed": 100 },
+      "xp": 0,
+      "group": "lesson",
+      "guard_hold": 3,
+      "reaction": "parry"
+    }
+  }
+]

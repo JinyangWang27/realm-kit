@@ -1,0 +1,60 @@
+look
+duel duelist
+step 4
+parry
+contact duelist
+step
+strike jab
+step 2
+contact fencer
+step 5
+parry
+step
+contact duelist
+step 7
+dodge
+step
+contact duelist
+step
+contact duelist
+step 5
+strike jab
+step 2
+contact fencer
+step 5
+strike cleave
+step 3
+contact duelist
+step 2
+contact fencer
+duel bruiser
+guard
+step 6
+contact bruiser
+step 10
+strike jab
+step 2
+contact fencer
+step 4
+contact bruiser
+step 10
+strike cleave
+step 5
+contact fencer
+step 11
+disengage
+step 6
+duel swordmaster
+step
+strike
+step 3
+contact fencer
+step 11
+strike
+step 3
+step
+contact fencer
+step 5
+disengage
+step 6
+status
