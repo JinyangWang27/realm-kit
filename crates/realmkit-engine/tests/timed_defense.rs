@@ -697,3 +697,35 @@ fn worlds_without_timed_defence_refuse_it_and_offer_none() {
         assert!(!json.contains(&format!("\"{field}\"")), "{field}");
     }
 }
+
+#[test]
+fn a_newcomer_staggered_at_the_step_it_joined_saves_and_resumes() {
+    let world = hall();
+    let script = [
+        Duel("duelist".into()),
+        step(4),
+        Intent(I::Join {
+            character: "bruiser".into(),
+            team: 2,
+        }),
+        Intent(I::Contact {
+            attacker: "duelist".into(),
+            target: Some("bruiser".into()),
+        }),
+    ];
+    let mut engine = fighting(&world, &script);
+    assert_eq!(
+        action(&engine, "bruiser"),
+        RealtimeAction::Staggered { until: 9 }
+    );
+    let bytes = engine.snapshot().to_json();
+    let mut resumed = Engine::restore(&world, SaveSnapshot::from_json(&bytes).unwrap()).unwrap();
+    assert_eq!(run(&mut resumed, &[step(6)]), run(&mut engine, &[step(6)]));
+    // It still has regenerated nothing at the step it joined.
+    let mut snapshot = SaveSnapshot::from_json(&bytes).unwrap();
+    let Stance::Realtime(fight) = &mut snapshot.state.combat.as_mut().unwrap().stance else {
+        panic!("fighting");
+    };
+    fight.fighters[2].mp_remainder = 1;
+    assert!(Engine::restore(&world, snapshot).is_err());
+}

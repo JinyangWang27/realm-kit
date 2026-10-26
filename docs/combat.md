@@ -493,7 +493,8 @@ snapshot, with every companion's vitals and standing order beside it in
   nobody else is; teams are numbered in the order they appeared, so none is
   skipped; join steps never go back and are not after now. The whole
   starting group is on team 1, and a fighter at the step it joined is still
-  `Ready` with no regeneration progress.
+  `Ready`, or staggered in full by a contact at that step, with no
+  regeneration progress.
 - **Vitals and progress** within maxima, progress below one point; a
   yielded fighter at or below its threshold (the player and companions may
   enter a fight already that low and have not yielded until hit again).

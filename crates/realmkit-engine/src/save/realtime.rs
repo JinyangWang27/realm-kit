@@ -183,9 +183,16 @@ pub(super) fn check(
                 *until > now && until - now <= u64::from(realtime.stagger)
             }
         };
-        // A newcomer acts and regenerates from the step after it joined.
-        let fresh =
-            i == 0 || f.joined < now || (f.action == RealtimeAction::Ready && f.mp_remainder == 0);
+        // A newcomer acts and regenerates from the step after it joined;
+        // a contact at that step can only have staggered it, in full.
+        let arrived = match f.action {
+            RealtimeAction::Ready => true,
+            RealtimeAction::Staggered { until } => {
+                now.checked_add(u64::from(realtime.stagger)) == Some(until)
+            }
+            _ => false,
+        };
+        let fresh = i == 0 || f.joined < now || (arrived && f.mp_remainder == 0);
         yield_ok
             && fresh
             && action_ok
