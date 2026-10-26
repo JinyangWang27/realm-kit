@@ -248,8 +248,20 @@ every capability optional:
   authored targeting and guard holds for engine-controlled fighters, a fight
   that ends only when no foe fights, settled once, and mid-fight saves.
   Existing walkthroughs play the same fights.
+- [x] Named companions and tactical orders
+  ([combat.md](combat.md#named-companions-and-tactical-orders)): optional
+  `companion` characters recruited and dismissed only by dialogue effects,
+  travelling with the player and parting where the player stands, each with
+  one persistent copy of its HP, MP and Rage that real-time fights read and
+  change in place; joins from the party only, never while down; resting and
+  world-time recovery for the party; typed, validated and saved Follow,
+  Hold, Defend and Attack orders that shape only whom a companion aims at,
+  with deterministic fallbacks and an authored `caution`; mid-fight saves and
+  save checks. The `hollow-ford` example plays it in line mode. Existing
+  packages, saves and walkthroughs are unchanged.
 - [ ] Spatial authority for real-time contact, real-time dodges, parries and
-  interruption, and persistent companions.
+  interruption; companions in turn-based encounters and battles, and
+  companion progression and gear.
 - [x] Overland-map authored placement + engine map query, with
   places known by an authored condition.
 - [x] Embeddable graphical-client seam, including a browser/WASM hosting proof

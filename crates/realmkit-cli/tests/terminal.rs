@@ -914,3 +914,40 @@ fn a_line_host_steps_real_time_duels_and_reports_contact() {
     // Contact is the host's report, never a menu choice.
     assert!(!text.contains("Contact"), "{text}");
 }
+
+const FORD: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/hollow-ford");
+
+#[test]
+fn a_line_host_brings_named_companions_into_a_fight_and_orders_them() {
+    let walkthrough = std::fs::read_to_string(format!("{FORD}/walkthrough.txt")).unwrap();
+    let play = || run(&["play", FORD, "--seed", "7", "--line"], &walkthrough);
+    let output = play();
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(String::from_utf8(play().stdout).unwrap(), text);
+    for passage in [
+        "Wren: 'I don't ride with strangers. Ask Mara who I am.'",
+        "Wren joins your party.",
+        "Brother Oake joins your party.",
+        "  Party:\n    Brother Oake HP 36/36 · follow you\n    Wren HP 30/30 · MP 6/6 · follow you",
+        "Wren joins the fight at your side.",
+        "Wren will attack The Lookout.",
+        "Brother Oake will defend you.",
+        "Wren HP 30/30 · MP 6/6 · rage 0 · at your side · attack The Lookout · ready",
+        "Orders ›",
+        "A cut from The Lookout finds Wren: 5 damage.",
+        "A quick thrust from Wren finds The Lookout: 9 damage.",
+        "The Toll Captain is down.\nThe fight is over.",
+        // She keeps what the fight left her, recovers MP on the road and
+        // the rest at the inn.
+        "    Wren HP 15/30 · MP 0/6 · follow you",
+        "    Wren HP 15/30 · MP 2/6 · follow you",
+        "    Wren HP 30/30 · MP 6/6 · follow you",
+        "Wren leaves your party and stays here.",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    // After parting, only Brother Oake travels on.
+    let last = text.rsplit("Party:").next().unwrap();
+    assert!(!last.contains("Wren HP"), "{last}");
+}

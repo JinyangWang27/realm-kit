@@ -1,0 +1,59 @@
+[
+  { "id": "traveller", "name": "You", "description": "A traveller bound for the far bank." },
+  {
+    "id": "mara",
+    "name": "Mara",
+    "description": "The innkeeper, who knows everyone worth knowing on this road.",
+    "dialogue": "mara"
+  },
+  {
+    "id": "wren",
+    "name": "Wren",
+    "description": "A spear for hire, quick and short of patience.",
+    "dialogue": "wren",
+    "combat": {
+      "stats": { "hp": 30, "mp": 6, "patk": 9, "pdef": 4, "satk": 0, "sdef": 3, "speed": 110 },
+      "xp": 0,
+      "skills": ["quick_thrust"],
+      "ally": true,
+      "targeting": "weakest"
+    },
+    "companion": {}
+  },
+  {
+    "id": "oake",
+    "name": "Brother Oake",
+    "description": "A broad shrine-keeper with an iron-rimmed shield.",
+    "dialogue": "oake",
+    "combat": {
+      "stats": { "hp": 36, "patk": 7, "pdef": 8, "satk": 0, "sdef": 5, "speed": 90 },
+      "xp": 0,
+      "skills": ["shield_bash"],
+      "resources": { "mp": false, "rage": true },
+      "ally": true,
+      "guard_hold": 2
+    },
+    "companion": { "caution": 40 }
+  },
+  {
+    "id": "ford_captain",
+    "name": "The Toll Captain",
+    "description": "He holds a cudgel like a ledger.",
+    "combat": {
+      "stats": { "hp": 34, "patk": 9, "pdef": 5, "satk": 0, "sdef": 3, "speed": 95 },
+      "xp": 12,
+      "group": "ford_bandits"
+    }
+  },
+  {
+    "id": "ford_lookout",
+    "name": "The Lookout",
+    "description": "Thin, nervous, and fast with a knife; he goes for whoever looks weakest.",
+    "combat": {
+      "stats": { "hp": 20, "patk": 8, "pdef": 3, "satk": 0, "sdef": 2, "speed": 105 },
+      "xp": 8,
+      "group": "ford_bandits",
+      "targeting": "weakest"
+    }
+  }
+]

@@ -4,8 +4,9 @@ RealmKit is a deterministic RPG engine, not a turn-based combat engine. A
 fighting character's progression and rules hold however a fight is run; the
 paused initiative timeline is one way to run one, and a fixed-step real-time
 duel is another. This page says which parts belong where, how MP and Rage
-work, how real-time duels run and where their authority ends, and what is not
-supported yet. Package fields are in
+work, how real-time duels run and where their authority ends, how named
+companions fight in them under tactical orders, and what is not supported
+yet. Package fields are in
 [world-format.md](world-format.md#combat-block-numeric-rules-and-templates).
 
 ## Three layers
@@ -14,7 +15,8 @@ supported yet. Package fields are in
 | --- | --- | --- |
 | **Character core** (universal) | Levels and XP, stat points, effective stats, gear and techniques, HP, MP and Rage, skill costs, damage and crits, Rage from acting and from damage, resource regeneration and decay, validated vitals | `realmkit-engine/src/character/`, `gear.rs`, `techniques.rs`, `formulas.rs`; spec `stats.rs`, most of `combat.rs` |
 | **Turn-based encounters** (optional) | The initiative timeline, action delays, whose turn it is, opponents' policy, attack, skill, flee and item turns, how encounters start and end, and timeline MP regeneration | `realmkit-engine/src/encounter/`; spec `Timeline` |
-| **Real-time fights** (optional) | A fight's fixed-step clock, its fighters and teams, joins, targets, attack phases, guard and retreat timing, which intents are legal at each step, engine-controlled fighters' policies, host-reported contact, when the fight ends, and fight-time MP regeneration | `realmkit-engine/src/realtime/`; spec `Realtime`, a profile's `ally`, `targeting` and `guard_hold` |
+| **Real-time fights** (optional) | A fight's fixed-step clock, its fighters and teams, joins, targets, attack phases, guard and retreat timing, which intents are legal at each step, engine-controlled fighters' policies, named companions' orders as targeting, host-reported contact, when the fight ends, and fight-time MP regeneration | `realmkit-engine/src/realtime/`; spec `Realtime`, a profile's `ally`, `targeting` and `guard_hold`, a companion's `caution` |
+| **Party** (optional, world level) | Which named companions travel with the player, where a parted one stays, each companion's persistent vitals and standing order, and what resting and world time do to them | `realmkit-engine/src/rules/party.rs`; spec `Character::companion`, the `join_party` and `leave_party` effects, the `companion` condition |
 | **Mass battles** (strategic, separate) | Troop stacks, frontage, orders, morale, pursuit and autoresolve | `realmkit-engine/src/battle.rs`; spec `troops.rs` |
 
 The core knows nothing of initiative, turns, ticks, frames or a host engine.
@@ -42,19 +44,21 @@ resources. Maxima are derived from effective stats and never saved.
 
 - The player's vitals live in `CombatState::vitals`, whatever the stance.
   Exploring, an encounter, a duel and a battle all read and change that one copy.
-- Every other fighter's vitals, opponent or real-time ally, live in its
-  `Participant` (or real-time `Fighter`) for the length of the fight: they are
-  whole again next time, as before. The player's participant or fighter
-  holds `None` and the save check rejects anything else.
+- A named companion's vitals live in its `CompanionState` in
+  `GameState::companions` from the moment it is first recruited, in the party
+  or out of it. A real-time fight it joins reads and changes that one copy.
+- Every other fighter's vitals, opponent or temporary real-time ally, live in
+  its `Participant` (or real-time `Fighter`) for the length of the fight: they
+  are whole again next time, as before. The player's and a companion's
+  participant or fighter holds `None`, and the save check rejects anything
+  else.
 - Troops in a battle are fungible counts in stacks, never characters with
   vitals.
 
-`Stance` (`exploring`, `fighting`, `realtime`, `battle`) only records how the player is
-fighting now. A future named companion would get its own `Vitals` beside the
-player's in the same way, not a copy inside a stance: its fighter would hold
-`None` like the player's, read through the same accessor, and join on team
-0 by the same `Join`. Today's allies are characters with an `ally` profile
-whose vitals last one fight.
+`Stance` (`exploring`, `fighting`, `realtime`, `battle`) only records how the
+player is fighting now. `RealtimeEncounter::vitals(i, state)` reads any
+fighter's vitals: its own for the fight, or the player's or a companion's
+only copy in the state.
 
 ## MP and Rage
 
@@ -200,11 +204,15 @@ after every check passes; a refused join changes nothing:
   fallen or not, and is not the player (`AlreadyJoined`);
 - it is placed here, present under its conditions, and has a combat profile
   (`NotHere`), and is not recorded as defeated (`AlreadyDefeated`);
-- an `ally` joins only team 0; anyone else an existing opponent team or the
-  next unused number, never team 0 (`InvalidTeam`).
+- a named companion travels in the party (`NotInParty`) and is not down
+  (`Downed`);
+- an `ally` (every companion is one) joins only team 0; anyone else an
+  existing opponent team or the next unused number, never team 0
+  (`InvalidTeam`).
 
-The newcomer enters whole, `Ready`, under `Control::Policy`, and acts from
-the next step. The clock, everyone else's actions, vitals, Rage and
+The newcomer enters `Ready`, under `Control::Policy`, and acts from the next
+step: whole, with vitals for the fight, or, for a companion, with its own
+vitals as they are. The clock, everyone else's actions, vitals, Rage and
 regeneration progress are untouched. `Joined { character, team }` is
 reported. Arrival is the host's report, like contact: the engine checks
 eligibility, not how the character got there.
@@ -223,7 +231,9 @@ Every attack is aimed when it begins and carries its `target`:
 - **Engine-controlled fighters** aim each attack by their profile's
   `targeting`: `first` (the earliest in join order still fighting on
   another team, so the player while they fight) or `weakest` (the lowest
-  current HP, ties to the earliest). The choice depends only on the state.
+  current HP, ties to the earliest). A named companion aims by its standing
+  order first (see [Tactical orders](#tactical-orders)). The choice depends
+  only on the state.
 
 `Intent::Contact { attacker, target }` reports which fighter a blow
 touched; `None` is the one it was aimed at. A host may report it touching
@@ -296,7 +306,9 @@ A fighter is `Ready`, in an `Attack`, raising or holding a `Guard`, or in a
   it raises its guard whenever it is ready and attacks once the guard has
   been up `guard_hold` steps. Each attack aims by its `targeting` and uses
   the strongest skill it can pay for, else a basic attack, chosen as in
-  turn-based encounters.
+  turn-based encounters. A named companion whose order leaves it nobody to
+  strike now waits as it is, ready or behind its guard, and checks again
+  next step.
 
 A hit does not interrupt the target's own action in this slice: poise,
 stagger and interruption are later work.
@@ -343,7 +355,7 @@ and hit volumes stepped on the same fixed clock), which is open work
 
 | Rule | From |
 | --- | --- |
-| HP, MP, Rage | `CombatState::vitals` for the player; full vitals from the profile for everyone else, allies included |
+| HP, MP, Rage | `CombatState::vitals` for the player; `CompanionState::vitals` for a named companion; full vitals from the profile for everyone else, temporary allies included |
 | Effective stats, pools | `character::player_stats`, `resources::player_pools`, `profile_pools` |
 | Skill affordability and payment | `resources::afford`, `resources::spend` |
 | Rage from acting and from damage, cap | `resources::on_action`, `on_damage`, `at_cap` |
@@ -362,20 +374,22 @@ A fight can be saved between any two commands, since every committed command
 leaves it at a step boundary and its whole state (step, fighters in join
 order with their teams and join steps, actions with their `until` steps and
 targets, everyone's vitals but the player's, regeneration progress) is in the
-snapshot. Loading checks that the rules could have left it:
+snapshot, with every companion's vitals and standing order beside it in
+`GameState::companions`. Loading checks that the rules could have left it:
 
 - **Identities.** The player first, on team 0, player-controlled, with no
   vitals of their own in the fight; then fighters who are here, have a
-  combat profile, are not defeated, appear once and are engine-controlled
-  with vitals. The first of them is on team 1 at step 0, with every present
+  combat profile, are not defeated, appear once and are engine-controlled,
+  with vitals of their own, or, for a named companion, from the party with
+  none. The first of them is on team 1 at step 0, with every present
   member of its group beside it from step 0. Allies are only on team 0 and
   nobody else is; teams are numbered in the order they appeared, so none is
   skipped; join steps never go back and are not after now. The whole
   starting group is on team 1, and a fighter at the step it joined is still
   `Ready` with no regeneration progress.
 - **Vitals and progress** within maxima, progress below one point; a
-  yielded fighter at or below its threshold (the player may enter a fight
-  already that low and has not yielded until hit again).
+  yielded fighter at or below its threshold (the player and companions may
+  enter a fight already that low and have not yielded until hit again).
 - **Actions.** Every committed action ends after now and no later than its
   phase allows (exactly, for engine-controlled fighters, whose stats never
   change; at the slowest speed for the player, whom a rank earned mid-fight
@@ -383,10 +397,16 @@ snapshot. Loading checks that the rules could have left it:
   fighter of another team and uses a known, unlocked skill, or an earlier
   rank's skill of a learned technique, since a committed attack keeps the
   skill it began with; no landed wind-up. An engine-controlled fighter still
-  fighting is `Ready` only at the step it joined; one out of the fight is
-  always `Ready`. A guard is the player's, or a policy fighter's with a
-  `guard_hold` it has not yet held to the end; retreats only for the player,
-  and only where flight is allowed.
+  fighting is `Ready` only at the step it joined, unless it is a companion,
+  which may be waiting; one out of the fight is always `Ready`. A guard is
+  the player's, or a policy fighter's with a `guard_hold` it has not yet held
+  to the end (a companion's for as long as it waits); retreats only for the
+  player, and only where flight is allowed.
+- **Companions.** Each is a companion character a dialogue choice could have
+  recruited, parted (if at all) at a real place, with vitals within its
+  maxima and Rage only in a fight or where Rage carries. A parted companion
+  follows; one in the party defends only the player or another companion in
+  the party, and attacks only someone of another team in the current fight.
 - **Open.** The player and someone off their team still fight, or the
   player is dead.
 
@@ -415,21 +435,141 @@ delta or host physics callback is read.
   retreating, telegraphed patterns.
 - Dodges, parries, redirection, interruption and poise, conditional crits,
   light and heavy handling (Gheasin Combat-02 to Combat-04).
-- Persistent named companions: their world-level lifecycle (recruiting,
-  following the player) and vitals kept between fights; consumables during
-  a fight; host control of an ally.
+- Consumables during a fight; host control of an ally or companion beyond
+  orders; companion movement for `follow` and `hold` (the host's).
+
+## Named companions and tactical orders
+
+A named companion is a unique character (`"companion": {}` on a character
+whose combat profile is an `ally`; see
+[world-format.md](world-format.md#named-companions)) who can travel in the
+player's party, keeps its own HP, MP and Rage between fights, and fights in
+real time under a standing tactical order. It is not a fungible soldier:
+retinue squads, wages and battles are untouched, and a companion is never a
+troop. The capability is optional; a world without companions keeps no
+party state and nothing in its saves changes.
+
+### Party lifecycle
+
+- **Recruiting.** Only the `join_party` effect of a dialogue choice recruits,
+  so recruitment is gated by the choice's authored `requires`, like any other
+  transition. The companion must be here: at its placed location under its
+  conditions before it is first recruited, or where it parted from the party
+  since (`NotHere`). A companion already in the party refuses the whole
+  choice (`AlreadyInParty`), so nobody is recruited twice. The first
+  recruitment creates its `CompanionState` with full HP and MP and no Rage;
+  every later one reuses it, so parting and rejoining heals nothing.
+- **Travelling.** A companion in the party is wherever the player is,
+  whatever its own `requires`: it goes by every exit and road the player
+  takes, under the same conditions and world time, and is listed and can be
+  talked to there. Party membership is its own state, separate from standing,
+  faction or which team it fights on.
+- **Parting.** `leave_party` leaves it where the player stands now, under its
+  `requires` again, with its vitals; orders to defend it lapse to following.
+  Scheduled events and start answers cannot recruit or dismiss anyone
+  (`invalid_effect`), so the party never changes while nobody is looking.
+- **Conditions.** `{ "kind": "companion", "character": "wren" }` holds while
+  that companion travels in the party.
+- **Recovery.** Resting at a safe place restores every companion in the
+  party to full HP and MP, a downed one included, as it does the player;
+  Rage is untouched. World time recovers MP (`mp_recovery`) and drains carried
+  Rage (`rage_decay`) for every recruited companion at its own maxima, at
+  the same fixed minutes as the player's. Nothing regenerates HP over world
+  time, for companions or the player.
+- **Down.** A companion at 0 HP is down: it still travels with the party, is
+  listed as down, and cannot join a fight (`Downed`) until resting restores
+  it. In a yielding group nobody falls to 0, so a companion yields instead.
+  RealmKit never kills a companion; a story that wants one gone authors
+  `leave_party`.
+
+### In a real-time fight
+
+A companion joins as any ally does, by the host's `Intent::Join { character,
+team: 0 }`: at the start (step 0, before any advance) or while the fight
+runs. Belonging to the party brings nobody in by itself; arrival is the
+host's report, and a companion may travel without fighting. The join is
+checked as above: in the party, not down, not already in the fight. Its
+fighter holds `vitals: None` and every hit, cost, Rage gain and MP
+regeneration lands on its `CompanionState`, so leaving the fight, by
+victory, flight or yielding, keeps exactly what the fight left it, minus
+Rage that belongs to one fight. Temporary `ally` characters still fight with
+vitals of their own that last one fight.
+
+A companion fights by the same rules as everyone: the same phases, guard,
+damage, Rage, MP and yielding from the character core, and the same policy
+(its `guard_hold`, its skills chosen by what it can afford). Allies give no
+loot or XP, so nothing is rewarded twice, and a companion who falls reports
+`AllyDown`.
+
+### Tactical orders
+
+`Command::Tactic { companion, order }` gives a companion in the party
+(`NotInParty`, `NotACompanion`) a standing `TacticalOrder`, while exploring
+or during a real-time fight. Every check comes before any change, and an
+order only changes whom the companion's *next* attack aims at: it never
+begins, cancels, retargets or lands an attack, so it cannot duplicate an
+attack, damage or a reward. Orders are saved with the companion; joining
+the party resets it to `follow`.
+
+| Order | Objective (host) | Whom the engine aims at |
+| --- | --- | --- |
+| `follow` (default) | go with the player | by the companion's authored `targeting` |
+| `hold` | stay at the objective the host keeps | only foes whose attack (wind-up or active) is aimed at the companion, by `targeting`; nobody else |
+| `defend { ally }` | protect the player or another companion in the party (`InvalidWard` otherwise) | foes whose attack is aimed at the ward, by `targeting`; else as `follow` |
+| `attack { target }` | go for that foe | `target` while it still fights; else as `follow` |
+
+`attack` names a fighter of another team still fighting in the current fight
+(`NotFighting` outside one, `InvalidTarget`, `NotHostile`), even before the
+companion joins; it stays the order until another is given or the fight
+ends, when it lapses to `follow`. Its fallback when the target falls or
+yields is the companion's own `targeting` over the foes still fighting,
+which is deterministic, as is every other fallback above.
+
+A companion's `caution` (a percent of maximum HP) makes it wary at or below
+that much HP, whatever its order: it strikes only at foes whose attack is
+aimed at it, like `hold`. So two companions under the same order can fight
+differently because of authored data: Brother Oake in `examples/hollow-ford`
+guards before every blow and turns wary at 40%, while Wren never guards and
+goes for the weakest foe.
+
+**The spatial boundary.** RealmKit has no geometry. `follow` and `hold` are
+objectives a host moves the companion by (navigation, spacing, a position
+to keep); the engine does not simulate movement, proximity, line of sight or
+interception, and claims none of them. What the engine decides is targeting
+and when an attack begins; whether a blow touched is still the host's
+contact report, bounded as for every fighter.
+
+### Progression
+
+A companion's level, stats, skills and policy are its authored combat
+profile's; it earns no XP, ranks or gear in this slice, so nothing it earns
+can be lost after a fight. Victory XP and technique shares remain the
+player's. General character progression, weapon proficiency, style mastery
+and cultivation are not modelled for companions; when they are, they belong
+in `CompanionState` beside its vitals, derived the way the player's are, so
+the record is where a future model goes rather than a copy to reconcile.
+
+### Determinism and saves
+
+Companions are kept in ID order, fighters in join order, and orders and
+targeting read only the state, so the same package, seed and commands
+(joins, orders and contacts included) give identical events, state and
+saves. Refused orders and joins change nothing and draw nothing. A fight
+saved at any step resumes exactly, companions' vitals, actions, targets and
+orders included.
 
 ## Not supported yet
 
 - Verified real-time hit detection: duel contact is host-reported and only
   bounded by the engine (see [Contact and its authority](#contact-and-its-authority)).
-- Persistent companions in real-time fights (allies' vitals last one
-  fight); consumables, gear changes or dodges during a fight;
+- Consumables, gear changes or dodges during a fight;
   engine-controlled fighters that space or retreat; formations;
   interruption, poise, parries and situational crits.
 - Committing elapsed host time in batches outside travel, waiting and
   resting (see [host-driven passage of time](spatial-hosts-and-military-battles.md#host-driven-passage-of-time-future-requirement)).
-- Named companions with persistent vitals, and allies in turn-based encounters.
+- Companions and allies in turn-based encounters and mass battles; companion
+  XP, levels, techniques, gear and the three progression dimensions; HP
+  recovery for companions other than resting; permanent companion death.
 - HP regeneration over world time.
 - Resource events for recovery and decay: clients read the new vitals.
 - Opponents carrying Rage or wounds between encounters; their vitals belong
@@ -438,7 +578,19 @@ delta or host physics callback is read.
 
 ## Compatibility
 
-Existing packages need no change and keep their rules revision: every new
+**Named companions (Combat-RT-03).** Every new field (`companion` on a
+character, the `join_party` and `leave_party` effects, the `companion`
+condition) is optional and absent from existing packages, which keep their
+rules revision. `GameState::companions` is omitted when empty, so existing
+saves parse and load as before, and the format stays 19 under the
+[format policy](world-format.md#versions): no earlier save or package can
+hold companion state. Every example walkthrough produces byte-identical
+output and save files. Hosts reading `RealtimeEncounter::vitals`,
+`fighting` and `contested` now pass the `GameState` (the player's and
+companions' vitals live there) instead of the player's vitals; the
+compiler flags every call site.
+
+**Multi-participant fights (Combat-RT-02).** Existing packages need no change and keep their rules revision: every new
 field (`realtime.friendly_fire`, a profile's `ally`, `targeting` and
 `guard_hold`) is optional, absent by default and not serialized when absent.
 Encounters, damage, RNG draws, progression and battles are unchanged. A

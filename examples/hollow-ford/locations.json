@@ -1,0 +1,21 @@
+[
+  {
+    "id": "inn",
+    "name": "The Lantern Inn",
+    "description": "A low room of smoke and wet wool. Travellers wait out the rain here.",
+    "characters": ["mara", "wren"],
+    "safe": true
+  },
+  {
+    "id": "crossroads",
+    "name": "The Old Crossroads",
+    "description": "A leaning shrine marks where the hill road meets the river track.",
+    "characters": ["oake"]
+  },
+  {
+    "id": "ford",
+    "name": "Hollow Ford",
+    "description": "Shallow water over grey stones, and two figures who want a toll for it.",
+    "characters": ["ford_captain", "ford_lookout"]
+  }
+]

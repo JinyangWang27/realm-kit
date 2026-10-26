@@ -132,10 +132,9 @@ fn frame(engine: &mut Engine<'_>) -> Vec<Command> {
         }
     }
     let fight = fight(engine);
-    let player = vitals(engine);
     if fight.fighters[0].action == RealtimeAction::Ready {
         let foe = (1..fight.fighters.len())
-            .find(|&i| fight.fighters[i].team != 0 && fight.fighting(i, &player))
+            .find(|&i| fight.fighters[i].team != 0 && fight.fighting(i, engine.state()))
             .unwrap();
         sent.push(strike_at(&fight.fighters[foe].character));
         engine.execute(sent.last().unwrap().clone()).unwrap();

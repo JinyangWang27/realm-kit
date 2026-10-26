@@ -218,6 +218,20 @@ pub(super) fn dialogues(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     }
 }
 
+/// A reference to a character that is a named companion.
+pub(super) fn companion(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, id: &str) {
+    match w.character(id) {
+        None => reference(out, owner, "character", id, false),
+        Some(c) if c.companion.is_none() => issue(
+            out,
+            owner,
+            "not_a_companion",
+            format!("{id} is not a companion, so it cannot be in the party"),
+        ),
+        Some(_) => {}
+    }
+}
+
 pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effect: &Effect) {
     match effect {
         Effect::AcceptQuest { quest } | Effect::CompleteQuest { quest } => {
@@ -256,6 +270,9 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
         }
         Effect::DeclareWar { factions: pair } | Effect::MakePeace { factions: pair } => {
             factions::pair(out, w, owner, pair)
+        }
+        Effect::JoinParty { character } | Effect::LeaveParty { character } => {
+            companion(out, w, owner, character)
         }
         Effect::GrantTechnique(grant) => {
             progression::technique_grant(out, w, owner, grant);
@@ -316,7 +333,9 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 | Effect::DiscoverEvidence { .. }
                 | Effect::EnterPhase { .. }
                 | Effect::DeclareWar { .. }
-                | Effect::MakePeace { .. } => issue(
+                | Effect::MakePeace { .. }
+                | Effect::JoinParty { .. }
+                | Effect::LeaveParty { .. } => issue(
                     out,
                     &question.id,
                     "invalid_effect",

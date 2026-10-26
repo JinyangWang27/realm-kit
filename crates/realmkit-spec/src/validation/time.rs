@@ -252,7 +252,9 @@ fn event_effect(
         | Effect::SellWorkshop { .. }
         | Effect::RaiseProficiency { .. }
         | Effect::DiscoverEvidence { .. }
-        | Effect::EnterPhase { .. } => issue(
+        | Effect::EnterPhase { .. }
+        | Effect::JoinParty { .. }
+        | Effect::LeaveParty { .. } => issue(
             out,
             owner,
             "invalid_effect",

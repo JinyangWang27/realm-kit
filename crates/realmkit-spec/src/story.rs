@@ -123,6 +123,10 @@ pub enum Condition {
     AtWar {
         factions: [Id; 2],
     },
+    /// The named companion travels in the player's party now.
+    Companion {
+        character: Id,
+    },
 }
 
 impl Condition {
@@ -320,6 +324,15 @@ pub enum Effect {
     /// The two factions make peace; already at peace changes nothing.
     MakePeace {
         factions: [Id; 2],
+    },
+    /// A named companion here joins the player's party; one already in it
+    /// refuses the whole transition.
+    JoinParty {
+        character: Id,
+    },
+    /// A companion in the party leaves it and stays where the player is.
+    LeaveParty {
+        character: Id,
     },
 }
 

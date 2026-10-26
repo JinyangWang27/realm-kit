@@ -10,7 +10,8 @@ use realmkit_spec::Combat;
 
 /// A fight the rules could have left: the player first, then fighters who
 /// are here, undefeated and each in it once, the first of them on team 1
-/// with its whole group;
+/// with its whole group; named companions only from the party, holding no
+/// vitals of their own in the fight, and everyone else with theirs;
 /// teams numbered in the order they appeared, allies only on the player's
 /// and nobody else on it; joins in order and not after now; vitals within
 /// maxima, regeneration progress below one point; every committed action
@@ -51,8 +52,16 @@ pub(super) fn check(
                 Some(_) => (1..=last_team + 1).contains(&f.team),
                 None => false,
             };
+            // A named companion's vitals stay its own; it joins from the party.
+            let held = world
+                .character(&f.character)
+                .is_some_and(|c| c.companion.is_some());
+            let vitals_ok = match held {
+                true => f.vitals.is_none() && rules::in_party(state, &f.character),
+                false => f.vitals.is_some(),
+            };
             let ok = team_ok
-                && f.vitals.is_some()
+                && vitals_ok
                 && f.control == Control::Policy
                 && (last_joined..=now).contains(&f.joined)
                 && f.character != world.world.player
@@ -82,18 +91,20 @@ pub(super) fn check(
     let known = techniques::player_skills(world, combat);
     let fighters_ok = fight.fighters.iter().enumerate().all(|(i, f)| {
         let side = &sides[i];
-        let v = fight.vitals(i, &combat.vitals);
-        let fighting = fight.fighting(i, &combat.vitals);
+        let v = fight.vitals(i, state);
+        let fighting = fight.fighting(i, state);
+        // A named companion: its own vitals, and a policy its order shapes.
+        let held = i > 0 && f.vitals.is_none();
         let hold = (i > 0)
             .then(|| profile(world, &f.character).guard_hold)
             .flatten();
         // A fighter yields when a hit leaves it at or below its threshold.
-        // Others enter whole; the player may enter already that low, from
-        // an earlier fight, and has not yielded until hit again.
+        // Others enter whole; the player and companions may enter already
+        // that low, from an earlier fight, and have not yielded until hit again.
         let yield_ok = match yield_share {
             Some(share) => {
                 let low = v.hp <= encounter::yield_threshold(side.stats.hp, share);
-                let entered_low = i == 0 && !f.yielded;
+                let entered_low = (i == 0 || held) && !f.yielded;
                 v.hp > 0
                     && (f.yielded == low || entered_low || (!f.yielded && v.hp == side.stats.hp))
             }
@@ -116,7 +127,8 @@ pub(super) fn check(
         let action_ok = match &f.action {
             // A policy begins something at every step it is free, from the
             // step after it joined; anyone else out of the fight is `Ready`.
-            RealtimeAction::Ready => i == 0 || !fighting || f.joined == now,
+            // A companion with nobody its order lets it strike waits.
+            RealtimeAction::Ready => i == 0 || held || !fighting || f.joined == now,
             // Only the player stays committed once out: dead, the fight open.
             _ if i > 0 && !fighting => false,
             RealtimeAction::Attack {
@@ -138,9 +150,12 @@ pub(super) fn check(
             }
             RealtimeAction::Guard { ready_at } => {
                 let raised = *ready_at <= now.saturating_add(u64::from(realtime.guard_raise));
-                // A policy attacks once its guard has been up its hold.
+                // A policy attacks once its guard has been up its hold; a
+                // companion with nobody to strike keeps it up.
                 raised
-                    && (i == 0 || hold.is_some_and(|h| now < ready_at.saturating_add(u64::from(h))))
+                    && (i == 0
+                        || hold
+                            .is_some_and(|h| held || now < ready_at.saturating_add(u64::from(h))))
             }
             RealtimeAction::Retreat { until } => {
                 i == 0 && !no_flee && *until > now && until - now <= u64::from(realtime.retreat)
@@ -158,7 +173,7 @@ pub(super) fn check(
     // A finished fight never stays open: the player and someone against
     // them still fight, or the player is dead.
     let dead = combat.vitals.hp == 0;
-    let open = dead || (fight.fighting(0, &combat.vitals) && fight.contested(&combat.vitals));
+    let open = dead || (fight.fighting(0, state) && fight.contested(state));
     if fighters_ok && open && state.dialogue.is_none() {
         Ok(())
     } else {

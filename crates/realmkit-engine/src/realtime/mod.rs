@@ -7,6 +7,10 @@
 //! never by a host's frames or a wall clock, so the same state and intents
 //! give the same fight.
 //!
+//! Named companions fight here with their own persistent vitals, which
+//! stay in their `CompanionState` like the player's in `CombatState`, and
+//! aim by their standing tactical order.
+//!
 //! Contact and arrivals are the host's to report: the engine has no
 //! geometry. It accepts a contact only while the attacker's attack is active
 //! and has not landed, on a fighter it may hit, and decides the damage,
@@ -124,25 +128,41 @@ pub(crate) fn group<'w>(world: &'w WorldSpec, fight: &RealtimeEncounter) -> Opti
     )
 }
 
-/// The fight beside the player's vitals, and every fighter's numbers.
+/// The fight beside the vitals held outside it, the player's and the
+/// named companions', and every fighter's numbers.
 struct Ring<'s> {
     fight: &'s mut RealtimeEncounter,
     player: &'s mut Vitals,
+    companions: &'s mut BTreeMap<Id, CompanionState>,
     sides: Vec<Side>,
 }
 
 impl Ring<'_> {
     fn vitals(&self, i: usize) -> &Vitals {
-        self.fight.vitals(i, self.player)
+        let fighter = &self.fight.fighters[i];
+        match (&fighter.vitals, i) {
+            (Some(vitals), _) => vitals,
+            (None, 0) => self.player,
+            (None, _) => &self.companions[&fighter.character].vitals,
+        }
     }
     fn vitals_mut(&mut self, i: usize) -> &mut Vitals {
-        match self.fight.fighters[i].vitals.as_mut() {
-            Some(vitals) => vitals,
-            None => self.player,
+        let fighter = &mut self.fight.fighters[i];
+        match (fighter.vitals.as_mut(), i) {
+            (Some(vitals), _) => vitals,
+            (None, 0) => self.player,
+            (None, _) => {
+                let companion = self.companions.get_mut(&fighter.character);
+                &mut companion.unwrap().vitals
+            }
         }
     }
     fn fighting(&self, i: usize) -> bool {
-        self.fight.fighting(i, self.player)
+        self.vitals(i).hp > 0 && !self.fight.fighters[i].yielded
+    }
+    /// Whether anyone off the player's team still fights.
+    fn contested(&self) -> bool {
+        (1..self.fight.fighters.len()).any(|i| self.fight.fighters[i].team != 0 && self.fighting(i))
     }
     /// The fighters `i` may aim at: on another team and still fighting.
     fn foes(&self, i: usize) -> impl Iterator<Item = usize> + '_ {
@@ -150,12 +170,20 @@ impl Ring<'_> {
         (0..self.fight.fighters.len())
             .filter(move |&t| self.fight.fighters[t].team != team && self.fighting(t))
     }
+    /// The standing order of fighter `i`, if it is a named companion.
+    fn order(&self, i: usize) -> Option<&TacticalOrder> {
+        let fighter = &self.fight.fighters[i];
+        match (&fighter.vitals, i) {
+            (None, 1..) => Some(&self.companions[&fighter.character].order),
+            _ => None,
+        }
+    }
 }
 
-fn ring<'s>(
-    world: &WorldSpec,
-    combat: &'s mut Option<CombatState>,
-) -> Result<Ring<'s>, EngineError> {
+fn ring<'s>(world: &WorldSpec, state: &'s mut GameState) -> Result<Ring<'s>, EngineError> {
+    let GameState {
+        combat, companions, ..
+    } = state;
     let combat = combat.as_mut().ok_or(EngineError::NotFighting)?;
     let Stance::Realtime(fight) = &combat.stance else {
         return Err(EngineError::NotFighting);
@@ -167,12 +195,15 @@ fn ring<'s>(
     Ok(Ring {
         fight,
         player: &mut combat.vitals,
+        companions,
         sides,
     })
 }
 
-/// A character entering the fight now, whole, as the engine controls it.
-fn newcomer(world: &WorldSpec, character: Id, team: u32, joined: u64) -> Fighter {
+/// A character entering the fight now, as the engine controls it: whole,
+/// with vitals that last the fight, or with `held` (`None`) for a named
+/// companion, whose vitals stay its own.
+fn newcomer(world: &WorldSpec, character: Id, team: u32, joined: u64, held: bool) -> Fighter {
     let profile = profile(world, &character);
     let pools = resources::profile_pools(world, profile);
     Fighter {
@@ -180,7 +211,7 @@ fn newcomer(world: &WorldSpec, character: Id, team: u32, joined: u64) -> Fighter
         team,
         control: Control::Policy,
         joined,
-        vitals: Some(resources::full(&profile.stats, pools)),
+        vitals: (!held).then(|| resources::full(&profile.stats, pools)),
         mp_remainder: 0,
         action: RealtimeAction::Ready,
         yielded: false,
@@ -222,7 +253,11 @@ pub(crate) fn start(
         yielded: false,
     };
     let fighters = std::iter::once(player)
-        .chain(opponents.iter().map(|c| newcomer(world, c.clone(), 1, 0)))
+        .chain(
+            opponents
+                .iter()
+                .map(|c| newcomer(world, c.clone(), 1, 0, false)),
+        )
         .collect();
     let combat = state.combat.as_mut().unwrap();
     resources::after_fight(world, &mut combat.vitals);
@@ -246,7 +281,7 @@ pub(crate) fn intent(
         .as_ref()
         .map(|c| techniques::player_skills(world, c))
         .unwrap_or_default();
-    let mut ring = ring(world, &mut state.combat)?;
+    let mut ring = ring(world, state)?;
     let now = ring.fight.step;
     let free = matches!(
         ring.fight.fighters[0].action,
@@ -363,21 +398,57 @@ fn aim(ring: &Ring, target: Option<Id>) -> Result<Id, EngineError> {
     }
 }
 
-/// The foe an engine-controlled fighter `i` aims its next attack at, by
-/// its authored targeting.
+/// The foe an engine-controlled fighter `i` aims its next attack at: by its
+/// authored targeting, or, for a named companion, by its standing order
+/// first. `None` when it has nobody it would strike now, which only a
+/// companion holding position or fighting warily can have while foes stand.
 fn pick(world: &WorldSpec, ring: &Ring, i: usize) -> Option<usize> {
-    let mut foes = ring.foes(i);
-    match profile(world, &ring.fight.fighters[i].character).targeting {
-        Targeting::First => foes.next(),
+    let character = &ring.fight.fighters[i].character;
+    let targeting = profile(world, character).targeting;
+    let by_targeting = |foes: Vec<usize>| match targeting {
+        Targeting::First => foes.first().copied(),
         // `min_by_key` keeps the first of equals: the earliest to join.
-        Targeting::Weakest => foes.min_by_key(|&t| ring.vitals(t).hp),
+        Targeting::Weakest => foes.into_iter().min_by_key(|&t| ring.vitals(t).hp),
+    };
+    let foes: Vec<usize> = ring.foes(i).collect();
+    let Some(order) = ring.order(i) else {
+        return by_targeting(foes);
+    };
+    // Foes whose attack, still to land or miss, is aimed at `who`.
+    let threats = |who: &str| -> Vec<usize> {
+        let aimed = |t: &usize| match &ring.fight.fighters[*t].action {
+            RealtimeAction::Attack { target, phase, .. } => {
+                target == who && *phase != AttackPhase::Recovery
+            }
+            _ => false,
+        };
+        foes.iter().copied().filter(aimed).collect()
+    };
+    let caution = world.character(character).unwrap().companion.as_ref();
+    let max_hp = ring.sides[i].stats.hp;
+    let wary = caution
+        .and_then(|c| c.caution)
+        .is_some_and(|share| ring.vitals(i).hp <= encounter::yield_threshold(max_hp, share));
+    match order {
+        _ if wary => by_targeting(threats(character)),
+        TacticalOrder::Hold => by_targeting(threats(character)),
+        TacticalOrder::Follow => by_targeting(foes),
+        TacticalOrder::Defend { ally } => {
+            by_targeting(threats(ally)).or_else(|| by_targeting(foes.clone()))
+        }
+        TacticalOrder::Attack { target } => foes
+            .iter()
+            .copied()
+            .find(|&t| ring.fight.fighters[t].character == *target)
+            .or_else(|| by_targeting(foes.clone())),
     }
 }
 
 /// An authored join: `character`, here, enters whole on `team` at the
 /// current step. An ally joins only the player's team, anyone else an
 /// opponent's team or the next unused number; nobody joins twice, and a
-/// defeated opponent stays defeated.
+/// defeated opponent stays defeated. A named companion joins only from the
+/// party, never downed, and brings its own vitals instead of whole ones.
 fn join(
     world: &WorldSpec,
     state: &mut GameState,
@@ -400,6 +471,18 @@ fn join(
     if combat.defeated.contains(&character) {
         return Err(EngineError::AlreadyDefeated(character));
     }
+    let held = world
+        .character(&character)
+        .is_some_and(|c| c.companion.is_some());
+    if held {
+        match state.companions.get(&character) {
+            Some(c) if c.in_party() && c.downed() => {
+                return Err(EngineError::Downed(character));
+            }
+            Some(c) if c.in_party() => {}
+            _ => return Err(EngineError::NotInParty(character)),
+        }
+    }
     let unused = fight.fighters.iter().map(|f| f.team).max().unwrap() + 1;
     let allowed = match profile.ally {
         true => team == 0,
@@ -412,7 +495,7 @@ fn join(
     let Stance::Realtime(fight) = &mut combat.stance else {
         unreachable!("checked above");
     };
-    let fighter = newcomer(world, character.clone(), team, fight.step);
+    let fighter = newcomer(world, character.clone(), team, fight.step, held);
     fight.fighters.push(fighter);
     events.push(Event::Joined { character, team });
     Ok(())
@@ -488,7 +571,7 @@ fn land(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let rules = world.combat().unwrap();
-    let mut ring = ring(world, &mut state.combat)?;
+    let mut ring = ring(world, state)?;
     let now = ring.fight.step;
     let RealtimeAction::Attack { skill, .. } = &ring.fight.fighters[i].action else {
         unreachable!("only an active attack lands");
@@ -576,10 +659,7 @@ fn land(
     if t != 0 && !ring.fighting(t) {
         ring.fight.fighters[t].action = RealtimeAction::Ready;
     }
-    let (contested, player_yielded) = (
-        ring.fight.contested(ring.player),
-        ring.fight.fighters[0].yielded,
-    );
+    let (contested, player_yielded) = (ring.contested(), ring.fight.fighters[0].yielded);
     // A technique that lands trains, less so against much weaker opponents.
     let combat = state.combat.as_ref().unwrap();
     if let Some(technique) = skill
@@ -601,8 +681,10 @@ fn land(
 
 /// Ends the fight and settles its outcome, once. A victory rewards every
 /// opponent that fell, in join order, whoever struck it down; allies and
-/// the opponents that yielded give nothing. The player's death leaves the
-/// fight open instead, as it does an encounter.
+/// the opponents that yielded give nothing. Named companions keep the
+/// vitals the fight left them, losing only Rage that belongs to one fight,
+/// and orders to attack someone in it lapse to following. The player's
+/// death leaves the fight open instead, as it does an encounter.
 fn end(
     world: &WorldSpec,
     state: &mut GameState,
@@ -619,5 +701,18 @@ fn end(
         .filter(|f| f.team != 0 && f.vitals.is_some_and(|v| v.hp == 0))
         .map(|f| f.character.clone())
         .collect();
+    let fought: Vec<Id> = fight.fighters[1..]
+        .iter()
+        .filter(|f| f.vitals.is_none())
+        .map(|f| f.character.clone())
+        .collect();
+    for id in &fought {
+        resources::after_fight(world, &mut state.companions.get_mut(id).unwrap().vitals);
+    }
+    for companion in state.companions.values_mut() {
+        if let TacticalOrder::Attack { .. } = companion.order {
+            companion.order = TacticalOrder::Follow;
+        }
+    }
     settle::settle(world, state, outcome, group, fallen, events)
 }

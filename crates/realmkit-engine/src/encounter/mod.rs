@@ -108,6 +108,10 @@ pub(super) fn engage(
         return Err(EngineError::InEncounter);
     };
     let timeline = timeline(world)?;
+    // A named companion fights beside the player, never against them.
+    if world.character(&id).is_some_and(|c| c.companion.is_some()) {
+        return Err(EngineError::NotHostile(id));
+    }
     let player = character::player_stats(world, combat);
     let opponents: Vec<Id> = opponents_for(world, state, &id);
     let combat = state.combat.as_mut().unwrap();

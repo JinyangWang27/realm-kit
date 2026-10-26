@@ -251,6 +251,62 @@ pub(super) fn characters(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
         if let Some(profile) = &character.combat {
             combat_profile(out, w, &character.id, profile);
         }
+        if let Some(companion) = &character.companion {
+            self::companion(out, w, character, companion);
+        }
+    }
+}
+
+/// A named companion fights beside the player in real time, as an ally,
+/// and starts in one place: the only place it can be recruited from until
+/// it first joins. It is a person who neither moves on a schedule nor
+/// leads an army.
+fn companion(out: &mut Vec<Diagnostic>, w: &WorldSpec, character: &Character, c: &Companion) {
+    let id = &character.id;
+    if !character.combat.as_ref().is_some_and(|p| p.ally) {
+        issue(
+            out,
+            id,
+            "companion_not_ally",
+            "a companion needs a combat profile with `ally`: it fights only beside the player",
+        );
+    }
+    if w.combat().is_some_and(|c| c.realtime.is_none()) {
+        issue(
+            out,
+            id,
+            "companion_without_realtime",
+            "companions fight only in real-time fights, which this world's combat block lacks",
+        );
+    }
+    if character.moves.is_some() || character.army.is_some() {
+        issue(
+            out,
+            id,
+            "companion_moves",
+            "a companion goes where the party goes; it cannot move on a schedule or lead an army",
+        );
+    }
+    let placed = w
+        .locations
+        .iter()
+        .filter(|l| l.characters.contains(id))
+        .count();
+    if placed != 1 {
+        issue(
+            out,
+            id,
+            "companion_placement",
+            "a companion is placed at exactly one location, where it can first be recruited",
+        );
+    }
+    if c.caution.is_some_and(|p| !(1..=100).contains(&p)) {
+        issue(
+            out,
+            id,
+            "invalid_caution",
+            "caution is a percentage of maximum HP, 1 to 100",
+        );
     }
 }
 

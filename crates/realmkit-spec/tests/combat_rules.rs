@@ -198,6 +198,7 @@ fn groups_and_profile_levels_are_validated() {
                 moves: None,
                 army: None,
                 faction: None,
+                companion: None,
             });
             w.dialogues.push(Dialogue {
                 id: "orders".into(),

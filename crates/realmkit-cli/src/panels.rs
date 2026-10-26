@@ -1,8 +1,8 @@
 //! Panels: views of the current state that spend no time.
 
 use crate::render::{
-    clock, direction_name, faction_name, faction_pair, money, piece_name, standing_value,
-    stat_name, travel_time, workshop_name, Paint,
+    clock, direction_name, faction_name, faction_pair, money, order_text, piece_name,
+    standing_value, stat_name, travel_time, workshop_name, Paint,
 };
 use realmkit_engine::{Engine, Standing};
 use realmkit_spec::{Proficiency, Stat};
@@ -59,22 +59,28 @@ pub fn location(
         location_exits(output, engine, &exits)?;
     }
     for character in engine.present_here() {
-        // A fighter shows its HP: current in a fight, full otherwise.
+        // A fighter shows its HP: current in a fight, or a recruited
+        // companion's own, full otherwise. A downed companion is still here.
         let fighting = engine
             .encounter()
             .and_then(|e| e.participants.iter().find(|p| p.character == character.id));
+        let companion = engine.companion(&character.id).map(|c| c.vitals.hp);
         let hp = fighting
             .and_then(|p| engine.vitals_of(p))
             .map(|v| v.hp)
+            .or(companion)
             .or(character.combat.as_ref().map(|c| c.stats.hp));
-        if hp == Some(0) {
+        if hp == Some(0) && companion.is_none() {
             continue;
         }
         let notes: Vec<String> = character
             .faction
             .iter()
             .map(|f| faction_name(world, f).to_owned())
-            .chain(hp.map(|hp| format!("HP {hp}")))
+            .chain(hp.map(|hp| match hp {
+                0 => "down".to_string(),
+                hp => format!("HP {hp}"),
+            }))
             .collect();
         match notes.is_empty() {
             true => writeln!(output, "{} — {}", character.name, character.description)?,
@@ -336,7 +342,42 @@ pub fn status(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
         Some(points) if points > 0 => writeln!(output, " · {points} points to spend")?,
         _ => writeln!(output)?,
     }
+    party(output, engine)?;
     holdings(output, engine)
+}
+
+/// "Party: Wren HP 22/30 · MP 4/6 · follow you": each companion travelling
+/// with the player, their own vitals and their standing order.
+fn party(output: &mut impl Write, engine: &Engine<'_>) -> io::Result<()> {
+    let world = engine.world();
+    let party = engine.party();
+    if party.is_empty() {
+        return Ok(());
+    }
+    writeln!(output, "  Party:")?;
+    for id in party {
+        let (Some(companion), Some(character), Some(pools)) = (
+            engine.companion(id),
+            world.character(id),
+            engine.pools_of(id),
+        ) else {
+            continue;
+        };
+        let max = character.combat.as_ref().map_or(0, |p| p.stats.hp);
+        let v = companion.vitals;
+        write!(output, "    {} HP {}/{max}", character.name, v.hp)?;
+        if let Some(max) = pools.mp.filter(|max| *max > 0) {
+            write!(output, " · MP {}/{max}", v.mp)?;
+        }
+        if pools.rage.is_some() && world.combat().is_some_and(|c| c.resources.rage_carries) {
+            write!(output, " · Rage {}", v.rage)?;
+        }
+        match companion.downed() {
+            true => writeln!(output, " · down")?,
+            false => writeln!(output, " · {}", order_text(world, &companion.order))?,
+        }
+    }
+    Ok(())
 }
 
 /// Proficiency ranks with points waiting, the player's workshops, then standing.

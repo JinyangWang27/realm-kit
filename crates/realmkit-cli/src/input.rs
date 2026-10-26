@@ -1,4 +1,4 @@
-use realmkit_engine::{BattleOrder, Command, Intent};
+use realmkit_engine::{BattleOrder, Command, Intent, TacticalOrder};
 use realmkit_spec::{CharacterKind, Direction, Proficiency, Stat, WorldSpec};
 
 /// A proficiency's typed token.
@@ -51,6 +51,9 @@ pub fn help(world: &WorldSpec) -> String {
     }
     if combat.is_some_and(|c| c.realtime.is_some()) {
         attack += "duel <character-id> — a real-time fight on a fixed-step clock, with its group\nstep [steps] — run the duel's clock on\nstrike [skill-id] [at <character-id>] | guard | lower | disengage\ncontact <character-id> [target-id] — that fighter's active attack touched, as a host reports it\njoin <character-id> <team> — that fighter arrives, as a host reports it (0 is your side)\n";
+    }
+    if world.characters.iter().any(|c| c.companion.is_some()) {
+        attack += "order <companion-id> follow | hold | defend [ally-id] | attack <target-id> — a standing order (defend alone: you)\n";
     }
     if world.battle().is_some() {
         attack += "engage <army-id> — start a battle\ncharge | hold | flank | retreat — order a round\nautoresolve — charge to the end\n";
@@ -171,7 +174,20 @@ impl Context {
 }
 
 pub fn parse(world: &WorldSpec, line: &str) -> Result<Input, &'static str> {
-    parse_with(line, Context::of(world))
+    let input = parse_with(line, Context::of(world))?;
+    // `defend` alone, or `defend me`, protects the player.
+    Ok(match input {
+        Input::Command(Command::Tactic {
+            companion,
+            order: TacticalOrder::Defend { ally },
+        }) if ally.is_empty() => Input::Command(Command::Tactic {
+            companion,
+            order: TacticalOrder::Defend {
+                ally: world.world.player.clone(),
+            },
+        }),
+        input => input,
+    })
 }
 
 /// A one-letter key typed outside a conversation, such as `n` or `i`.
@@ -269,6 +285,23 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
             character: (*id).into(),
             team: team.parse().map_err(|_| "expected a team number")?,
         }),
+        ("order", [companion, rest @ ..]) => Command::Tactic {
+            companion: (*companion).into(),
+            order: match rest {
+                ["follow"] => TacticalOrder::Follow,
+                ["hold"] => TacticalOrder::Hold,
+                ["defend"] | ["defend", "me"] => TacticalOrder::Defend {
+                    ally: String::new(),
+                },
+                ["defend", ally] => TacticalOrder::Defend {
+                    ally: (*ally).into(),
+                },
+                ["attack", target] => TacticalOrder::Attack {
+                    target: (*target).into(),
+                },
+                _ => return Err("expected follow, hold, defend [ally] or attack <target>"),
+            },
+        },
         ("attack", [id]) => Command::Attack((*id).into()),
         ("use", [item]) => Command::Use((*item).into()),
         ("use", [skill, target]) => Command::UseSkill {
@@ -402,6 +435,31 @@ mod tests {
             }
         );
         assert!(parse("join warden ours").is_err());
+        let order = |line| match parse(line) {
+            Ok(Input::Command(Command::Tactic { companion, order })) => (companion, order),
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(
+            order("order wren hold"),
+            ("wren".into(), TacticalOrder::Hold)
+        );
+        assert_eq!(
+            order("order wren attack lookout"),
+            (
+                "wren".into(),
+                TacticalOrder::Attack {
+                    target: "lookout".into()
+                }
+            )
+        );
+        assert_eq!(
+            order("order wren defend oake").1,
+            TacticalOrder::Defend {
+                ally: "oake".into()
+            }
+        );
+        assert!(parse("order wren").is_err());
+        assert!(parse("order wren charge").is_err());
         assert_eq!(parse("strike at"), Err("expected a fighter to strike at"));
     }
 

@@ -1,0 +1,65 @@
+look
+talk wren
+1
+talk mara
+1
+1
+talk wren
+1
+travel crossroads
+talk oake
+1
+status
+travel ford
+duel ford_captain
+join wren 0
+join oake 0
+order wren attack ford_lookout
+order oake defend
+strike at ford_captain
+step 3
+contact traveller
+step 1
+contact ford_lookout
+contact wren
+step 1
+contact ford_captain
+step 3
+contact oake
+step 1
+strike at ford_captain
+step 3
+contact traveller
+step 1
+contact ford_lookout
+contact wren
+step 4
+contact ford_captain
+step 1
+strike at ford_captain
+step 3
+contact traveller
+step 1
+contact ford_lookout
+contact wren
+step 1
+contact oake
+step 4
+strike at ford_captain
+step 2
+contact ford_captain
+step 1
+contact traveller
+step 1
+contact wren
+status
+travel crossroads
+travel inn
+status
+rest
+status
+talk wren
+1
+look
+status
+quit

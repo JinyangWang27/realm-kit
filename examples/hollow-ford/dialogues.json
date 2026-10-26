@@ -1,0 +1,99 @@
+[
+  {
+    "id": "mara",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Mara wipes a cup. 'Bound for the ford? Not alone, I hope.'",
+        "choices": [
+          {
+            "id": "vouch",
+            "text": "Who would come with me?",
+            "next": "vouched",
+            "once": true,
+            "effects": [{ "kind": "set_flag", "flag": "vouched" }]
+          },
+          { "text": "Goodbye.", "next": null }
+        ]
+      },
+      {
+        "id": "vouched",
+        "text": "'Wren, by the fire. Tell her I sent you. And Brother Oake keeps the shrine at the crossroads.'",
+        "choices": [{ "text": "Thank you.", "next": null }]
+      }
+    ]
+  },
+  {
+    "id": "wren",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Wren looks up from a short spear. 'Well?'",
+        "choices": [
+          {
+            "text": "Ride with me to the ford.",
+            "next": "stranger",
+            "requires": {
+              "kind": "all",
+              "of": [
+                { "kind": "not", "condition": { "kind": "flag", "flag": "vouched" } },
+                { "kind": "not", "condition": { "kind": "companion", "character": "wren" } }
+              ]
+            }
+          },
+          {
+            "text": "Mara sent me. Ride with me to the ford.",
+            "next": "joined",
+            "requires": {
+              "kind": "all",
+              "of": [
+                { "kind": "flag", "flag": "vouched" },
+                { "kind": "not", "condition": { "kind": "companion", "character": "wren" } }
+              ]
+            },
+            "effects": [{ "kind": "join_party", "character": "wren" }]
+          },
+          {
+            "text": "We part here.",
+            "next": "parted",
+            "requires": { "kind": "companion", "character": "wren" },
+            "effects": [{ "kind": "leave_party", "character": "wren" }]
+          },
+          { "text": "Nothing.", "next": null }
+        ]
+      },
+      { "id": "stranger", "text": "'I don't ride with strangers. Ask Mara who I am.'", "choices": [] },
+      { "id": "joined", "text": "'Lead on, then.'", "choices": [] },
+      { "id": "parted", "text": "'I'll be here when you need a spear.'", "choices": [] }
+    ]
+  },
+  {
+    "id": "oake",
+    "start": "greeting",
+    "nodes": [
+      {
+        "id": "greeting",
+        "text": "Brother Oake rests on his shield. 'Peace on your road.'",
+        "choices": [
+          {
+            "text": "Walk with me as far as the ford.",
+            "next": "joined",
+            "requires": { "kind": "not", "condition": { "kind": "companion", "character": "oake" } },
+            "effects": [{ "kind": "join_party", "character": "oake" }]
+          },
+          {
+            "text": "Go back to your shrine, brother.",
+            "next": "parted",
+            "requires": { "kind": "companion", "character": "oake" },
+            "effects": [{ "kind": "leave_party", "character": "oake" }]
+          },
+          { "text": "Peace.", "next": null }
+        ]
+      },
+      { "id": "joined", "text": "'The shrine will keep.'", "choices": [] },
+      { "id": "parted", "text": "'Then go with care.'", "choices": [] }
+    ]
+  }
+]
