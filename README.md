@@ -175,6 +175,14 @@ from one fight to the next until you rest; bring them into a fight with
 `join wren 0` and give standing orders (`order wren attack ford_lookout`,
 `order oake defend`, `order wren hold`, `order wren follow`, or the Orders
 menu) while they choose their own blows (`examples/hollow-ford`).
+A world can also tell light from heavy blows and let fighters parry and
+dodge on a timer (`examples/fencing-hall`): a quick jab lands before a slow
+wind-up and can interrupt it, while a heavy cleave keeps coming through a
+jab and breaks a raised guard. `parry` deflects a blow that touches you in
+its short window and leaves the attacker staggered for your counter; `dodge`
+lets a blow find nothing while its window is open. Either one, mistimed,
+leaves you committed and unprotected for a few steps. Foes and companions
+can parry or dodge by the same rules.
 Worlds can also grant stat
 points on levelling up, which you spend to shape your own build, and
 techniques mastered rank by rank, each rank named by the world

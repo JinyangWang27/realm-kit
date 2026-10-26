@@ -304,11 +304,23 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   orders that decide only whom they aim at, with deterministic fallbacks.
   Follow and Hold are host objectives; the engine simulates no movement.
   Companion progression stays authored for now.
+- **Weapon handling and timed defence (Combat-RT-04):** light and heavy
+  attacks are skills whose `power` and `time` trade hit for wind-up and
+  recovery, with optional `impact` and `poise`; a timed parry that deflects
+  and staggers the attacker, a timed dodge that lets contact find nothing,
+  each with a committed, unprotected recovery; guard breaks; and a stagger
+  state, not a resource. One documented precedence decides how a reported
+  contact meets dodge, parry, guard and poise, and simultaneous reports
+  resolve in submission order. The same rules hold for the player, foes,
+  allies and companions, who parry or dodge by an authored `reaction`.
+  Windows are the engine's; moving out of reach stays the host's. The
+  `fencing-hall` example plays it headless.
 
 Next, when a client needs it: spatial authority for real-time contact
 (positions, reach and hit volumes on the fixed step, or a validated spatial
 record), a host bridge for a 3D client, spacing and retreat for
-engine-controlled fighters, interruption and poise, dodges and parries;
+engine-controlled fighters, redirection, directional parries and
+situational crits from openings;
 companion progression (XP, ranks, gear and the weapon, style and cultivation
 dimensions) and companions in turn-based encounters and battles. See [Not supported yet](docs/combat.md#not-supported-yet).
 

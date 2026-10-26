@@ -159,11 +159,21 @@ time) that only an explicit advance moves. Fighters are on numbered teams,
 the player's being 0; allies, reinforcements and third parties can join
 while it runs, and it ends when nobody off the player's team still fights.
 Each fighter is ready or committed to an attack's wind-up, active or
-recovery phase, a guard or a retreat. Whether an active attack touched, and
+recovery phase, a guard, a retreat, a parry or dodge, or a stagger. Whether an active attack touched, and
 whom, is reported by the host and bounded by the engine; everything it does
 is decided by the engine. Like an encounter, it owns only the
 [Vitals](#vitals) of fighters other than the player. See
 [Real-time duels](combat.md#real-time-duels).
+
+## Poise and Stagger
+
+Real-time only. Poise is the impact a fighter stands through at a step,
+given by what it is doing (a skill's `poise` while it winds up or strikes, a
+raised guard's `guard_poise`, else none); it is not a resource and never
+drains. A landed hit whose `impact` is greater interrupts the fighter: it is
+staggered, unable to act, for the world's `stagger` steps. A parry staggers
+the attacker it deflects. See
+[Weapon handling and timed defence](combat.md#weapon-handling-and-timed-defence).
 
 ## Vitals
 

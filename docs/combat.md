@@ -15,7 +15,7 @@ yet. Package fields are in
 | --- | --- | --- |
 | **Character core** (universal) | Levels and XP, stat points, effective stats, gear and techniques, HP, MP and Rage, skill costs, damage and crits, Rage from acting and from damage, resource regeneration and decay, validated vitals | `realmkit-engine/src/character/`, `gear.rs`, `techniques.rs`, `formulas.rs`; spec `stats.rs`, most of `combat.rs` |
 | **Turn-based encounters** (optional) | The initiative timeline, action delays, whose turn it is, opponents' policy, attack, skill, flee and item turns, how encounters start and end, and timeline MP regeneration | `realmkit-engine/src/encounter/`; spec `Timeline` |
-| **Real-time fights** (optional) | A fight's fixed-step clock, its fighters and teams, joins, targets, attack phases, guard and retreat timing, which intents are legal at each step, engine-controlled fighters' policies, named companions' orders as targeting, host-reported contact, when the fight ends, and fight-time MP regeneration | `realmkit-engine/src/realtime/`; spec `Realtime`, a profile's `ally`, `targeting` and `guard_hold`, a companion's `caution` |
+| **Real-time fights** (optional) | A fight's fixed-step clock, its fighters and teams, joins, targets, attack phases, guard and retreat timing, parry and dodge windows, poise and stagger, which intents are legal at each step, engine-controlled fighters' policies, named companions' orders as targeting, host-reported contact, when the fight ends, and fight-time MP regeneration | `realmkit-engine/src/realtime/`; spec `Realtime`, a skill's `impact` and `poise`, a profile's `ally`, `targeting`, `guard_hold` and `reaction`, a companion's `caution` |
 | **Party** (optional, world level) | Which named companions travel with the player, where a parted one stays, each companion's persistent vitals and standing order, and what resting and world time do to them | `realmkit-engine/src/rules/party.rs`; spec `Character::companion`, the `join_party` and `leave_party` effects, the `companion` condition |
 | **Mass battles** (strategic, separate) | Troop stacks, frontage, orders, morale, pursuit and autoresolve | `realmkit-engine/src/battle.rs`; spec `troops.rs` |
 
@@ -278,8 +278,9 @@ minutes, regenerates nothing on world time and runs no world schedules.
 
 ### Actions and phases
 
-A fighter is `Ready`, in an `Attack`, raising or holding a `Guard`, or in a
-`Retreat`. Each timed state ends when the clock reaches its `until` step.
+A fighter is `Ready`, in an `Attack`, raising or holding a `Guard`, in a
+`Retreat`, in a `Parry` or `Dodge`, or `Staggered`. Each timed state ends
+when the clock reaches its `until` step.
 
 - **Attack** (`Intent::Attack`, or `Intent::Skill` for a known, unlocked
   skill): allowed only from `Ready` or `Guard` (it drops the guard). A skill's
@@ -290,8 +291,12 @@ A fighter is `Ready`, in an `Attack`, raising or holding a `Guard`, or in a
   scaled to `max(1, ceil(length × time / speed))` steps by the attacker's
   effective speed and the skill's `time` (a worn weapon's `basic_time` for a
   basic attack).
-- **Commitment.** During any attack phase the player can start nothing else:
-  no other attack, guard or retreat (`Committed`). There is no cancel.
+- **Commitment.** During any attack phase, parry, dodge or stagger the
+  player can start nothing else: no attack, guard, parry, dodge or retreat
+  (`Committed`). There is no cancel.
+- **Parry and dodge** (`Intent::Parry`, `Intent::Dodge`, from `Ready` or
+  `Guard`, in a world that has them, else `NoParry` or `NoDodge`): see
+  [Weapon handling and timed defence](#weapon-handling-and-timed-defence).
 - **Guard** (`Intent::Guard`, only from `Ready`): stops hits from
   `guard_raise` steps later until it is lowered (`Intent::LowerGuard`) or an
   attack drops it. A hit landing on a raised guard deals `guard_percent` of its
@@ -308,10 +313,101 @@ A fighter is `Ready`, in an `Attack`, raising or holding a `Guard`, or in a
   the strongest skill it can pay for, else a basic attack, chosen as in
   turn-based encounters. A named companion whose order leaves it nobody to
   strike now waits as it is, ready or behind its guard, and checks again
-  next step.
+  next step. Before any of that, a fighter with a `reaction` takes it (below).
 
-A hit does not interrupt the target's own action in this slice: poise,
-stagger and interruption are later work.
+### Weapon handling and timed defence
+
+An optional, minimal model of light and heavy attacks, a timed parry, a
+timed dodge and interruption. It adds no resource: poise is a property of
+what a fighter is doing at a step, never a pool that drains or refills, and
+a stagger is an action state like a guard. Package fields are in
+[world-format.md](world-format.md#weapon-handling-and-timed-defence). Every
+rule here is the same for the player, foes, temporary allies and named
+companions; only the choice to parry or dodge differs (the player's intents,
+or a profile's `reaction`).
+
+**Light and heavy attacks** are skills. `power` sets the hit and `time`
+scales its wind-up, active window and recovery together, as for every
+attack, so a light skill (the fencing hall's jab: 70 power, 60% time, 2/2/3
+steps) lands sooner, recovers sooner and hits softer than a heavy one (its
+cleave: 220 power, 160% time, 5/4/7 steps). Damage is the character core's,
+unchanged. Two optional skill fields make the difference tactical:
+
+- `impact`: a landed hit whose impact is greater than the target's current
+  poise interrupts it (it is staggered).
+- `poise`: the impact the attack stands through while winding up and
+  striking. A heavy attack with poise keeps coming through a light hit (it
+  takes the damage); it is limited hyperarmor, not immunity.
+
+**Poise at a step**, by what the target is doing when the hit lands:
+
+| Target is | Poise | A greater impact |
+| --- | --- | --- |
+| `Ready`, retreating, or raising a guard not yet up | 0 | staggers it; a retreat never completes |
+| Winding up or striking | the skill's `poise` (basic attacks 0) | staggers it; the attack is gone, costs paid |
+| Behind a raised guard | `guard_poise` | breaks the guard, after it stopped its share of the damage |
+| Recovering from an attack, or from a parry or dodge whose window closed | none | nothing: it is already committed, and a stagger would only shorten that |
+| Staggered | none | nothing: a stagger does not stack or extend |
+
+**Stagger.** An interrupted fighter is `Staggered { until }` for the world's
+`stagger` steps: it can do nothing (`Committed`), regenerates MP as usual,
+and is `Ready` again at `until`, when an engine-controlled one acts at once.
+Basic attacks have no impact, so a world gives impact only to the skills it
+means to interrupt with.
+
+**Parry** opens at once: contact at the step it begins and the `window - 1`
+steps after is deflected. The blow does no damage and earns no Rage, its
+attacker is staggered (the counter opening), and the parrier skips its
+recovery: it is free when the window closes (`until == open_until`). After a
+window that deflected nothing come `recovery` committed steps with no
+protection at all: no guard, poise 0, nothing to interrupt. A parry begun
+too early therefore leaves the parrier exposed to the full hit while it
+cannot attack, guard or defend again.
+
+**Dodge** opens at once for `window` steps, in which a reported contact
+finds nothing: no damage, no Rage, no interruption. The attack stays live
+and has not landed, so the host may still report it on anyone, the dodger
+included once the window has closed. Then come `recovery` committed steps,
+unprotected. Recovery is at least one step, so dodges cannot chain into
+permanent invulnerability. The dodge is a timing window the engine keeps;
+moving the dodger out of reach is the host's (below).
+
+**Reactions.** An engine-controlled fighter with a `reaction` that is free
+(ready or guarding) parries or dodges, before its policy does anything
+else, whenever a foe's attack aimed at it is active and has not landed. It
+reacts at the policy part of the step that attack became active, so its
+window covers contact reported at that step; a host that reports a contact
+after a one-step parry window has closed lands the blow. Named companions
+react under any order.
+
+**How a reported contact resolves.** An accepted contact (see
+[Contact and its authority](#contact-and-its-authority)) of attacker `A` on
+target `T` at step `s` is decided in this order, each first match ending it:
+
+1. `T` dodging, `s` before `open_until`: evaded (`Evaded`). Nothing changes.
+2. `T` parrying, `s` before `open_until`: deflected (`Parried`); `A` is
+   staggered and `T` skips its recovery.
+3. Otherwise the hit lands: damage, reduced to `guard_percent` by a raised
+   guard (`Blocked`), Rage, technique XP, then, if `A`'s impact beats `T`'s
+   poise at `s` and `T` still fights, `T` is staggered (`Staggered`), then a
+   fall or yield, and the fight's end.
+
+**Simultaneous actions.** Within one step, everything the engine does comes
+first, in the fixed step order: phases move on, then policies act,
+reactions included. Then the host's intents apply one at a time in the
+order submitted, each against the state the previous one left. So two blows
+active at the same step resolve in report order: if the first staggers its
+target, the target's attack is gone and its own contact report is refused
+(`NoContact`). A player's parry or dodge submitted before a contact at that
+step covers it; one submitted after is too late. A host that wants a fair
+trade must order its reports; the engine never reorders them.
+
+**Not modelled.** Poise that wears down over several hits, guard damage as
+a pool, directional parries, redirection, parries that some attacks beat,
+feints, cancels, Rage for a deflection, and situational crits from an
+opening. Authors should note that a light skill with impact that winds up
+faster than a target's unarmoured attack can interrupt it every time; poise
+on the slower skill, a guard with `guard_poise`, or a reaction is the answer.
 
 ### Contact and its authority
 
@@ -334,6 +430,16 @@ the engine decides everything that follows:
   swinging at the air earns nothing, technique XP for a landed skill, and the
   outcome. Hits the player deals are `DamageDealt`, hits on the player
   `DamageReceived`, and hits between two other fighters `Struck`.
+
+Timed defence does not move this boundary. Whether a parry or dodge window
+is open is the engine's own state, opened only by the player's intent or a
+fighter's authored reaction at a step the engine knows; the engine never
+grants a deflection, an evasion or invulnerability because a host claims one.
+Moving a dodger out of a hit volume is the host's, and so is not reporting a
+contact that no longer touches; inside the window the engine refuses the
+damage whatever the host reports. Equally, a host can deny a parry or dodge
+its effect by withholding a contact, or make a mistimed one fail by
+reporting a contact late, as it can any contact.
 
 What this bounds: a host can make an attack land at most once, only inside
 its active window, only on a fighter still fighting and, without
@@ -366,7 +472,8 @@ and hit volumes stepped on the same fixed clock), which is open work
 | Victory rewards, flags, objectives | `settle::settle`, shared with encounters |
 
 Nothing in a real-time fight is a second copy of the player. It adds no third resource:
-no stamina, posture or poise.
+no stamina or posture pool. Poise is a property of the action a fighter is
+in at a step, and a stagger an action state.
 
 ### Saves mid-fight
 
@@ -401,7 +508,10 @@ snapshot, with every companion's vitals and standing order beside it in
   which may be waiting; one out of the fight is always `Ready`. A guard is
   the player's, or a policy fighter's with a `guard_hold` it has not yet held
   to the end (a companion's for as long as it waits); retreats only for the
-  player, and only where flight is allowed.
+  player, and only where flight is allowed. A parry or dodge exists in the
+  world, is the player's or a fighter's whose `reaction` it is, was begun by
+  now and recovers for exactly `recovery` steps after its window (or, for a
+  parry that deflected, not at all); a stagger lasts at most `stagger` steps.
 - **Companions.** Each is a companion character a dialogue choice could have
   recruited, parted (if at all) at a real place, with vitals within its
   maxima and Rage only in a fight or where Rage carries. A parted companion
@@ -433,8 +543,10 @@ delta or host physics callback is read.
   between steps for presentation only.
 - Engine-controlled intents beyond attacking and holding a guard: spacing,
   retreating, telegraphed patterns.
-- Dodges, parries, redirection, interruption and poise, conditional crits,
-  light and heavy handling (Gheasin Combat-02 to Combat-04).
+- Redirection, directional parries and guard arcs, poise that wears down,
+  situational crits from openings, feints and combos (light and heavy
+  handling, timed parry and dodge, and interruption are in; see
+  [Weapon handling and timed defence](#weapon-handling-and-timed-defence)).
 - Consumables during a fight; host control of an ally or companion beyond
   orders; companion movement for `follow` and `hold` (the host's).
 
@@ -562,9 +674,9 @@ orders included.
 
 - Verified real-time hit detection: duel contact is host-reported and only
   bounded by the engine (see [Contact and its authority](#contact-and-its-authority)).
-- Consumables, gear changes or dodges during a fight;
-  engine-controlled fighters that space or retreat; formations;
-  interruption, poise, parries and situational crits.
+- Consumables or gear changes during a fight; engine-controlled fighters
+  that space or retreat; formations; redirection, directional parries,
+  poise that wears down and situational crits.
 - Committing elapsed host time in batches outside travel, waiting and
   resting (see [host-driven passage of time](spatial-hosts-and-military-battles.md#host-driven-passage-of-time-future-requirement)).
 - Companions and allies in turn-based encounters and mass battles; companion
@@ -577,6 +689,19 @@ orders included.
 - A third fundamental resource.
 
 ## Compatibility
+
+**Weapon handling and timed defence (Combat-RT-04).** Every new field
+(`realtime.stagger`, `guard_poise`, `parry` and `dodge`, a skill's `impact`
+and `poise`, a profile's `reaction`) is optional, absent by default and not
+serialized when absent, so existing packages keep their rules revision and
+their saves load. Without them no hit interrupts anything and nobody can
+parry or dodge (`NoParry`, `NoDodge`), so every fight plays as before: every
+earlier example walkthrough produces byte-identical output and save files.
+The new action states and intents are new enum variants; an earlier build
+refuses a save holding one rather than misreading it, and the format stays
+19 under the [format policy](world-format.md#versions). Hosts matching
+exhaustively on `RealtimeAction`, `Intent` or `Event` must handle the new
+variants; the compiler flags each.
 
 **Named companions (Combat-RT-03).** Every new field (`companion` on a
 character, the `join_party` and `leave_party` effects, the `companion`
