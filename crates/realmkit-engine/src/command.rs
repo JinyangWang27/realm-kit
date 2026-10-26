@@ -139,6 +139,12 @@ pub enum Intent {
     LowerGuard,
     /// Turns to retreat; the escape happens after the retreat's steps.
     Retreat,
+    /// Begins the world's timed parry: contact during its window is
+    /// deflected and staggers the attacker; after it, a committed recovery.
+    Parry,
+    /// Begins the world's timed dodge: contact during its window finds
+    /// nothing; after it, a committed recovery. Moving is the host's.
+    Dodge,
     /// The host reports that `attacker`'s attack touched `target` now
     /// (`None`: the fighter it was aimed at). The engine accepts it only
     /// while that attack is active and has not landed, on a fighter still
@@ -308,6 +314,28 @@ pub enum Event {
     },
     /// In a real-time fight: the player turned to retreat.
     RetreatStarted,
+    /// In a real-time fight: `character` began a parry or a dodge.
+    Parrying {
+        character: Id,
+    },
+    Dodging {
+        character: Id,
+    },
+    /// In a real-time fight: `character`'s parry deflected `attacker`'s blow.
+    Parried {
+        character: Id,
+        attacker: Id,
+    },
+    /// In a real-time fight: `attacker`'s blow found nothing; `character`
+    /// was dodging. The attack can still land while it is active.
+    Evaded {
+        character: Id,
+        attacker: Id,
+    },
+    /// In a real-time fight: `character` was interrupted and is staggered.
+    Staggered {
+        character: Id,
+    },
     /// A named companion joined the player's party.
     JoinedParty {
         character: Id,

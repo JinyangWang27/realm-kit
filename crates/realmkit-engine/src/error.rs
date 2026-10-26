@@ -88,6 +88,10 @@ pub enum EngineError {
     Committed,
     #[error("you are not guarding")]
     NotGuarding,
+    #[error("there is no parrying in this world")]
+    NoParry,
+    #[error("there is no dodging in this world")]
+    NoDodge,
     #[error("{0} has no attack that can land now")]
     NoContact(Id),
     #[error(

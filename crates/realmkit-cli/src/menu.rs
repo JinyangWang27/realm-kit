@@ -34,6 +34,8 @@ const TEAM: &str = "side";
 const GUARD: &str = "Raise guard";
 const LOWER: &str = "Lower guard";
 const DISENGAGE: &str = "Disengage";
+const PARRY: &str = "Parry";
+const DODGE: &str = "Dodge";
 const STEP_NOW: &str = "Step";
 const READY: &str = "ready";
 const WINDING_UP: &str = "winding up";
@@ -42,6 +44,10 @@ const RECOVERING: &str = "recovering";
 const GUARD_UP: &str = "guard up";
 const GUARD_RAISING: &str = "raising guard";
 const DISENGAGING: &str = "disengaging";
+const PARRYING: &str = "parrying";
+const DODGING: &str = "dodging";
+const EXPOSED: &str = "exposed";
+const STAGGERED: &str = "staggered";
 const UNTIL: &str = "until";
 const TRAIN: &str = "Train";
 const RESPEC: &str = "Refund stat points";
@@ -265,6 +271,17 @@ fn duel_lines(engine: &Engine<'_>) -> Vec<String> {
             RealtimeAction::Guard { ready_at } if *ready_at <= duel.step => GUARD_UP.to_string(),
             RealtimeAction::Guard { ready_at } => format!("{GUARD_RAISING} {UNTIL} {ready_at}"),
             RealtimeAction::Retreat { until } => format!("{DISENGAGING} {UNTIL} {until}"),
+            // Open until the window closes, then exposed through the recovery.
+            RealtimeAction::Parry { open_until, .. } if duel.step < *open_until => {
+                format!("{PARRYING} {UNTIL} {open_until}")
+            }
+            RealtimeAction::Dodge { open_until, .. } if duel.step < *open_until => {
+                format!("{DODGING} {UNTIL} {open_until}")
+            }
+            RealtimeAction::Parry { until, .. } | RealtimeAction::Dodge { until, .. } => {
+                format!("{EXPOSED} {UNTIL} {until}")
+            }
+            RealtimeAction::Staggered { until } => format!("{STAGGERED} {UNTIL} {until}"),
         };
         let v = *duel.vitals(i, engine.state());
         // Only fights that grew beyond the player and their foes say whose
@@ -672,6 +689,8 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 Intent::Guard => GUARD.into(),
                 Intent::LowerGuard => LOWER.into(),
                 Intent::Retreat => DISENGAGE.into(),
+                Intent::Parry => PARRY.into(),
+                Intent::Dodge => DODGE.into(),
                 Intent::Contact { .. } | Intent::Join { .. } => return None,
             }
         }

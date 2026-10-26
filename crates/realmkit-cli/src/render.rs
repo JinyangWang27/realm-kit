@@ -537,6 +537,27 @@ pub fn events(
                 name(character)
             )?,
             Event::RetreatStarted => writeln!(output, "You turn to disengage.")?,
+            Event::Parrying { character } => writeln!(output, "{}: parrying.", name(character))?,
+            Event::Dodging { character } => writeln!(output, "{}: dodging.", name(character))?,
+            Event::Parried {
+                character,
+                attacker,
+            } => writeln!(
+                output,
+                "{}: parried a blow from {}.",
+                name(character),
+                name(attacker)
+            )?,
+            Event::Evaded {
+                character,
+                attacker,
+            } => writeln!(
+                output,
+                "{}: dodged a blow from {}.",
+                name(character),
+                name(attacker)
+            )?,
+            Event::Staggered { character } => writeln!(output, "{}: staggered.", name(character))?,
             Event::JoinedParty { character } => {
                 writeln!(output, "{} joins your party.", name(character))?
             }

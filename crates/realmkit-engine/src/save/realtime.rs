@@ -6,7 +6,7 @@
 use super::*;
 use crate::character::profile;
 use crate::realtime;
-use realmkit_spec::Combat;
+use realmkit_spec::{Combat, Reaction};
 
 /// A fight the rules could have left: the player first, then fighters who
 /// are here, undefeated and each in it once, the first of them on team 1
@@ -159,6 +159,28 @@ pub(super) fn check(
             }
             RealtimeAction::Retreat { until } => {
                 i == 0 && !no_flee && *until > now && until - now <= u64::from(realtime.retreat)
+            }
+            // Begun by now, in a world with that defence, by the player or a
+            // fighter that reacts with it; recovering in full unless a parry
+            // deflected something.
+            RealtimeAction::Parry { open_until, until }
+            | RealtimeAction::Dodge { open_until, until } => {
+                let reaction = match f.action {
+                    RealtimeAction::Parry { .. } => Reaction::Parry,
+                    _ => Reaction::Dodge,
+                };
+                let reacts = i == 0 || profile(world, &f.character).reaction == Some(reaction);
+                let clean = reaction == Reaction::Parry && until == open_until;
+                realtime::timed(realtime, reaction).is_ok_and(|d| {
+                    let begun = open_until
+                        .checked_sub(u64::from(d.window))
+                        .is_some_and(|b| b <= now);
+                    let recovers = open_until.checked_add(u64::from(d.recovery)) == Some(*until);
+                    reacts && begun && *until > now && (recovers || clean)
+                })
+            }
+            RealtimeAction::Staggered { until } => {
+                *until > now && until - now <= u64::from(realtime.stagger)
             }
         };
         // A newcomer acts and regenerates from the step after it joined.
