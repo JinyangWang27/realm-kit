@@ -372,6 +372,8 @@ fn skill(id: &str, power: u32, channel: Channel, cost: u32, resource: Resource) 
         cross_share: None,
         text: TextTemplate("{attacker} {target} {damage}".into()),
         crit: None,
+        impact: 0,
+        poise: 0,
     }
 }
 

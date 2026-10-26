@@ -31,7 +31,7 @@ fn basics(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
     }
     share(out, owner, combat.cross_share);
     crit(out, owner, combat.player_basic_crit);
-    realtime(out, owner, combat.realtime);
+    realtime(out, owner, combat);
     let Some(timeline) = combat.timeline else {
         return;
     };
@@ -48,12 +48,32 @@ fn basics(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
     }
 }
 
-/// Real-time timing within its bounds, so the duel clock's arithmetic stays small.
-fn realtime(out: &mut Vec<Diagnostic>, owner: &str, realtime: Option<Realtime>) {
-    let Some(r) = realtime else {
+/// Real-time timing within its bounds, so the duel clock's arithmetic stays
+/// small, and a stagger wherever something can interrupt.
+fn realtime(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
+    let Some(r) = combat.realtime else {
         return;
     };
     let phase = |steps: u32| (1..=PHASE_BOUND).contains(&steps);
+    let timed = |d: Option<TimedDefense>| d.is_none_or(|d| phase(d.window) && phase(d.recovery));
+    if !(timed(r.parry) && timed(r.dodge)) || r.stagger > PHASE_BOUND || r.guard_poise > POISE_BOUND
+    {
+        issue(
+            out,
+            owner,
+            "invalid_timed_defense",
+            format!("a parry's or dodge's window and recovery are 1 to {PHASE_BOUND} steps, a stagger 0 to {PHASE_BOUND}, a guard's poise 0 to {POISE_BOUND}"),
+        );
+    }
+    let interrupts = r.parry.is_some() || combat.skills.iter().any(|s| s.impact > 0);
+    if interrupts && r.stagger == 0 {
+        issue(
+            out,
+            owner,
+            "missing_stagger",
+            "a parry or a skill with impact staggers, so give the stagger 1 or more steps",
+        );
+    }
     if !(1..=STEP_RATE_BOUND).contains(&r.steps_per_second)
         || !(phase(r.windup) && phase(r.active) && phase(r.recovery) && phase(r.retreat))
         || r.guard_raise > PHASE_BOUND
@@ -237,6 +257,14 @@ fn skills(out: &mut Vec<Diagnostic>, combat: &Combat) {
         }
         if let Some(value) = skill.cross_share {
             share(out, &skill.id, value);
+        }
+        if skill.impact > POISE_BOUND || skill.poise > POISE_BOUND {
+            issue(
+                out,
+                &skill.id,
+                "invalid_impact",
+                format!("impact and poise are 0 to {POISE_BOUND}"),
+            );
         }
         crit(out, &skill.id, skill.crit);
         if skill.name.trim().is_empty() {

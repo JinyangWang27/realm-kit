@@ -115,6 +115,29 @@ pub struct Realtime {
     /// Without it, such a report is refused; nobody aims at a teammate either way.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub friendly_fire: bool,
+    /// Steps an interrupted fighter is staggered: hit by an attack whose
+    /// `impact` beats its poise, or parried. 0 when nothing interrupts.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub stagger: u32,
+    /// Poise of a raised guard: a hit of greater impact breaks it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub guard_poise: u32,
+    /// A timed parry; absent, nobody parries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parry: Option<TimedDefense>,
+    /// A timed dodge; absent, nobody dodges.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dodge: Option<TimedDefense>,
+}
+
+/// A timed defence's commitment: it protects for `window` steps from the
+/// step it begins, then leaves the fighter `recovery` steps committed and
+/// unprotected.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TimedDefense {
+    pub window: u32,
+    pub recovery: u32,
 }
 
 /// MP and Rage: what builds, restores and drains them. Every field is
@@ -206,6 +229,8 @@ pub struct Costs {
 pub const STEP_RATE_BOUND: u32 = 1_000;
 /// Longest authored real-time phase, in steps.
 pub const PHASE_BOUND: u32 = 10_000;
+/// Highest authored impact or poise.
+pub const POISE_BOUND: u32 = 100;
 /// Most steps one advance of a duel's clock may take.
 pub const ADVANCE_BOUND: u32 = 10_000;
 
@@ -253,6 +278,14 @@ pub struct Skill {
     pub text: TextTemplate,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crit: Option<Crit>,
+    /// Real-time only: how hard a landed hit is to stand through; one whose
+    /// impact beats the target's poise staggers it. Basic attacks have none.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub impact: u32,
+    /// Real-time only: the impact this attack stands through while winding
+    /// up and striking, without interruption (it still takes the damage).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub poise: u32,
 }
 
 /// A chance for a landed hit to deal more damage, drawn from the world's
