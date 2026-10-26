@@ -768,7 +768,7 @@ optional `skills` (skill IDs, usable once the profile's `level` reaches each
 skill's unlock level), `basic_channel` (`physical` by default), `level`
 (default 1; it also scales the XP the character grants), an optional
 `group`, an optional `resources` choice (see [MP and Rage](#mp-and-rage)), and
-the real-time-only `ally`, `targeting` and `guard_hold` (see
+the real-time-only `ally`, `targeting`, `guard_hold` and `reaction` (see
 [Real-time duels](#real-time-duels)). A defeated character is gone: it is no longer listed and cannot be
 talked to. A character with a combat profile is one instance: it may be placed
 at most once, and its defeat is permanent (no respawns) unless its group is
@@ -1317,8 +1317,9 @@ A skill has an `id`, `name`, `power` (1–1,000; a basic attack is 100), a
 (`mp`, the default, or `rage`) or [`costs`](#mp-and-rage) in both, an action
 `time` in percent of a basic attack (default 100; the turn-based timeline
 delays the user's next turn by it), the `level` at which the player can use it (default 1), an
-optional `cross_share` overriding the world's, and its own `text` template
-(`{attacker}`, `{target}`, `{damage}`). `player_skills` lists the player's skills; `player_basic_channel`
+optional `cross_share` overriding the world's, its own `text` template
+(`{attacker}`, `{target}`, `{damage}`), and the real-time-only `impact` and
+`poise` (see [Weapon handling and timed defence](#weapon-handling-and-timed-defence)). `player_skills` lists the player's skills; `player_basic_channel`
 and a profile's `basic_channel` set the channel of each character's basic
 attack. Every usable skill and basic attack needs attack in its channel, and
 every MP skill must be affordable with the MP its user has when it unlocks;
@@ -1673,6 +1674,55 @@ real-time fights read; turn-based encounters ignore them:
 - `guard_hold` (1–10,000 steps, absent by default): it raises its guard
   whenever it is ready and attacks once the guard has been up this many
   steps. Absent, it never guards (`invalid_guard_hold` outside the bounds).
+- `reaction` (`parry` or `dodge`, absent by default): the timed defence it
+  takes, before anything else its policy would do, whenever it is free
+  (ready or guarding) and a foe's attack aimed at it is active and has not
+  landed. The world must have that defence (`invalid_reaction`).
+
+### Weapon handling and timed defence
+
+Five optional fields of `realtime` and two of a skill tell light and heavy
+attacks apart and add a timed parry, a timed dodge and interruption. All are
+absent by default and not serialized when absent, so a world without them
+plays, and hashes its rules revision, exactly as before. See
+[Weapon handling and timed defence](combat.md#weapon-handling-and-timed-defence)
+for how a reported contact meets each of them.
+
+```json
+"realtime": {
+  "...": "the fields above",
+  "stagger": 5,
+  "guard_poise": 1,
+  "parry": { "window": 1, "recovery": 4 },
+  "dodge": { "window": 2, "recovery": 3 }
+},
+"skills": [
+  { "id": "jab", "power": 70, "time": 60, "impact": 1, "...": "..." },
+  { "id": "cleave", "power": 220, "time": 160, "impact": 2, "poise": 1, "...": "..." }
+]
+```
+
+- **Light and heavy** come from what a skill already has: `power` for the
+  hit and `time` for its wind-up, active window and recovery, all scaled
+  together. A skill's `impact` (0–100, default 0) is how hard its landed hit
+  is to stand through; its `poise` (0–100, default 0) is the impact it
+  stands through itself while winding up and striking (limited hyperarmor:
+  it still takes the damage). Basic attacks have neither. Outside the
+  bounds is `invalid_impact`.
+- `stagger` (0–10,000 steps, default 0): how long an interrupted fighter can
+  do nothing. A hit whose impact is greater than the target's poise
+  interrupts it, and a parry interrupts the attacker. A world with a parry or
+  any skill with impact needs 1 or more (`missing_stagger`).
+- `guard_poise` (0–100, default 0): the poise of a raised guard. A hit of
+  greater impact breaks it, after the guard has stopped its share of the
+  damage.
+- `parry` and `dodge` (each absent by default, so nobody can): a timed
+  defence that protects for `window` steps from the step it begins, then
+  commits the fighter for `recovery` steps without protection (each 1–10,000;
+  `invalid_timed_defense`, as are a stagger or guard poise outside their
+  bounds). A parry's window deflects a blow and staggers its attacker; a
+  dodge's lets it find nothing. The player uses them with `parry` and
+  `dodge`; engine-controlled fighters by their profile's `reaction`.
 
 ### Named companions
 

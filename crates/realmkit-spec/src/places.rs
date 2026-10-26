@@ -164,6 +164,18 @@ pub struct CombatProfile {
     /// absent, it never guards.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub guard_hold: Option<u32>,
+    /// Real-time only: the timed defence it takes, when free, against a
+    /// foe's attack on it that is active and has not landed; absent, none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reaction: Option<Reaction>,
+}
+
+/// A timed defence an engine-controlled fighter reacts with.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Reaction {
+    Parry,
+    Dodge,
 }
 
 /// How an engine-controlled fighter picks its target from the hostile

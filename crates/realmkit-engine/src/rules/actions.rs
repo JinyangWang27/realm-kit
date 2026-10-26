@@ -327,8 +327,8 @@ fn battle_actions(world: &WorldSpec, battle: &BattleState, panels: Vec<Action>) 
 /// Attacks and skills on every opponent still fighting, then flight if the
 /// group allows it.
 /// The intents a real-time fight takes at its current step: strikes at
-/// each foe still fighting (untargeted when there is only one), then guard
-/// and retreat. Contact and joins are the host's to report, never offered.
+/// each foe still fighting (untargeted when there is only one), then guard,
+/// the world's parry and dodge, and retreat. Contact and joins are the host's to report, never offered.
 fn duel_actions(
     world: &WorldSpec,
     state: &GameState,
@@ -374,6 +374,13 @@ fn duel_actions(
     match action {
         RealtimeAction::Guard { .. } => actions.push(intent(Intent::LowerGuard, true)),
         _ => actions.push(intent(Intent::Guard, *action == RealtimeAction::Ready)),
+    }
+    let rules = world.combat().and_then(|c| c.realtime.as_ref());
+    if rules.is_some_and(|r| r.parry.is_some()) {
+        actions.push(intent(Intent::Parry, free));
+    }
+    if rules.is_some_and(|r| r.dodge.is_some()) {
+        actions.push(intent(Intent::Dodge, free));
     }
     if !realtime::group(world, fight).is_some_and(|g| g.no_flee) {
         actions.push(intent(Intent::Retreat, free));

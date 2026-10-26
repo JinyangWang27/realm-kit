@@ -259,8 +259,17 @@ every capability optional:
   with deterministic fallbacks and an authored `caution`; mid-fight saves and
   save checks. The `hollow-ford` example plays it in line mode. Existing
   packages, saves and walkthroughs are unchanged.
-- [ ] Spatial authority for real-time contact, real-time dodges, parries and
-  interruption; companions in turn-based encounters and battles, and
+- [x] Weapon handling and timed defence
+  ([combat.md](combat.md#weapon-handling-and-timed-defence)): light and heavy
+  skills through `power` and `time` with optional `impact` and `poise`; a
+  timed parry and dodge with committed recoveries; guard breaks and a
+  `Staggered` state; one precedence for a reported contact and submission
+  order for simultaneous ones; engine-controlled `reaction`s for foes,
+  allies and companions; save checks for every new state. The
+  `fencing-hall` example plays it in line mode. Existing packages, saves and
+  walkthroughs are unchanged.
+- [ ] Spatial authority for real-time contact, redirection and directional
+  parries; companions in turn-based encounters and battles, and
   companion progression and gear.
 - [x] Overland-map authored placement + engine map query, with
   places known by an authored condition.

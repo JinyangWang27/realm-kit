@@ -915,6 +915,45 @@ fn a_line_host_steps_real_time_duels_and_reports_contact() {
     assert!(!text.contains("Contact"), "{text}");
 }
 
+const HALL: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/fencing-hall");
+
+#[test]
+fn a_line_host_plays_light_and_heavy_attacks_parries_dodges_and_staggers() {
+    let walkthrough = std::fs::read_to_string(format!("{HALL}/walkthrough.txt")).unwrap();
+    let play = || run(&["play", HALL, "--seed", "7", "--line"], &walkthrough);
+    let output = play();
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(String::from_utf8(play().stdout).unwrap(), text);
+    for passage in [
+        "Parry\n",
+        "Dodge\n",
+        // A parry in its window, and the counter while the duelist reels.
+        "You: parried a blow from The Duelist.\nThe Duelist: staggered.",
+        "You HP 60/60 · parrying until 5 | The Duelist HP 40/40 · staggered until 9",
+        "You jab The Duelist: 4 damage.\n\nStep 7 | You HP 60/60 · striking until 9 | The Duelist HP 36/40 · staggered until 9",
+        // A parry a step early: exposed, and the thrust lands in full.
+        "Step 13 | You HP 60/60 · exposed until 17",
+        "The Duelist thrusts at You: 4 damage.",
+        // A dodge: nothing inside its window, a hit after it.
+        "You: dodged a blow from The Duelist.",
+        "Step 22 | You HP 56/60 · exposed until 25",
+        // A light jab interrupts a light wind-up; a heavy one stands through it.
+        "You jab The Duelist: 4 damage.\nThe Duelist: staggered.",
+        "You jab The Bruiser: 4 damage.\n\nStep 18 | You HP 46/60 · striking until 20 | The Bruiser HP 46/50 · winding up until 22",
+        "The Duelist yields.\nThe fight is over.",
+        // A maul breaks a raised guard; a cleave breaks the maul.
+        "You: the guard stops 7 damage.\nThe Bruiser brings the maul down on You: 2 damage.\nYou: staggered.",
+        "You cleave into The Bruiser: 12 damage.\nThe Bruiser: staggered.",
+        // The swordmaster parries on her own, and a late contact beats her.
+        "The Swordmaster: parrying.",
+        "The Swordmaster: parried a blow from You.\nYou: staggered.",
+        "You cut at The Swordmaster: 5 damage.",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+}
+
 const FORD: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/hollow-ford");
 
 #[test]

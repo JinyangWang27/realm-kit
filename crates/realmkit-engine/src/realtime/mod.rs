@@ -19,7 +19,7 @@
 
 use super::*;
 use crate::character::{profile, resources, strike, Pools};
-use realmkit_spec::{Group, Realtime, Targeting, ADVANCE_BOUND};
+use realmkit_spec::{Group, Reaction, Realtime, Targeting, TimedDefense, ADVANCE_BOUND};
 
 mod clock;
 
@@ -347,6 +347,17 @@ pub(crate) fn intent(
             events.push(Event::RetreatStarted);
             Ok(())
         }
+        Intent::Parry | Intent::Dodge => {
+            let reaction = match intent {
+                Intent::Parry => Reaction::Parry,
+                _ => Reaction::Dodge,
+            };
+            let defense = timed(&realtime, reaction)?;
+            if !free {
+                return Err(EngineError::Committed);
+            }
+            defend(&mut ring, 0, reaction, defense, events)
+        }
         Intent::Contact { attacker, target } => {
             let i = ring
                 .fight
@@ -556,9 +567,98 @@ fn raise(
     Ok(())
 }
 
+/// The world's timed defence of this kind.
+pub(crate) fn timed(realtime: &Realtime, reaction: Reaction) -> Result<TimedDefense, EngineError> {
+    match reaction {
+        Reaction::Parry => realtime.parry.ok_or(EngineError::NoParry),
+        Reaction::Dodge => realtime.dodge.ok_or(EngineError::NoDodge),
+    }
+}
+
+/// Fighter `i` begins a parry or a dodge now: its window covers contact
+/// from this step on, and its recovery follows it.
+fn defend(
+    ring: &mut Ring,
+    i: usize,
+    reaction: Reaction,
+    defense: TimedDefense,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let now = ring.fight.step;
+    let open_until = now
+        .checked_add(u64::from(defense.window))
+        .ok_or(EngineError::NumericLimit)?;
+    let until = open_until
+        .checked_add(u64::from(defense.recovery))
+        .ok_or(EngineError::NumericLimit)?;
+    let character = ring.fight.fighters[i].character.clone();
+    let (action, event) = match reaction {
+        Reaction::Parry => (
+            RealtimeAction::Parry { open_until, until },
+            Event::Parrying { character },
+        ),
+        Reaction::Dodge => (
+            RealtimeAction::Dodge { open_until, until },
+            Event::Dodging { character },
+        ),
+    };
+    ring.fight.fighters[i].action = action;
+    events.push(event);
+    Ok(())
+}
+
+/// The impact a fighter doing `action` stands through at step `now`: its
+/// skill's poise while winding up or striking, a raised guard's, else none.
+/// `None` when it has nothing left to interrupt: it is recovering (from an
+/// attack, or from a parry or dodge whose window has closed) or staggered,
+/// and a stagger then would only shorten its commitment.
+fn poise(world: &WorldSpec, realtime: &Realtime, action: &RealtimeAction, now: u64) -> Option<u32> {
+    match action {
+        RealtimeAction::Attack {
+            phase: AttackPhase::Recovery,
+            ..
+        }
+        | RealtimeAction::Parry { .. }
+        | RealtimeAction::Dodge { .. }
+        | RealtimeAction::Staggered { .. } => None,
+        RealtimeAction::Attack { skill, .. } => Some(
+            skill
+                .as_ref()
+                .map_or(0, |id| world.skill(id).unwrap().poise),
+        ),
+        RealtimeAction::Guard { ready_at } if *ready_at <= now => Some(realtime.guard_poise),
+        RealtimeAction::Ready | RealtimeAction::Guard { .. } | RealtimeAction::Retreat { .. } => {
+            Some(0)
+        }
+    }
+}
+
+/// Interrupts fighter `i`: whatever it was doing stops, with a skill's paid
+/// costs, and it can do nothing for the world's `stagger` steps.
+fn stagger(
+    realtime: &Realtime,
+    ring: &mut Ring,
+    i: usize,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let until = ring
+        .fight
+        .step
+        .checked_add(u64::from(realtime.stagger))
+        .ok_or(EngineError::NumericLimit)?;
+    ring.fight.fighters[i].action = RealtimeAction::Staggered { until };
+    let character = ring.fight.fighters[i].character.clone();
+    events.push(Event::Staggered { character });
+    Ok(())
+}
+
 /// Fighter `i`'s active attack lands on fighter `t`. The character core
 /// decides the damage, with no random crit: a real-time hit's force depends
-/// only on the state. A raised guard lets `guard_percent` through. Rage for
+/// only on the state. A dodge's open window lets the blow find nothing and
+/// leaves the attack live; a parry's deflects it and staggers the attacker.
+/// Otherwise it hits: a raised guard lets `guard_percent` through, and an
+/// impact above the target's poise staggers it, guard or not, unless it is
+/// already recovering or staggered. Rage for
 /// acting is credited only to an attack that lands, so swinging at the air
 /// earns nothing. A fighter knocked out of the fight stops whatever it was
 /// doing; the fight ends when nobody off the player's team still fights.
@@ -577,6 +677,31 @@ fn land(
         unreachable!("only an active attack lands");
     };
     let skill = skill.as_ref().map(|id| world.skill(id).unwrap());
+    let source = ring.fight.fighters[i].character.clone();
+    let target = ring.fight.fighters[t].character.clone();
+    match ring.fight.fighters[t].action {
+        RealtimeAction::Dodge { open_until, .. } if now < open_until => {
+            events.push(Event::Evaded {
+                character: target,
+                attacker: source,
+            });
+            return Ok(());
+        }
+        RealtimeAction::Parry { open_until, .. } if now < open_until => {
+            // A clean parry skips its recovery: free again once the window closes.
+            ring.fight.fighters[t].action = RealtimeAction::Parry {
+                open_until,
+                until: open_until,
+            };
+            events.push(Event::Parried {
+                character: target,
+                attacker: source,
+            });
+            return stagger(realtime, &mut ring, i, events);
+        }
+        _ => {}
+    }
+    let standing = poise(world, realtime, &ring.fight.fighters[t].action, now);
     let (attacker, defender) = (ring.sides[i], ring.sides[t]);
     let attack = strike::Attack::of(world, skill, attacker.basic.0, None);
     let modifier = defender.guard(attack.channel);
@@ -587,7 +712,6 @@ fn land(
         modifier,
         &mut None,
     )?;
-    let target = ring.fight.fighters[t].character.clone();
     let guard = &ring.fight.fighters[t].action;
     if matches!(guard, RealtimeAction::Guard { ready_at } if *ready_at <= now) {
         let through = (u64::from(dealt) * u64::from(realtime.guard_percent) / 100) as u32;
@@ -597,7 +721,6 @@ fn land(
         });
         dealt = through;
     }
-    let source = ring.fight.fighters[i].character.clone();
     // A stray blow on a teammate earns neither Rage for acting nor training.
     let hostile = ring.fight.fighters[i].team != ring.fight.fighters[t].team;
     if hostile {
@@ -654,6 +777,11 @@ fn land(
         events.push(Event::Yielded {
             character: target.clone(),
         });
+    }
+    // Nobody out of the fight is interrupted.
+    let impact = skill.map_or(0, |s| s.impact);
+    if standing.is_some_and(|poise| impact > poise) && ring.fighting(t) {
+        stagger(realtime, &mut ring, t, events)?;
     }
     // The player's own action stays as it was, dead or not, as it always has.
     if t != 0 && !ring.fighting(t) {

@@ -346,6 +346,20 @@ fn combat_profile(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, profile
             format!("a guard is held 1 to {PHASE_BOUND} steps"),
         );
     }
+    // A reaction needs the world's timed defence of that kind.
+    let realtime = w.combat().and_then(|c| c.realtime);
+    let defense = |reaction| match reaction {
+        Reaction::Parry => realtime.and_then(|r| r.parry),
+        Reaction::Dodge => realtime.and_then(|r| r.dodge),
+    };
+    if profile.reaction.is_some_and(|r| defense(r).is_none()) {
+        issue(
+            out,
+            owner,
+            "invalid_reaction",
+            "a reaction needs the world's real-time parry or dodge",
+        );
+    }
     if let Some(rules) = w.combat() {
         ids(
             out,

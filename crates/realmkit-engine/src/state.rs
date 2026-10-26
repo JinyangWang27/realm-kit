@@ -224,6 +224,15 @@ pub enum RealtimeAction {
     Guard { ready_at: u64 },
     /// Turning away: the player is gone at step `until` if still fighting.
     Retreat { until: u64 },
+    /// A parry: it deflects contact before step `open_until`, then leaves
+    /// the fighter committed and unprotected until `until`. A parry that
+    /// deflected something skips that recovery (`until == open_until`).
+    Parry { open_until: u64, until: u64 },
+    /// A dodge: contact before step `open_until` finds nothing; then
+    /// committed and unprotected until `until`.
+    Dodge { open_until: u64, until: u64 },
+    /// Interrupted: it can do nothing until `until`.
+    Staggered { until: u64 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

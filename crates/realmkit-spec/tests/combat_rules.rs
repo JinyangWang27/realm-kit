@@ -386,6 +386,10 @@ fn realtime() -> Realtime {
         retreat: 90,
         mp_regen_percent: 2,
         friendly_fire: false,
+        stagger: 0,
+        guard_poise: 0,
+        parry: None,
+        dodge: None,
     }
 }
 
@@ -426,6 +430,133 @@ fn real_time_rules_are_optional_and_bounded() {
     // revision, and the saves bound to it, stay the same.
     let json = serde_json::to_value(&duel().world.combat).unwrap();
     assert!(json.get("realtime").is_none());
+}
+
+#[test]
+fn timed_defence_and_interruption_are_bounded_and_need_a_stagger() {
+    let defense = |window, recovery| Some(TimedDefense { window, recovery });
+    let timed = || Realtime {
+        stagger: 5,
+        guard_poise: 1,
+        parry: defense(1, 4),
+        dodge: defense(2, 3),
+        ..realtime()
+    };
+    let with = |rules: Realtime, impact: u32, poise: u32| {
+        let mut world = duel();
+        let combat = world.world.combat.as_mut().unwrap();
+        combat.realtime = Some(rules);
+        combat.skills[0].impact = impact;
+        combat.skills[0].poise = poise;
+        world
+    };
+    let world = with(timed(), POISE_BOUND, POISE_BOUND);
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    for (rules, impact, poise, code) in [
+        (
+            Realtime {
+                parry: defense(0, 4),
+                ..timed()
+            },
+            0,
+            0,
+            "invalid_timed_defense",
+        ),
+        (
+            Realtime {
+                dodge: defense(2, 0),
+                ..timed()
+            },
+            0,
+            0,
+            "invalid_timed_defense",
+        ),
+        (
+            Realtime {
+                dodge: defense(PHASE_BOUND + 1, 1),
+                ..timed()
+            },
+            0,
+            0,
+            "invalid_timed_defense",
+        ),
+        (
+            Realtime {
+                stagger: PHASE_BOUND + 1,
+                ..timed()
+            },
+            0,
+            0,
+            "invalid_timed_defense",
+        ),
+        (
+            Realtime {
+                guard_poise: POISE_BOUND + 1,
+                ..timed()
+            },
+            0,
+            0,
+            "invalid_timed_defense",
+        ),
+        (timed(), POISE_BOUND + 1, 0, "invalid_impact"),
+        (timed(), 0, POISE_BOUND + 1, "invalid_impact"),
+        // A parry or an impact staggers, so it needs a stagger to last.
+        (
+            Realtime {
+                stagger: 0,
+                ..timed()
+            },
+            0,
+            0,
+            "missing_stagger",
+        ),
+        (
+            Realtime {
+                stagger: 0,
+                parry: None,
+                ..timed()
+            },
+            1,
+            0,
+            "missing_stagger",
+        ),
+    ] {
+        let world = with(rules, impact, poise);
+        assert!(
+            codes(&world).contains(&code.to_string()),
+            "{rules:?} {impact} {poise}"
+        );
+    }
+    // A dodge alone, or poise without impact, staggers nobody.
+    let world = with(
+        Realtime {
+            stagger: 0,
+            parry: None,
+            ..timed()
+        },
+        0,
+        1,
+    );
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    // A fighter reacts only with a defence the world has.
+    let mut world = with(
+        Realtime {
+            parry: None,
+            ..timed()
+        },
+        0,
+        0,
+    );
+    fighter(&mut world, "witch").reaction = Some(Reaction::Dodge);
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    fighter(&mut world, "witch").reaction = Some(Reaction::Parry);
+    assert!(codes(&world).contains(&"invalid_reaction".to_string()));
+    // None of it is serialized when absent.
+    let json = serde_json::to_value(&with(realtime(), 0, 0).world.combat).unwrap();
+    for field in ["stagger", "guard_poise", "parry", "dodge"] {
+        assert!(json["realtime"].get(field).is_none(), "{field}");
+    }
+    assert!(json["skills"][0].get("impact").is_none());
 }
 
 #[test]

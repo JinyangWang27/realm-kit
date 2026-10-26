@@ -19,6 +19,7 @@ fn profile() -> CombatProfile {
         ally: false,
         targeting: Targeting::First,
         guard_hold: None,
+        reaction: None,
     }
 }
 

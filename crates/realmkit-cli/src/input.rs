@@ -52,6 +52,10 @@ pub fn help(world: &WorldSpec) -> String {
     if combat.is_some_and(|c| c.realtime.is_some()) {
         attack += "duel <character-id> — a real-time fight on a fixed-step clock, with its group\nstep [steps] — run the duel's clock on\nstrike [skill-id] [at <character-id>] | guard | lower | disengage\ncontact <character-id> [target-id] — that fighter's active attack touched, as a host reports it\njoin <character-id> <team> — that fighter arrives, as a host reports it (0 is your side)\n";
     }
+    let realtime = combat.and_then(|c| c.realtime);
+    if realtime.is_some_and(|r| r.parry.is_some() || r.dodge.is_some()) {
+        attack += "parry | dodge — a timed defence: its window opens now, then you recover\n";
+    }
     if world.characters.iter().any(|c| c.companion.is_some()) {
         attack += "order <companion-id> follow | hold | defend [ally-id] | attack <target-id> — a standing order (defend alone: you)\n";
     }
@@ -273,6 +277,8 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
         ("guard", []) => Command::Intent(Intent::Guard),
         ("lower", []) => Command::Intent(Intent::LowerGuard),
         ("disengage", []) => Command::Intent(Intent::Retreat),
+        ("parry", []) => Command::Intent(Intent::Parry),
+        ("dodge", []) => Command::Intent(Intent::Dodge),
         ("contact", [id]) => Command::Intent(Intent::Contact {
             attacker: (*id).into(),
             target: None,
@@ -407,6 +413,8 @@ mod tests {
         };
         let id = |s: &str| Some(s.to_string());
         assert_eq!(intent("strike"), Intent::Attack { target: None });
+        assert_eq!(intent("parry"), Intent::Parry);
+        assert_eq!(intent("dodge"), Intent::Dodge);
         assert_eq!(
             intent("strike at left_twin"),
             Intent::Attack {

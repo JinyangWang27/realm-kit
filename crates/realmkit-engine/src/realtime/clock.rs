@@ -68,7 +68,9 @@ fn step(
 /// Each attack aims by its `targeting` (a named companion's by its order
 /// first) and uses the strongest skill it can pay for, else a basic attack,
 /// chosen as in turn-based encounters. A companion with nobody it would
-/// strike now waits as it is, ready or behind its guard.
+/// strike now waits as it is, ready or behind its guard. Before any of
+/// that, a fighter with a `reaction` that is free (ready or guarding) takes
+/// it whenever a foe's attack on it is active and has not landed.
 fn policy(
     world: &WorldSpec,
     realtime: &Realtime,
@@ -78,7 +80,24 @@ fn policy(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let character = &ring.fight.fighters[i].character;
-    let hold = profile(world, character).guard_hold;
+    let profile = profile(world, character);
+    let free = matches!(
+        ring.fight.fighters[i].action,
+        RealtimeAction::Ready | RealtimeAction::Guard { .. }
+    );
+    let threatened = ring.foes(i).any(|t| {
+        matches!(&ring.fight.fighters[t].action, RealtimeAction::Attack {
+            target,
+            phase: AttackPhase::Active,
+            connected: false,
+            ..
+        } if target == character)
+    });
+    if let Some(reaction) = profile.reaction.filter(|_| free && threatened) {
+        let defense = super::timed(realtime, reaction)?;
+        return super::defend(ring, i, reaction, defense, events);
+    }
+    let hold = profile.guard_hold;
     let attack = match (&ring.fight.fighters[i].action, hold) {
         (RealtimeAction::Ready, Some(_)) => return raise(realtime, ring, i, events),
         (RealtimeAction::Ready, None) => true,
@@ -147,6 +166,15 @@ fn phase(
         }
         RealtimeAction::Guard { ready_at } if *ready_at == now => {
             events.push(Event::GuardUp { character });
+            Ok(false)
+        }
+        RealtimeAction::Parry { until, .. }
+        | RealtimeAction::Dodge { until, .. }
+        | RealtimeAction::Staggered { until }
+            if *until == now =>
+        {
+            fighter.action = RealtimeAction::Ready;
+            events.push(Event::Ready { character });
             Ok(false)
         }
         RealtimeAction::Retreat { until } => Ok(*until == now),
