@@ -113,7 +113,9 @@ proves the complete single-player loop with authored content.
   fight and is never offered. Any batching gives the same state, streams and
   occurrences; only the command counter differs. No package or save format
   change. `engine/tests/pass_time.rs` exercises it on `examples/marches`,
-  `practice-yard`, `arena` and a clocked `duel`.
+  `practice-yard`, `arena`, a clocked `duel`, `caravan-trail` and `sect`.
+  Breakthroughs now resolve chains in one change: a gate on another
+  technique's rank opens in the same command as that rank.
 - [x] Economy core (M6a): currency with a world-language format, goods,
   producer kinds and markets whose price index per good follows production
   and demand on a scheduled four-phase price tick drawn from its own

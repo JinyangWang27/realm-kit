@@ -188,6 +188,112 @@ fn an_outcome_that_holds_for_one_minute_of_a_batch_is_reached_as_any_split_reach
     assert_eq!(played(&once), played(&split));
 }
 
+#[test]
+fn readings_unlocked_a_minute_apart_are_each_reported_however_time_is_batched() {
+    // Two flags at 06:01 and 06:02, each unlocking a further reading of the
+    // wheel ruts, which the player already holds.
+    let mut world = caravan_trail();
+    for (minute, flag) in [(361, "first_look"), (362, "second_look")] {
+        world.world.flags.push(flag.into());
+        world.world.events.push(
+            serde_json::from_value(serde_json::json!({
+                "id": flag, "schedule": { "at": minute },
+                "effects": [{ "kind": "set_flag", "flag": flag }]
+            }))
+            .unwrap(),
+        );
+        let ruts = world
+            .world
+            .evidence
+            .iter_mut()
+            .find(|e| e.id == "wheel_ruts")
+            .unwrap();
+        ruts.interpretations.push(
+            serde_json::from_value(serde_json::json!({
+                "when": { "kind": "flag", "flag": flag }, "text": flag
+            }))
+            .unwrap(),
+        );
+    }
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    let mut snapshot = Engine::start(&world, 7, &["caravan_guard".into()])
+        .unwrap()
+        .snapshot();
+    snapshot.state.evidence.insert("wheel_ruts".into());
+    let mut once = Engine::restore(&world, snapshot.clone()).unwrap();
+    let mut split = Engine::restore(&world, snapshot).unwrap();
+    let long = happenings(once.execute(PassTime(2)).unwrap());
+    let parts = pass_in_steps(&mut split, 2, 1);
+    let readings = |events: &[Event]| {
+        events
+            .iter()
+            .filter(|e| matches!(e, Event::EvidenceReinterpreted { .. }))
+            .count()
+    };
+    assert_eq!(readings(&parts), 2);
+    assert_eq!(long, parts);
+    assert_eq!(played(&once), played(&split));
+}
+
+#[test]
+fn chained_breakthroughs_open_at_the_minute_they_hold_however_time_is_batched() {
+    // Both arts wait at a sealed rank. Cloud Palm's opens with a flag at
+    // minute 1; Azure Breath's needs Cloud Palm's and the minute 1 to 2, and
+    // is promoted first, by ID, so only a second look at that minute opens it.
+    let mut world = sect();
+    world.world.time = Some(WorldTime {
+        start: 0,
+        clock: TextTemplate("Day {day}, {hour}:{minute}".into()),
+        wait: Some(30),
+        rest: Some(480),
+        calendar: None,
+    });
+    world.world.flags.push("palm_open".into());
+    world.world.events.push(
+        serde_json::from_value(serde_json::json!({
+            "id": "palm_open", "schedule": { "at": 1 },
+            "effects": [{ "kind": "set_flag", "flag": "palm_open" }]
+        }))
+        .unwrap(),
+    );
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.player_techniques[0].xp = 40;
+    combat.player_techniques.push(
+        serde_json::from_value(serde_json::json!({ "technique": "cloud_palm", "xp": 40 })).unwrap(),
+    );
+    let gate = |id: &str| -> Condition {
+        serde_json::from_value(match id {
+            "azure_breath" => serde_json::json!({ "kind": "all", "of": [
+                { "kind": "technique", "technique": "cloud_palm", "rank": 2 },
+                { "kind": "time_of_day", "from": 1, "to": 2 }
+            ]}),
+            _ => serde_json::json!({ "kind": "flag", "flag": "palm_open" }),
+        })
+        .unwrap()
+    };
+    for technique in &mut combat.techniques {
+        let sealed = technique.ranks.len() - 1;
+        technique.ranks[sealed].requires = Some(gate(&technique.id));
+    }
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    let mut once = Engine::new(&world).unwrap();
+    let mut split = Engine::new(&world).unwrap();
+    let long = happenings(once.execute(PassTime(2)).unwrap());
+    let parts = pass_in_steps(&mut split, 2, 1);
+    let ranks = |engine: &Engine<'_>| {
+        let learned = &combat_of(engine).techniques;
+        (learned["azure_breath"].rank, learned["cloud_palm"].rank)
+    };
+    assert_eq!(ranks(&split), (3, 2), "both opened at minute 1");
+    assert_eq!(ranks(&once), ranks(&split));
+    assert_eq!(long, parts);
+    assert_eq!(played(&once), played(&split));
+}
+
+fn combat_of<'e>(engine: &'e Engine<'_>) -> &'e CombatState {
+    engine.state().combat.as_ref().unwrap()
+}
+
 fn wenna<'e>(engine: &'e Engine<'_>) -> &'e str {
     &engine.state().whereabouts["wenna"]
 }

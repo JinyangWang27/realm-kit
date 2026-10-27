@@ -326,12 +326,13 @@ pub(crate) fn pass_time(
         return Err(EngineError::InvalidDuration);
     }
     // A condition can hold for only part of the span: a speaker away for an
-    // hour, a time of day an outcome or breakthrough needs. What every
-    // command checks after it runs is therefore checked after every minute,
-    // so the span brings what any split of it would.
+    // hour, a time of day an outcome or breakthrough needs, a reading a flag
+    // unlocks before the next. Each minute therefore settles as a one-minute
+    // command would, so the span brings exactly what any split of it would.
     let start = state.time.unwrap();
     let before = events.len();
     for _ in 0..minutes {
+        let readings_before = readings(world, state);
         let mut minute = Vec::new();
         advance(world, state, 1, &mut minute)?;
         events.extend(
@@ -339,9 +340,7 @@ pub(crate) fn pass_time(
                 .into_iter()
                 .filter(|e| !matches!(e, Event::TimePassed { .. })),
         );
-        techniques::promote(world, state, events);
-        end_lapsed_dialogue(world, state, events);
-        reach_outcome(world, state, events);
+        settle(world, state, &readings_before, events);
     }
     events.push(Event::TimePassed {
         minutes,

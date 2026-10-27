@@ -221,6 +221,7 @@ pub(super) fn execute(
     command: Command,
 ) -> Result<Vec<Event>, EngineError> {
     let panel = is_panel(&command);
+    let host_time = matches!(command, Command::PassTime(_));
     if dead(state) && !panel {
         return Err(EngineError::PlayerDead);
     }
@@ -329,35 +330,53 @@ pub(super) fn execute(
         Command::Rest => player::rest(world, state, &mut events)?,
         Command::Use(item) => consume::consume(world, state, item, &mut events)?,
     }
-    // A flag or quest this command changed may open a breakthrough gate.
-    if !panel {
-        techniques::promote(world, state, &mut events);
-        // Any change, such as a trade that empties a choice's condition, can
-        // leave the conversation with no speaker or nothing to say: it ends.
-        end_lapsed_dialogue(world, state, &mut events);
-        // Evidence found by this command reports itself as discovered.
-        let before = readings_before.unwrap_or_default();
-        for now in readings(world, state) {
-            let Some(was) = before.iter().find(|u| u.evidence == now.evidence) else {
-                continue;
-            };
-            // Facts are never lost, so the new ones are those not known before.
-            for fact in now.facts.iter().filter(|f| !was.facts.contains(f)) {
-                events.push(Event::EvidenceFactLearned {
-                    evidence: now.evidence.clone(),
-                    fact: *fact,
-                });
-            }
-            if let Some(reading) = now.reading.filter(|r| was.reading != Some(*r)) {
-                events.push(Event::EvidenceReinterpreted {
-                    evidence: now.evidence.clone(),
-                    reading,
-                });
-            }
-        }
-        reach_outcome(world, state, &mut events);
+    // Host time settles itself after every minute it passes, as if each
+    // were its own command.
+    if !panel && !host_time {
+        settle(
+            world,
+            state,
+            &readings_before.unwrap_or_default(),
+            &mut events,
+        );
     }
     Ok(events)
+}
+
+/// What every command settles once it has run, given the evidence readings
+/// from before it: a flag or quest it changed may open a breakthrough gate,
+/// a conversation may be left with no speaker or nothing to say, evidence
+/// may be discovered or read anew, and an outcome may be reached.
+pub(super) fn settle(
+    world: &WorldSpec,
+    state: &mut GameState,
+    before: &[story::Understanding<'_>],
+    events: &mut Vec<Event>,
+) {
+    techniques::promote(world, state, events);
+    // Any change, such as a trade that empties a choice's condition, can
+    // leave the conversation with no speaker or nothing to say: it ends.
+    end_lapsed_dialogue(world, state, events);
+    // Evidence found by this command reports itself as discovered.
+    for now in readings(world, state) {
+        let Some(was) = before.iter().find(|u| u.evidence == now.evidence) else {
+            continue;
+        };
+        // Facts are never lost, so the new ones are those not known before.
+        for fact in now.facts.iter().filter(|f| !was.facts.contains(f)) {
+            events.push(Event::EvidenceFactLearned {
+                evidence: now.evidence.clone(),
+                fact: *fact,
+            });
+        }
+        if let Some(reading) = now.reading.filter(|r| was.reading != Some(*r)) {
+            events.push(Event::EvidenceReinterpreted {
+                evidence: now.evidence.clone(),
+                reading,
+            });
+        }
+    }
+    reach_outcome(world, state, events);
 }
 
 /// Records the first authored outcome whose condition holds now, if none
