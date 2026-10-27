@@ -334,14 +334,7 @@ pub(super) fn execute(
         techniques::promote(world, state, &mut events);
         // Any change, such as a trade that empties a choice's condition, can
         // leave the conversation with no speaker or nothing to say: it ends.
-        if let Some(open) = &state.dialogue {
-            if !npc_here(world, state, &open.npc)
-                || choices(world, state, &open.npc, &open.node).is_empty()
-            {
-                state.dialogue = None;
-                events.push(Event::DialogueEnded);
-            }
-        }
+        end_lapsed_dialogue(world, state, &mut events);
         // Evidence found by this command reports itself as discovered.
         let before = readings_before.unwrap_or_default();
         for now in readings(world, state) {
@@ -371,6 +364,23 @@ pub(super) fn execute(
         }
     }
     Ok(events)
+}
+
+/// Ends the open conversation if it has no speaker here or nothing left to
+/// say.
+pub(super) fn end_lapsed_dialogue(
+    world: &WorldSpec,
+    state: &mut GameState,
+    events: &mut Vec<Event>,
+) {
+    if let Some(open) = &state.dialogue {
+        if !npc_here(world, state, &open.npc)
+            || choices(world, state, &open.npc, &open.node).is_empty()
+        {
+            state.dialogue = None;
+            events.push(Event::DialogueEnded);
+        }
+    }
 }
 
 /// The authored outcomes whose conditions hold now, in authored order.

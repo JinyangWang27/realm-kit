@@ -324,5 +324,41 @@ pub(crate) fn pass_time(
     if minutes == 0 || minutes > DURATION_BOUND {
         return Err(EngineError::InvalidDuration);
     }
-    advance(world, state, minutes, events)
+    if state.dialogue.is_none() {
+        return advance(world, state, minutes, events);
+    }
+    // An open conversation can lapse at any minute (its speaker moves away,
+    // a choice's time of day ends) and come back later in the span. Passed a
+    // minute at a time, it ends at the minute any split of the span would
+    // end it, and the rest passes as one.
+    let start = state.time.unwrap();
+    let before = events.len();
+    let mut passed = 0;
+    while passed < minutes && state.dialogue.is_some() {
+        let mut minute = Vec::new();
+        advance(world, state, 1, &mut minute)?;
+        events.extend(
+            minute
+                .into_iter()
+                .filter(|e| !matches!(e, Event::TimePassed { .. })),
+        );
+        end_lapsed_dialogue(world, state, events);
+        passed += 1;
+    }
+    let mut rest = Vec::new();
+    if passed < minutes {
+        advance(world, state, minutes - passed, &mut rest)?;
+    }
+    events.extend(
+        rest.into_iter()
+            .filter(|e| !matches!(e, Event::TimePassed { .. })),
+    );
+    events.push(Event::TimePassed {
+        minutes,
+        now: start + minutes,
+        eventful: events[before..]
+            .iter()
+            .any(|e| !matches!(e, Event::StoryFlagSet { .. })),
+    });
+    Ok(())
 }

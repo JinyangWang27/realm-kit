@@ -124,6 +124,38 @@ fn a_conversation_ends_only_when_the_time_takes_its_speaker_away() {
     assert_eq!(engine.state().dialogue, None);
 }
 
+#[test]
+fn a_conversation_whose_speaker_leaves_and_returns_in_one_batch_ends_as_any_split_ends_it() {
+    let world = marches();
+    // When Wenna first leaves Greyford, and when she is first back.
+    let mut probe = Engine::new_with_seed(&world, 7).unwrap();
+    let (mut left, mut back) = (None, None);
+    while back.is_none() && now(&probe) < 480 + DURATION_BOUND {
+        probe.execute(PassTime(1)).unwrap();
+        match (left, wenna(&probe) == "greyford") {
+            (None, false) => left = Some(now(&probe)),
+            (Some(_), true) => back = Some(now(&probe)),
+            _ => {}
+        }
+    }
+    let span = back.expect("Wenna comes back to Greyford") - 480;
+    let mut batch = Engine::new_with_seed(&world, 7).unwrap();
+    let mut split = Engine::new_with_seed(&world, 7).unwrap();
+    batch.execute(Talk("wenna".into())).unwrap();
+    split.execute(Talk("wenna".into())).unwrap();
+    let once = happenings(batch.execute(PassTime(span)).unwrap());
+    let minutes = pass_in_steps(&mut split, span, 1);
+    // She is back, but the conversation ended when she went.
+    assert_eq!(wenna(&batch), "greyford");
+    assert_eq!(batch.state().dialogue, None);
+    assert_eq!(once, minutes);
+    assert_eq!(
+        once.iter().filter(|e| **e == Event::DialogueEnded).count(),
+        1
+    );
+    assert_eq!(played(&batch), played(&split));
+}
+
 fn wenna<'e>(engine: &'e Engine<'_>) -> &'e str {
     &engine.state().whereabouts["wenna"]
 }
