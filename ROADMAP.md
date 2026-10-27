@@ -315,6 +315,11 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   allies and companions, who parry or dodge by an authored `reaction`.
   Windows are the engine's; moving out of reach stays the host's. The
   `fencing-hall` example plays it headless.
+- **Host-driven world time (RT-Time-01):** `PassTime(minutes)`, a bounded,
+  never-offered command by which a continuous host commits elapsed world
+  time while its player explores. It reuses the waiting rules, keeps any
+  conversation open, is refused mid-fight, and gives the same world however
+  the host batches it. The real-to-world time scale is the host's.
 
 Next, when a client needs it: spatial authority for real-time contact
 (positions, reach and hit volumes on the fixed step, or a validated spatial

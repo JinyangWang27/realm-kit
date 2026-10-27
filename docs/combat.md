@@ -99,15 +99,15 @@ words; it is still the same resource, not a third one.
 World time, encounter time and duel time are separate clocks and never
 regenerate the same MP twice:
 
-- An encounter, duel or battle never advances world time: travel, waiting and
-  resting are refused during them.
+- An encounter, duel or battle never advances world time: travel, waiting,
+  resting and host-reported `PassTime` are refused during them.
 - Encounter time exists only inside an encounter and duel time only inside a
   duel; the player is never in both. Each one's regeneration progress
   (`Participant::mp_remainder`, `Fighter::mp_remainder`) ends with it.
 - World-time recovery and decay happen at fixed multiples of `every`, counted
   from minute 0. Crossing boundaries is additive, so a span split anywhere
-  (one long wait, several short ones, a journey interrupted by scheduled
-  events) crosses the same boundaries, and nothing needs saving between them.
+  (one long wait, several short ones, a host's minute-by-minute `PassTime`,
+  a journey interrupted by scheduled events) crosses the same boundaries, and nothing needs saving between them.
   Boundaries at a minute apply before anything else scheduled then.
 
 ## Real-time duels
@@ -678,8 +678,6 @@ orders included.
 - Consumables or gear changes during a fight; engine-controlled fighters
   that space or retreat; formations; redirection, directional parries,
   poise that wears down and situational crits.
-- Committing elapsed host time in batches outside travel, waiting and
-  resting (see [host-driven passage of time](spatial-hosts-and-military-battles.md#host-driven-passage-of-time-future-requirement)).
 - Companions and allies in turn-based encounters and mass battles; companion
   XP, levels, techniques, gear and the three progression dimensions; HP
   recovery for companions other than resting; permanent companion death.

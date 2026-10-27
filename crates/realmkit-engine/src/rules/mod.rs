@@ -286,6 +286,7 @@ pub(super) fn execute(
         Command::Move(direction) => move_to(world, state, direction, &mut events)?,
         Command::Travel(to) => time::travel(world, state, to, &mut events)?,
         Command::Wait(minutes) => time::wait(world, state, minutes, &mut events)?,
+        Command::PassTime(minutes) => time::pass_time(world, state, minutes, &mut events)?,
         Command::Talk(id) => story::talk(world, state, id, &mut events)?,
         Command::ChooseDialogue(number) => story::choose(world, state, number, &mut events)?,
         Command::AcceptQuest(id) => {

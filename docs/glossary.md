@@ -117,7 +117,9 @@ milestones, rather than by real-world time or ordinary exploration.
 
 Optional simulated in-world time represented as a minute count from an authored
 epoch. It is monotonic within one forward committed history and advances only
-through explicit gameplay actions/effects. Loading or recovering an older snapshot
+through explicit gameplay actions/effects: travel, waiting, resting, and a
+continuous host's `PassTime`, which commits whole minutes the host has decided
+elapsed (the engine never reads real time). Loading or recovering an older snapshot
 restores its saved WorldTime exactly, so discarded-future values may be traversed
 again on the new branch. WorldTime is independent of story-phase progression and
 encounter scheduling.
@@ -128,7 +130,7 @@ date is then derived from WorldTime, which stays the one time source of truth.
 
 ## Host-driven WorldTime Advancement
 
-**Proposed optional command boundary.** A continuous graphical host can commit bounded in-world elapsed durations explicitly and deterministically, allowing schedules to run on the same canonical [World Time](#world-time). The renderer's frame clock must never implicitly mutate engine state; the exact command and pause policy are undecided. See [Spatial hosts](spatial-hosts-and-military-battles.md#host-driven-passage-of-time-future-requirement).
+`Command::PassTime(minutes)`: a continuous graphical host commits bounded whole minutes of in-world elapsed time, explicitly and deterministically, so schedules run on the same canonical [World Time](#world-time). The renderer's frame clock never mutates engine state; the real-to-world time scale and the pause policy belong to the host's game. See [Spatial hosts](spatial-hosts-and-military-battles.md#host-driven-passage-of-time-rt-time-01-delivered).
 
 ## Recurring Schedule
 

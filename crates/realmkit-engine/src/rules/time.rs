@@ -308,3 +308,21 @@ pub(crate) fn wait(
     state.dialogue = None;
     advance(world, state, minutes, events)
 }
+
+/// Host-reported time: [`advance`] in any world with a clock, needing no
+/// authored wait and leaving a conversation open. Only what the time brings
+/// (a speaker who leaves, a choice whose condition lapses) can end one.
+pub(crate) fn pass_time(
+    world: &WorldSpec,
+    state: &mut GameState,
+    minutes: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    if state.time.is_none() {
+        return Err(EngineError::NoWorldTime);
+    }
+    if minutes == 0 || minutes > DURATION_BOUND {
+        return Err(EngineError::InvalidDuration);
+    }
+    advance(world, state, minutes, events)
+}

@@ -22,17 +22,21 @@ An authored client-side manifest may associate an engine location/Area with a wo
 
 For transition-sensitive interactions, the host resolves an input into an offered action or a future validated typed command. If a 3D collision proposes entrance into a restricted place, the engine can refuse it; the visible scene must then respect the refusal. Physical movement within a locally loaded scene need not produce a RealmKit command for every step. Logical location changes and rule-significant discoveries do.
 
-### Host-driven passage of time (future requirement)
+### Host-driven passage of time (RT-Time-01, delivered)
 
-WorldTime remains the **only** in-world time source. Existing travel, wait and rest commands already advance it. A continuous host needs a *proposed* bounded, explicit way to commit elapsed in-world time in batches when the player walks or acts locally. Such a command must:
+WorldTime remains the **only** in-world time source. Travel, wait and rest advance it as before. A continuous host (a graphical client whose player stands in the world while time goes by) commits elapsed in-world time with `Command::PassTime(minutes)`:
 
-- use integer gameplay duration and a validated reason/context, **never** directly read a wall clock in the engine;
-- run all due world schedules in canonical order and perform the same quest, payroll, healing, movement, and agent consequences as other time advancement;
-- refuse zero, invalid, overflow, or unauthorized time jumps without partially committing;
-- keep viewing menus, panning a camera, hovering over an NPC, and other non-gameplay actions time- and RNG-neutral;
-- support replay/snapshot equivalence using the **same committed time commands**, regardless of render frame rate.
+- **Integer minutes only.** The engine never reads a wall clock, frame count or real duration. How much real time is worth a minute, how often the host samples, and when its game counts as paused are the host's policy, decided and documented by the game, not by RealmKit.
+- **Bounds.** 1 to `DURATION_BOUND` (43,200) minutes per command, else `InvalidDuration`; past `WORLD_TIME_BOUND`, `NumericLimit`. A world without a clock refuses it with `NoWorldTime`. Like every command it runs on a staged copy, so a refusal changes no state and draws nothing from any random stream.
+- **Same rules as waiting.** It runs the shared time advance: every scheduled occurrence crossed, in chronological then schedule order (midnights and month ends, events, movers, the price tick, prosperity, restocking, workshops, upkeep, refills), with MP recovery and Rage decay for the player and companions at their fixed minute boundaries. It emits `TimePassed` and whatever the occurrences report.
+- **What it does not do.** It needs no authored `time.wait`, is never listed by `Engine::actions()` and is not a CLI command. It does not move the player and does not end a conversation itself: an open dialogue ends only if the time removes its speaker or its last choice, by the general check every command runs.
+- **Fights.** Refused with `InEncounter` during a turn-based encounter, a real-time fight and a mass battle, like Wait and Travel: a fight's clock never overlaps world time.
+- **Batching.** Passing N minutes in one command or in any split gives the same `GameState`, the same random streams and the same events apart from the `TimePassed` reports, because occurrences and recovery boundaries are counted from absolute minutes. The one difference is `GameState::turn`, which counts accepted commands: a host committing a minute at a time adds one per commit. `turn` only picks which authored narration variant a turn-based encounter shows; no rule outcome depends on it.
+- **Replay.** It serializes as `{"pass_time": n}`, saves and restores mid-history, and replays exactly from the same committed commands, whatever the host's frame rate was.
 
-The host's sampling rate and game-minutes-per-real-second policy are not decided here. Paused menus, instanced battles and background progression require an explicit policy before implementation, so they cannot create two diverging clocks.
+There is no reason or context field: the engine would not interpret one, and a host that keeps a journey already records the command. Worlds whose hosts never send it behave exactly as before; it adds no package field, so neither the format version nor any world's rules revision changes.
+
+Still open: background progression while the player is elsewhere, real-time mass battles and journey-progress modelling along a road (a host that wants partial journeys needs a different command, not `PassTime` during a `Travel`).
 
 ## Military custody and station access (M6c / M6e pressure)
 

@@ -11,6 +11,13 @@ pub enum Command {
     Travel(Id),
     /// Lets this many minutes of world time pass.
     Wait(u64),
+    /// Host-reported world time: this many minutes pass while the player
+    /// goes on being where they are, as [`Command::Wait`] passes them but
+    /// whether or not the world authors waiting, and leaving any
+    /// conversation open. For a continuous host (a graphical client whose
+    /// player is in the world as time goes by), which decides how much real
+    /// time is worth a minute; never offered as an action.
+    PassTime(u64),
     /// Buys units of a good at this location's market.
     Buy {
         good: Id,
