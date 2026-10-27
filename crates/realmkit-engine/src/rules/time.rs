@@ -309,9 +309,10 @@ pub(crate) fn wait(
     advance(world, state, minutes, events)
 }
 
-/// Host-reported time: [`advance`] in any world with a clock, needing no
-/// authored wait and leaving a conversation open. Only what the time brings
-/// (a speaker who leaves, a choice whose condition lapses) can end one.
+/// Host-reported time: [`advance`] in any world with a clock, a minute at a
+/// time, needing no authored wait and leaving a conversation open. Only what
+/// the time brings (a speaker who leaves, a choice whose condition lapses)
+/// can end one.
 pub(crate) fn pass_time(
     world: &WorldSpec,
     state: &mut GameState,
@@ -324,17 +325,13 @@ pub(crate) fn pass_time(
     if minutes == 0 || minutes > DURATION_BOUND {
         return Err(EngineError::InvalidDuration);
     }
-    if state.dialogue.is_none() {
-        return advance(world, state, minutes, events);
-    }
-    // An open conversation can lapse at any minute (its speaker moves away,
-    // a choice's time of day ends) and come back later in the span. Passed a
-    // minute at a time, it ends at the minute any split of the span would
-    // end it, and the rest passes as one.
+    // A condition can hold for only part of the span: a speaker away for an
+    // hour, a time of day an outcome or breakthrough needs. What every
+    // command checks after it runs is therefore checked after every minute,
+    // so the span brings what any split of it would.
     let start = state.time.unwrap();
     let before = events.len();
-    let mut passed = 0;
-    while passed < minutes && state.dialogue.is_some() {
+    for _ in 0..minutes {
         let mut minute = Vec::new();
         advance(world, state, 1, &mut minute)?;
         events.extend(
@@ -342,17 +339,10 @@ pub(crate) fn pass_time(
                 .into_iter()
                 .filter(|e| !matches!(e, Event::TimePassed { .. })),
         );
+        techniques::promote(world, state, events);
         end_lapsed_dialogue(world, state, events);
-        passed += 1;
+        reach_outcome(world, state, events);
     }
-    let mut rest = Vec::new();
-    if passed < minutes {
-        advance(world, state, minutes - passed, &mut rest)?;
-    }
-    events.extend(
-        rest.into_iter()
-            .filter(|e| !matches!(e, Event::TimePassed { .. })),
-    );
     events.push(Event::TimePassed {
         minutes,
         now: start + minutes,

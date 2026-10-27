@@ -355,15 +355,21 @@ pub(super) fn execute(
                 });
             }
         }
-        // Validation proves outcomes exclude each other, so at most one holds.
-        if state.outcome.is_none() {
-            if let Some(reached) = outcomes(world, state).pop() {
-                state.outcome = Some(reached.clone());
-                events.push(Event::OutcomeReached { outcome: reached });
-            }
-        }
+        reach_outcome(world, state, &mut events);
     }
     Ok(events)
+}
+
+/// Records the first authored outcome whose condition holds now, if none
+/// has been reached.
+pub(super) fn reach_outcome(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
+    // Validation proves outcomes exclude each other, so at most one holds.
+    if state.outcome.is_none() {
+        if let Some(reached) = outcomes(world, state).pop() {
+            state.outcome = Some(reached.clone());
+            events.push(Event::OutcomeReached { outcome: reached });
+        }
+    }
 }
 
 /// Ends the open conversation if it has no speaker here or nothing left to

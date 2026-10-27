@@ -156,6 +156,38 @@ fn a_conversation_whose_speaker_leaves_and_returns_in_one_batch_ends_as_any_spli
     assert_eq!(played(&batch), played(&split));
 }
 
+#[test]
+fn an_outcome_that_holds_for_one_minute_of_a_batch_is_reached_as_any_split_reaches_it() {
+    // An ending that holds only at 14:00, once the thaw (day 2, 14:00) has come.
+    let mut world = marches();
+    world.world.outcomes.push(RouteOutcome {
+        id: "thaw_seen".into(),
+        name: "thaw_seen".into(),
+        text: "thaw_seen".into(),
+        when: Condition::All {
+            of: vec![
+                Condition::Flag {
+                    flag: "thaw".into(),
+                },
+                Condition::TimeOfDay { from: 840, to: 841 },
+            ],
+        },
+    });
+    assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
+    let mut once = Engine::new_with_seed(&world, 7).unwrap();
+    let mut split = Engine::new_with_seed(&world, 7).unwrap();
+    let long = happenings(once.execute(PassTime(1_801)).unwrap());
+    let mut parts = happenings(split.execute(PassTime(1_800)).unwrap());
+    parts.extend(happenings(split.execute(PassTime(1)).unwrap()));
+    let reached = Event::OutcomeReached {
+        outcome: "thaw_seen".into(),
+    };
+    assert!(long.contains(&reached));
+    assert_eq!(long, parts);
+    assert_eq!(once.state().outcome.as_deref(), Some("thaw_seen"));
+    assert_eq!(played(&once), played(&split));
+}
+
 fn wenna<'e>(engine: &'e Engine<'_>) -> &'e str {
     &engine.state().whereabouts["wenna"]
 }
