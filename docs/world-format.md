@@ -287,6 +287,11 @@ without it has no time at all, and its saves carry none.
   to 43,200 minutes. Without it there is no waiting.
 - `rest`, if present, is how long resting at a safe place takes; it needs the
   combat block.
+- `hosted: true` hands every duration to the host: the world authors no
+  `wait`, no `rest` and no road `minutes` or `durations` (`hosted_duration`),
+  travel and rest take no time of their own, and time passes only by the
+  host's `PassTime` and `Timed` commands. See
+  [hosted worlds](spatial-hosts-and-military-battles.md#hosted-worlds-the-host-decides-every-duration).
 
 A world may also date its time with the proleptic Gregorian calendar:
 

@@ -18,6 +18,16 @@ pub enum Command {
     /// player is in the world as time goes by), which decides how much real
     /// time is worth a minute; never offered as an action.
     PassTime(u64),
+    /// In a hosted world, `action` (a [`Command::Travel`] or a
+    /// [`Command::Rest`]) taking `minutes` the host decided, as one
+    /// command: it is applied and its time passed, or it changes nothing.
+    /// The time passes as the authored time of a road or a rest does in
+    /// any other world: a journey arrives first and then passes its time
+    /// on the road; a rest restores first and then passes its time.
+    Timed {
+        action: Box<Command>,
+        minutes: u64,
+    },
     /// Buys units of a good at this location's market.
     Buy {
         good: Id,

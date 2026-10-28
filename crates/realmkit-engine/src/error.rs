@@ -22,6 +22,10 @@ pub enum EngineError {
     NoWorldTime,
     #[error("time passes 1 to {} minutes at a time", realmkit_spec::DURATION_BOUND)]
     InvalidDuration,
+    #[error("only a hosted world's host decides how long things take")]
+    NotHosted,
+    #[error("only travel and rest take a host's time")]
+    Untimed,
     #[error("there is no market here")]
     NoMarket,
     #[error("{0} is not traded here")]

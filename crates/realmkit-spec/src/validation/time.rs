@@ -98,6 +98,14 @@ fn clock(out: &mut Vec<Diagnostic>, w: &WorldSpec, time: &WorldTime) {
             );
         }
     }
+    if time.hosted && (time.wait.is_some() || time.rest.is_some()) {
+        issue(
+            out,
+            owner,
+            "hosted_duration",
+            "a hosted world's host decides how long waiting and resting take, so it authors no `wait` or `rest`",
+        );
+    }
     if time.rest.is_some() && w.combat().is_none() {
         issue(
             out,
@@ -142,6 +150,15 @@ fn roads(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             );
         }
         travel_times(out, road);
+        let hosted = w.world.time.as_ref().is_some_and(|t| t.hosted);
+        if hosted && (road.minutes > 0 || !road.durations.is_empty()) {
+            issue(
+                out,
+                &road.id,
+                "hosted_duration",
+                "a hosted world's host decides how long a journey takes, so its roads author no time",
+            );
+        }
         if road.minutes > 0 || !road.durations.is_empty() {
             needed(out, w, &road.id);
         }

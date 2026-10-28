@@ -74,10 +74,11 @@ pub(crate) fn respec(
 }
 
 /// Restores HP and MP at a safe location, the party's included, then the
-/// world's rest time passes.
+/// world's rest time passes, or the host's `minutes` in a hosted world.
 pub(crate) fn rest(
     world: &WorldSpec,
     state: &mut GameState,
+    minutes: Option<u64>,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let safe = world.location(&state.player.location).unwrap().safe;
@@ -91,7 +92,9 @@ pub(crate) fn rest(
     if let Some(retinue) = state.retinue.as_mut() {
         retinue::mend(retinue, None, events);
     }
-    // Resting takes the world's authored time, if it keeps one.
-    let minutes = world.world.time.as_ref().and_then(|t| t.rest).unwrap_or(0);
+    // Resting takes the host's time, else the world's authored time, if any.
+    let minutes = minutes
+        .or_else(|| world.world.time.as_ref().and_then(|t| t.rest))
+        .unwrap_or(0);
     time::advance(world, state, minutes, events)
 }

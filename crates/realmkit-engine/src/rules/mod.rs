@@ -285,9 +285,12 @@ pub(super) fn execute(
             economy::trade(world, state, &good, quantity, false, &mut events)?
         }
         Command::Move(direction) => move_to(world, state, direction, &mut events)?,
-        Command::Travel(to) => time::travel(world, state, to, &mut events)?,
+        Command::Travel(to) => time::travel(world, state, to, None, &mut events)?,
         Command::Wait(minutes) => time::wait(world, state, minutes, &mut events)?,
         Command::PassTime(minutes) => time::pass_time(world, state, minutes, &mut events)?,
+        Command::Timed { action, minutes } => {
+            time::timed(world, state, *action, minutes, &mut events)?
+        }
         Command::Talk(id) => story::talk(world, state, id, &mut events)?,
         Command::ChooseDialogue(number) => story::choose(world, state, number, &mut events)?,
         Command::AcceptQuest(id) => {
@@ -327,7 +330,7 @@ pub(super) fn execute(
         Command::Enchant { piece, enchantment } => {
             crafting::enchant(world, state, piece, &enchantment, &mut events)?
         }
-        Command::Rest => player::rest(world, state, &mut events)?,
+        Command::Rest => player::rest(world, state, None, &mut events)?,
         Command::Use(item) => consume::consume(world, state, item, &mut events)?,
     }
     // Host time settles itself after every minute it passes, as if each

@@ -114,6 +114,13 @@ proves the complete single-player loop with authored content.
   occurrences; only the command counter differs. No package or save format
   change. `engine/tests/pass_time.rs` exercises it on `examples/marches`,
   `practice-yard`, `arena`, a clocked `duel`, `caravan-trail` and `sect`.
+- [x] Hosted world time: `time.hosted` opts a world into host-decided
+  durations (no authored wait, rest or road times; `hosted_duration`), and
+  `Timed { action, minutes }` gives a `Travel` or `Rest` the host's time as
+  one atomic command, in the order an authored road or rest uses. Off by
+  default; existing packages, saves and revisions are unchanged.
+  `engine/tests/hosted_time.rs` proves a hosted marches given the authored
+  times plays exactly as the authored marches.
   Breakthroughs now resolve chains in one change: a gate on another
   technique's rank opens in the same command as that rank.
 - [x] Economy core (M6a): currency with a world-language format, goods,

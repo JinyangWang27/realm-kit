@@ -119,7 +119,9 @@ Optional simulated in-world time represented as a minute count from an authored
 epoch. It is monotonic within one forward committed history and advances only
 through explicit gameplay actions/effects: travel, waiting, resting, and a
 continuous host's `PassTime`, which commits whole minutes the host has decided
-elapsed (the engine never reads real time). Loading or recovering an older snapshot
+elapsed (the engine never reads real time). In a hosted world (`time.hosted`)
+the host decides every duration: travel and rest take none of their own, and
+`Timed { action, minutes }` gives a journey or a rest the host's minutes. Loading or recovering an older snapshot
 restores its saved WorldTime exactly, so discarded-future values may be traversed
 again on the new branch. WorldTime is independent of story-phase progression and
 encounter scheduling.

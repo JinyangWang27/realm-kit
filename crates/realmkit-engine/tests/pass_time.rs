@@ -247,6 +247,7 @@ fn chained_breakthroughs_open_at_the_minute_they_hold_however_time_is_batched() 
         wait: Some(30),
         rest: Some(480),
         calendar: None,
+        hosted: false,
     });
     world.world.flags.push("palm_open".into());
     world.world.events.push(
@@ -410,6 +411,7 @@ fn recovering() -> WorldSpec {
         wait: Some(30),
         rest: Some(480),
         calendar: None,
+        hosted: false,
     });
     let combat = world.world.combat.as_mut().unwrap();
     combat.resources.rage_cap = Some(10);

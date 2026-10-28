@@ -246,11 +246,13 @@ fn relocate(state: &mut GameState, character: &Character, events: &mut Vec<Event
 }
 
 /// Takes the road to `to`: arrives, then its travel time passes, drawn as
-/// the player sets out on a road whose time varies.
+/// the player sets out on a road whose time varies, or the host's `minutes`
+/// in a hosted world.
 pub(crate) fn travel(
     world: &WorldSpec,
     state: &mut GameState,
     to: Id,
+    minutes: Option<u64>,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let road = world
@@ -268,7 +270,7 @@ pub(crate) fn travel(
         from,
         to: to.clone(),
     });
-    let minutes = journey(state, road);
+    let minutes = minutes.unwrap_or_else(|| journey(state, road));
     // On the road: the destination shows who is there on arrival.
     pass(world, state, minutes, events, false)?;
     events.push(Event::LocationViewed { location: to });
@@ -350,4 +352,26 @@ pub(crate) fn pass_time(
             .any(|e| !matches!(e, Event::StoryFlagSet { .. })),
     });
     Ok(())
+}
+
+/// A hosted world's travel or rest, taking the host's `minutes` in place of
+/// the authored times such a world does not have.
+pub(crate) fn timed(
+    world: &WorldSpec,
+    state: &mut GameState,
+    action: Command,
+    minutes: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    if !world.world.time.as_ref().is_some_and(|t| t.hosted) {
+        return Err(EngineError::NotHosted);
+    }
+    if minutes == 0 || minutes > DURATION_BOUND {
+        return Err(EngineError::InvalidDuration);
+    }
+    match action {
+        Command::Travel(to) => travel(world, state, to, Some(minutes), events),
+        Command::Rest => player::rest(world, state, Some(minutes), events),
+        _ => Err(EngineError::Untimed),
+    }
 }

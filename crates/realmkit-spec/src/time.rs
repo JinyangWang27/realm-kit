@@ -9,7 +9,7 @@ pub const DURATION_BOUND: u64 = 43_200;
 pub const MINUTES_PER_DAY: u64 = 1_440;
 
 /// Optional world time: minutes from an authored epoch, advanced only by
-/// travel, waiting and resting.
+/// travel, waiting and resting, or, in a hosted world, by the host.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WorldTime {
@@ -28,6 +28,12 @@ pub struct WorldTime {
     /// Pins minute 0 to a Gregorian midnight, so the time has a date.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calendar: Option<Calendar>,
+    /// The host decides every duration: the world authors none (no `wait`,
+    /// no `rest`, no road times), so travelling and resting take no time of
+    /// their own, and time passes only by the host's `PassTime` and `Timed`
+    /// commands.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub hosted: bool,
 }
 
 /// The proleptic Gregorian calendar, from the date at minute 0. A date is
@@ -212,6 +218,10 @@ pub fn clock_values(time: &WorldTime, minute: u64) -> Vec<(&'static str, String)
         ]);
     }
     values
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 fn is_zero_u64(value: &u64) -> bool {

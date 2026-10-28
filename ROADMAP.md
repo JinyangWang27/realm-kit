@@ -320,6 +320,10 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   time while its player explores. It reuses the waiting rules, keeps any
   conversation open, is refused mid-fight, and gives the same world however
   the host batches it. The real-to-world time scale is the host's.
+- **Hosted world time:** an opt-in `time.hosted` world authors no durations;
+  its host passes time with `PassTime` and gives travel and rest their time
+  with the atomic `Timed { action, minutes }`. RealmKit keeps the one clock
+  and every consequence of it.
 
 Next, when a client needs it: spatial authority for real-time contact
 (positions, reach and hit volumes on the fixed step, or a validated spatial
