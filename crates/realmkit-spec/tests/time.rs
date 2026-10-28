@@ -149,6 +149,7 @@ fn time_content_is_checked_with_stable_codes() {
         wait: None,
         rest: Some(60),
         calendar: None,
+        hosted: false,
     });
     assert!(codes(&archive).contains(&"combat_disabled".to_string()));
     // A start past the bound also leaves every schedule before it.
@@ -415,4 +416,51 @@ fn a_calendar_is_checked_with_stable_codes_and_belongs_to_the_rules() {
     let revision = dated(date(742, 1, 1)).revision();
     assert_ne!(dated(date(742, 1, 2)).revision(), revision);
     assert_ne!(marches().revision(), revision);
+}
+
+/// The marches with the host deciding every duration.
+fn hosted(mut w: WorldSpec) -> WorldSpec {
+    let time = w.world.time.as_mut().unwrap();
+    time.hosted = true;
+    time.wait = None;
+    time.rest = None;
+    for road in &mut w.world.roads {
+        road.minutes = 0;
+    }
+    w
+}
+
+#[test]
+fn a_hosted_world_authors_no_durations() {
+    let world = hosted(marches());
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    let json = serde_json::to_string(&world.world.time).unwrap();
+    assert!(json.contains(r#""hosted":true"#), "{json}");
+    // Left out when false, so existing packages serialize as before.
+    assert!(!serde_json::to_string(&marches().world.time)
+        .unwrap()
+        .contains("hosted"));
+    type Change = fn(&mut WorldSpec);
+    let cases: Vec<Change> = vec![
+        |w| w.world.time.as_mut().unwrap().wait = Some(60),
+        |w| w.world.time.as_mut().unwrap().rest = Some(480),
+        |w| road(w, "greyford-ashmere").minutes = 120,
+        |w| {
+            road(w, "greyford-ashmere").durations = vec![
+                TravelTime {
+                    minutes: 60,
+                    weight: 1,
+                },
+                TravelTime {
+                    minutes: 90,
+                    weight: 1,
+                },
+            ]
+        },
+    ];
+    for (index, change) in cases.into_iter().enumerate() {
+        let mut world = hosted(marches());
+        change(&mut world);
+        assert_eq!(codes(&world), ["hosted_duration"], "case {index}");
+    }
 }

@@ -255,6 +255,7 @@ fn resting_takes_the_authored_time_in_a_world_with_a_clock() {
         wait: None,
         rest: Some(480),
         calendar: None,
+        hosted: false,
     });
     let mut engine = Engine::new(&world).unwrap();
     let events = engine.execute(Rest).unwrap();
@@ -389,6 +390,7 @@ fn a_save_cannot_know_what_a_future_event_teaches() {
         wait: Some(60),
         rest: None,
         calendar: None,
+        hosted: false,
     });
     world.world.events.push(WorldEvent {
         id: "lesson".into(),

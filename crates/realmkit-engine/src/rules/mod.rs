@@ -221,6 +221,7 @@ pub(super) fn execute(
     command: Command,
 ) -> Result<Vec<Event>, EngineError> {
     let panel = is_panel(&command);
+    let host_time = matches!(command, Command::PassTime(_));
     if dead(state) && !panel {
         return Err(EngineError::PlayerDead);
     }
@@ -284,8 +285,12 @@ pub(super) fn execute(
             economy::trade(world, state, &good, quantity, false, &mut events)?
         }
         Command::Move(direction) => move_to(world, state, direction, &mut events)?,
-        Command::Travel(to) => time::travel(world, state, to, &mut events)?,
+        Command::Travel(to) => time::travel(world, state, to, None, &mut events)?,
         Command::Wait(minutes) => time::wait(world, state, minutes, &mut events)?,
+        Command::PassTime(minutes) => time::pass_time(world, state, minutes, &mut events)?,
+        Command::Timed { action, minutes } => {
+            time::timed(world, state, *action, minutes, &mut events)?
+        }
         Command::Talk(id) => story::talk(world, state, id, &mut events)?,
         Command::ChooseDialogue(number) => story::choose(world, state, number, &mut events)?,
         Command::AcceptQuest(id) => {
@@ -325,51 +330,85 @@ pub(super) fn execute(
         Command::Enchant { piece, enchantment } => {
             crafting::enchant(world, state, piece, &enchantment, &mut events)?
         }
-        Command::Rest => player::rest(world, state, &mut events)?,
+        Command::Rest => player::rest(world, state, None, &mut events)?,
         Command::Use(item) => consume::consume(world, state, item, &mut events)?,
     }
-    // A flag or quest this command changed may open a breakthrough gate.
-    if !panel {
-        techniques::promote(world, state, &mut events);
-        // Any change, such as a trade that empties a choice's condition, can
-        // leave the conversation with no speaker or nothing to say: it ends.
-        if let Some(open) = &state.dialogue {
-            if !npc_here(world, state, &open.npc)
-                || choices(world, state, &open.npc, &open.node).is_empty()
-            {
-                state.dialogue = None;
-                events.push(Event::DialogueEnded);
-            }
-        }
-        // Evidence found by this command reports itself as discovered.
-        let before = readings_before.unwrap_or_default();
-        for now in readings(world, state) {
-            let Some(was) = before.iter().find(|u| u.evidence == now.evidence) else {
-                continue;
-            };
-            // Facts are never lost, so the new ones are those not known before.
-            for fact in now.facts.iter().filter(|f| !was.facts.contains(f)) {
-                events.push(Event::EvidenceFactLearned {
-                    evidence: now.evidence.clone(),
-                    fact: *fact,
-                });
-            }
-            if let Some(reading) = now.reading.filter(|r| was.reading != Some(*r)) {
-                events.push(Event::EvidenceReinterpreted {
-                    evidence: now.evidence.clone(),
-                    reading,
-                });
-            }
-        }
-        // Validation proves outcomes exclude each other, so at most one holds.
-        if state.outcome.is_none() {
-            if let Some(reached) = outcomes(world, state).pop() {
-                state.outcome = Some(reached.clone());
-                events.push(Event::OutcomeReached { outcome: reached });
-            }
-        }
+    // Host time settles itself after every minute it passes, as if each
+    // were its own command.
+    if !panel && !host_time {
+        settle(
+            world,
+            state,
+            &readings_before.unwrap_or_default(),
+            &mut events,
+        );
     }
     Ok(events)
+}
+
+/// What every command settles once it has run, given the evidence readings
+/// from before it: a flag or quest it changed may open a breakthrough gate,
+/// a conversation may be left with no speaker or nothing to say, evidence
+/// may be discovered or read anew, and an outcome may be reached.
+pub(super) fn settle(
+    world: &WorldSpec,
+    state: &mut GameState,
+    before: &[story::Understanding<'_>],
+    events: &mut Vec<Event>,
+) {
+    techniques::promote(world, state, events);
+    // Any change, such as a trade that empties a choice's condition, can
+    // leave the conversation with no speaker or nothing to say: it ends.
+    end_lapsed_dialogue(world, state, events);
+    // Evidence found by this command reports itself as discovered.
+    for now in readings(world, state) {
+        let Some(was) = before.iter().find(|u| u.evidence == now.evidence) else {
+            continue;
+        };
+        // Facts are never lost, so the new ones are those not known before.
+        for fact in now.facts.iter().filter(|f| !was.facts.contains(f)) {
+            events.push(Event::EvidenceFactLearned {
+                evidence: now.evidence.clone(),
+                fact: *fact,
+            });
+        }
+        if let Some(reading) = now.reading.filter(|r| was.reading != Some(*r)) {
+            events.push(Event::EvidenceReinterpreted {
+                evidence: now.evidence.clone(),
+                reading,
+            });
+        }
+    }
+    reach_outcome(world, state, events);
+}
+
+/// Records the first authored outcome whose condition holds now, if none
+/// has been reached.
+pub(super) fn reach_outcome(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
+    // Validation proves outcomes exclude each other, so at most one holds.
+    if state.outcome.is_none() {
+        if let Some(reached) = outcomes(world, state).pop() {
+            state.outcome = Some(reached.clone());
+            events.push(Event::OutcomeReached { outcome: reached });
+        }
+    }
+}
+
+/// Ends the open conversation if it has no speaker here or nothing left to
+/// say.
+pub(super) fn end_lapsed_dialogue(
+    world: &WorldSpec,
+    state: &mut GameState,
+    events: &mut Vec<Event>,
+) {
+    if let Some(open) = &state.dialogue {
+        if !npc_here(world, state, &open.npc)
+            || choices(world, state, &open.npc, &open.node).is_empty()
+        {
+            state.dialogue = None;
+            events.push(Event::DialogueEnded);
+        }
+    }
 }
 
 /// The authored outcomes whose conditions hold now, in authored order.

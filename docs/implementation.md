@@ -105,6 +105,24 @@ proves the complete single-player loop with authored content.
   `{month}` and `{day_of_month}` while `{day}` still counts elapsed days.
   Validation rejects impossible epochs, a minute range past the year 9999 and
   calendar placeholders without a calendar.
+- [x] Host-driven world time (RT-Time-01): `PassTime(minutes)` lets a
+  continuous host commit elapsed world time, 1 to `DURATION_BOUND` minutes
+  at a time, in any world with a clock and without an authored wait. It
+  runs the same schedule, recovery and decay as waiting, leaves the player
+  and any open conversation where they are, is refused in every kind of
+  fight and is never offered. Any batching gives the same state, streams and
+  occurrences; only the command counter differs. No package or save format
+  change. `engine/tests/pass_time.rs` exercises it on `examples/marches`,
+  `practice-yard`, `arena`, a clocked `duel`, `caravan-trail` and `sect`.
+- [x] Hosted world time: `time.hosted` opts a world into host-decided
+  durations (no authored wait, rest or road times; `hosted_duration`), and
+  `Timed { action, minutes }` gives a `Travel` or `Rest` the host's time as
+  one atomic command, in the order an authored road or rest uses. Off by
+  default; existing packages, saves and revisions are unchanged.
+  `engine/tests/hosted_time.rs` proves a hosted marches given the authored
+  times plays exactly as the authored marches.
+  Breakthroughs now resolve chains in one change: a gate on another
+  technique's rank opens in the same command as that rank.
 - [x] Economy core (M6a): currency with a world-language format, goods,
   producer kinds and markets whose price index per good follows production
   and demand on a scheduled four-phase price tick drawn from its own

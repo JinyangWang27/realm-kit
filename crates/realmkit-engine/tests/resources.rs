@@ -51,6 +51,7 @@ fn fighters(uses: Option<ResourceUse>, player_skills: &[&str]) -> WorldSpec {
         wait: Some(30),
         rest: Some(480),
         calendar: None,
+        hosted: false,
     });
     let combat = world.world.combat.as_mut().unwrap();
     combat.resources = Resources {

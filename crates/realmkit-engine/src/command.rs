@@ -11,6 +11,23 @@ pub enum Command {
     Travel(Id),
     /// Lets this many minutes of world time pass.
     Wait(u64),
+    /// Host-reported world time: this many minutes pass while the player
+    /// goes on being where they are, as [`Command::Wait`] passes them but
+    /// whether or not the world authors waiting, and leaving any
+    /// conversation open. For a continuous host (a graphical client whose
+    /// player is in the world as time goes by), which decides how much real
+    /// time is worth a minute; never offered as an action.
+    PassTime(u64),
+    /// In a hosted world, `action` (a [`Command::Travel`] or a
+    /// [`Command::Rest`]) taking `minutes` the host decided, as one
+    /// command: it is applied and its time passed, or it changes nothing.
+    /// The time passes as the authored time of a road or a rest does in
+    /// any other world: a journey arrives first and then passes its time
+    /// on the road; a rest restores first and then passes its time.
+    Timed {
+        action: Box<Command>,
+        minutes: u64,
+    },
     /// Buys units of a good at this location's market.
     Buy {
         good: Id,

@@ -129,39 +129,47 @@ pub(super) fn add_xp(
 
 /// Rises through every rank whose threshold is met and whose gate holds; XP
 /// waits at a closed gate's threshold. Run after every change, so opening a
-/// gate promotes a technique that was waiting.
+/// gate promotes a technique that was waiting, and again until nothing rises,
+/// so a gate on another technique's rank opens in the same change.
 pub(super) fn promote(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
     let Some(combat) = &state.combat else {
         return;
     };
     let ids: Vec<Id> = combat.techniques.keys().cloned().collect();
-    for id in ids {
-        let technique = spec(world, &id);
-        loop {
-            let learned = state.combat.as_ref().unwrap().techniques[&id];
-            let Some(next) = technique.ranks.get(learned.rank) else {
-                break;
-            };
-            if learned.xp < next.xp {
-                break;
+    // Ranks are finite, so a pass that promotes nothing comes.
+    loop {
+        let before = events.len();
+        for id in &ids {
+            let technique = spec(world, id);
+            loop {
+                let learned = state.combat.as_ref().unwrap().techniques[id];
+                let Some(next) = technique.ranks.get(learned.rank) else {
+                    break;
+                };
+                if learned.xp < next.xp {
+                    break;
+                }
+                let open = rules::allowed(state, next.requires.as_ref());
+                let learned = state
+                    .combat
+                    .as_mut()
+                    .unwrap()
+                    .techniques
+                    .get_mut(id)
+                    .unwrap();
+                if !open {
+                    learned.xp = next.xp;
+                    break;
+                }
+                learned.rank += 1;
+                events.push(Event::TechniqueRankUp {
+                    technique: id.clone(),
+                    rank: learned.rank,
+                });
             }
-            let open = rules::allowed(state, next.requires.as_ref());
-            let learned = state
-                .combat
-                .as_mut()
-                .unwrap()
-                .techniques
-                .get_mut(&id)
-                .unwrap();
-            if !open {
-                learned.xp = next.xp;
-                break;
-            }
-            learned.rank += 1;
-            events.push(Event::TechniqueRankUp {
-                technique: id.clone(),
-                rank: learned.rank,
-            });
+        }
+        if events.len() == before {
+            break;
         }
     }
     rules::clamp_vitals(world, state);

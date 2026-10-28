@@ -246,11 +246,13 @@ fn relocate(state: &mut GameState, character: &Character, events: &mut Vec<Event
 }
 
 /// Takes the road to `to`: arrives, then its travel time passes, drawn as
-/// the player sets out on a road whose time varies.
+/// the player sets out on a road whose time varies, or the host's `minutes`
+/// in a hosted world.
 pub(crate) fn travel(
     world: &WorldSpec,
     state: &mut GameState,
     to: Id,
+    minutes: Option<u64>,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let road = world
@@ -268,7 +270,7 @@ pub(crate) fn travel(
         from,
         to: to.clone(),
     });
-    let minutes = journey(state, road);
+    let minutes = minutes.unwrap_or_else(|| journey(state, road));
     // On the road: the destination shows who is there on arrival.
     pass(world, state, minutes, events, false)?;
     events.push(Event::LocationViewed { location: to });
@@ -307,4 +309,69 @@ pub(crate) fn wait(
     }
     state.dialogue = None;
     advance(world, state, minutes, events)
+}
+
+/// Host-reported time: [`advance`] in any world with a clock, a minute at a
+/// time, needing no authored wait and leaving a conversation open. Only what
+/// the time brings (a speaker who leaves, a choice whose condition lapses)
+/// can end one.
+pub(crate) fn pass_time(
+    world: &WorldSpec,
+    state: &mut GameState,
+    minutes: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    if state.time.is_none() {
+        return Err(EngineError::NoWorldTime);
+    }
+    if minutes == 0 || minutes > DURATION_BOUND {
+        return Err(EngineError::InvalidDuration);
+    }
+    // A condition can hold for only part of the span: a speaker away for an
+    // hour, a time of day an outcome or breakthrough needs, a reading a flag
+    // unlocks before the next. Each minute therefore settles as a one-minute
+    // command would, so the span brings exactly what any split of it would.
+    let start = state.time.unwrap();
+    let before = events.len();
+    for _ in 0..minutes {
+        let readings_before = readings(world, state);
+        let mut minute = Vec::new();
+        advance(world, state, 1, &mut minute)?;
+        events.extend(
+            minute
+                .into_iter()
+                .filter(|e| !matches!(e, Event::TimePassed { .. })),
+        );
+        settle(world, state, &readings_before, events);
+    }
+    events.push(Event::TimePassed {
+        minutes,
+        now: start + minutes,
+        eventful: events[before..]
+            .iter()
+            .any(|e| !matches!(e, Event::StoryFlagSet { .. })),
+    });
+    Ok(())
+}
+
+/// A hosted world's travel or rest, taking the host's `minutes` in place of
+/// the authored times such a world does not have.
+pub(crate) fn timed(
+    world: &WorldSpec,
+    state: &mut GameState,
+    action: Command,
+    minutes: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    if !world.world.time.as_ref().is_some_and(|t| t.hosted) {
+        return Err(EngineError::NotHosted);
+    }
+    if minutes == 0 || minutes > DURATION_BOUND {
+        return Err(EngineError::InvalidDuration);
+    }
+    match action {
+        Command::Travel(to) => travel(world, state, to, Some(minutes), events),
+        Command::Rest => player::rest(world, state, Some(minutes), events),
+        _ => Err(EngineError::Untimed),
+    }
 }
