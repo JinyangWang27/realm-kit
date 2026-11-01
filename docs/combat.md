@@ -91,6 +91,13 @@ both. It is usable only if every cost is covered; MP is checked and spent
 first, and each resource spent is reported. A refused skill changes nothing
 and draws nothing from the random streams.
 
+A host asks the same rule without acting: `Engine::player_skills` lists the
+skills the player knows (the world's `player_skills`, then each learned
+technique's rank skill), and `Engine::skill_usable` says whether one is known,
+unlocked by level and affordable now, refusing with the error a skill intent
+would give. Neither looks at timing or targets: in a real-time fight only the
+intent itself says whether the player is free to act.
+
 A world may present Rage as sword momentum or fighting spirit in its own
 words; it is still the same resource, not a third one.
 
