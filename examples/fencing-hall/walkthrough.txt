@@ -1,5 +1,5 @@
 look
-duel duelist
+fight duelist
 step 4
 parry
 contact duelist
@@ -27,7 +27,7 @@ step 3
 contact duelist
 step 2
 contact fencer
-duel bruiser
+fight bruiser
 guard
 step 6
 contact bruiser
@@ -44,7 +44,7 @@ contact fencer
 step 11
 disengage
 step 6
-duel swordmaster
+fight swordmaster
 step
 strike
 step 3

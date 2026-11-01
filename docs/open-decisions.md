@@ -797,23 +797,23 @@ mapping to seconds/minutes or world time. If an encounter should consume world
 time, author that consequence explicitly, for example by applying a world-time
 advance after resolution.
 
-### Duel clock
+### Fight clock
 
-A real-time duel's clock is a third local scheduler, in fixed steps that only
+A real-time fight's clock is a third local scheduler, in fixed steps that only
 an explicit advance moves. `steps_per_second` tells hosts how fast to step; it
-is not a mapping to world time, which stands still for the whole duel. See
-[Real-time duels](combat.md#real-time-duels).
+is not a mapping to world time, which stands still for the whole real-time fight. See
+[Real-time fights](combat.md#real-time-fights).
 
 ### Cross-layer rules
 
 - Real-world thinking/input time advances none of StoryPhase, WorldTime,
-  EncounterTimeline or a duel's clock; a host's frames advance a duel only
+  EncounterTimeline or a fight's clock; a host's frames advance a real-time fight only
   through the advances it submits.
 - WorldTime never implicitly advances StoryPhase.
 - A StoryPhase transition may explicitly advance WorldTime when representing an
   authored canonical time skip.
 - EncounterTimeline never implicitly advances WorldTime, and neither does a
-  duel's clock.
+  fight's clock.
 - Save/load preserves all enabled time state exactly.
 
 ## 10. Definitions, instances and identity

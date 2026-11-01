@@ -84,8 +84,8 @@ fn consumables_are_checked_with_stable_codes() {
         );
     }
     // Where the player can have MP, restoring it is fine.
-    let mut duel = duel();
-    duel.items.push(Item {
+    let mut fight = duel();
+    fight.items.push(Item {
         id: "ether".into(),
         name: "Ether".into(),
         description: "It fizzes.".into(),
@@ -93,9 +93,9 @@ fn consumables_are_checked_with_stable_codes() {
         consumable: Some(Consumable { hp: 0, mp: 5 }),
     });
     assert!(
-        !codes(&duel).contains(&"invalid_consumable".to_string()),
+        !codes(&fight).contains(&"invalid_consumable".to_string()),
         "{:?}",
-        duel.diagnostics()
+        fight.diagnostics()
     );
     // Restoring HP needs HP: a world without combat has none.
     let mut archive = archive();

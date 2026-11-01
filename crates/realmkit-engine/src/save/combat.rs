@@ -36,7 +36,7 @@ pub(super) fn check(
     match &combat.stance {
         Stance::Exploring => {}
         Stance::Fighting(encounter) => encounter_state(world, state, combat, rules, encounter)?,
-        Stance::Realtime(duel) => super::realtime::check(world, state, combat, rules, duel)?,
+        Stance::Realtime(fight) => super::realtime::check(world, state, combat, rules, fight)?,
         Stance::Battle(battle) => super::battle::check(world, state, combat, battle)?,
     }
     ensure(

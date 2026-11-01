@@ -172,7 +172,7 @@ fn count(events: &[Event], wanted: impl Fn(&Event) -> bool) -> usize {
 fn a_fight_grows_from_one_on_one_to_two_on_two_and_settles_once() {
     let world = yard_with_warden(json!({}));
     let mut engine = Engine::new_with_seed(&world, 4).unwrap();
-    let mut commands = vec![Duel("brigand".into())];
+    let mut commands = vec![EngageRealtime("brigand".into())];
     run(&mut engine, &commands);
     commands.extend(fight_on(&mut engine, 12));
     // An enemy, then a friend, arrive in the middle of the fight.
@@ -253,7 +253,7 @@ fn a_fight_grows_from_one_on_one_to_two_on_two_and_settles_once() {
 fn a_group_starts_one_against_two_and_strikes_must_name_a_foe() {
     let world = yard();
     let mut engine = Engine::new(&world).unwrap();
-    let events = run(&mut engine, &[Duel("right_twin".into())]);
+    let events = run(&mut engine, &[EngageRealtime("right_twin".into())]);
     assert_eq!(
         events,
         [Event::EncounterStarted {
@@ -314,7 +314,10 @@ fn a_group_starts_one_against_two_and_strikes_must_name_a_foe() {
 fn joining_keeps_the_clock_and_everyone_as_they_were() {
     let world = yard_with_warden(json!({}));
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("brigand".into()), strike(), step(3)]);
+    run(
+        &mut engine,
+        &[EngageRealtime("brigand".into()), strike(), step(3)],
+    );
     run(&mut engine, &[contact("trainee")]);
     let before = fight(&engine);
     let player = vitals(&engine);
@@ -354,7 +357,7 @@ fn refused_joins_change_nothing() {
     assert_refused(engine.execute(join("warden", 0)), EngineError::NotFighting);
     run(
         &mut engine,
-        &[Duel("brigand".into()), step(2), join("warden", 0)],
+        &[EngageRealtime("brigand".into()), step(2), join("warden", 0)],
     );
     let before = engine.snapshot().to_json();
     for (command, refusal) in [
@@ -393,7 +396,7 @@ fn refused_joins_change_nothing() {
     }
     let world = yard_with_warden(json!({}));
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("brigand".into())]);
+    run(&mut engine, &[EngageRealtime("brigand".into())]);
     let before = engine.snapshot().to_json();
     assert_refused(
         engine.execute(join("warden", 1)),
@@ -405,17 +408,17 @@ fn refused_joins_change_nothing() {
     assert_eq!(engine.snapshot().to_json(), before);
     // A defeated foe stays defeated, and an ally is never the one fought.
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("brigand".into())]);
+    run(&mut engine, &[EngageRealtime("brigand".into())]);
     fight_on(&mut engine, 500);
     assert!(combat(&engine).defeated.contains("brigand"));
     assert_refused(
-        engine.execute(Duel("warden".into())),
+        engine.execute(EngageRealtime("warden".into())),
         EngineError::NotHostile("warden".into()),
     );
     assert!(!offered(&engine)
         .iter()
-        .any(|(c, _)| *c == Duel("warden".into())));
-    run(&mut engine, &[Duel("master".into())]);
+        .any(|(c, _)| *c == EngageRealtime("warden".into())));
+    run(&mut engine, &[EngageRealtime("master".into())]);
     let before = engine.snapshot().to_json();
     assert_refused(
         engine.execute(join("brigand", 1)),
@@ -430,7 +433,7 @@ fn friendly_fire_is_refused_unless_the_world_allows_it() {
     let mut engine = Engine::new(&world).unwrap();
     run(
         &mut engine,
-        &[Duel("brigand".into()), join("warden", 0), step(4)],
+        &[EngageRealtime("brigand".into()), join("warden", 0), step(4)],
     );
     // The warden's wind-up (3) is over and his blow at the brigand is live.
     assert!(active(&fighter(&engine, "warden")));
@@ -471,7 +474,7 @@ fn friendly_fire_is_refused_unless_the_world_allows_it() {
     let mut engine = Engine::new(&world).unwrap();
     run(
         &mut engine,
-        &[Duel("brigand".into()), join("warden", 0), step(4)],
+        &[EngageRealtime("brigand".into()), join("warden", 0), step(4)],
     );
     let events = run(&mut engine, &[contact_on("warden", "trainee")]);
     assert!(matches!(
@@ -521,7 +524,7 @@ fn a_blow_on_a_teammate_trains_nothing_and_earns_no_rage() {
         run(
             &mut engine,
             &[
-                Duel("brigand".into()),
+                EngageRealtime("brigand".into()),
                 join("warden", 0),
                 lunge("brigand"),
                 step(4),
@@ -541,7 +544,7 @@ fn a_blow_on_a_teammate_trains_nothing_and_earns_no_rage() {
 fn the_first_foe_to_fall_does_not_end_the_fight() {
     let world = yard();
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("left_twin".into())]);
+    run(&mut engine, &[EngageRealtime("left_twin".into())]);
     let mut events = Vec::new();
     while hp(&engine, "left_twin") > 0 {
         let fight = fight(&engine);
@@ -605,7 +608,10 @@ fn allies_guard_fall_and_yield_by_the_same_rules_as_foes() {
     // A warden who holds his guard 5 steps before each attack.
     let world = yard_with_warden(json!({ "guard_hold": 5 }));
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("brigand".into()), join("warden", 0)]);
+    run(
+        &mut engine,
+        &[EngageRealtime("brigand".into()), join("warden", 0)],
+    );
     let events = run(&mut engine, &[step(1)]);
     assert!(events.contains(&Event::GuardRaising {
         character: "warden".into()
@@ -630,7 +636,7 @@ fn allies_guard_fall_and_yield_by_the_same_rules_as_foes() {
     let mut engine = Engine::new(&world).unwrap();
     run(
         &mut engine,
-        &[Duel("brigand".into()), join("warden", 0), step(3)],
+        &[EngageRealtime("brigand".into()), join("warden", 0), step(3)],
     );
     // The brigand aims at the player, but the host reports his blow on the warden.
     let brigand = fighter(&engine, "brigand");
@@ -657,7 +663,10 @@ fn allies_guard_fall_and_yield_by_the_same_rules_as_foes() {
         .stats
         .hp = 1;
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("brigand".into()), join("warden", 0)]);
+    run(
+        &mut engine,
+        &[EngageRealtime("brigand".into()), join("warden", 0)],
+    );
     let mut events = Vec::new();
     while hp(&engine, "warden") > 0 {
         let brigand = fighter(&engine, "brigand");
@@ -680,7 +689,10 @@ fn allies_guard_fall_and_yield_by_the_same_rules_as_foes() {
     // In a yielding group an ally yields at its threshold instead.
     let world = yard_with_warden(json!({}));
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("master".into()), join("warden", 0)]);
+    run(
+        &mut engine,
+        &[EngageRealtime("master".into()), join("warden", 0)],
+    );
     let mut events = Vec::new();
     while !fighter(&engine, "warden").yielded {
         let master = fighter(&engine, "master");
@@ -708,7 +720,7 @@ fn engine_fighters_aim_by_their_authored_targeting() {
     // who aims at the weakest, takes him, though the player came first.
     run(
         &mut engine,
-        &[Duel("brigand".into()), join("warden", 0), step(1)],
+        &[EngageRealtime("brigand".into()), join("warden", 0), step(1)],
     );
     let RealtimeAction::Attack { target, .. } = fighter(&engine, "brigand").action else {
         panic!("attacking");
@@ -719,7 +731,7 @@ fn engine_fighters_aim_by_their_authored_targeting() {
     let mut engine = Engine::new(&world).unwrap();
     run(
         &mut engine,
-        &[Duel("brigand".into()), join("warden", 0), step(1)],
+        &[EngageRealtime("brigand".into()), join("warden", 0), step(1)],
     );
     let RealtimeAction::Attack { target, .. } = fighter(&engine, "brigand").action else {
         panic!("attacking");
@@ -731,7 +743,7 @@ fn engine_fighters_aim_by_their_authored_targeting() {
 fn a_third_team_fights_everyone_else() {
     let world = hardy(yard());
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("left_twin".into())]);
+    run(&mut engine, &[EngageRealtime("left_twin".into())]);
     // The twins are team 1; the brigand comes over the wall for himself.
     run(&mut engine, &[join("brigand", 2), step(1)]);
     assert_eq!(fighter(&engine, "brigand").team, 2);
@@ -760,7 +772,7 @@ fn a_third_team_fights_everyone_else() {
 fn reinforcements_after_the_victory_start_a_new_fight() {
     let world = yard();
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("brigand".into())]);
+    run(&mut engine, &[EngageRealtime("brigand".into())]);
     fight_on(&mut engine, 500);
     assert!(engine.realtime().is_none());
     // The fight was settled by the blow that ended it; a twin arriving now
@@ -769,7 +781,7 @@ fn reinforcements_after_the_victory_start_a_new_fight() {
         engine.execute(join("left_twin", 1)),
         EngineError::NotFighting,
     );
-    let events = run(&mut engine, &[Duel("left_twin".into())]);
+    let events = run(&mut engine, &[EngageRealtime("left_twin".into())]);
     assert!(matches!(&events[..], [Event::EncounterStarted { .. }]));
     assert_eq!(fight(&engine).step, 0);
 }
@@ -784,7 +796,10 @@ fn a_reinforcement_keeps_its_own_groups_record() {
         .unwrap()
         .repeatable = true;
     let mut engine = Engine::new(&world).unwrap();
-    run(&mut engine, &[Duel("left_twin".into()), join("brigand", 1)]);
+    run(
+        &mut engine,
+        &[EngageRealtime("left_twin".into()), join("brigand", 1)],
+    );
     fight_on(&mut engine, 2_000);
     assert!(engine.realtime().is_none());
     let defeated = &combat(&engine).defeated;
@@ -796,7 +811,7 @@ fn a_reinforcement_keeps_its_own_groups_record() {
 fn a_grown_fight_saved_at_any_point_resumes_exactly() {
     let world = yard_with_warden(json!({ "guard_hold": 2 }));
     let mut whole = Engine::new_with_seed(&world, 3).unwrap();
-    let mut script = vec![Duel("brigand".into())];
+    let mut script = vec![EngageRealtime("brigand".into())];
     run(&mut whole, &script);
     script.extend(fight_on(&mut whole, 6));
     script.push(join("warden", 0));
@@ -826,7 +841,12 @@ fn saves_with_fight_states_the_rules_cannot_reach_are_refused() {
     let mut engine = Engine::new(&world).unwrap();
     run(
         &mut engine,
-        &[Duel("brigand".into()), step(2), join("warden", 0), step(1)],
+        &[
+            EngageRealtime("brigand".into()),
+            step(2),
+            join("warden", 0),
+            step(1),
+        ],
     );
     run(&mut engine, &[join("left_twin", 1)]);
     Engine::restore(&world, engine.snapshot()).unwrap();
@@ -879,7 +899,7 @@ fn saves_with_fight_states_the_rules_cannot_reach_are_refused() {
     }));
     // A twin cannot be in the fight without his brother if they started it.
     let mut twins = Engine::new(&world).unwrap();
-    run(&mut twins, &[Duel("left_twin".into())]);
+    run(&mut twins, &[EngageRealtime("left_twin".into())]);
     let mut snapshot = twins.snapshot();
     let mut split = twins.snapshot();
     let Stance::Realtime(fight) = &mut snapshot.state.combat.as_mut().unwrap().stance else {

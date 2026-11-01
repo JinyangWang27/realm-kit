@@ -322,7 +322,7 @@ fn resource_rules_are_bounded() {
 
 #[test]
 fn world_time_resource_rules_without_a_clock_or_carried_rage_only_warn() {
-    // The duel keeps no clock, so recovery never happens.
+    // The real-time fight keeps no clock, so recovery never happens.
     let mut world = duel();
     world.world.combat.as_mut().unwrap().resources.mp_recovery = Some(Recovery {
         percent: 10,

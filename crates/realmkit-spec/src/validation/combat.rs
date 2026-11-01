@@ -48,7 +48,7 @@ fn basics(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
     }
 }
 
-/// Real-time timing within its bounds, so the duel clock's arithmetic stays
+/// Real-time timing within its bounds, so the fight clock's arithmetic stays
 /// small, and a stagger wherever something can interrupt.
 fn realtime(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
     let Some(r) = combat.realtime else {

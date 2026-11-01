@@ -50,7 +50,7 @@ pub fn help(world: &WorldSpec) -> String {
         attack += "retinue — your soldiers\nrecruit <line> [count] — where soldiers are raised\nupgrade <line> <to-line> [count]\n";
     }
     if combat.is_some_and(|c| c.realtime.is_some()) {
-        attack += "duel <character-id> — a real-time fight on a fixed-step clock, with its group\nstep [steps] — run the duel's clock on\nstrike [skill-id] [at <character-id>] | guard | lower | disengage\ncontact <character-id> [target-id] — that fighter's active attack touched, as a host reports it\njoin <character-id> <team> — that fighter arrives, as a host reports it (0 is your side)\n";
+        attack += "fight <character-id> — a real-time fight on a fixed-step clock, with its group\nstep [steps] — run the fight's clock on\nstrike [skill-id] [at <character-id>] | guard | lower | disengage\ncontact <character-id> [target-id] — that fighter's active attack touched, as a host reports it\njoin <character-id> <team> — that fighter arrives, as a host reports it (0 is your side)\n";
     }
     let realtime = combat.and_then(|c| c.realtime);
     if realtime.is_some_and(|r| r.parry.is_some() || r.dodge.is_some()) {
@@ -256,7 +256,7 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
         ("wait", []) => Command::Wait(context.wait_step.ok_or("this world has no waiting")?),
         ("wait", [value]) => Command::Wait(minutes(&value.to_ascii_lowercase())?),
         ("engage", [id]) => Command::Engage((*id).into()),
-        ("duel", [id]) => Command::Duel((*id).into()),
+        ("fight", [id]) => Command::EngageRealtime((*id).into()),
         ("step", []) => Command::Intent(Intent::Advance(1)),
         ("step", [n]) => Command::Intent(Intent::Advance(
             n.parse().map_err(|_| "expected a number of steps")?,

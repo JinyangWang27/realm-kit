@@ -3,8 +3,8 @@
 RealmKit is a deterministic RPG engine, not a turn-based combat engine. A
 fighting character's progression and rules hold however a fight is run; the
 paused initiative timeline is one way to run one, and a fixed-step real-time
-duel is another. This page says which parts belong where, how MP and Rage
-work, how real-time duels run and where their authority ends, how named
+fight is another. This page says which parts belong where, how MP and Rage
+work, how real-time fights run and where their authority ends, how named
 companions fight in them under tactical orders, and what is not supported
 yet. Package fields are in
 [world-format.md](world-format.md#combat-block-numeric-rules-and-templates).
@@ -29,13 +29,13 @@ not personal combat and is not a real-time system.
 Field meanings are the core's, with each layer reading them in its own terms:
 
 - `speed` is how quickly a character acts. The timeline turns it into the delay
-  between turns; a duel divides each attack phase's length by it.
+  between turns; a real-time fight divides each attack phase's length by it.
 - A skill's `time` is the action's length relative to a basic attack. The
-  timeline delays the user's next turn by it; a duel scales each of the
+  timeline delays the user's next turn by it; a real-time fight scales each of the
   attack's phases by it, as a worn weapon's `basic_time` does a basic attack's.
 - `combat.resources.mp_regen_percent` belongs to the timeline alone: per
   baseline turn of encounter time. `combat.realtime.mp_regen_percent` is per
-  second of duel time. World-time regeneration is `mp_recovery`.
+  second of fight time. World-time regeneration is `mp_recovery`.
 
 ## One owner per character's vitals
 
@@ -43,7 +43,7 @@ Field meanings are the core's, with each layer reading them in its own terms:
 resources. Maxima are derived from effective stats and never saved.
 
 - The player's vitals live in `CombatState::vitals`, whatever the stance.
-  Exploring, an encounter, a duel and a battle all read and change that one copy.
+  Exploring, an encounter, a real-time fight and a battle all read and change that one copy.
 - A named companion's vitals live in its `CompanionState` in
   `GameState::companions` from the moment it is first recruited, in the party
   or out of it. A real-time fight it joins reads and changes that one copy.
@@ -96,13 +96,13 @@ words; it is still the same resource, not a third one.
 
 ### Clocks
 
-World time, encounter time and duel time are separate clocks and never
+World time, encounter time and fight time are separate clocks and never
 regenerate the same MP twice:
 
-- An encounter, duel or battle never advances world time: travel, waiting,
+- An encounter, real-time fight or battle never advances world time: travel, waiting,
   resting and host-reported `PassTime` are refused during them.
-- Encounter time exists only inside an encounter and duel time only inside a
-  duel; the player is never in both. Each one's regeneration progress
+- Encounter time exists only inside an encounter and fight time only inside a
+  real-time fight; the player is never in both. Each one's regeneration progress
   (`Participant::mp_remainder`, `Fighter::mp_remainder`) ends with it.
 - World-time recovery and decay happen at fixed multiples of `every`, counted
   from minute 0. Crossing boundaries is additive, so a span split anywhere
@@ -110,16 +110,15 @@ regenerate the same MP twice:
   a journey interrupted by scheduled events) crosses the same boundaries, and nothing needs saving between them.
   Boundaries at a minute apply before anything else scheduled then.
 
-## Real-time duels
+## Real-time fights
 
-A world whose combat block has `realtime` runs real-time fights ("duels",
-after the command that starts them) on a fixed-step clock inside the engine,
+A world whose combat block has `realtime` runs real-time fights on a fixed-step clock inside the engine,
 beside the turn-based layer. A fight starts as the player against one
 opponent or a group, and can grow while it runs: hostile reinforcements,
 friendly NPCs and third parties join without restarting it. Fighters attack
 with basic attacks and skills in three phases, guard, and the player can
 retreat. Package fields are in
-[world-format.md](world-format.md#real-time-duels).
+[world-format.md](world-format.md#real-time-fights).
 
 ### Fighters and teams
 
@@ -150,7 +149,7 @@ blow).
 
 ### Lifecycle
 
-1. **Start.** `Command::Duel(id)` starts a fight with a fighter here, not
+1. **Start.** `Command::EngageRealtime(id)` starts a fight with a fighter here, not
    defeated and not an `ally`, and whoever engaging it would bring in: it
    alone, or every present, undefeated member of its group, all on team 1.
    `EncounterStarted` names them. The player brings their own vitals;
@@ -263,7 +262,7 @@ runs in one fixed order:
 4. each engine-controlled fighter still fighting acts by its policy, in join
    order (below).
 
-With two fighters this is exactly the one-on-one duel's order. An advance
+With two fighters this is exactly the one-on-one fight's order. An advance
 stops at the step the fight ends. Because every step does the same thing
 whatever command it came in, splitting an advance anywhere (one step per
 host frame, or many) gives the same state and events. `steps_per_second`
@@ -423,7 +422,7 @@ the engine decides everything that follows:
   skill's power and channel, worn gear's modifiers on the player, and the
   target's guard, whoever the two fighters are;
 - **no random crit and no accuracy roll:** a landed real-time hit deals the
-  same damage from the same state, and duels draw nothing from any random
+  same damage from the same state, and real-time fights draw nothing from any random
   stream;
 - HP loss (stopping at 1 HP in a yielding group), Rage for being hit, Rage
   for acting credited to the attacker only because the attack landed, so
@@ -673,7 +672,7 @@ orders included.
 
 ## Not supported yet
 
-- Verified real-time hit detection: duel contact is host-reported and only
+- Verified real-time hit detection: real-time contact is host-reported and only
   bounded by the engine (see [Contact and its authority](#contact-and-its-authority)).
 - Consumables or gear changes during a fight; engine-controlled fighters
   that space or retreat; formations; redirection, directional parries,
@@ -718,10 +717,10 @@ compiler flags every call site.
 field (`realtime.friendly_fire`, a profile's `ally`, `targeting` and
 `guard_hold`) is optional, absent by default and not serialized when absent.
 Encounters, damage, RNG draws, progression and battles are unchanged. A
-one-on-one duel plays exactly as before, step for step: every example
+one-on-one fight plays exactly as before, step for step: every example
 walkthrough produces byte-identical fights and save files. The one visible
-difference is that a group member can now be dueled, so the practice yard's
-menu also offers `Duel The Left Twin` and `Duel The Right Twin`. Turn-based
+difference is that a group member can now be fought in real time, so the practice yard's
+menu also offers `Fight The Left Twin` and `Fight The Right Twin`. Turn-based
 encounters settle through the same `settle` function as real-time fights;
 recording each fallen opponent by its own group's `repeatable` is the same
 rule there, since all of an encounter's opponents share one group.
@@ -729,9 +728,9 @@ rule there, since all of an encounter's opponents share one group.
 Saves keep format 19, as the [format policy](world-format.md#versions)
 allows: every save outside a real-time fight parses and loads exactly as
 before. The real-time stance is now `realtime`, holding a list of fighters
-with teams, so a save made in the middle of a one-on-one duel by an earlier
+with teams, so a save made in the middle of a one-on-one fight by an earlier
 build (stance `dueling`) no longer parses and is refused, never
-reinterpreted; finish the duel there, or start it again. A world that gains
+reinterpreted; finish the real-time fight there, or start it again. A world that gains
 or loses `realtime` changes its rules revision, so saves made before are
 refused. The player's vitals stay in `combat.vitals`; a save in the earlier
 layout that kept them in the stance is refused by name, with the advice to

@@ -1,6 +1,6 @@
 //! MP and Rage in the character core: which a character uses, skills that
 //! spend either or both, what world time does to them, and how they survive
-//! saving. The duel gains a clock and both resources for these tests.
+//! saving. The real-time fight gains a clock and both resources for these tests.
 
 mod common;
 
@@ -40,7 +40,7 @@ fn skill(id: &str, power: u32, costs: Costs) -> Skill {
     }
 }
 
-/// The duel with a clock, Rage that carries up to a cap of 10 and decays a
+/// The real-time fight with a clock, Rage that carries up to a cap of 10 and decays a
 /// point every 30 minutes, MP that recovers a quarter every hour, and two
 /// more skills: `slash` for 4 Rage and `storm` for 6 MP and 3 Rage.
 fn fighters(uses: Option<ResourceUse>, player_skills: &[&str]) -> WorldSpec {
@@ -534,7 +534,7 @@ fn a_world_without_combat_has_no_vitals_at_all() {
 
 #[test]
 fn without_a_choice_resources_follow_the_world() {
-    // The duel's apprentice has MP and the world builds no Rage.
+    // The real-time fight's apprentice has MP and the world builds no Rage.
     let world = duel();
     let engine = Engine::new(&world).unwrap();
     let pools = engine.player_pools().unwrap();
