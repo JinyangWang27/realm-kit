@@ -233,6 +233,29 @@ impl<'w> Engine<'w> {
         self.world.combat()?;
         Some(character::resources::profile_pools(self.world, profile))
     }
+    /// The skills the player knows, in order: the world's `player_skills`,
+    /// then each learned technique's skill at its rank. Empty without combat.
+    pub fn player_skills(&self) -> Vec<&'w Skill> {
+        let Some(combat) = self.state.combat.as_ref() else {
+            return Vec::new();
+        };
+        techniques::player_skills(self.world, combat)
+    }
+    /// Whether the player could pay for and use `skill` now, timing and
+    /// targets aside: refused as `UnknownSkill`, `SkillLocked`,
+    /// `NotEnoughMp` or `NotEnoughRage`, as a skill intent or encounter
+    /// action using it would be. Changes nothing.
+    pub fn skill_usable(&self, skill: &str) -> Result<(), EngineError> {
+        let unknown = || EngineError::UnknownSkill(skill.into());
+        let combat = self.state.combat.as_ref().ok_or_else(unknown)?;
+        let known = techniques::player_skills(self.world, combat);
+        let skill = known
+            .into_iter()
+            .find(|s| s.id == skill)
+            .ok_or_else(unknown)?;
+        let pools = self.player_pools().ok_or_else(unknown)?;
+        encounter::check_skill(&combat.vitals, pools, combat.level, skill)
+    }
     /// Stat points granted so far and not yet spent; `None` without combat.
     pub fn unspent_points(&self) -> Option<u32> {
         let combat = self.state.combat.as_ref()?;

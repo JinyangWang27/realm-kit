@@ -366,3 +366,37 @@ fn a_rank_that_lowers_max_hp_carries_rage_progress_over() {
         }
     }
 }
+
+#[test]
+fn the_player_skills_and_whether_one_is_usable_are_queries() {
+    let world = sect();
+    let mut engine = Engine::new(&world).unwrap();
+    assert!(engine.player_skills().is_empty());
+    assert!(matches!(
+        engine.skill_usable("palm_drifting"),
+        Err(EngineError::UnknownSkill(_))
+    ));
+    learn_palm(&mut engine);
+    let known: Vec<&str> = engine
+        .player_skills()
+        .iter()
+        .map(|s| s.id.as_str())
+        .collect();
+    assert_eq!(known, ["palm_drifting"]);
+    let before = engine.state().clone();
+    assert!(engine.skill_usable("palm_drifting").is_ok());
+    assert!(matches!(
+        engine.skill_usable("palm_storm"),
+        Err(EngineError::UnknownSkill(_))
+    ));
+    assert_eq!(engine.state(), &before, "a query changes nothing");
+
+    // Short of MP: refused as a skill intent would be.
+    let mut snapshot = engine.snapshot();
+    snapshot.state.combat.as_mut().unwrap().vitals.mp = 4;
+    let engine = Engine::restore(&world, snapshot).unwrap();
+    assert!(matches!(
+        engine.skill_usable("palm_drifting"),
+        Err(EngineError::NotEnoughMp(_))
+    ));
+}
