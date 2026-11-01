@@ -352,10 +352,10 @@ fn no_fight_lets_world_time_pass() {
     engine.execute(Move(Direction::North)).unwrap();
     engine.execute(Engage("grey_wolf".into())).unwrap();
     refused_in_a_fight(&mut engine);
-    // A real-time duel on its own clock, in a world with world time.
-    let world = duel_yard();
+    // A real-time fight on its own clock, in a world with world time.
+    let world = realtime_yard();
     let mut engine = Engine::new_with_seed(&world, 7).unwrap();
-    engine.execute(Duel("brigand".into())).unwrap();
+    engine.execute(EngageRealtime("brigand".into())).unwrap();
     refused_in_a_fight(&mut engine);
     // A mass battle.
     let world = marches();
@@ -393,7 +393,7 @@ fn refused_in_a_fight(engine: &mut Engine<'_>) {
     assert_eq!(engine.state(), &before);
 }
 
-fn duel_yard() -> WorldSpec {
+fn realtime_yard() -> WorldSpec {
     WorldSpec::load(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../examples/practice-yard"
@@ -401,7 +401,7 @@ fn duel_yard() -> WorldSpec {
     .unwrap()
 }
 
-/// The duel world with a clock, MP that recovers a quarter every hour and
+/// The real-time fight world with a clock, MP that recovers a quarter every hour and
 /// Rage that decays a point every 30 minutes, for a player who uses both.
 fn recovering() -> WorldSpec {
     let mut world = duel();

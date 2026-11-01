@@ -1,5 +1,5 @@
 look
-duel master
+fight master
 guard
 step 4
 contact master
@@ -20,7 +20,7 @@ strike
 step 3
 contact trainee
 status
-duel brigand
+fight brigand
 disengage
 strike
 step 3

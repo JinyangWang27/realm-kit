@@ -28,7 +28,7 @@ pub(crate) fn rules(world: &WorldSpec) -> Result<&Realtime, EngineError> {
     world
         .combat()
         .and_then(|c| c.realtime.as_ref())
-        .ok_or(EngineError::NoDuels)
+        .ok_or(EngineError::NoRealtime)
 }
 
 /// A fighter's numbers, which cannot change while the fight lasts: nothing

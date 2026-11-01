@@ -18,7 +18,7 @@ pub struct Combat {
     /// can be engaged in a personal fight, while everything else stays.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeline: Option<Timeline>,
-    /// Real-time duels on a fixed-step clock; without it, nobody can be
+    /// Real-time fights on a fixed-step clock; without it, nobody can be
     /// fought one-on-one in real time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub realtime: Option<Realtime>,
@@ -91,7 +91,7 @@ pub struct Timeline {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Realtime {
-    /// Steps in one second of duel time: the rate a host steps at, and the
+    /// Steps in one second of fight time: the rate a host steps at, and the
     /// span `mp_regen_percent` is measured in. The engine reads no clock.
     pub steps_per_second: u32,
     /// Committed steps before an attack can connect.
@@ -107,7 +107,7 @@ pub struct Realtime {
     pub guard_percent: u32,
     /// Steps from turning to retreat until the player is away.
     pub retreat: u32,
-    /// Percent of maximum MP regained per second of duel time. Duel time is
+    /// Percent of maximum MP regained per second of fight time. Real-time fight time is
     /// neither world time nor encounter time.
     #[serde(default)]
     pub mp_regen_percent: u32,
@@ -231,7 +231,7 @@ pub const STEP_RATE_BOUND: u32 = 1_000;
 pub const PHASE_BOUND: u32 = 10_000;
 /// Highest authored impact or poise.
 pub const POISE_BOUND: u32 = 100;
-/// Most steps one advance of a duel's clock may take.
+/// Most steps one advance of a fight's clock may take.
 pub const ADVANCE_BOUND: u32 = 10_000;
 
 /// Engine bound for every authored stat; keeps damage arithmetic small.

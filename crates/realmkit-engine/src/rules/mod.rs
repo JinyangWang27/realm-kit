@@ -120,7 +120,7 @@ pub(super) fn fighting(state: &GameState) -> Option<&Encounter> {
     }
 }
 
-pub(super) fn dueling(state: &GameState) -> bool {
+pub(super) fn in_realtime(state: &GameState) -> bool {
     state
         .combat
         .as_ref()
@@ -233,9 +233,9 @@ pub(super) fn execute(
     if fighting(state).is_some() && !panel && !combat_action {
         return Err(EngineError::InEncounter);
     }
-    // In a duel only intents, orders and panels are possible.
+    // In a real-time fight only intents, orders and panels are possible.
     let realtime = matches!(command, Command::Intent(_) | Command::Tactic { .. });
-    if dueling(state) && !panel && !realtime {
+    if in_realtime(state) && !panel && !realtime {
         return Err(EngineError::InEncounter);
     }
     // In a battle only orders and panels are possible.
@@ -305,7 +305,7 @@ pub(super) fn execute(
             battle::engage(world, state, id, &mut events)?
         }
         Command::Engage(id) => encounter::engage(world, state, id, &mut events)?,
-        Command::Duel(id) => realtime::start(world, state, id, &mut events)?,
+        Command::EngageRealtime(id) => realtime::start(world, state, id, &mut events)?,
         Command::Intent(intent) => realtime::intent(world, state, intent, &mut events)?,
         Command::Tactic { companion, order } => {
             party::tactic(world, state, companion, order, &mut events)?

@@ -57,7 +57,7 @@ pub enum Command {
     Flee,
     /// Starts a real-time fight with a fighter here and whoever engaging it
     /// would bring in: one opponent, or its whole group.
-    Duel(Id),
+    EngageRealtime(Id),
     /// In a real-time fight: one input on its fixed-step clock.
     Intent(Intent),
     /// Gives a named companion in the party a standing tactical order,

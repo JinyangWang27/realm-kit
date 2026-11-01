@@ -888,16 +888,16 @@ fn text_lists_every_prose_key_an_overlay_needs() {
 const YARD: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/practice-yard");
 
 #[test]
-fn a_line_host_steps_real_time_duels_and_reports_contact() {
+fn a_line_host_steps_real_time_fights_and_reports_contact() {
     let walkthrough = std::fs::read_to_string(format!("{YARD}/walkthrough.txt")).unwrap();
     let play = || run(&["play", YARD, "--seed", "7", "--line"], &walkthrough);
     let output = play();
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
-    // The same intents replay the same duels.
+    // The same intents replay the same real-time fights.
     assert_eq!(String::from_utf8(play().stdout).unwrap(), text);
     for passage in [
-        "Duel The Sparring Master",
+        "Fight The Sparring Master",
         "Step 0 | You HP 40/40 · MP 12/12 · rage 0 · ready | The Sparring Master HP 40/40 · MP 6/6 · rage 0 · ready",
         "Wait a step",
         "Raise guard",

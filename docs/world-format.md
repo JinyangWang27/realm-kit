@@ -774,7 +774,7 @@ skill's unlock level), `basic_channel` (`physical` by default), `level`
 (default 1; it also scales the XP the character grants), an optional
 `group`, an optional `resources` choice (see [MP and Rage](#mp-and-rage)), and
 the real-time-only `ally`, `targeting`, `guard_hold` and `reaction` (see
-[Real-time duels](#real-time-duels)). A defeated character is gone: it is no longer listed and cannot be
+[Real-time fights](#real-time-fights)). A defeated character is gone: it is no longer listed and cannot be
 talked to. A character with a combat profile is one instance: it may be placed
 at most once, and its defeat is permanent (no respawns) unless its group is
 repeatable. Other
@@ -1171,7 +1171,7 @@ the next), so the choice need not repeat the condition.
 The optional `combat` object in `world.json` holds the level table, skills and
 combat prose. Everything in it except the `timeline` and `realtime` describes
 characters however a fight is run; the `timeline` enables turn-based
-encounters and [`realtime`](#real-time-duels) real-time fights. See
+encounters and [`realtime`](#real-time-fights) real-time fights. See
 [Combat architecture](combat.md) for which rules belong to which layer:
 
 ```json
@@ -1606,13 +1606,13 @@ again at once and rewards every victory (a defeat objective counts the first).
 Yielded opponents grant and record nothing. A victory sets the group's
 `victory_flags`. The player dying is ordinary death.
 
-### Real-time duels
+### Real-time fights
 
 A combat block with `realtime` lets the player fight in real time on a
 fixed-step clock inside the engine: one opponent or a group, with allies and
 foes who can join while the fight runs. It is optional and may sit beside a
-`timeline`; each fighter can then be engaged turn-based or dueled.
-See [Real-time duels](combat.md#real-time-duels) for the step order, teams,
+`timeline`; each fighter can then be engaged turn-based or fought in real time.
+See [Real-time fights](combat.md#real-time-fights) for the step order, teams,
 joins, the host's contact reports and their limits.
 
 ```json
@@ -1629,8 +1629,8 @@ joins, the host's contact reports and their limits.
 }
 ```
 
-- `steps_per_second` (1–1,000): how many steps make one second of duel time.
-  Hosts step at this rate to show the duel at its pace; the engine reads no
+- `steps_per_second` (1–1,000): how many steps make one second of fight time.
+  Hosts step at this rate to show the real-time fight at its pace; the engine reads no
   clock. MP regeneration is measured per second of steps.
 - `windup`, `active`, `recovery` (1–10,000 steps each): a basic attack's
   phases at speed 100. For a fighter at effective speed `s` (at least 1)
@@ -1644,16 +1644,16 @@ joins, the host's contact reports and their limits.
 - `retreat` (1–10,000 steps): how long turning to retreat takes before the
   player is away; a `no_flee` group forbids it.
 - `mp_regen_percent` (0–100, default 0): percent of maximum MP regained per
-  second of duel time, carrying the fraction. It is separate from the
+  second of fight time, carrying the fraction. It is separate from the
   timeline's `resources.mp_regen_percent` and from world-time `mp_recovery`;
-  a duel passes no world time.
+  a real-time fight passes no world time.
 - `friendly_fire` (default false): whether a host's contact report may land a
   blow on a fighter of the attacker's own team. Without it such a report is
   refused. Nobody ever aims an attack at a teammate.
 
-`duel` starts a fight with a fighter here and whoever `engage` would bring
+`EngageRealtime` (the CLI's `fight`) starts a fight with a fighter here and whoever `engage` would bring
 in: the fighter alone, or every present, undefeated member of its group, all
-on team 1. An `ally` cannot be the one dueled. Groups shape real-time fights
+on team 1. An `ally` cannot be the one fought in real time. Groups shape real-time fights
 as they do encounters: the group the fight started with sets `yield_share`,
 `no_flee`, `victory_flags` and `defeat_flags` for everyone in it,
 reinforcements included, while each fallen opponent is recorded unless its

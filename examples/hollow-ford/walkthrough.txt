@@ -11,7 +11,7 @@ talk oake
 1
 status
 travel ford
-duel ford_captain
+fight ford_captain
 join wren 0
 join oake 0
 order wren attack ford_lookout

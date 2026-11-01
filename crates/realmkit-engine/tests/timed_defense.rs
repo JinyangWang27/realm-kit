@@ -21,7 +21,7 @@ fn script(text: &str) -> Vec<Command> {
             let words: Vec<&str> = line.split_whitespace().collect();
             let id = |i: usize| words.get(i).map(|w| w.to_string());
             Intent(match words[0] {
-                "duel" => return Duel(words[1].into()),
+                "fight" => return EngageRealtime(words[1].into()),
                 "step" => I::Advance(words.get(1).map_or(1, |n| n.parse().unwrap())),
                 "strike" => match id(1) {
                     None => I::Attack { target: None },
@@ -119,8 +119,8 @@ fn light_and_heavy_attacks_trade_time_for_power() {
     let world = hall();
     // The jab runs at 60% of a basic attack's time, the cleave at 160%:
     // wind-up 2, active 2, recovery 3 against 5, 4 and 7.
-    let mut light = fighting(&world, &[Duel("bruiser".into()), skill("jab")]);
-    let mut heavy = fighting(&world, &[Duel("bruiser".into()), skill("cleave")]);
+    let mut light = fighting(&world, &[EngageRealtime("bruiser".into()), skill("jab")]);
+    let mut heavy = fighting(&world, &[EngageRealtime("bruiser".into()), skill("cleave")]);
     for (engine, phases) in [(&mut light, [2, 4, 7]), (&mut heavy, [5, 9, 16])] {
         for (until, phase) in phases.into_iter().zip([
             AttackPhase::Windup,
@@ -159,7 +159,12 @@ fn heavy_poise_stands_through_light_impact_and_simultaneous_blows_resolve_in_ord
     // impact 1 lands on it without interrupting it.
     let mut engine = fighting(
         &world,
-        &[Duel("bruiser".into()), step(1), skill("jab"), step(2)],
+        &[
+            EngageRealtime("bruiser".into()),
+            step(1),
+            skill("jab"),
+            step(2),
+        ],
     );
     let events = run(&mut engine, &[contact("fencer")]);
     assert!(!events.contains(&staggered("bruiser")));
@@ -173,7 +178,12 @@ fn heavy_poise_stands_through_light_impact_and_simultaneous_blows_resolve_in_ord
     // A cleave begun with the maul strikes at the same step. Whichever blow
     // the host reports first lands and interrupts the other, whose report
     // then finds no attack: both have poise 1 and impact 2.
-    let both = [Duel("bruiser".into()), step(1), skill("cleave"), step(5)];
+    let both = [
+        EngageRealtime("bruiser".into()),
+        step(1),
+        skill("cleave"),
+        step(5),
+    ];
     let mut player_first = fighting(&world, &both);
     let events = run(&mut player_first, &[contact("fencer")]);
     assert!(events.contains(&staggered("bruiser")));
@@ -204,7 +214,10 @@ fn heavy_poise_stands_through_light_impact_and_simultaneous_blows_resolve_in_ord
 fn a_parry_in_its_window_deflects_the_blow_and_opens_a_counter() {
     let world = hall();
     // The duelist's thrust is active at steps 4 and 5; a parry opens for one step.
-    let mut engine = fighting(&world, &[Duel("duelist".into()), step(4), Intent(I::Parry)]);
+    let mut engine = fighting(
+        &world,
+        &[EngageRealtime("duelist".into()), step(4), Intent(I::Parry)],
+    );
     assert_eq!(
         action(&engine, "fencer"),
         RealtimeAction::Parry {
@@ -263,12 +276,21 @@ fn a_mistimed_parry_takes_the_full_hit_and_commits_its_recovery() {
     let world = hall();
     let unparried = fighting(
         &world,
-        &[Duel("duelist".into()), step(4), contact("duelist")],
+        &[
+            EngageRealtime("duelist".into()),
+            step(4),
+            contact("duelist"),
+        ],
     );
     // A parry one step early has closed when the thrust lands.
     let mut engine = fighting(
         &world,
-        &[Duel("duelist".into()), step(3), Intent(I::Parry), step(1)],
+        &[
+            EngageRealtime("duelist".into()),
+            step(3),
+            Intent(I::Parry),
+            step(1),
+        ],
     );
     let events = run(&mut engine, &[contact("duelist")]);
     assert!(!events.iter().any(|e| matches!(e, Event::Parried { .. })));
@@ -310,7 +332,12 @@ fn a_dodge_evades_only_inside_its_window_and_leaves_the_attack_live() {
     let world = hall();
     let mut engine = fighting(
         &world,
-        &[Duel("duelist".into()), step(3), Intent(I::Dodge), step(1)],
+        &[
+            EngageRealtime("duelist".into()),
+            step(3),
+            Intent(I::Dodge),
+            step(1),
+        ],
     );
     let events = run(&mut engine, &[contact("duelist")]);
     assert_eq!(
@@ -344,7 +371,10 @@ fn a_dodge_evades_only_inside_its_window_and_leaves_the_attack_live() {
 fn impact_above_poise_interrupts_guards_retreats_and_idle_fighters() {
     let world = hall();
     // A raised guard (poise 1) stands through a thrust (impact 1)...
-    let mut engine = fighting(&world, &[Duel("duelist".into()), Intent(I::Guard), step(4)]);
+    let mut engine = fighting(
+        &world,
+        &[EngageRealtime("duelist".into()), Intent(I::Guard), step(4)],
+    );
     let events = run(&mut engine, &[contact("duelist")]);
     assert!(matches!(events[0], Event::Blocked { .. }));
     assert_eq!(
@@ -352,7 +382,10 @@ fn impact_above_poise_interrupts_guards_retreats_and_idle_fighters() {
         RealtimeAction::Guard { ready_at: 1 }
     );
     // ...but a maul (impact 2) breaks it, after the guard has taken its share.
-    let mut engine = fighting(&world, &[Duel("bruiser".into()), Intent(I::Guard), step(6)]);
+    let mut engine = fighting(
+        &world,
+        &[EngageRealtime("bruiser".into()), Intent(I::Guard), step(6)],
+    );
     let events = run(&mut engine, &[contact("bruiser")]);
     assert!(matches!(events[0], Event::Blocked { .. }));
     assert_eq!(events.last(), Some(&staggered("fencer")));
@@ -368,8 +401,12 @@ fn impact_above_poise_interrupts_guards_retreats_and_idle_fighters() {
         EngineError::NotGuarding.to_string()
     );
     // A guard still rising, a retreat and an idle fighter have no poise.
-    let rising = [Duel("duelist".into()), step(4), Intent(I::Guard)];
-    let retreating = [Duel("duelist".into()), Intent(I::Retreat), step(4)];
+    let rising = [EngageRealtime("duelist".into()), step(4), Intent(I::Guard)];
+    let retreating = [
+        EngageRealtime("duelist".into()),
+        Intent(I::Retreat),
+        step(4),
+    ];
     for setup in [&rising[..], &retreating[..]] {
         let mut engine = fighting(&world, setup);
         let events = run(&mut engine, &[contact("duelist")]);
@@ -378,14 +415,14 @@ fn impact_above_poise_interrupts_guards_retreats_and_idle_fighters() {
         run(&mut engine, &[step(10)]);
         assert!(engine.realtime().is_some());
     }
-    let mut engine = fighting(&world, &[Duel("duelist".into()), step(4)]);
+    let mut engine = fighting(&world, &[EngageRealtime("duelist".into()), step(4)]);
     let events = run(&mut engine, &[contact("duelist")]);
     assert_eq!(events.last(), Some(&staggered("fencer")));
     // Basic attacks have no impact, and a recovering attacker is not interrupted.
     let mut engine = fighting(
         &world,
         &[
-            Duel("duelist".into()),
+            EngageRealtime("duelist".into()),
             Intent(I::Attack { target: None }),
             step(5),
         ],
@@ -407,7 +444,7 @@ fn engine_controlled_fighters_parry_by_their_reaction() {
     // The swordmaster guards; when the player's attack is active and has
     // not landed, she parries, with the same window and recovery.
     let opening = [
-        Duel("swordmaster".into()),
+        EngageRealtime("swordmaster".into()),
         step(1),
         Intent(I::Attack { target: None }),
         step(3),
@@ -486,7 +523,7 @@ fn hooked(world: &WorldSpec) -> Engine<'_> {
             Talk("oake".into()),
             ChooseDialogue(1),
             Travel("ford".into()),
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             Intent(I::Join {
                 character: "oake".into(),
                 team: 0,
@@ -597,7 +634,7 @@ fn saves_with_defence_states_the_rules_cannot_reach_are_refused() {
     let engine = fighting(
         &world,
         &[
-            Duel("swordmaster".into()),
+            EngageRealtime("swordmaster".into()),
             step(1),
             Intent(I::Attack { target: None }),
             step(3),
@@ -668,7 +705,7 @@ fn worlds_without_timed_defence_refuse_it_and_offer_none() {
         "/../../examples/practice-yard"
     ))
     .unwrap();
-    let mut engine = fighting(&world, &[Duel("master".into())]);
+    let mut engine = fighting(&world, &[EngageRealtime("master".into())]);
     let before = engine.snapshot().to_json();
     assert_eq!(
         engine.execute(Intent(I::Parry)).unwrap_err().to_string(),
@@ -702,7 +739,7 @@ fn worlds_without_timed_defence_refuse_it_and_offer_none() {
 fn a_newcomer_staggered_at_the_step_it_joined_saves_and_resumes() {
     let world = hall();
     let script = [
-        Duel("duelist".into()),
+        EngageRealtime("duelist".into()),
         step(4),
         Intent(I::Join {
             character: "bruiser".into(),

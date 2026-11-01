@@ -30,7 +30,7 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     }
     match state.combat.as_ref().map(|c| &c.stance) {
         Some(Stance::Battle(battle)) => return battle_actions(world, battle, panels),
-        Some(Stance::Realtime(duel)) => return duel_actions(world, state, duel, panels),
+        Some(Stance::Realtime(fight)) => return realtime_actions(world, state, fight, panels),
         _ => {}
     }
     let location = world.location(&state.player.location).unwrap();
@@ -62,7 +62,7 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
                 here.iter()
                     .filter(|id| !defeated(state, id))
                     .filter(|id| character_here(world, state, id).is_some_and(foe))
-                    .map(|id| available(Command::Duel((*id).clone()))),
+                    .map(|id| available(Command::EngageRealtime((*id).clone()))),
             );
         }
     }
@@ -329,7 +329,7 @@ fn battle_actions(world: &WorldSpec, battle: &BattleState, panels: Vec<Action>) 
 /// The intents a real-time fight takes at its current step: strikes at
 /// each foe still fighting (untargeted when there is only one), then guard,
 /// the world's parry and dodge, and retreat. Contact and joins are the host's to report, never offered.
-fn duel_actions(
+fn realtime_actions(
     world: &WorldSpec,
     state: &GameState,
     fight: &RealtimeEncounter,

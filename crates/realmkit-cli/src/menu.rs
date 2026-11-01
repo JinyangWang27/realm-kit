@@ -25,7 +25,7 @@ const MP: &str = "MP";
 const RAGE: &str = "rage";
 const REST: &str = "Rest";
 const FLEE: &str = "Flee";
-const DUEL: &str = "Duel";
+const FIGHT: &str = "Fight";
 const STEP: &str = "Wait a step";
 const STRIKE: &str = "Strike";
 const AT: &str = "at";
@@ -252,12 +252,12 @@ fn fighter_line(engine: &Engine<'_>, character: &str, v: Vitals, yielded: bool) 
 
 /// "Step 12 | You HP 40/40 · ready | The Master HP 30/30 · striking until 15":
 /// each fighter's vitals and what they are committed to, and until when.
-fn duel_lines(engine: &Engine<'_>) -> Vec<String> {
-    let Some(duel) = engine.realtime() else {
+fn fight_lines(engine: &Engine<'_>) -> Vec<String> {
+    let Some(fight) = engine.realtime() else {
         return Vec::new();
     };
-    let mut parts = vec![format!("{STEP_NOW} {}", duel.step)];
-    for (i, f) in duel.fighters.iter().enumerate() {
+    let mut parts = vec![format!("{STEP_NOW} {}", fight.step)];
+    for (i, f) in fight.fighters.iter().enumerate() {
         let doing = match &f.action {
             RealtimeAction::Ready => READY.to_string(),
             RealtimeAction::Attack { phase, until, .. } => {
@@ -268,14 +268,14 @@ fn duel_lines(engine: &Engine<'_>) -> Vec<String> {
                 };
                 format!("{phase} {UNTIL} {until}")
             }
-            RealtimeAction::Guard { ready_at } if *ready_at <= duel.step => GUARD_UP.to_string(),
+            RealtimeAction::Guard { ready_at } if *ready_at <= fight.step => GUARD_UP.to_string(),
             RealtimeAction::Guard { ready_at } => format!("{GUARD_RAISING} {UNTIL} {ready_at}"),
             RealtimeAction::Retreat { until } => format!("{DISENGAGING} {UNTIL} {until}"),
             // Open until the window closes, then exposed through the recovery.
-            RealtimeAction::Parry { open_until, .. } if duel.step < *open_until => {
+            RealtimeAction::Parry { open_until, .. } if fight.step < *open_until => {
                 format!("{PARRYING} {UNTIL} {open_until}")
             }
-            RealtimeAction::Dodge { open_until, .. } if duel.step < *open_until => {
+            RealtimeAction::Dodge { open_until, .. } if fight.step < *open_until => {
                 format!("{DODGING} {UNTIL} {open_until}")
             }
             RealtimeAction::Parry { until, .. } | RealtimeAction::Dodge { until, .. } => {
@@ -283,7 +283,7 @@ fn duel_lines(engine: &Engine<'_>) -> Vec<String> {
             }
             RealtimeAction::Staggered { until } => format!("{STAGGERED} {UNTIL} {until}"),
         };
-        let v = *duel.vitals(i, engine.state());
+        let v = *fight.vitals(i, engine.state());
         // Only fights that grew beyond the player and their foes say whose
         // side; a named companion also says its order.
         let side = match f.team {
@@ -666,7 +666,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Rest => REST.into(),
         Command::Wait(minutes) => format!("{WAIT} — {}", duration(*minutes)),
         Command::Flee => FLEE.into(),
-        Command::Duel(id) => format!("{DUEL} {}", world.character(id)?.name),
+        Command::EngageRealtime(id) => format!("{FIGHT} {}", world.character(id)?.name),
         // "Order Wren: attack The Lookout".
         Command::Tactic { companion, order } => format!(
             "{ORDER} {}: {}",
@@ -921,7 +921,7 @@ impl Menu {
             header: if engine.battle().is_some() {
                 battle_lines(engine)
             } else if engine.realtime().is_some() {
-                duel_lines(engine)
+                fight_lines(engine)
             } else {
                 encounter_lines(engine)
             },

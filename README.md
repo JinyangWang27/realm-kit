@@ -158,14 +158,14 @@ Opponents answer with their own skills, and the player can rest at safe places
 timeline, which is one optional way to run a fight ([docs/combat.md](docs/combat.md)). Packs fight together, some
 fights can be repeated for grinding, you can flee most of them, and sparring
 partners yield instead of dying (`examples/arena`). A world may also run
-one-on-one duels in real time on a fixed-step clock inside the engine
-(`Duel The Sparring Master`, or `duel master`): attacks wind up, strike and
+one-on-one fights in real time on a fixed-step clock inside the engine
+(`Fight The Sparring Master`, or `fight master`): attacks wind up, strike and
 recover over steps, a raised guard lets only part of a hit through, and a
 retreat takes time. In the terminal you step the clock yourself (`step 3`,
 `strike`, `strike lunge`, `guard`, `lower`, `disengage`) and play the host's
 part by reporting that an active attack touched (`contact master`); the
 engine decides whether it could and what it does (`examples/practice-yard`).
-A real-time fight can be a group (`duel left_twin` brings in both twins, and
+A real-time fight can be a group (`fight left_twin` brings in both twins, and
 `strike at right_twin` picks one), and can grow while it runs: the host
 reports arrivals (`join brigand 1` for another foe, `join <ally> 0` for a
 friend at your side), allies fight by the same rules as foes, and the fight

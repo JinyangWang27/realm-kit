@@ -276,17 +276,17 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   (`player_resources`, a profile's `resources`) or as before by default. MP is a
   reserve that time refills; Rage is momentum that fighting builds, optionally
   capped, carried and decayed. Skills may cost both.
-- **Clocks never overlap:** fights pass no world time, so timeline, duel and
+- **Clocks never overlap:** fights pass no world time, so timeline, real-time fight and
   world-time regeneration never cover the same span.
-- **Real-time layer (minimal slice):** optional `realtime` one-on-one duels
+- **Real-time layer (minimal slice):** optional `realtime` one-on-one fights
   beside `encounter/`, on an engine-side fixed-step clock moved only by
   explicit advances. Attacks run wind-up, active and recovery phases scaled by
   speed and skill time; a guard with a raise time and a damage share; a
   timed retreat; an authored opponent policy; yielding and `no_flee` from
-  groups; duel-time MP regeneration; saves at any step; settlement shared
+  groups; fight-time MP regeneration; saves at any step; settlement shared
   with encounters, exactly once. Contact is host-reported and only bounded by
   the engine (active window, once per attack), with no accuracy or crit roll.
-- **Multi-participant real-time fights (Combat-RT-02):** the duel generalized
+- **Multi-participant real-time fights (Combat-RT-02):** the real-time fight generalized
   into a `RealtimeEncounter` of fighters in join order on numbered teams,
   player- or engine-controlled. Groups start together; allies (`ally`
   profiles), hostile reinforcements and third teams join mid-fight through a

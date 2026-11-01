@@ -72,8 +72,8 @@ pub enum EngineError {
     NoEncounters,
     #[error("finish the fight first")]
     InEncounter,
-    #[error("this world has no real-time duels")]
-    NoDuels,
+    #[error("this world has no real-time fights")]
+    NoRealtime,
     #[error("{0} is already in the fight")]
     AlreadyJoined(Id),
     #[error("{character} cannot join team {team}")]
@@ -103,7 +103,7 @@ pub enum EngineError {
     #[error("{0} has no attack that can land now")]
     NoContact(Id),
     #[error(
-        "a duel advances 1 to {} steps at a time",
+        "a real-time fight advances 1 to {} steps at a time",
         realmkit_spec::ADVANCE_BOUND
     )]
     InvalidSteps,

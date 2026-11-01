@@ -276,11 +276,11 @@ fn the_party_travels_with_the_player_by_road_and_world_time() {
     run(&mut engine, &[Travel("crossroads".into())]);
     let here: Vec<_> = engine.present_here().iter().map(|c| c.id.clone()).collect();
     assert_eq!(here, ["oake", "wren"]);
-    // A companion is nobody's foe, and never a duel's opening opponent.
+    // A companion is nobody's foe, and never a real-time fight's opening opponent.
     run(&mut engine, &[Travel("ford".into())]);
     refused(
         &mut engine,
-        Duel("wren".into()),
+        EngageRealtime("wren".into()),
         EngineError::NotHostile("wren".into()),
     );
 }
@@ -291,7 +291,11 @@ fn two_companions_fight_beside_the_player_and_keep_what_the_fight_left_them() {
     let mut engine = at_the_ford(&world);
     let mut events = run(
         &mut engine,
-        &[Duel("ford_captain".into()), join("wren"), join("oake")],
+        &[
+            EngageRealtime("ford_captain".into()),
+            join("wren"),
+            join("oake"),
+        ],
     );
     // Their fighters hold no vitals: the fight reads and changes their own.
     for id in ["wren", "oake"] {
@@ -307,7 +311,11 @@ fn two_companions_fight_beside_the_player_and_keep_what_the_fight_left_them() {
     let mut replay = at_the_ford(&world);
     events.extend(run(
         &mut replay,
-        &[Duel("ford_captain".into()), join("wren"), join("oake")],
+        &[
+            EngageRealtime("ford_captain".into()),
+            join("wren"),
+            join("oake"),
+        ],
     ));
     events.extend(run(&mut replay, &commands));
     assert_eq!(replay.snapshot().to_json(), engine.snapshot().to_json());
@@ -361,17 +369,23 @@ fn a_companion_brings_its_exact_vitals_into_the_next_fight() {
     let mut world = repeatable(ford());
     world.world.combat.as_mut().unwrap().resources.rage_carries = true;
     let mut engine = at_the_ford(&world);
-    run(&mut engine, &[Duel("ford_captain".into()), join("wren")]);
+    run(
+        &mut engine,
+        &[EngageRealtime("ford_captain".into()), join("wren")],
+    );
     fight_on(&mut engine, "ford_captain", 2_000);
     assert!(engine.realtime().is_none());
     let after = companion(&engine, "wren").vitals;
     assert!(after.hp < 30 && after.rage > 0, "{after:?}");
     // A fight she sits out leaves her as she was.
-    run(&mut engine, &[Duel("ford_captain".into())]);
+    run(&mut engine, &[EngageRealtime("ford_captain".into())]);
     fight_on(&mut engine, "ford_captain", 2_000);
     assert_eq!(companion(&engine, "wren").vitals, after);
     // Joining the next one, she enters with exactly those vitals.
-    run(&mut engine, &[Duel("ford_captain".into()), join("wren")]);
+    run(
+        &mut engine,
+        &[EngageRealtime("ford_captain".into()), join("wren")],
+    );
     let i = fight(&engine).index("wren").unwrap();
     assert_eq!(engine.fighter_vitals(i), Some(after));
     assert_eq!(fighter(&engine, "wren").vitals, None);
@@ -381,7 +395,7 @@ fn a_companion_brings_its_exact_vitals_into_the_next_fight() {
 fn a_companion_joins_a_fight_already_running() {
     let world = ford();
     let mut engine = at_the_ford(&world);
-    run(&mut engine, &[Duel("ford_captain".into())]);
+    run(&mut engine, &[EngageRealtime("ford_captain".into())]);
     fight_on(&mut engine, "ford_captain", 6);
     let now = fight(&engine).step;
     assert!(now > 0);
@@ -427,7 +441,10 @@ fn only_a_companion_in_the_party_and_on_its_feet_can_join() {
         .stats
         .hp = 4;
     let mut engine = at_the_ford(&world);
-    run(&mut engine, &[Duel("ford_captain".into()), join("wren")]);
+    run(
+        &mut engine,
+        &[EngageRealtime("ford_captain".into()), join("wren")],
+    );
     let mut replay = engine.clone();
     let events = run(&mut replay, &fight_on(&mut engine, "ford_captain", 2_000));
     assert!(events.contains(&Event::AllyDown {
@@ -437,7 +454,7 @@ fn only_a_companion_in_the_party_and_on_its_feet_can_join() {
     assert!(companion(&engine, "wren").downed());
     // Down, she still travels with the party but cannot fight.
     assert_eq!(engine.party(), vec!["oake", "wren"]);
-    run(&mut engine, &[Duel("ford_captain".into())]);
+    run(&mut engine, &[EngageRealtime("ford_captain".into())]);
     refused(
         &mut engine,
         join("wren"),
@@ -461,7 +478,10 @@ fn only_a_companion_in_the_party_and_on_its_feet_can_join() {
         &mut engine,
         &[Rest, Travel("crossroads".into()), Travel("ford".into())],
     );
-    run(&mut engine, &[Duel("ford_captain".into()), join("wren")]);
+    run(
+        &mut engine,
+        &[EngageRealtime("ford_captain".into()), join("wren")],
+    );
     let i = fight(&engine).index("wren").unwrap();
     assert_eq!(engine.fighter_vitals(i).unwrap().hp, 4);
     // A companion out of the party cannot come in from where it stays.
@@ -472,7 +492,7 @@ fn only_a_companion_in_the_party_and_on_its_feet_can_join() {
         &[
             Talk("oake".into()),
             ChooseDialogue(1),
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
         ],
     );
     refused(
@@ -486,7 +506,10 @@ fn only_a_companion_in_the_party_and_on_its_feet_can_join() {
 fn attack_target_aims_at_the_named_foe_and_falls_back_when_it_falls() {
     let world = ford();
     let mut engine = at_the_ford(&world);
-    run(&mut engine, &[Duel("ford_captain".into()), join("wren")]);
+    run(
+        &mut engine,
+        &[EngageRealtime("ford_captain".into()), join("wren")],
+    );
     // By her own `weakest` targeting Wren would go for the lookout.
     let mut follow = engine.clone();
     run(&mut follow, &[step(1)]);
@@ -532,7 +555,11 @@ fn defend_aims_at_whoever_attacks_the_ward() {
     let mut engine = at_the_ford(&world);
     run(
         &mut engine,
-        &[Duel("ford_captain".into()), join("wren"), join("oake")],
+        &[
+            EngageRealtime("ford_captain".into()),
+            join("wren"),
+            join("oake"),
+        ],
     );
     // Oake guards first, so he begins his attack once his guard has held.
     let mut follow = engine.clone();
@@ -559,7 +586,7 @@ fn hold_strikes_only_at_threats_and_otherwise_waits() {
     run(
         &mut engine,
         &[
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             join("wren"),
             order("wren", TacticalOrder::Hold),
             step(6),
@@ -582,7 +609,7 @@ fn hold_strikes_only_at_threats_and_otherwise_waits() {
     run(
         &mut engine,
         &[
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             join("oake"),
             order("oake", TacticalOrder::Hold),
             step(8),
@@ -611,7 +638,7 @@ fn a_wary_companion_fights_back_only_whatever_its_order() {
     run(
         &mut engine,
         &[
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             join("oake"),
             order("oake", attack("ford_captain")),
             step(8),
@@ -628,7 +655,7 @@ fn a_wary_companion_fights_back_only_whatever_its_order() {
     run(
         &mut engine,
         &[
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             join("oake"),
             order("oake", attack("ford_captain")),
             step(4),
@@ -668,7 +695,7 @@ fn orders_are_checked_before_anything_changes() {
         &mut engine,
         &[
             order("wren", defend("oake")),
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             join("wren"),
         ],
     );
@@ -743,7 +770,7 @@ fn companions_fight_on_against_several_teams() {
     run(
         &mut engine,
         &[
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             join("wren"),
             Intent(realmkit_engine::Intent::Join {
                 character: "raider".into(),
@@ -766,7 +793,7 @@ fn saving_mid_fight_and_after_resumes_exactly() {
     run(
         &mut engine,
         &[
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             join("wren"),
             join("oake"),
             order("wren", attack("ford_captain")),
@@ -801,7 +828,7 @@ fn saves_with_companion_state_the_rules_could_not_leave_are_refused() {
     run(
         &mut engine,
         &[
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             join("wren"),
             order("wren", attack("ford_captain")),
         ],
@@ -882,7 +909,7 @@ fn the_same_commands_replay_byte_for_byte() {
     let play = || {
         let mut engine = at_the_ford(&world);
         let mut commands = vec![
-            Duel("ford_captain".into()),
+            EngageRealtime("ford_captain".into()),
             join("wren"),
             order("wren", attack("ford_lookout")),
         ];
@@ -917,13 +944,21 @@ fn companions_are_never_duplicated_or_rewarded() {
     let mut engine = at_the_ford(&world);
     let mut events = run(
         &mut engine,
-        &[Duel("ford_captain".into()), join("wren"), join("oake")],
+        &[
+            EngageRealtime("ford_captain".into()),
+            join("wren"),
+            join("oake"),
+        ],
     );
     let commands = fight_on(&mut engine, "ford_captain", 2_000);
     let mut replay = at_the_ford(&world);
     run(
         &mut replay,
-        &[Duel("ford_captain".into()), join("wren"), join("oake")],
+        &[
+            EngageRealtime("ford_captain".into()),
+            join("wren"),
+            join("oake"),
+        ],
     );
     events.extend(run(&mut replay, &commands));
     // Each foe pays once, the companions nothing; nobody appears twice.
@@ -957,7 +992,7 @@ fn a_companion_may_travel_without_fighting() {
     let world = ford();
     let mut engine = at_the_ford(&world);
     let before = engine.state().companions.clone();
-    run(&mut engine, &[Duel("ford_captain".into())]);
+    run(&mut engine, &[EngageRealtime("ford_captain".into())]);
     fight_on(&mut engine, "ford_captain", 2_000);
     assert!(engine.realtime().is_none());
     assert_eq!(engine.state().companions, before);
@@ -972,7 +1007,7 @@ fn temporary_allies_and_worlds_without_companions_are_as_before() {
     ))
     .unwrap();
     let mut engine = Engine::new_with_seed(&yard, 7).unwrap();
-    run(&mut engine, &[Duel("brigand".into()), step(5)]);
+    run(&mut engine, &[EngageRealtime("brigand".into()), step(5)]);
     let json = String::from_utf8(engine.snapshot().to_json()).unwrap();
     assert!(!json.contains("companions"));
     assert!(engine.party().is_empty());
@@ -997,7 +1032,10 @@ fn temporary_allies_and_worlds_without_companions_are_as_before() {
     world.characters.push(warden);
     world.locations[2].characters.push("warden".into());
     let mut engine = at_the_ford(&world);
-    run(&mut engine, &[Duel("ford_captain".into()), join("warden")]);
+    run(
+        &mut engine,
+        &[EngageRealtime("ford_captain".into()), join("warden")],
+    );
     assert_eq!(fighter(&engine, "warden").vitals.unwrap().hp, 30);
     refused(
         &mut engine,

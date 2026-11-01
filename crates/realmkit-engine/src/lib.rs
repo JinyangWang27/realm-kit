@@ -262,7 +262,7 @@ impl<'w> Engine<'w> {
     /// The real-time fight, if any.
     pub fn realtime(&self) -> Option<&RealtimeEncounter> {
         match &self.state.combat.as_ref()?.stance {
-            Stance::Realtime(duel) => Some(duel),
+            Stance::Realtime(fight) => Some(fight),
             Stance::Exploring | Stance::Fighting(_) | Stance::Battle(_) => None,
         }
     }

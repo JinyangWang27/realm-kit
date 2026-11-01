@@ -253,10 +253,10 @@ every capability optional:
   walkthroughs are unchanged; saves in the earlier vitals layout are refused
   by name.
 - [x] A minimal real-time combat layer over the same core
-  ([combat.md](combat.md#real-time-duels)): optional `realtime` one-on-one
-  duels on their own fixed-step clock, with attack phases, a timed guard and
+  ([combat.md](combat.md#real-time-fights)): optional `realtime` one-on-one
+  real-time fights on their own fixed-step clock, with attack phases, a timed guard and
   retreat, an authored opponent policy, host-reported contact bounded by the
-  engine, duel-time MP regeneration, mid-duel saves and settlement shared
+  engine, fight-time MP regeneration, mid-fight saves and settlement shared
   with encounters. The `practice-yard` example plays one in line mode.
   Existing packages, saves and walkthroughs are unchanged.
 - [x] Multi-participant real-time fights
@@ -286,6 +286,12 @@ every capability optional:
   allies and companions; save checks for every new state. The
   `fencing-hall` example plays it in line mode. Existing packages, saves and
   walkthroughs are unchanged.
+- [x] One name for real-time combat: the command that starts a real-time
+  fight is `Command::EngageRealtime` (serialized `engage_realtime`, the
+  CLI's `fight <id>`, the menu's `Fight <name>`), formerly `Duel`, and a
+  world without `realtime` refuses with `EngineError::NoRealtime`. Packages
+  and saves are unchanged: no snapshot holds a command. A host that logs
+  commands (a journey, a replay) reads the old name as another format.
 - [ ] Spatial authority for real-time contact, redirection and directional
   parries; companions in turn-based encounters and battles, and
   companion progression and gear.

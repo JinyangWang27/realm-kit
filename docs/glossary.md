@@ -155,7 +155,7 @@ opponents' [Vitals](#vitals) for the length of the fight; the player's stay
 with the player. Rage belongs to one encounter unless the world carries it.
 See [Combat architecture](combat.md).
 
-## Duel
+## Real-time fight
 
 The optional real-time layer's fight (`RealtimeEncounter`): the player
 against one opponent or a group, on a fixed-step clock of its own (fight
@@ -167,7 +167,7 @@ recovery phase, a guard, a retreat, a parry or dodge, or a stagger. Whether an a
 whom, is reported by the host and bounded by the engine; everything it does
 is decided by the engine. Like an encounter, it owns only the
 [Vitals](#vitals) of fighters other than the player. See
-[Real-time duels](combat.md#real-time-duels).
+[Real-time fights](combat.md#real-time-fights).
 
 ## Poise and Stagger
 
@@ -183,7 +183,7 @@ the attacker it deflects. See
 
 A fighting character's current HP, MP and Rage, with one owner per
 character: the player's in `CombatState::vitals` whatever the stance, an
-opponent's in its encounter or duel. Maxima are derived, never saved.
+opponent's in its encounter or real-time fight. Maxima are derived, never saved.
 
 ## MP and Rage
 
@@ -406,7 +406,7 @@ hands during play, with income, a garrison and authored buildings.
 
 ## Battle Site / Battle Rendering Instance
 
-**Proposed host seam.** A battle site identifies an authored real world location/region for a conflict. A rendering instance is a temporary view of the same canonical battle; a game client may show a bounded subset of its terrain without instantiating a second authoritative playthrough. Existing mass battles remain discrete; real-time personal duels exist, but authority over real-time hit geometry is an open decision ([Contact and its authority](combat.md#contact-and-its-authority)). See [Spatial hosts](spatial-hosts-and-military-battles.md#battle-sites-and-isolated-high-detail-battle-instances).
+**Proposed host seam.** A battle site identifies an authored real world location/region for a conflict. A rendering instance is a temporary view of the same canonical battle; a game client may show a bounded subset of its terrain without instantiating a second authoritative playthrough. Existing mass battles remain discrete; real-time personal fights exist, but authority over real-time hit geometry is an open decision ([Contact and its authority](combat.md#contact-and-its-authority)). See [Spatial hosts](spatial-hosts-and-military-battles.md#battle-sites-and-isolated-high-detail-battle-instances).
 
 ## World Agent
 
