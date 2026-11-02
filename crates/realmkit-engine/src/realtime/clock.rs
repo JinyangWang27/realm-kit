@@ -1,6 +1,6 @@
 //! The fight's fixed-step clock. Each step runs in one order: the clock
-//! moves on, every fighter still fighting regenerates MP, each fighter's
-//! committed action moves through its phases, and each engine-controlled
+//! moves on, projectiles out of flight end, every fighter still fighting
+//! regenerates MP, each fighter's committed action moves through its phases, and each engine-controlled
 //! fighter acts by its policy, all in join order. Nothing depends on how
 //! steps are batched into advances, so a host may submit one step per frame
 //! or many at once.
@@ -36,6 +36,9 @@ fn step(
         .checked_add(1)
         .ok_or(EngineError::NumericLimit)?;
     let now = ring.fight.step;
+    while let Some(p) = ring.fight.projectiles.iter().position(|p| p.expires <= now) {
+        super::end_projectile(&mut ring, p, ProjectileEnd::Expired, events);
+    }
     // Fight time regenerates only on this clock, per second of steps.
     let per_point = 100 * u128::from(realtime.steps_per_second);
     for i in 0..ring.fight.fighters.len() {
@@ -81,6 +84,9 @@ fn policy(
 ) -> Result<(), EngineError> {
     let character = &ring.fight.fighters[i].character;
     let profile = profile(world, character);
+    if profile.inert {
+        return Ok(());
+    }
     let free = matches!(
         ring.fight.fighters[i].action,
         RealtimeAction::Ready | RealtimeAction::Guard { .. }
@@ -168,9 +174,18 @@ fn phase(
             events.push(Event::GuardUp { character });
             Ok(false)
         }
+        RealtimeAction::Drawing { began } => {
+            let weapon = side.ranged.ok_or(EngineError::NoRangedWeapon)?;
+            let (full, _) = super::draw_steps(&weapon, side.stats.speed);
+            if began.saturating_add(full) == now {
+                events.push(Event::DrawFull { character });
+            }
+            Ok(false)
+        }
         RealtimeAction::Parry { until, .. }
         | RealtimeAction::Dodge { until, .. }
         | RealtimeAction::Staggered { until }
+        | RealtimeAction::Loosed { until }
             if *until == now =>
         {
             fighter.action = RealtimeAction::Ready;

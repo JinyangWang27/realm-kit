@@ -337,7 +337,10 @@ fn realtime_actions(
 ) -> Vec<Action> {
     let combat = state.combat.as_ref().unwrap();
     let action = &fight.fighters[0].action;
-    let free = matches!(action, RealtimeAction::Ready | RealtimeAction::Guard { .. });
+    let free = matches!(
+        action,
+        RealtimeAction::Ready | RealtimeAction::Guard { .. } | RealtimeAction::Drawing { .. }
+    );
     let pools = crate::character::resources::player_pools(world, &player_stats(world, combat));
     let intent = |intent, available| Action {
         command: Command::Intent(intent),
@@ -374,6 +377,15 @@ fn realtime_actions(
     match action {
         RealtimeAction::Guard { .. } => actions.push(intent(Intent::LowerGuard, true)),
         _ => actions.push(intent(Intent::Guard, *action == RealtimeAction::Ready)),
+    }
+    if gear::ranged(world, combat).is_some() {
+        match action {
+            RealtimeAction::Drawing { .. } => {
+                actions.push(intent(Intent::Loose, true));
+                actions.push(intent(Intent::LowerDraw, true));
+            }
+            _ => actions.push(intent(Intent::Draw, free)),
+        }
     }
     let rules = world.combat().and_then(|c| c.realtime.as_ref());
     if rules.is_some_and(|r| r.parry.is_some()) {

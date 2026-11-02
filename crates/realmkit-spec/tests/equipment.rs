@@ -16,6 +16,71 @@ fn gear<'w>(w: &'w mut WorldSpec, id: &str) -> &'w mut Equipment {
 }
 
 #[test]
+fn a_drawn_weapon_is_real_time_and_within_bounds() {
+    let load = || {
+        WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/archery-range"
+        ))
+        .unwrap()
+    };
+    assert!(load().diagnostics().is_empty());
+    type Change = fn(&mut RangedWeapon);
+    let cases: [Change; 8] = [
+        |r| r.draw = 0,
+        |r| r.min_draw = 0,
+        |r| r.min_draw = r.draw + 1,
+        |r| r.recovery = 0,
+        |r| r.flight = 0,
+        |r| r.power = 0,
+        |r| r.min_power = r.power + 1,
+        |r| r.impact = POISE_BOUND + 1,
+    ];
+    for change in cases {
+        let mut world = load();
+        change(gear(&mut world, "short_bow").ranged.as_mut().unwrap());
+        assert!(codes(&world).contains(&"invalid_ranged".to_string()));
+    }
+    let mut untimed = load();
+    untimed.world.combat.as_mut().unwrap().realtime = None;
+    assert!(codes(&untimed).contains(&"invalid_ranged".to_string()));
+    let mut apart = load();
+    apart
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .slots
+        .push("back".into());
+    gear(&mut apart, "staff").ranged = gear(&mut load(), "short_bow").ranged;
+    gear(&mut apart, "staff").slots = vec!["back".into()];
+    assert!(codes(&apart).contains(&"competing_weapons".to_string()));
+}
+
+#[test]
+fn an_inert_fighter_does_nothing_at_all() {
+    let world = || {
+        WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/archery-range"
+        ))
+        .unwrap()
+    };
+    type Change = fn(&mut CombatProfile);
+    let cases: [Change; 3] = [
+        |p| p.skills = vec!["shove".into()],
+        |p| p.guard_hold = Some(3),
+        |p| p.reaction = Some(Reaction::Parry),
+    ];
+    for change in cases {
+        let mut w = world();
+        let butt = w.characters.iter_mut().find(|c| c.id == "butt").unwrap();
+        change(butt.combat.as_mut().unwrap());
+        assert!(codes(&w).contains(&"invalid_inert".to_string()));
+    }
+}
+
+#[test]
 fn equipment_occupies_declared_slots_within_bounds() {
     let world = arena();
     assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());

@@ -2,7 +2,7 @@
 //! effective stats, and the damage modifiers they give the wearer.
 
 use super::*;
-use realmkit_spec::Equipment;
+use realmkit_spec::{Equipment, RangedWeapon};
 
 fn equipment<'w>(world: &'w WorldSpec, item: &str) -> &'w Equipment {
     world.item(item).unwrap().equipment.as_ref().unwrap()
@@ -46,6 +46,11 @@ pub(super) fn basic(world: &WorldSpec, combat: &CombatState) -> (Option<Channel>
         pieces.iter().find_map(|p| p.basic_channel),
         pieces.iter().find_map(|p| p.basic_time),
     )
+}
+
+/// The worn drawn weapon, if any.
+pub(super) fn ranged(world: &WorldSpec, combat: &CombatState) -> Option<RangedWeapon> {
+    worn(world, combat).iter().find_map(|p| p.ranged)
 }
 
 /// The multiplier worn gear applies to damage on `channel`: modifiers multiply,

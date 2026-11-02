@@ -179,6 +179,40 @@ pub struct RealtimeEncounter {
     /// In join order: the player, the opponents the fight started with,
     /// then everyone who joined, as they did. Nobody is ever removed.
     pub fighters: Vec<Fighter>,
+    /// Projectiles loosed and not yet settled, oldest first. Each ends once:
+    /// landed, deflected, reported spent, or at its `expires` step.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub projectiles: Vec<Projectile>,
+    /// The next projectile's ID; IDs are never reused within a fight.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub next_projectile: u64,
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
+}
+
+/// The player's drawn weapon, and the steps to its full and shortest draws
+/// at their speed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerRanged {
+    pub weapon: realmkit_spec::RangedWeapon,
+    pub full: u64,
+    pub least: u64,
+}
+
+/// A shot in the air, its force settled when it was loosed. Where it is, is
+/// the host's: the engine holds only that it is live, and until when.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Projectile {
+    pub id: u64,
+    pub shooter: Id,
+    pub power: u32,
+    pub channel: Channel,
+    pub impact: u32,
+    /// The clock reaching this step ends it; it can land before that.
+    pub expires: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -233,6 +267,11 @@ pub enum RealtimeAction {
     Dodge { open_until: u64, until: u64 },
     /// Interrupted: it can do nothing until `until`.
     Staggered { until: u64 },
+    /// Drawing a worn ranged weapon since step `began`. Not a commitment:
+    /// it may loose, lower or begin something else, and no shot exists yet.
+    Drawing { began: u64 },
+    /// Just loosed a shot: committed until `until`. The shot flies on its own.
+    Loosed { until: u64 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

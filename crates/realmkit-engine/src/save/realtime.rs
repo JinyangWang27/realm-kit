@@ -128,7 +128,9 @@ pub(super) fn check(
             // A policy begins something at every step it is free, from the
             // step after it joined; anyone else out of the fight is `Ready`.
             // A companion with nobody its order lets it strike waits.
-            RealtimeAction::Ready => i == 0 || held || !fighting || f.joined == now,
+            RealtimeAction::Ready => {
+                i == 0 || held || !fighting || f.joined == now || profile(world, &f.character).inert
+            }
             // Only the player stays committed once out: dead, the fight open.
             _ if i > 0 && !fighting => false,
             RealtimeAction::Attack {
@@ -182,6 +184,14 @@ pub(super) fn check(
             RealtimeAction::Staggered { until } => {
                 *until > now && until - now <= u64::from(realtime.stagger)
             }
+            RealtimeAction::Drawing { began } => i == 0 && side.ranged.is_some() && *began <= now,
+            // At the slowest speed: a rank earned mid-fight can change theirs.
+            RealtimeAction::Loosed { until } => {
+                i == 0
+                    && side.ranged.is_some_and(|w| {
+                        *until > now && until - now <= realtime::phase_steps(w.recovery, 1, 100)
+                    })
+            }
         };
         // A newcomer acts and regenerates from the step after it joined;
         // a contact at that step can only have staggered it, in full.
@@ -199,6 +209,26 @@ pub(super) fn check(
             && combat::within(rules, v, &side.stats, side.pools)
             && u128::from(f.mp_remainder) < per_point
     });
+    // Live projectiles in the order loosed, below the counter, each still in
+    // flight, with the force the player's worn weapon can give.
+    let weapon = sides[0].ranged;
+    let mut last = None;
+    let shots_ok = fight.projectiles.iter().all(|p| {
+        let ordered = last.is_none_or(|l| l < p.id) && p.id < fight.next_projectile;
+        last = Some(p.id);
+        ordered
+            && p.shooter == player.character
+            && weapon.is_some_and(|w| {
+                (w.min_power..=w.power).contains(&p.power)
+                    && p.channel == w.channel
+                    && (p.impact == 0 || p.impact == w.impact)
+                    && p.expires > now
+                    && p.expires - now <= u64::from(w.flight)
+            })
+    });
+    if !shots_ok {
+        return Err(invalid());
+    }
     // A finished fight never stays open: the player and someone against
     // them still fight, or the player is dead.
     let dead = combat.vitals.hp == 0;

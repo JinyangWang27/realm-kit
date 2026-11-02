@@ -352,6 +352,16 @@ fn combat_profile(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, profile
         Reaction::Parry => realtime.and_then(|r| r.parry),
         Reaction::Dodge => realtime.and_then(|r| r.dodge),
     };
+    let acts =
+        !profile.skills.is_empty() || profile.guard_hold.is_some() || profile.reaction.is_some();
+    if profile.inert && (acts || profile.ally) {
+        issue(
+            out,
+            owner,
+            "invalid_inert",
+            "an inert fighter has no skills, guard or reaction, and is nobody's ally",
+        );
+    }
     if profile.reaction.is_some_and(|r| defense(r).is_none()) {
         issue(
             out,
