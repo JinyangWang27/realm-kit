@@ -46,6 +46,11 @@ const GUARD_RAISING: &str = "raising guard";
 const DISENGAGING: &str = "disengaging";
 const PARRYING: &str = "parrying";
 const DODGING: &str = "dodging";
+const DRAWING: &str = "drawing";
+const IN_THE_AIR: &str = "in the air";
+const DRAW: &str = "Draw";
+const LOOSE: &str = "Loose";
+const LOWER_DRAW: &str = "Lower the draw";
 const EXPOSED: &str = "exposed";
 const STAGGERED: &str = "staggered";
 const UNTIL: &str = "until";
@@ -282,6 +287,10 @@ fn fight_lines(engine: &Engine<'_>) -> Vec<String> {
                 format!("{EXPOSED} {UNTIL} {until}")
             }
             RealtimeAction::Staggered { until } => format!("{STAGGERED} {UNTIL} {until}"),
+            RealtimeAction::Drawing { began } => {
+                format!("{DRAWING} {} steps", fight.step - began)
+            }
+            RealtimeAction::Loosed { until } => format!("{RECOVERING} {UNTIL} {until}"),
         };
         let v = *fight.vitals(i, engine.state());
         // Only fights that grew beyond the player and their foes say whose
@@ -300,6 +309,10 @@ fn fight_lines(engine: &Engine<'_>) -> Vec<String> {
             "{}{side} · {doing}",
             fighter_line(engine, &f.character, v, f.yielded)
         ));
+    }
+    if !fight.projectiles.is_empty() {
+        let ids: Vec<String> = fight.projectiles.iter().map(|p| p.id.to_string()).collect();
+        parts.push(format!("{IN_THE_AIR}: {}", ids.join(", ")));
     }
     vec![parts.join(" | ")]
 }
@@ -691,7 +704,13 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 Intent::Retreat => DISENGAGE.into(),
                 Intent::Parry => PARRY.into(),
                 Intent::Dodge => DODGE.into(),
-                Intent::Contact { .. } | Intent::Join { .. } => return None,
+                Intent::Draw => DRAW.into(),
+                Intent::Loose => LOOSE.into(),
+                Intent::LowerDraw => LOWER_DRAW.into(),
+                Intent::Contact { .. }
+                | Intent::ProjectileContact { .. }
+                | Intent::ProjectileSpent { .. }
+                | Intent::Join { .. } => return None,
             }
         }
         // "Train Attack: 12 → 13", from the same effective stats the engine uses.

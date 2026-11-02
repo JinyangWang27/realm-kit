@@ -1,0 +1,29 @@
+look
+fight butt
+draw
+step 2
+loose
+arrow 0 butt
+step 3
+draw
+step 8
+loose
+step 2
+arrow 1
+step 1
+draw
+step 8
+loose
+step 3
+draw
+step 8
+loose
+arrow 2 butt
+arrow 3 butt
+arrow 3 butt
+step 20
+draw
+step 1
+loose
+undraw
+status

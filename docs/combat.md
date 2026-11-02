@@ -463,6 +463,78 @@ needs engine-side geometry or a validated spatial record (positions, reach
 and hit volumes stepped on the same fixed clock), which is open work
 (below).
 
+### Drawn weapons and projectiles
+
+A melee `Contact` is only accepted inside its attacker's active window, and a
+shot arrives long after the action that loosed it, perhaps while its shooter
+is doing something else. So a projectile is its own thing, not a stretched
+attack: an entry in `RealtimeEncounter::projectiles`, with a force settled when
+it was loosed and an `expires` step. Package fields are in
+[world-format.md](world-format.md#drawn-weapons). Nothing here spends MP or
+Rage; a world that wants ammunition or costed shots has neither yet.
+
+**The draw.** `Intent::Draw`, from `Ready` or `Guard` with a drawn weapon worn
+(`NoRangedWeapon`, `Committed`), begins `Drawing { began }`. A draw is not a
+commitment: `Intent::LowerDraw` ends it at once, owing nothing, and an attack,
+skill, parry, dodge or retreat simply replaces it, as an attack replaces a
+guard. A guard needs the draw lowered first. Holding a full draw longer changes
+nothing here: steadiness and fatigue are a host's aiming, not a rule.
+`DrawBegun`, `DrawFull` (once, at exactly `draw` steps) and `DrawLowered` are
+reported.
+
+**Loosing.** `Intent::Loose` needs a draw (`NotDrawing`) of at least `min_draw`
+steps (`DrawTooShort`, which leaves it drawing). Power runs evenly from
+`min_power` at `min_draw` to `power` at `draw`, rounded down; only a full draw
+carries the weapon's `impact`. The shot goes live at once, `Loosed` reports its
+ID, percent of draw, power and `expires`, and the shooter is `Loosed { until }`
+for `recovery` steps, committed, with nothing left to interrupt.
+
+**Interruption.** A draw has poise 0: a hit whose impact is above 0 staggers the
+archer and the draw is gone, with nothing loosed. A shot already in the air
+is not affected by anything its shooter suffers or does.
+
+**How a projectile ends: exactly once, one of**
+
+| Cause | How | `ProjectileEnded` cause |
+| --- | --- | --- |
+| It hit someone | `Intent::ProjectileContact { projectile, target }`; the hit resolves as a contact does | `landed` |
+| A parry | the same report on someone whose parry window is open: no damage, and no stagger, since the shooter is out of reach | `deflected` |
+| Scenery | `Intent::ProjectileSpent { projectile }`, the host's report that it touched something that does not fight | `obstructed` |
+| Out of flight | the clock reaching `expires`, first thing in that step | `expired` |
+| The fight ends | it goes with the fight's state; nothing is reported | none |
+
+A report on a shot that has ended is `NoProjectile`; after the fight it is
+`NotFighting`. A contact on the shooter or on someone out of the fight is
+`InvalidTarget`, and on a teammate without `friendly_fire` `NotHostile`; a
+refused report leaves the shot live. A dodge's open window makes a contact
+`Evaded`, and the shot stays live, so it can fly on and land on someone else, or
+on the dodger once the window has closed.
+
+The hit itself goes through the same `land` as a melee blow: the character core's
+damage from the shooter's stats and the settled power, guard, poise and
+stagger, yielding, Rage for acting, the fight's end. It does not touch the
+shooter's current action, so a shot landing during a melee attack does not
+spend that attack's one landing. It trains no technique, since no skill loosed it.
+
+**The authority boundary** is the one for melee (below), and no wider: a host
+can land each shot at most once, while it is live, on someone it may hit, and
+cannot choose its force, a kill, loot, XP or victory. It can still claim a
+shot touched someone it did not, or withhold a hit. Velocity, drop,
+obstruction, range in metres, aim and sway are the host's and are not
+verified, and replays reproduce the reports, not the physics.
+
+**Saves and replays.** Live shots and `next_projectile` are in the snapshot; IDs
+are never reused in a fight. Where a shot is, is not, so a host resuming a saved
+fight has no position to fly it from: it may reconstruct one, or leave it to
+expire, harmlessly. Loading checks that each shot is the player's, below the
+counter, in order, live, and of a force and channel their worn weapon can give;
+that a draw or a loosed recovery is the player's, with such a weapon; and that
+a stated `until` is no later than its recovery at the slowest speed.
+
+**Not modelled.** Engine-controlled archers (only the player wears gear, so
+only the player draws), ammunition, projectile skills, policies reacting to a
+shot, and a shot's own Rage or XP rules.
+
 ### What a real-time fight reuses
 
 | Rule | From |
@@ -526,6 +598,9 @@ snapshot, with every companion's vitals and standing order beside it in
   the party, and attacks only someone of another team in the current fight.
 - **Open.** The player and someone off their team still fight, or the
   player is dead.
+
+Live projectiles and draws are checked too; see
+[Drawn weapons and projectiles](#drawn-weapons-and-projectiles).
 
 A resumed fight continues exactly as an uninterrupted one would.
 
@@ -694,6 +769,15 @@ orders included.
 - A third fundamental resource.
 
 ## Compatibility
+
+**Drawn weapons and projectiles (Archery-01).** Every new field (an equipment's
+`ranged`, a profile's `inert`, a fight's `projectiles` and `next_projectile`) is
+optional and not serialized when absent, so existing packages keep their rules
+revision and their saves load. Every earlier example walkthrough produces
+byte-identical output and save files. Earlier builds refuse a save holding a
+draw or a shot rather than misread it, and the format stays 19 under the
+[format policy](world-format.md#versions). Hosts matching exhaustively on
+`RealtimeAction`, `Intent` or `Event` must handle the new variants.
 
 **Weapon handling and timed defence (Combat-RT-04).** Every new field
 (`realtime.stagger`, `guard_poise`, `parry` and `dodge`, a skill's `impact`

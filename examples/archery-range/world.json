@@ -1,0 +1,50 @@
+{
+  "format_version": 19,
+  "id": "archery_range",
+  "name": "The Archery Range",
+  "language": "en",
+  "start": "range",
+  "player": "archer",
+  "combat": {
+    "special_name": "Focus",
+    "realtime": {
+      "steps_per_second": 10,
+      "windup": 3,
+      "active": 2,
+      "recovery": 4,
+      "guard_raise": 1,
+      "guard_percent": 25,
+      "retreat": 6,
+      "stagger": 5,
+      "guard_poise": 1,
+      "parry": { "window": 2, "recovery": 3 },
+      "dodge": { "window": 2, "recovery": 3 }
+    },
+    "slots": ["hands"],
+    "player_equipment": ["short_bow", "staff"],
+    "levels": [
+      { "xp": 0, "stats": { "hp": 60, "mp": 0, "patk": 10, "pdef": 5, "satk": 0, "sdef": 4, "speed": 100 } }
+    ],
+    "skills": [
+      {
+        "id": "shove",
+        "name": "Shove",
+        "power": 100,
+        "channel": "physical",
+        "impact": 1,
+        "text": "{attacker} shove {target}: {damage} damage."
+      }
+    ],
+    "groups": [
+      { "id": "butts", "yield_share": 10, "repeatable": true },
+      { "id": "brawl", "yield_share": 50 },
+      { "id": "lesson", "yield_share": 50 }
+    ],
+    "narrative": {
+      "attack": ["{attacker} hit {target}: {damage} damage."],
+      "hurt": ["{attacker} catches {target}: {damage} damage."],
+      "victory": "{target} is down.",
+      "death": "The range goes quiet.\nStart a new game to try again."
+    }
+  }
+}

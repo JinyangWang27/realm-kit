@@ -183,6 +183,10 @@ its short window and leaves the attacker staggered for your counter; `dodge`
 lets a blow find nothing while its window is open. Either one, mistimed,
 leaves you committed and unprotected for a few steps. Foes and companions
 can parry or dodge by the same rules.
+A worn bow draws in real time too (`examples/archery-range`): `draw`, `step`
+and `loose` shoot, a short draw hits softer than a full one, and each shot
+flies on by itself, however many are in the air, until the host reports where
+it went (`arrow 0 butt`, or `arrow 0` for a fence) or its flight runs out.
 Worlds can also grant stat
 points on levelling up, which you spend to shape your own build, and
 techniques mastered rank by rank, each rank named by the world

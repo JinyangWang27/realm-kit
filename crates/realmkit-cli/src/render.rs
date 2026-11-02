@@ -1,6 +1,8 @@
 use crate::panels;
 use crossterm::style::Stylize;
-use realmkit_engine::{AttackPhase, BattleOutcome, Engine, Event, Outcome, TacticalOrder};
+use realmkit_engine::{
+    AttackPhase, BattleOutcome, Engine, Event, Outcome, ProjectileEnd, TacticalOrder,
+};
 use realmkit_spec::{CharacterKind, Direction, Id, Stat, TextTemplate};
 use std::io::{self, Write};
 
@@ -558,6 +560,34 @@ pub fn events(
                 name(attacker)
             )?,
             Event::Staggered { character } => writeln!(output, "{}: staggered.", name(character))?,
+            Event::DrawBegun { character } => writeln!(output, "{}: drawing.", name(character))?,
+            Event::DrawFull { character } => writeln!(output, "{}: full draw.", name(character))?,
+            Event::DrawLowered { character } => {
+                writeln!(output, "{}: lowers the draw.", name(character))?
+            }
+            Event::Loosed {
+                character,
+                projectile,
+                draw_percent,
+                power,
+                expires,
+            } => writeln!(
+                output,
+                "{}: looses shot {projectile} at {draw_percent}% draw, power {power}, live until step {expires}.",
+                name(character)
+            )?,
+            Event::ProjectileEnded {
+                projectile, cause, ..
+            } => writeln!(
+                output,
+                "Shot {projectile} {}.",
+                match cause {
+                    ProjectileEnd::Landed => "strikes home",
+                    ProjectileEnd::Deflected => "is turned aside",
+                    ProjectileEnd::Obstructed => "strikes something else",
+                    ProjectileEnd::Expired => "falls spent",
+                }
+            )?,
             Event::JoinedParty { character } => {
                 writeln!(output, "{} joins your party.", name(character))?
             }

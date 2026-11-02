@@ -292,6 +292,12 @@ every capability optional:
   world without `realtime` refuses with `EngineError::NoRealtime`. Packages
   and saves are unchanged: no snapshot holds a command. A host that logs
   commands (a journey, a replay) reads the old name as another format.
+- [x] Drawn weapons and projectiles
+  ([combat.md](combat.md#drawn-weapons-and-projectiles)): a worn weapon's
+  `ranged` block; draw, loose and lower intents; live projectiles with their
+  own host reports, ending exactly once; an `inert` profile for practice
+  targets; save checks for every new state. The `archery-range` example plays
+  it in line mode. Existing packages, saves and walkthroughs are unchanged.
 - [ ] Spatial authority for real-time contact, redirection and directional
   parries; companions in turn-based encounters and battles, and
   companion progression and gear.
