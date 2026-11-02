@@ -36,8 +36,9 @@ pub(crate) fn rules(world: &WorldSpec) -> Result<&Realtime, EngineError> {
         .ok_or(EngineError::NoRealtime)
 }
 
-/// A fighter's numbers, which cannot change while the fight lasts: nothing
-/// that changes stats or gear can be done during one.
+/// A fighter's numbers. Only the player's can change while a fight lasts, by
+/// a rank earned or `Intent::Equip`, and never during a timed commitment that
+/// read them, so these are derived afresh rather than kept.
 #[derive(Clone, Copy)]
 pub(crate) struct Side {
     pub stats: Stats,
@@ -370,6 +371,15 @@ pub(crate) fn intent(
             events.push(Event::RetreatStarted);
             Ok(())
         }
+        Intent::Equip(piece) => {
+            if realtime.swap == 0 {
+                return Err(EngineError::NoSwapping);
+            }
+            if !free {
+                return Err(EngineError::Committed);
+            }
+            swap(world, &realtime, state, piece, events)
+        }
         Intent::Draw => {
             ring.sides[0].ranged.ok_or(EngineError::NoRangedWeapon)?;
             if matches!(
@@ -493,6 +503,27 @@ pub(crate) fn intent(
         }
         Intent::Join { character, team } => join(world, state, character, team, events),
     }
+}
+
+/// The player wears `piece` now, by the character core's own rule, and their
+/// hands are busy for the world's `swap` steps at the speed it leaves them.
+fn swap(
+    world: &WorldSpec,
+    realtime: &Realtime,
+    state: &mut GameState,
+    piece: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    gear::equip(world, state, piece, events)?;
+    let ring = ring(world, state)?;
+    let steps = phase_steps(realtime.swap, ring.sides[0].stats.speed, 100);
+    let until = ring
+        .fight
+        .step
+        .checked_add(steps)
+        .ok_or(EngineError::NumericLimit)?;
+    ring.fight.fighters[0].action = RealtimeAction::Swapping { until };
+    Ok(())
 }
 
 /// The index of projectile `id` if it is in the air.
@@ -804,7 +835,8 @@ fn poise(world: &WorldSpec, realtime: &Realtime, action: &RealtimeAction, now: u
         RealtimeAction::Ready
         | RealtimeAction::Guard { .. }
         | RealtimeAction::Retreat { .. }
-        | RealtimeAction::Drawing { .. } => Some(0),
+        | RealtimeAction::Drawing { .. }
+        | RealtimeAction::Swapping { .. } => Some(0),
     }
 }
 

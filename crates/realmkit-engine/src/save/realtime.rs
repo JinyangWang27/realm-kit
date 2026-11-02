@@ -131,6 +131,8 @@ pub(super) fn check(
             RealtimeAction::Ready => {
                 i == 0 || held || !fighting || f.joined == now || profile(world, &f.character).inert
             }
+            // An inert fighter does nothing, and nothing interrupts it.
+            _ if i > 0 && profile(world, &f.character).inert => false,
             // Only the player stays committed once out: dead, the fight open.
             _ if i > 0 && !fighting => false,
             RealtimeAction::Attack {
@@ -185,6 +187,12 @@ pub(super) fn check(
                 *until > now && until - now <= u64::from(realtime.stagger)
             }
             RealtimeAction::Drawing { began } => i == 0 && side.ranged.is_some() && *began <= now,
+            RealtimeAction::Swapping { until } => {
+                i == 0
+                    && realtime.swap > 0
+                    && *until > now
+                    && until - now <= realtime::phase_steps(realtime.swap, 1, 100)
+            }
             // At the slowest speed: a rank earned mid-fight can change theirs.
             RealtimeAction::Loosed { until } => {
                 i == 0
@@ -210,18 +218,24 @@ pub(super) fn check(
             && u128::from(f.mp_remainder) < per_point
     });
     // Live projectiles in the order loosed, below the counter, each still in
-    // flight, with the force the player's worn weapon can give.
-    let weapon = sides[0].ranged;
+    // flight, with the force a weapon the player owns can give: it may have
+    // gone back in the pack since.
+    let owned: Vec<_> = combat
+        .gear
+        .values()
+        .filter_map(|g| world.item(&g.item)?.equipment.as_ref()?.ranged)
+        .collect();
     let mut last = None;
     let shots_ok = fight.projectiles.iter().all(|p| {
         let ordered = last.is_none_or(|l| l < p.id) && p.id < fight.next_projectile;
         last = Some(p.id);
         ordered
             && p.shooter == player.character
-            && weapon.is_some_and(|w| {
+            && owned.iter().any(|w| {
                 (w.min_power..=w.power).contains(&p.power)
                     && p.channel == w.channel
-                    && (p.impact == 0 || p.impact == w.impact)
+                    // Only a full draw carries impact, and it has full power.
+                    && (p.impact == 0 || (p.impact == w.impact && p.power == w.power))
                     && p.expires > now
                     && p.expires - now <= u64::from(w.flight)
             })

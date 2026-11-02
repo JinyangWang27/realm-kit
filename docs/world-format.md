@@ -1714,6 +1714,10 @@ slot with each other and with pieces that change the basic attack
 | `recovery` | Steps committed after loosing, 1 to 10,000, at speed 100 |
 | `flight` | Steps a shot stays live, 1 to 10,000; speed does not change it |
 
+`realtime.swap` is the steps, 0 to 10,000 at speed 100, a player stays committed
+after changing what they wear during a fight (`Intent::Equip`). Absent or 0, gear
+cannot be changed during one.
+
 A combat profile's `inert: true` makes a fighter that never acts in real time
 and cannot be interrupted, as a practice target: it has no skills, guard or
 reaction and is nobody's ally (`invalid_inert`). A host keeps its figure still.

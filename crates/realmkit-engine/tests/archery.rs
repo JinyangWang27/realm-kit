@@ -493,6 +493,14 @@ fn a_save_holds_only_shots_and_draws_the_rules_could_leave() {
     assert!(!tampered(&|f| f.projectiles[0].power = 49), "too weak");
     assert!(!tampered(&|f| f.projectiles[0].impact = 9), "impact");
     assert!(
+        !tampered(&|f| f.projectiles[0].power = 100),
+        "a full draw's impact on less than its power"
+    );
+    assert!(
+        !tampered(&|f| f.fighters[1].action = RealtimeAction::Staggered { until: f.step + 1 }),
+        "an inert fighter is never interrupted"
+    );
+    assert!(
         !tampered(&|f| f.projectiles[0].shooter = "butt".into()),
         "shooter"
     );
@@ -528,13 +536,127 @@ fn a_save_holds_only_shots_and_draws_the_rules_could_leave() {
         "only the player draws"
     );
 
-    // With no bow in hand, neither a draw nor a shot can be in a save.
+    // With no bow in hand, no draw can be in a save, and a recovery from
+    // loosing it cannot either; a shot outlives it, in the pack or not.
     let mut swapped = good.clone();
     let combat = swapped.state.combat.as_mut().unwrap();
     for gear in combat.gear.values_mut() {
         gear.equipped = gear.item == "staff";
     }
     assert!(Engine::restore(&world, swapped).is_err());
+}
+
+fn piece(engine: &Engine<'_>, item: &str) -> u64 {
+    let gear = &engine.state().combat.as_ref().unwrap().gear;
+    *gear.iter().find(|(_, g)| g.item == item).unwrap().0
+}
+
+#[test]
+fn a_swap_in_a_fight_is_a_commitment_and_shots_fly_on() {
+    let world = range();
+    let mut engine = start(&world, "butt");
+    let staff = piece(&engine, "staff");
+    let bow = piece(&engine, "short_bow");
+    shoot(&mut engine, 8);
+    // Not out of a commitment: loosing's recovery has to end first.
+    assert!(matches!(
+        engine.execute(Intent(I::Equip(staff))),
+        Err(EngineError::Committed)
+    ));
+    engine.execute(step(3)).unwrap();
+    // A draw gives way, unshot.
+    engine.execute(Intent(I::Draw)).unwrap();
+    let events = engine.execute(Intent(I::Equip(staff))).unwrap();
+    assert!(events.contains(&Event::Equipped { gear: staff }));
+    assert!(events.contains(&Event::Unequipped { gear: bow }));
+    assert_eq!(
+        live(&engine),
+        [0],
+        "a swap looses nothing and loses nothing"
+    );
+    assert!(engine.player_ranged().is_none(), "in hand at once");
+    assert!(matches!(action(&engine, 0), RealtimeAction::Swapping { until } if until == 14));
+    // Busy: nothing else starts, nothing can be drawn, and it saves and loads.
+    for busy in [
+        I::Attack { target: None },
+        I::Equip(bow),
+        I::Guard,
+        I::Parry,
+    ] {
+        assert!(matches!(
+            engine.execute(Intent(busy)),
+            Err(EngineError::Committed)
+        ));
+    }
+    let saved = engine.snapshot().to_json();
+    let mut resumed = Engine::restore(&world, SaveSnapshot::from_json(&saved).unwrap()).unwrap();
+    assert_eq!(resumed.snapshot().to_json(), saved);
+    // The shot loosed from the bow still lands at the force it left with, with
+    // the bow in the pack.
+    let events = run(&mut resumed, vec![hit(0, "butt")]);
+    assert_eq!(ended(&events), [(0, ProjectileEnd::Landed)]);
+    assert_eq!(hp(&resumed, 1), 88);
+    resumed.execute(step(3)).unwrap();
+    assert_eq!(action(&resumed, 0), RealtimeAction::Ready);
+    assert!(matches!(
+        resumed.execute(Intent(I::Draw)),
+        Err(EngineError::NoRangedWeapon)
+    ));
+    resumed.execute(Intent(I::Attack { target: None })).unwrap();
+}
+
+#[test]
+fn a_swap_can_be_interrupted_and_a_bad_one_changes_nothing() {
+    let world = range();
+    let mut engine = start(&world, "brawler");
+    let staff = piece(&engine, "staff");
+    let bow = piece(&engine, "short_bow");
+    for refused in [bow, 99] {
+        assert!(engine.execute(Intent(I::Equip(refused))).is_err());
+    }
+    assert_eq!(action(&engine, 0), RealtimeAction::Ready);
+    engine.execute(step(4)).unwrap();
+    engine.execute(Intent(I::Equip(staff))).unwrap();
+    let hit = run(
+        &mut engine,
+        vec![Intent(I::Contact {
+            attacker: "brawler".into(),
+            target: None,
+        })],
+    );
+    assert!(hit.contains(&Event::Staggered {
+        character: "archer".into()
+    }));
+    assert!(engine.player_ranged().is_none(), "it stays in hand");
+}
+
+#[test]
+fn a_world_with_no_swap_time_refuses_a_swap() {
+    let hall = range();
+    let mut world = hall.clone();
+    world
+        .world
+        .combat
+        .as_mut()
+        .unwrap()
+        .realtime
+        .as_mut()
+        .unwrap()
+        .swap = 0;
+    let mut engine = start(&world, "butt");
+    let staff = piece(&engine, "staff");
+    assert!(matches!(
+        engine.execute(Intent(I::Equip(staff))),
+        Err(EngineError::NoSwapping)
+    ));
+    assert!(matches!(
+        engine.execute(Command::Equip(staff)),
+        Err(EngineError::InEncounter)
+    ));
+    let offered = engine.actions();
+    assert!(!offered
+        .iter()
+        .any(|a| matches!(a.command, Intent(I::Equip(_)))));
 }
 
 #[test]
@@ -551,10 +673,12 @@ fn the_menu_offers_a_draw_and_never_a_report() {
     assert_eq!(offered(&engine, I::Draw), Some(true));
     assert_eq!(offered(&engine, I::Loose), None);
     engine.execute(Intent(I::Draw)).unwrap();
-    assert_eq!(offered(&engine, I::Loose), Some(true));
+    assert_eq!(offered(&engine, I::Loose), Some(false), "too short yet");
     assert_eq!(offered(&engine, I::LowerDraw), Some(true));
     assert_eq!(offered(&engine, I::Draw), None);
-    engine.execute(step(8)).unwrap();
+    engine.execute(step(2)).unwrap();
+    assert_eq!(offered(&engine, I::Loose), Some(true));
+    engine.execute(step(6)).unwrap();
     engine.execute(Intent(I::Loose)).unwrap();
     assert_eq!(offered(&engine, I::Draw), Some(false));
     let reported = |a: &Action| {

@@ -272,6 +272,8 @@ pub enum RealtimeAction {
     Drawing { began: u64 },
     /// Just loosed a shot: committed until `until`. The shot flies on its own.
     Loosed { until: u64 },
+    /// Just changed what it wears, already in hand: committed until `until`.
+    Swapping { until: u64 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

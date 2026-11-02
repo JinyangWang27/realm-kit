@@ -16,6 +16,7 @@
       "guard_percent": 25,
       "retreat": 6,
       "stagger": 5,
+      "swap": 3,
       "guard_poise": 1,
       "parry": { "window": 2, "recovery": 3 },
       "dodge": { "window": 2, "recovery": 3 }

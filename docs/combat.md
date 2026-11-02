@@ -489,6 +489,15 @@ carries the weapon's `impact`. The shot goes live at once, `Loosed` reports its
 ID, percent of draw, power and `expires`, and the shooter is `Loosed { until }`
 for `recovery` steps, committed, with nothing left to interrupt.
 
+**Swapping weapons.** In a world with `realtime.swap`, `Intent::Equip(piece)`
+wears a piece from the pack by the same rule as `Command::Equip`, from `Ready`,
+`Guard` or `Drawing`, which it drops, unshot (`Committed` otherwise; `NoSwapping`
+without a `swap`). It is on at once, so the player's stats, gear and whether they
+can draw change now, and `Swapping { until }` keeps them busy for `swap` steps at
+the speed it leaves them. They have poise 0 meanwhile, and a stagger leaves the
+new piece in hand. A shot in the air keeps the force it left with, whatever is
+worn when it lands. `Command::Equip` is still refused during a fight.
+
 **Interruption.** A draw has poise 0: a hit whose impact is above 0 staggers the
 archer and the draw is gone, with nothing loosed. A shot already in the air
 is not affected by anything its shooter suffers or does.
@@ -528,8 +537,10 @@ are never reused in a fight. Where a shot is, is not, so a host resuming a saved
 fight has no position to fly it from: it may reconstruct one, or leave it to
 expire, harmlessly. Loading checks that each shot is the player's, below the
 counter, in order, live, and of a force and channel their worn weapon can give;
-that a draw or a loosed recovery is the player's, with such a weapon; and that
-a stated `until` is no later than its recovery at the slowest speed.
+that a draw or a loosed recovery is the player's, with such a weapon worn; and
+that a stated `until` is no later than its recovery at the slowest speed. A live
+shot's force is checked against any drawn weapon the player owns, since it may
+have gone back in the pack.
 
 **Not modelled.** Engine-controlled archers (only the player wears gear, so
 only the player draws), ammunition, projectile skills, policies reacting to a
@@ -756,7 +767,8 @@ orders included.
 
 - Verified real-time hit detection: real-time contact is host-reported and only
   bounded by the engine (see [Contact and its authority](#contact-and-its-authority)).
-- Consumables or gear changes during a fight; engine-controlled fighters
+- Consumables during a fight; gear changes for anyone but the player, or in a
+  world with no `swap`; engine-controlled fighters
   that space or retreat; formations; redirection, directional parries,
   poise that wears down and situational crits.
 - Companions and allies in turn-based encounters and mass battles; companion
@@ -771,7 +783,7 @@ orders included.
 ## Compatibility
 
 **Drawn weapons and projectiles (Archery-01).** Every new field (an equipment's
-`ranged`, a profile's `inert`, a fight's `projectiles` and `next_projectile`) is
+`ranged`, a profile's `inert`, `realtime.swap`, a fight's `projectiles` and `next_projectile`) is
 optional and not serialized when absent, so existing packages keep their rules
 revision and their saves load. Every earlier example walkthrough produces
 byte-identical output and save files. Earlier builds refuse a save holding a

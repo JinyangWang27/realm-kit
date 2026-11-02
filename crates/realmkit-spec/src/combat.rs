@@ -122,6 +122,10 @@ pub struct Realtime {
     /// Poise of a raised guard: a hit of greater impact breaks it.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub guard_poise: u32,
+    /// Steps a player is committed after changing what they wear; 0 is no
+    /// changing gear during a fight.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub swap: u32,
     /// A timed parry; absent, nobody parries.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parry: Option<TimedDefense>,

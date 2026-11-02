@@ -977,6 +977,7 @@ fn a_line_host_draws_looses_and_reports_where_each_shot_went() {
         "projectile 3 is not in the air",
         "the draw is too short to loose",
         "You: lowers the draw.",
+        "Take up Staff\n",
     ] {
         assert!(text.contains(passage), "missing {passage:?} in {text}");
     }

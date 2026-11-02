@@ -287,6 +287,7 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
             attacker: (*id).into(),
             target: Some((*target).into()),
         }),
+        ("swap", [piece]) => Command::Intent(Intent::Equip(gear(piece)?)),
         ("draw", []) => Command::Intent(Intent::Draw),
         ("loose", []) => Command::Intent(Intent::Loose),
         ("undraw", []) => Command::Intent(Intent::LowerDraw),

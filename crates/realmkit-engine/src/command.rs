@@ -156,6 +156,10 @@ pub enum Intent {
     LowerGuard,
     /// Turns to retreat; the escape happens after the retreat's steps.
     Retreat,
+    /// Takes up a piece from the pack, as [`Command::Equip`] does, in a world
+    /// with a `swap` time, from anything but a commitment. It is worn at once
+    /// and commits the player for those steps. Shots in the air fly on.
+    Equip(u64),
     /// Begins drawing the worn ranged weapon, from ready or guarding.
     Draw,
     /// Looses the drawn shot: its force is settled by how long it was drawn.

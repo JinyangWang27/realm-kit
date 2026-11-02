@@ -94,6 +94,8 @@ pub enum EngineError {
     InvalidTarget(Id),
     #[error("finish what you are doing first")]
     Committed,
+    #[error("gear cannot be changed during a fight in this world")]
+    NoSwapping,
     #[error("nothing you carry can be drawn")]
     NoRangedWeapon,
     #[error("you are not drawing")]

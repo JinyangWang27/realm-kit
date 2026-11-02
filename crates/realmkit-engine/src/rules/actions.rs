@@ -329,6 +329,13 @@ fn battle_actions(world: &WorldSpec, battle: &BattleState, panels: Vec<Action>) 
 /// The intents a real-time fight takes at its current step: strikes at
 /// each foe still fighting (untargeted when there is only one), then guard,
 /// the world's parry and dodge, and retreat. Contact and joins are the host's to report, never offered.
+fn rules_swap(world: &WorldSpec) -> u32 {
+    world
+        .combat()
+        .and_then(|c| c.realtime)
+        .map_or(0, |r| r.swap)
+}
+
 fn realtime_actions(
     world: &WorldSpec,
     state: &GameState,
@@ -378,10 +385,18 @@ fn realtime_actions(
         RealtimeAction::Guard { .. } => actions.push(intent(Intent::LowerGuard, true)),
         _ => actions.push(intent(Intent::Guard, *action == RealtimeAction::Ready)),
     }
+    if rules_swap(world) > 0 {
+        let pack = combat.gear.iter().filter(|(_, g)| !g.equipped);
+        actions.extend(pack.map(|(id, _)| intent(Intent::Equip(*id), free)));
+    }
     if gear::ranged(world, combat).is_some() {
         match action {
-            RealtimeAction::Drawing { .. } => {
-                actions.push(intent(Intent::Loose, true));
+            RealtimeAction::Drawing { began } => {
+                let drawn = fight.step.saturating_sub(*began);
+                let speed = player_stats(world, combat).speed;
+                let least =
+                    gear::ranged(world, combat).map_or(0, |w| realtime::draw_steps(&w, speed).1);
+                actions.push(intent(Intent::Loose, drawn >= least));
                 actions.push(intent(Intent::LowerDraw, true));
             }
             _ => actions.push(intent(Intent::Draw, free)),

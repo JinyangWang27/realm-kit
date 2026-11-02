@@ -49,6 +49,7 @@ const DODGING: &str = "dodging";
 const DRAWING: &str = "drawing";
 const IN_THE_AIR: &str = "in the air";
 const DRAW: &str = "Draw";
+const TAKE_UP: &str = "Take up";
 const LOOSE: &str = "Loose";
 const LOWER_DRAW: &str = "Lower the draw";
 const EXPOSED: &str = "exposed";
@@ -290,7 +291,9 @@ fn fight_lines(engine: &Engine<'_>) -> Vec<String> {
             RealtimeAction::Drawing { began } => {
                 format!("{DRAWING} {} steps", fight.step - began)
             }
-            RealtimeAction::Loosed { until } => format!("{RECOVERING} {UNTIL} {until}"),
+            RealtimeAction::Loosed { until } | RealtimeAction::Swapping { until } => {
+                format!("{RECOVERING} {UNTIL} {until}")
+            }
         };
         let v = *fight.vitals(i, engine.state());
         // Only fights that grew beyond the player and their foes say whose
@@ -704,6 +707,10 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
                 Intent::Retreat => DISENGAGE.into(),
                 Intent::Parry => PARRY.into(),
                 Intent::Dodge => DODGE.into(),
+                Intent::Equip(piece) => {
+                    let item = &engine.state().combat.as_ref()?.gear.get(piece)?.item;
+                    format!("{TAKE_UP} {}", world.item(item)?.name)
+                }
                 Intent::Draw => DRAW.into(),
                 Intent::Loose => LOOSE.into(),
                 Intent::LowerDraw => LOWER_DRAW.into(),

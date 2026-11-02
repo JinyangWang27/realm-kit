@@ -77,6 +77,7 @@ fn realtime(out: &mut Vec<Diagnostic>, owner: &str, combat: &Combat) {
     if !(1..=STEP_RATE_BOUND).contains(&r.steps_per_second)
         || !(phase(r.windup) && phase(r.active) && phase(r.recovery) && phase(r.retreat))
         || r.guard_raise > PHASE_BOUND
+        || r.swap > PHASE_BOUND
         || r.guard_percent > 100
         || r.mp_regen_percent > 100
     {

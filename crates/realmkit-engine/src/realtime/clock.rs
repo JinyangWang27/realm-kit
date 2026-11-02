@@ -186,6 +186,7 @@ fn phase(
         | RealtimeAction::Dodge { until, .. }
         | RealtimeAction::Staggered { until }
         | RealtimeAction::Loosed { until }
+        | RealtimeAction::Swapping { until }
             if *until == now =>
         {
             fighter.action = RealtimeAction::Ready;
