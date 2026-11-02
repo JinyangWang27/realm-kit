@@ -606,6 +606,37 @@ fn a_swap_in_a_fight_is_a_commitment_and_shots_fly_on() {
 }
 
 #[test]
+fn a_shot_keeps_the_shooters_attack_from_when_it_was_loosed() {
+    let mut world = range();
+    let stack = |w: &mut WorldSpec, id: &str, patk: u32| {
+        let item = w.items.iter_mut().find(|i| i.id == id).unwrap();
+        let gear = item.equipment.as_mut().unwrap();
+        gear.bonuses.insert(Stat::Patk, patk);
+    };
+    stack(&mut world, "short_bow", 20);
+    let dealt = |swap: bool, world: &WorldSpec| {
+        let mut engine = start(world, "butt");
+        let staff = piece(&engine, "staff");
+        shoot(&mut engine, 8);
+        if swap {
+            engine.execute(step(3)).unwrap();
+            engine.execute(Intent(I::Equip(staff))).unwrap();
+        }
+        // Through a save, as a shot can be.
+        let json = engine.snapshot().to_json();
+        let mut engine = Engine::restore(world, SaveSnapshot::from_json(&json).unwrap()).unwrap();
+        engine.execute(hit(0, "butt")).unwrap();
+        100 - hp(&engine, 1)
+    };
+    let kept = dealt(false, &world);
+    assert!(kept > 12, "the bow's bonus counts: {kept}");
+    assert_eq!(dealt(true, &world), kept, "the bow went back in the pack");
+    // Nor does a stronger weapon, taken up after the shot, reach it.
+    stack(&mut world, "staff", 200);
+    assert_eq!(dealt(true, &world), kept, "the staff was not in hand");
+}
+
+#[test]
 fn a_swap_can_be_interrupted_and_a_bad_one_changes_nothing() {
     let world = range();
     let mut engine = start(&world, "brawler");

@@ -219,7 +219,8 @@ pub(super) fn check(
     });
     // Live projectiles in the order loosed, below the counter, each still in
     // flight, with the force a weapon the player owns can give: it may have
-    // gone back in the pack since.
+    // gone back in the pack since. Its stats cannot be checked from here, since
+    // gear and ranks may have changed since it left; damage is checked arithmetic.
     let owned: Vec<_> = combat
         .gear
         .values()

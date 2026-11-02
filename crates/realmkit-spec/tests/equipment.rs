@@ -58,6 +58,43 @@ fn a_drawn_weapon_is_real_time_and_within_bounds() {
 }
 
 #[test]
+fn a_drawn_weapons_impact_needs_a_stagger() {
+    let mut world = WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/archery-range"
+    ))
+    .unwrap();
+    let combat = world.world.combat.as_mut().unwrap();
+    let realtime = combat.realtime.as_mut().unwrap();
+    (realtime.stagger, realtime.parry) = (0, None);
+    combat.skills.iter_mut().for_each(|s| s.impact = 0);
+    assert!(codes(&world).contains(&"missing_stagger".to_string()));
+    gear(&mut world, "short_bow")
+        .ranged
+        .as_mut()
+        .unwrap()
+        .impact = 0;
+    assert!(!codes(&world).contains(&"missing_stagger".to_string()));
+}
+
+#[test]
+fn a_drawn_weapon_needs_attack_in_its_channel() {
+    let mut world = WorldSpec::load(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/archery-range"
+    ))
+    .unwrap();
+    world.world.combat.as_mut().unwrap().cross_share = 0;
+    let bow = gear(&mut world, "short_bow");
+    bow.ranged.as_mut().unwrap().channel = Channel::Special;
+    assert!(codes(&world).contains(&"no_attack".to_string()));
+    // Its own bonus gives it some.
+    let bow = gear(&mut world, "short_bow");
+    bow.bonuses.insert(Stat::Satk, 5);
+    assert!(!codes(&world).contains(&"no_attack".to_string()));
+}
+
+#[test]
 fn an_inert_fighter_does_nothing_at_all() {
     let world = || {
         WorldSpec::load(concat!(

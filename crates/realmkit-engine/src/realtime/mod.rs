@@ -441,6 +441,7 @@ pub(crate) fn intent(
             let share = world.combat().unwrap().cross_share;
             let blow = Blow {
                 skill: None,
+                stats: shot.stats,
                 attack: strike::Attack {
                     channel: shot.channel,
                     power: shot.power,
@@ -495,6 +496,7 @@ pub(crate) fn intent(
             let channel = ring.sides[i].basic.0;
             let blow = Blow {
                 skill,
+                stats: ring.sides[i].stats,
                 attack: strike::Attack::of(world, skill, channel, None),
                 impact: skill.map_or(0, |s| s.impact),
                 projectile: false,
@@ -577,6 +579,7 @@ fn loose(ring: &mut Ring, events: &mut Vec<Event>) -> Result<(), EngineError> {
     ring.fight.projectiles.push(Projectile {
         id,
         shooter: character.clone(),
+        stats: side.stats,
         power,
         channel: weapon.channel,
         impact: if held == full { weapon.impact } else { 0 },
@@ -862,6 +865,8 @@ fn stagger(
 /// What is landing: an active attack, or a projectile with its force settled.
 struct Blow<'w> {
     skill: Option<&'w Skill>,
+    /// The attacker's stats behind it.
+    stats: Stats,
     attack: strike::Attack,
     impact: u32,
     projectile: bool,
@@ -889,6 +894,7 @@ fn land(
 ) -> Result<(), EngineError> {
     let Blow {
         skill,
+        stats,
         attack,
         impact,
         projectile,
@@ -928,13 +934,7 @@ fn land(
         .filter(|_| t == 0 || !profile(world, &target).inert);
     let (attacker, defender) = (ring.sides[i], ring.sides[t]);
     let modifier = defender.guard(attack.channel);
-    let (mut dealt, _) = strike::damage_of(
-        &attacker.stats,
-        &defender.stats,
-        attack,
-        modifier,
-        &mut None,
-    )?;
+    let (mut dealt, _) = strike::damage_of(&stats, &defender.stats, attack, modifier, &mut None)?;
     let guard = &ring.fight.fighters[t].action;
     if matches!(guard, RealtimeAction::Guard { ready_at } if *ready_at <= now) {
         let through = (u64::from(dealt) * u64::from(realtime.guard_percent) / 100) as u32;

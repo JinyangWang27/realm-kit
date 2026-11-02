@@ -495,8 +495,8 @@ wears a piece from the pack by the same rule as `Command::Equip`, from `Ready`,
 without a `swap`). It is on at once, so the player's stats, gear and whether they
 can draw change now, and `Swapping { until }` keeps them busy for `swap` steps at
 the speed it leaves them. They have poise 0 meanwhile, and a stagger leaves the
-new piece in hand. A shot in the air keeps the force it left with, whatever is
-worn when it lands. `Command::Equip` is still refused during a fight.
+new piece in hand. A shot in the air keeps the power and the shooter's stats it
+left with, whatever is worn when it lands. `Command::Equip` is still refused during a fight.
 
 **Interruption.** A draw has poise 0: a hit whose impact is above 0 staggers the
 archer and the draw is gone, with nothing loosed. A shot already in the air
@@ -520,7 +520,8 @@ refused report leaves the shot live. A dodge's open window makes a contact
 on the dodger once the window has closed.
 
 The hit itself goes through the same `land` as a melee blow: the character core's
-damage from the shooter's stats and the settled power, guard, poise and
+damage from the shooter's stats as they were when it was loosed and the settled
+power, guard, poise and
 stagger, yielding, Rage for acting, the fight's end. It does not touch the
 shooter's current action, so a shot landing during a melee attack does not
 spend that attack's one landing. It trains no technique, since no skill loosed it.
@@ -540,7 +541,9 @@ counter, in order, live, and of a force and channel their worn weapon can give;
 that a draw or a loosed recovery is the player's, with such a weapon worn; and
 that a stated `until` is no later than its recovery at the slowest speed. A live
 shot's force is checked against any drawn weapon the player owns, since it may
-have gone back in the pack.
+have gone back in the pack. Its saved stats are not checked, since gear and ranks
+may have changed since it left: a hand-edited save can strengthen a shot in the
+air, and the damage arithmetic is checked either way.
 
 **Not modelled.** Engine-controlled archers (only the player wears gear, so
 only the player draws), ammunition, projectile skills, policies reacting to a

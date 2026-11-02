@@ -29,8 +29,17 @@ pub(super) fn equipment(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Comba
     }
 }
 
-/// A drawn weapon needs a real-time clock, and timing and power in bounds.
+/// A drawn weapon needs a real-time clock, timing and power in bounds, and a
+/// stagger for its impact to cause: one of 0 steps would never end.
 fn drawn(out: &mut Vec<Diagnostic>, combat: &Combat, id: &str, w: RangedWeapon) {
+    if w.impact > 0 && combat.realtime.is_some_and(|r| r.stagger == 0) {
+        issue(
+            out,
+            id,
+            "missing_stagger",
+            "a drawn weapon with impact staggers, so give the stagger 1 or more steps",
+        );
+    }
     let phase = |steps: u32| (1..=PHASE_BOUND).contains(&steps);
     let power = |p: u32| (POWER_BOUNDS.0..=POWER_BOUNDS.1).contains(&p);
     if combat.realtime.is_none()
@@ -136,24 +145,25 @@ pub(super) fn weapon_channels(
         let Some(gear) = &item.equipment else {
             continue;
         };
-        let Some(channel) = gear.basic_channel else {
-            continue;
-        };
+        let drawn = gear.ranged.map(|r| r.channel);
+        let channels = [gear.basic_channel, drawn].into_iter().flatten();
         // Every tier, since a tier's bonuses replace the ones before.
-        let unarmed = (0..=gear.tiers.len()).any(|tier| {
-            let mut stats = first;
-            for (stat, bonus) in gear.bonuses_at(tier) {
-                let total = stats.get_mut(*stat);
-                *total = total.saturating_add(*bonus);
-            }
-            stats.combined(channel, combat.cross_share, false) == 0
+        let unarmed = channels.into_iter().any(|channel| {
+            (0..=gear.tiers.len()).any(|tier| {
+                let mut stats = first;
+                for (stat, bonus) in gear.bonuses_at(tier) {
+                    let total = stats.get_mut(*stat);
+                    *total = total.saturating_add(*bonus);
+                }
+                stats.combined(channel, combat.cross_share, false) == 0
+            })
         });
         if unarmed {
             issue(
                 out,
                 &item.id,
                 "no_attack",
-                "this weapon's basic attack needs attack in its channel",
+                "this weapon's attack needs attack in its channel",
             );
         }
     }

@@ -208,6 +208,9 @@ pub struct PlayerRanged {
 pub struct Projectile {
     pub id: u64,
     pub shooter: Id,
+    /// The shooter's stats when it left: a shot keeps the attack of the
+    /// weapon that loosed it, whatever is worn when it lands.
+    pub stats: Stats,
     pub power: u32,
     pub channel: Channel,
     pub impact: u32,
