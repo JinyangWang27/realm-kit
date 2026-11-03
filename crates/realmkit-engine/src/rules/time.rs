@@ -265,6 +265,7 @@ pub(crate) fn travel(
         });
     }
     let from = std::mem::replace(&mut state.player.location, to.clone());
+    state.visited.insert(to.clone());
     state.dialogue = None;
     events.push(Event::Moved {
         from,

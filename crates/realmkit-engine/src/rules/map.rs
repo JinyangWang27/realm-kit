@@ -11,6 +11,12 @@ pub(crate) fn known(world: &WorldSpec, state: &GameState, location: &str) -> boo
             .is_some_and(|l| allowed(state, l.known_when.as_ref()))
 }
 
+/// Whether the player has been at a location: where they stand, or a place
+/// kept in [`GameState::visited`].
+pub(crate) fn visited(state: &GameState, location: &str) -> bool {
+    state.player.location == location || state.visited.contains(location)
+}
+
 pub(crate) fn map_view(world: &WorldSpec, state: &GameState) -> Option<MapView> {
     // Validation guarantees every place has a position or none does.
     let places = world
@@ -21,6 +27,7 @@ pub(crate) fn map_view(world: &WorldSpec, state: &GameState) -> Option<MapView> 
             Some(MapPlace {
                 location: l.id.clone(),
                 point: l.map?,
+                visited: visited(state, &l.id),
             })
         })
         .collect::<Option<Vec<_>>>()?;

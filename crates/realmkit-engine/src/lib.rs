@@ -191,6 +191,7 @@ impl<'w> Engine<'w> {
                     .map(realmkit_spec::faction_pair)
                     .collect(),
                 companions: BTreeMap::new(),
+                visited: BTreeSet::from([world.world.start.clone()]),
             },
         };
         // Merchants open with their stock at its targets, drawing nothing.
@@ -415,6 +416,14 @@ impl<'w> Engine<'w> {
     /// `known_when` holds. Clients name only known places, roads included.
     pub fn knows(&self, location: &str) -> bool {
         rules::known(self.world, &self.state, location)
+    }
+
+    /// Whether the player has been at a location: where they stand, the
+    /// start, or anywhere a road or an exit brought them. Being there is
+    /// more than knowing of it ([`Engine::knows`]); a host may offer
+    /// journeys back to visited places only, say.
+    pub fn visited(&self, location: &str) -> bool {
+        rules::visited(&self.state, location)
     }
 
     /// The player's journal: phase, known quests, evidence and outcome.

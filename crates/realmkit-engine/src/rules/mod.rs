@@ -20,7 +20,7 @@ pub(super) use crate::character::{clamp_vitals, player_stats};
 pub(super) use actions::actions;
 pub(super) use economy::{quote, stock_up, ware_price};
 pub(super) use factions::initial as initial_standing;
-pub(super) use map::{known, map_view};
+pub(super) use map::{known, map_view, visited};
 pub(crate) use party::in_party;
 pub(super) use player::{granted_points, unspent_points};
 pub(super) use proficiency::{
@@ -446,6 +446,7 @@ fn move_to(
         });
     }
     let from = std::mem::replace(&mut state.player.location, exit.destination.clone());
+    state.visited.insert(exit.destination.clone());
     state.dialogue = None;
     events.push(Event::Moved {
         from,

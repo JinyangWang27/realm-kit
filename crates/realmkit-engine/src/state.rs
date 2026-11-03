@@ -415,6 +415,11 @@ pub struct GameState {
     /// Every named companion ever recruited, in the party or parted from it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub companions: BTreeMap<Id, CompanionState>,
+    /// Every location the player has been at: the start, and each place
+    /// a road or an exit brought them to. Never forgotten. A save made
+    /// before this was kept has none, and counts only where the player is.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub visited: BTreeSet<Id>,
 }
 
 /// A track's value: one for a global track, one per faction for a faction track.

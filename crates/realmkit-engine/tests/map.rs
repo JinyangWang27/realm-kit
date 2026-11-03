@@ -124,3 +124,88 @@ fn an_unknown_place_is_off_the_map_and_off_the_roads() {
     assert!(offered(&engine).contains(&(Travel("hollin_keep".into()), true)));
     engine.execute(Travel("hollin_keep".into())).unwrap();
 }
+
+#[test]
+fn visiting_is_kept_apart_from_knowing() {
+    let world = marches();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    let visited = |engine: &Engine| -> Vec<(String, bool)> {
+        let view = engine.map_view().unwrap();
+        view.places
+            .into_iter()
+            .map(|p| (p.location, p.visited))
+            .collect()
+    };
+    // The start is visited from the first moment; every other place is
+    // known, by the map, but not yet visited.
+    assert!(engine.visited("greyford"));
+    assert!(engine.knows("vellmarket") && !engine.visited("vellmarket"));
+    assert_eq!(
+        visited(&engine),
+        [
+            ("greyford".into(), true),
+            ("ashmere".into(), false),
+            ("hollin_keep".into(), false),
+            ("vellmarket".into(), false),
+        ]
+    );
+    // A refused journey visits nothing: no road, or a closed one.
+    assert!(engine.execute(Travel("vellmarket".into())).is_err());
+    engine.execute(Travel("ashmere".into())).unwrap();
+    assert!(engine.execute(Travel("vellmarket".into())).is_err());
+    assert!(!engine.visited("vellmarket"));
+    engine.execute(Travel("greyford".into())).unwrap();
+    engine.execute(Travel("hollin_keep".into())).unwrap();
+    engine.execute(Travel("greyford".into())).unwrap();
+    // Leaving a place does not unvisit it.
+    assert!(engine.visited("ashmere") && engine.visited("hollin_keep"));
+    assert!(!engine.visited("vellmarket"));
+    // Visits survive a save, in the state itself.
+    let snapshot = engine.snapshot();
+    assert_eq!(
+        snapshot.state.visited,
+        ["ashmere", "greyford", "hollin_keep"]
+            .map(String::from)
+            .into_iter()
+            .collect()
+    );
+    let json = serde_json::to_string(&snapshot).unwrap();
+    let restored = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
+    assert_eq!(visited(&restored), visited(&engine));
+}
+
+#[test]
+fn an_exit_visits_the_place_it_leads_to() {
+    let world = demo();
+    let mut engine = Engine::new(&world).unwrap();
+    let start = engine.state().player.location.clone();
+    let (direction, to) = world
+        .location(&start)
+        .unwrap()
+        .exits
+        .iter()
+        .find(|(_, e)| e.requires.is_none())
+        .map(|(d, e)| (*d, e.destination.clone()))
+        .unwrap();
+    assert!(!engine.visited(&to));
+    engine.execute(Move(direction)).unwrap();
+    assert!(engine.visited(&to) && engine.visited(&start));
+}
+
+#[test]
+fn a_save_must_visit_only_real_places_and_may_predate_visits() {
+    let world = marches();
+    let engine = Engine::new_with_seed(&world, 7).unwrap();
+    let mut snapshot = engine.snapshot();
+    snapshot.state.visited.insert("atlantis".into());
+    assert!(Engine::restore(&world, snapshot).is_err());
+    // A save from before visits were kept has none: only where the player
+    // stands counts, and it loads.
+    let mut snapshot = engine.snapshot();
+    snapshot.state.visited.clear();
+    let json = serde_json::to_string(&snapshot).unwrap();
+    assert!(!json.contains("visited"));
+    let restored = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
+    assert!(restored.visited("greyford"));
+    assert!(!restored.visited("ashmere"));
+}
