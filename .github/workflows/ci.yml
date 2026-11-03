@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - name: Browser hosting check
+        run: cargo build -p realmkit-engine --target wasm32-unknown-unknown --locked
+      - name: CLI must not depend on worldgen
+        run: "! cargo tree -p realmkit-cli -e normal --prefix none | grep -q realmkit-worldgen"
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uvx ruff check scripts
+      - run: uvx ruff format --check scripts
+      - run: uvx mypy --strict scripts/combat_sim
+      - name: Simulator balance targets
+        run: python3 -m scripts.combat_sim check
