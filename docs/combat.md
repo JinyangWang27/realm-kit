@@ -463,6 +463,23 @@ needs engine-side geometry or a validated spatial record (positions, reach
 and hit volumes stepped on the same fixed clock), which is open work
 (below).
 
+### What a weapon allows
+
+A skill may `require` capabilities, the world's own names for what wielding
+something lets a fighter do (`blade`, `bow`, `shield`, `fist`). Worn pieces
+provide their `capabilities`; each slot nothing occupies provides the world's
+`bare` ones for it, so empty hands can strike while a two-handed bow forbids
+it. The player may use a skill only while they have every capability it
+requires: `EngineError::Unwielded` otherwise, in a real-time `Intent::Skill`,
+a turn-based `UseSkill`, `skill_usable` and the action lists, before level and
+cost. It is the character core's rule (`gear::capabilities`, `gear::wields`),
+so both fight layers share it. A save cannot hold a committed attack with a
+skill the gear worn forbids: gear changes only while the player is free.
+Engine-controlled fighters wear nothing; their authored skills are theirs to
+use. A requirement is all-of; one capability shared by several weapons
+(`blade` on swords and sabres) makes any-of, and a slot per hand lets a world
+model a shield beside a sword, two blades or a cultural style that needs both.
+
 ### Drawn weapons and projectiles
 
 A melee `Contact` is only accepted inside its attacker's active window, and a
@@ -496,7 +513,22 @@ without a `swap`). It is on at once, so the player's stats, gear and whether the
 can draw change now, and `Swapping { until }` keeps them busy for `swap` steps at
 the speed it leaves them. They have poise 0 meanwhile, and a stagger leaves the
 new piece in hand. A shot in the air keeps the power and the shooter's stats it
-left with, whatever is worn when it lands. `Command::Equip` is still refused during a fight.
+left with, whatever is worn when it lands, and names the pieces worn when it
+left (`worn`, its provenance for save checks). `Command::Equip` is still refused during a fight.
+
+**A shot that opens a fight.** `Command::OpeningShot { target, drawn }` is a
+host's report that a shot loosed while exploring, after `drawn` steps of
+drawing at the world's step rate with the drawn weapon worn now, reached
+`target`. Exploring has no fight clock, so the host times that draw, as it
+times every draw in a fight by when it sends `Draw` and `Loose`. The command
+starts the fight exactly as `EngageRealtime` would (here, undefeated, not an
+ally, not mid-fight), looses the shot at step 0 with the force those steps give
+(`DrawTooShort`, `NoRangedWeapon`) and lands it at once through the same path
+as `ProjectileContact`; the player is `Ready`, the recovery having passed in
+flight. A refused one starts nothing. It is never offered in `actions()`: like
+every report, it comes from a host with geometry. A shot that touches scenery or
+someone who cannot be fought reaches RealmKit not at all. Every ranged weapon,
+and later a projectile skill, opens a fight the same way.
 
 **Interruption.** A draw has poise 0: a hit whose impact is above 0 staggers the
 archer and the draw is gone, with nothing loosed. A shot already in the air
@@ -537,15 +569,21 @@ verified, and replays reproduce the reports, not the physics.
 are never reused in a fight. Where a shot is, is not, so a host resuming a saved
 fight has no position to fly it from: it may reconstruct one, or leave it to
 expire, harmlessly. Loading checks that each shot is the player's, below the
-counter, in order, live, and of a force and channel their worn weapon can give;
-that a draw or a loosed recovery is the player's, with such a weapon worn; and
-that a stated `until` is no later than its recovery at the slowest speed. A live
-shot's force is checked against any drawn weapon the player owns, since it may
-have gone back in the pack. Its saved stats are not checked, since gear and ranks
-may have changed since it left: a hand-edited save can strengthen a shot in the
-air, and the damage arithmetic is checked either way.
+counter, in order and live; that a draw or a loosed recovery is the player's,
+with such a weapon worn; and that a stated `until` is no later than its
+recovery at the slowest speed. A live shot is checked against its provenance,
+the pieces `worn` when it left, never against today's gear, which may have
+changed in flight: they must be pieces the player still owns, worn together
+(no slot twice), with a drawn weapon among them whose force, channel, impact
+and flight bound the shot's. Its saved `stats` must be no more, stat by stat,
+than the level, stat points and those pieces give with each technique's
+largest passive up to its current rank (ranks are all that can rise during a
+fight). **What remains trusted:** a save edited to a weaker shot, or to stats
+anywhere within that bound, loads; nothing is signed, and a player who can edit
+saves can edit gear and levels too. The damage arithmetic is checked either way.
 
-**Not modelled.** Engine-controlled archers (only the player wears gear, so
+**Not modelled.** A basic `Attack` with a bow in hand (a host sends draws),
+engine-controlled archers (only the player wears gear, so
 only the player draws), ammunition, projectile skills, policies reacting to a
 shot, and a shot's own Rage or XP rules.
 
