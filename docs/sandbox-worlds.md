@@ -7,8 +7,6 @@ foundations and [M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed)
 capabilities, and [Section 18](open-decisions.md#18-living-sandbox-worlds) of the
 open-decisions register tracks the questions this document leaves open.
 
-[Spatial hosts, stationed forces, and battle boundaries](spatial-hosts-and-military-battles.md) is a complementary **proposal** for using these same optional rules from a continuous first-person client. It does not introduce runtime 3D terrain or real-time physics into RealmKit, and it does not change the delivered M6 slices.
-
 RealmKit's fixtures so far are authored adventures: the player moves through
 places, talks, fights and follows a questline. A *living sandbox* is a different
 kind of world. The story is mostly what the player makes of it, and the world
@@ -34,8 +32,7 @@ the borders. A later visit finds a new banner over a town the player once knew.
 No part of this needs a concrete source game. The scenario only pushes
 RealmKit's abstractions and tests.
 
-The original game's world is now the first intended full-game consumer close to this
-reference scenario. That makes the core political sandbox a prioritization tool,
+The core political sandbox is a prioritization tool,
 not a mandate to implement every feature listed below. For the representative
 world, factions/standing, companions/party travel, holdings, world agents and
 faction strategy matter before optional detail such as marriage, elaborate
@@ -476,7 +473,6 @@ they do, without scripting each character.
 
 ### Retinue
 
-**Future multi-custody extension, not delivered:** an authored world may want a small nearby escort, separately hosted garrisons, and independently traveling forces. Keep ordinary troops fungible in the existing count/wound/XP model, with deterministic transfers and no duplicated custody. Named companions remain unique characters. See [Spatial hosts and military battles](spatial-hosts-and-military-battles.md#military-custody-and-station-access-m6c--m6e-pressure).
 
 - **Troops.** Troop definitions optionally carry wages, an upgrade path
   (recruit → footman → sergeant) and a travel speed where the world uses travel
@@ -638,7 +634,6 @@ character can wear gear:
 
 ### Mass battle
 
-**Host boundary:** a game may visualize a battle as a separate instance of a bounded subregion of its continuous world. This is a graphical-host concern unless the core rules need location/participant/settlement metadata; the existing discrete mass battle remains authoritative and unaffected. Real-time fight inputs and reconciliation are **not yet specified or implemented**; see [battle-instance guarantees](spatial-hosts-and-military-battles.md#battle-sites-and-isolated-high-detail-battle-instances).
 
 The [capability catalog](capabilities.md#combat-across-sources) keeps mass
 battles out of personal combat. This capability resolves army against army.
@@ -793,7 +788,6 @@ battles out of personal combat. This capability resolves army against army.
 
 ### Holdings
 
-**Future station distinction:** not every military station is a player-owned holding. A paid barracks, mercenary yard or faction facility may host troops subject to separate rights, fees and custody. Do not add a new universal requirement to holdings until an authored fixture needs station access; see [Military custody and station access](spatial-hosts-and-military-battles.md#military-custody-and-station-access-m6c--m6e-pressure).
 
 - **Ownership.** A holding is a location with an owner, a faction or a
   character, that can change during play.
@@ -870,7 +864,6 @@ Politics composes the capabilities above rather than adding a new one.
 
 ### World agents
 
-**Future order use case:** a detached force can move and receive authorized strategic orders on the logical road graph without rendering its soldiers continuously in 3D. This is proposed multi-force behavior, not an already shipped remote-command API; see [order, travel and information](spatial-hosts-and-military-battles.md#order-travel-and-information).
 
 World agents are what make the world move without the player.
 
@@ -1010,8 +1003,6 @@ Tournaments, arena fights and wagers need no capability. They are encounters
 plus currency effects, gated by standing or world time.
 
 ## Overland map
-
-The **rule-side road graph** is canonical regardless of whether the host shows a 2D chart, a first-person continuous landscape or a battle subregion. Map display coordinates and 3D transforms do not create new travel edges or bypass authored knowledge gates. See [Spatial hosts](spatial-hosts-and-military-battles.md#a-presentation-host-over-logical-locations).
 
 The road graph is the map in the rules. This section describes how a client
 draws it, and how authors make a road network dense enough to feel like

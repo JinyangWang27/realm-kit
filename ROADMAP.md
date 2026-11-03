@@ -6,7 +6,7 @@ partially delivered; M7 through M9 remain proposed. Individual slices below are 
 scope. Combat pacing and balance formulas remain design decisions where their
 sections still say so, not promises about current behavior.
 The [open-decisions register](docs/open-decisions.md) records unresolved choices
-and when they must be settled. The [spatial-host and military battle boundary design](docs/spatial-hosts-and-military-battles.md) records future pressure from continuously explored graphical worlds without turning the engine into a real-time renderer.
+and when they must be settled.
 
 ## Principles that carry through every milestone
 
@@ -43,13 +43,12 @@ and when they must be settled. The [spatial-host and military battle boundary de
   mandatory feature list.
 - Add a system when a milestone needs it. No empty future crates or generic ECS.
 
-## Original-game priority path
+## Priority path
 
-The first intended full original game is RealmKit's main pressure test. Its
-requirements set the near-term implementation priority, but they do **not** become
-mandatory engine features for unrelated worlds. When choosing between speculative
-generality and a feature needed by the original game's next playable slice, build the
-original game's requirement with the smallest reusable typed boundary.
+Concrete authored content sets the near-term implementation priority, but its
+needs do **not** become mandatory engine features for unrelated worlds. When
+choosing between speculative generality and a feature a world's next playable
+slice needs, build that requirement with the smallest reusable typed boundary.
 
 The current priority is:
 
@@ -65,11 +64,11 @@ The current priority is:
    route outcomes; evidence as investigation state; places the player learns
    of before the map shows them; and features to examine.
    `examples/caravan-trail` plays an MVP-shaped slice from a caravan's
-   arrival through an investigation to a choice of leads. Authoring the
-   original game's first slice then added `at_least`
+   arrival through an investigation to a choice of leads. Authoring a
+   first full slice then added `at_least`
    conditions, evidence facts that fill in, ask-once and back dialogue
    choices, unavailable choices with a reason, and language overlays with
-   saves bound to the rules alone. Still to come when the original game's
+   saves bound to the rules alone. Still to come when
    content needs them: failing, abandoned and deadline quests, terminal and
    failure outcomes, dialogue-by-role and conditional text.
 3. **P0 — political identity · foundation delivered**. Factions, war and
@@ -77,12 +76,12 @@ The current priority is:
    world's states, martial schools and orders be gameplay rather than
    lore-only labels. Still to come when content needs them: per-character
    relation, personalities and reactions to deeds, and membership ranks.
-4. **P1 — living sandbox world.** Finish the retinue pieces the original game needs
+4. **P1 — living sandbox world.** Finish the retinue pieces a full sandbox needs
    (especially companions, provisions/morale and travel speed), then holdings and
    sieges, world agents, faction strategy, and the minimum politics/order
    composition needed for fealty and organizations. The already delivered
    economy and mass-battle slices are foundations. Prisoner detail, courtship,
-   champion duels and similar subfeatures wait for the original game's authored content that
+   champion duels and similar subfeatures wait for authored content that
    actually needs them.
 5. **P2 — Shared play.** Preserve a complete offline solo game. Shared
    play is a later optional authoritative mode over the same deterministic
@@ -334,7 +333,7 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
 
 Next, when a client needs it: spatial authority for real-time contact
 (positions, reach and hit volumes on the fixed step, or a validated spatial
-record), a host bridge for a 3D client, spacing and retreat for
+record), spacing and retreat for
 engine-controlled fighters, redirection, directional parries and
 situational crits from openings;
 companion progression (XP, ranks, gear and the weapon, style and cultivation
@@ -1149,7 +1148,7 @@ milestones. They change how play reads, never the engine or its rules.
    last six lines of the fight (the latest turn marked) and the menu. When
    it ends, scrollback keeps only the opening line and the final turn. Line
    mode and pipes keep the full log.
-6. **Overland map** · delivered, **original-game P0**. A map of
+6. **Overland map** · delivered, **P0**. A map of
    places and roads drawn from authored display positions, with zoom,
    panning and labels that make room for each other, and a fixed view in
    line mode ([Overland map](docs/sandbox-worlds.md#overland-map)). Unlike
@@ -1158,7 +1157,7 @@ milestones. They change how play reads, never the engine or its rules.
    out until knowledge and news exists; travel to a chosen place waits for
    travel speed and world agents. `known_when` keeps a place
    off the map, and off the roads, until the player learns of it.
-7. **Embeddable client surface** · delivered, **original-game P0**.
+7. **Embeddable client surface** · delivered, **P0**.
    The engine stays presentation-agnostic; a non-terminal host loads a
    package from memory (`WorldSpec::from_files`), inspects views and actions,
    executes typed commands and imports/exports snapshots as JSON bytes, with
@@ -1221,7 +1220,7 @@ M5 also lays the general foundations that
 these slices. The investigation fixture, optional Inventory and authored endings
 above are delivered alongside them, in whichever order a fixture needs them.
 
-For the original game, the identifiers below describe scope rather than a strict execution
+The identifiers below describe scope rather than a strict execution
 order: **M5f start choices** (delivered) and the authored-progression part of **M5c** are P0,
 and M5e is pulled forward as soon as repeated social roles or state-sensitive
 dialogue in the opening town would otherwise duplicate content.
@@ -1255,7 +1254,7 @@ dialogue in the opening town would otherwise duplicate content.
    `{year}`, `{month}` and `{day_of_month}`. WorldTime remains elapsed
    minutes, the calendar position is derived and never saved, and there is
    one time source of truth. The spec finds the next day and month
-   boundaries after a minute, which the original game's financial
+   boundaries after a minute, which financial
    settlement uses: banking interest and monthly payroll are delivered
    (M6a and M6c below); salaries and holding settlement are not.
    **Extended** with variable road travel: a road may author weighted
@@ -1321,8 +1320,6 @@ only for a world that needs one.
 
 ## M6 — Living sandbox worlds · proposed
 
-**Additional host/integration pressure (design only):** [Spatial hosts, stationed forces, and battle boundaries](docs/spatial-hosts-and-military-battles.md) explains optional distributed troop custody, non-owned military stations, remote force orders, world-anchored battle presentation and explicit in-world time advancement for continuous clients. These remain proposed, **not delivered**. The original game's three-ordinary-escort limit is a game rule, not a RealmKit constant. Prioritize a small deterministic fixture before adding a new format field or command.
-
 Let a world keep moving without the player: an overland realm of rival
 kingdoms where the player trades, hires soldiers, earns standing, holds fiefs
 and joins orders while lords, bandits and caravans act on their own. The
@@ -1340,13 +1337,13 @@ needs only M5a's effects and M5b's schedules, so it came first. Deliver in
 slices; a slice changes the package and save format version only under the
 [Versions](docs/world-format.md#versions) rule, so optional additions leave it as it is.
 
-The original game now supplies the concrete ordering pressure. After the already delivered
+After the already delivered
 economy, first troop/battle and M6b factions/standing slices, prioritize the
 remaining **M6c** retinue/companion/travel needs, then **M6e holdings/sieges**,
 **M6f world agents**, **M6g faction strategy**, and only the minimal **M6h**
-politics/order composition that the game's authored content requires. M6d additions
-such as prisoners, injuries and champion duels are not blockers unless the
-original-game fixture actually uses them.
+politics/order composition that authored content requires. M6d additions
+such as prisoners, injuries and champion duels are not blockers unless a
+fixture actually uses them.
 
 1. **M6a — economy.** Currency; markets whose per-good price index follows
    authored production and demand on a recurring price tick; linked markets
@@ -1376,7 +1373,7 @@ original-game fixture actually uses them.
    capabilities they need: party proficiencies (companions), studying
    items over world time, a wider spread for unneeded goods and disliked
    merchants (M6b), and caravan and village-trade prosperity (M6f).
-   **Banking · delivered**, driven by the original game on the M5b
+   **Banking · delivered**, on the M5b
    calendar: carried cash and one optional bank account apart from it,
    with deposits and withdrawals only at authored branches, in no time;
    interest in basis points at each real Gregorian month end on the
@@ -1438,7 +1435,7 @@ original-game fixture actually uses them.
    condition holds, ahead of factions; wounded and killed losses, the
    player knocked out rather than killed, and victory XP shared with the
    squads that fought. `examples/marches` raises levies and beats the fen
-   outlaws. **Monthly payroll · delivered**, from the original game:
+   outlaws. **Monthly payroll · delivered**:
    a `monthly` payroll separates financial payroll from physical upkeep,
    paying a month-end snapshot of the roster with no proration through
    the economy's generic payment, bank first and then carried cash, all or
@@ -1447,13 +1444,12 @@ original-game fixture actually uses them.
    mends the wounded on its own schedule; worlds that do not opt in keep
    their scheduled wages and legacy desertion. Still to come: companions, provisions, persistent morale,
    travel speed, leaders and companions as individuals, ground, prisoners,
-   injuries and loot tables. Future distributed custody (nearby escort vs stationed force vs traveling party), when the consumer needs it, must reuse the squad counts/XP model and preserve the player's existing retinue rules.
+   injuries and loot tables.
 5. **M6e — holdings and sieges.** Ownership that changes during play, income,
    garrisons, authored buildings, sieges as mass battles after a preparation
    time, and raiding enemy villages for loot at the cost of their income.
    Villages add rent collected in person with a risk of unrest, demanding
    supplies, herds of livestock, and bandit trouble cleared through offers.
-   A military station that hosts another owner's troops is a separate proposed access/hosting use case; it must not require player ownership of a holding.
 6. **M6f — world agents.** Party instances on the road graph that apply a
    closed set of engine policies on recurring world ticks, with priorities
    that may test the leader's traits, routing by shortest travel time with ties
@@ -1559,9 +1555,9 @@ data, and validate and simulate independently from their own starts.
 
 Richer player-facing clients are no longer parked in this milestone: the
 [presentation track](#presentation-track--in-progress) owns the embeddable
-client/map work needed by the offline original game.
+client/map work needed by an offline game.
 
-M9 is specifically the later **shared play** path of the original game. Solo
+M9 is specifically the later **shared play** path. Solo
 play remains fully local and playable without a server. When shared play becomes
 active work, introduce an authoritative server as an adapter around the same
 deterministic command/event rules. The server owns canonical shared state, RNG
@@ -1599,7 +1595,7 @@ reconnect restores current server state; and no multiplayer feature requires
 runtime AI.
 ## Decisions to discuss next
 
-Resolve decisions immediately before the original game's slice that consumes them. The
+Resolve decisions immediately before the slice that consumes them. The
 complete cross-project register remains in
 [docs/open-decisions.md](docs/open-decisions.md).
 
@@ -1612,14 +1608,14 @@ complete cross-project register remains in
    an ordered list moved by effects, `main` and `requires` on quests, and
    outcomes recorded once. Several languages are settled too: one base
    language plus complete overlays, and a rules-only save revision. Settle failure, deadlines and terminal outcomes
-   when the original game's content beyond the MVP needs them.
+   when content beyond the MVP needs them.
 3. **Politics P0 · war/peace and standing settled**: factions as
    plain entities, war or peace per unordered pair, and standing tracks with
    global or per-faction scopes, bounds and named thresholds. Settle
    membership ranks, per-character relation and personalities before
    authoring the game world's schools and orders.
 4. **Party P1:** settle companion progression/gear, roster limit, provisions,
-   morale and travel-speed rules required by the first full party of the original game.
+   morale and travel-speed rules required by the first full party.
 5. **Living world P1:** settle only the holding, world-agent and faction-strategy
    details needed by the representative sandbox; defer ornamental systems
    such as courtship or champion duels until authored content demands them.
