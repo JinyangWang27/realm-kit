@@ -253,6 +253,7 @@ impl<'w> Engine<'w> {
             .into_iter()
             .find(|s| s.id == skill)
             .ok_or_else(unknown)?;
+        gear::wields(&gear::capabilities(self.world, combat), skill)?;
         let pools = self.player_pools().ok_or_else(unknown)?;
         encounter::check_skill(&combat.vitals, pools, combat.level, skill)
     }

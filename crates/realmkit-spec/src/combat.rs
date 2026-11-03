@@ -55,6 +55,10 @@ pub struct Combat {
     /// The slots equipment can occupy in this world.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub slots: Vec<Id>,
+    /// What each slot provides while nothing is worn in it, by slot: empty
+    /// hands strike and grapple; a bow in them does neither.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub bare: BTreeMap<Id, Vec<Id>>,
     /// Gear the player starts with, equipped in order while its slots are free.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_equipment: Vec<Id>,
@@ -286,6 +290,11 @@ pub struct Skill {
     /// impact beats the target's poise staggers it. Basic attacks have none.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub impact: u32,
+    /// Capabilities the player must have, all of them, to use it: given by
+    /// worn equipment or an empty slot (`bare`). Only the player wears gear;
+    /// an engine-controlled fighter's authored skills are its own to use.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<Id>,
     /// Real-time only: the impact this attack stands through while winding
     /// up and striking, without interruption (it still takes the damage).
     #[serde(default, skip_serializing_if = "is_zero")]

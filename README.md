@@ -185,6 +185,9 @@ A worn bow draws in real time too (`examples/archery-range`): `draw`, `step`
 and `loose` shoot, a short draw hits softer than a full one, and each shot
 flies on by itself, however many are in the air, until the host reports where
 it went (`arrow 0 butt`, or `arrow 0` for a fence) or its flight runs out.
+A shot loosed before any fight can start one: `shoot brawler 8` reports a
+full draw reaching the brawler, and the fight begins with its hit. Skills can
+require what you wield: a staff thrust needs the staff in hand, not the bow.
 Worlds can also grant stat
 points on levelling up, which you spend to shape your own build, and
 techniques mastered rank by rank, each rank named by the world

@@ -328,6 +328,7 @@ fn many_worn_modifiers_combine_exactly() {
                     speed_penalty: 0,
                     basic_channel: None,
                     basic_time: None,
+                    capabilities: Vec::new(),
                     ranged: None,
                     modifiers,
                     tiers: Vec::new(),

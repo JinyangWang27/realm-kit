@@ -64,6 +64,8 @@ pub enum EngineError {
     UnknownSkill(Id),
     #[error("you have not reached the level for {0}")]
     SkillLocked(Id),
+    #[error("what you wield does not allow {0}")]
+    Unwielded(Id),
     #[error("not enough MP for {0}")]
     NotEnoughMp(Id),
     #[error("not enough rage for {0}")]

@@ -35,6 +35,7 @@ fn skill(id: &str, power: u32, costs: Costs) -> Skill {
         cross_share: None,
         text: TextTemplate("{attacker} {target} {damage}".into()),
         crit: None,
+        requires: Vec::new(),
         impact: 0,
         poise: 0,
     }

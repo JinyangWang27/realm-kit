@@ -298,6 +298,12 @@ every capability optional:
   own host reports, ending exactly once; an `inert` profile for practice
   targets; save checks for every new state. The `archery-range` example plays
   it in line mode. Existing packages, saves and walkthroughs are unchanged.
+- [x] Combat stabilization ([combat.md](combat.md#what-a-weapon-allows)):
+  skills `require` capabilities that worn `capabilities` or `bare` slots provide
+  (`Unwielded`), in both fight layers; `OpeningShot` starts a real-time fight
+  with a shot loosed while exploring, landing it once; a live projectile's
+  provenance (`worn`) bounds its saved force and stats. Packages are unchanged;
+  a save from before with a shot in the air does not load (no `worn`).
 - [ ] Spatial authority for real-time contact, redirection and directional
   parries; companions in turn-based encounters and battles, and
   companion progression and gear.

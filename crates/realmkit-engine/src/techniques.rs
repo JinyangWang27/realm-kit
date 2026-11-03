@@ -49,6 +49,19 @@ pub(super) fn add_passives(world: &WorldSpec, combat: &CombatState, stats: &mut 
     }
 }
 
+/// Each learned technique's largest passive bonus of any rank up to its
+/// current one, stat by stat.
+pub(super) fn add_largest_passives(world: &WorldSpec, combat: &CombatState, stats: &mut Stats) {
+    for (id, learned) in &combat.techniques {
+        for stat in Stat::ALL {
+            let ranks = &spec(world, id).ranks[..learned.rank];
+            let bonus = ranks.iter().filter_map(|r| r.passive.get(&stat)).max();
+            let total = stats.get_mut(stat);
+            *total = total.saturating_add(bonus.copied().unwrap_or(0));
+        }
+    }
+}
+
 /// Teaches the technique if unknown, raises it to at least the grant's rank
 /// (teaching passes gates), then adds the grant's XP.
 pub(super) fn grant(

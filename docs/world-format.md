@@ -1438,6 +1438,7 @@ an item with an `equipment` part can be worn:
 ```
 
 - `slots` lists the slots a piece occupies (a two-handed weapon takes two);
+  `capabilities` names what wielding it allows (see below);
   `bonuses` adds to stats while worn; `speed_penalty` subtracts from speed;
   a weapon's `basic_channel` and `basic_time` replace the wearer's basic attack
   (pieces that set either must share a slot, so only one is ever worn);
@@ -1711,6 +1712,27 @@ real-time fights read; turn-based encounters ignore them:
   takes, before anything else its policy would do, whenever it is free
   (ready or guarding) and a foe's attack aimed at it is active and has not
   landed. The world must have that defence (`invalid_reaction`).
+
+### Capabilities
+
+A skill's `requires` lists capabilities the player must all have to use it
+([combat.md](combat.md#what-a-weapon-allows)); worn pieces provide their
+`capabilities`, and the combat block's `bare` gives a slot's capabilities while
+nothing is worn in it:
+
+```json
+"slots": ["hands"],
+"bare": { "hands": ["fist"] },
+"skills": [{ "id": "thrust", "requires": ["staff"], "...": "..." }]
+```
+
+```json
+"equipment": { "slots": ["hands"], "capabilities": ["staff"] }
+```
+
+A `bare` key must be a declared slot, and a required capability must be one some
+piece or bare slot provides (`missing_reference`). All three default to empty,
+which requires and provides nothing, so worlds without them are unchanged.
 
 ### Drawn weapons
 

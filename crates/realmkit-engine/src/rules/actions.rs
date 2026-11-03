@@ -349,6 +349,7 @@ fn realtime_actions(
         RealtimeAction::Ready | RealtimeAction::Guard { .. } | RealtimeAction::Drawing { .. }
     );
     let pools = crate::character::resources::player_pools(world, &player_stats(world, combat));
+    let wielded = gear::capabilities(world, combat);
     let intent = |intent, available| Action {
         command: Command::Intent(intent),
         available,
@@ -375,7 +376,8 @@ fn realtime_actions(
         ));
         // Unaffordable skills stay listed, so the player sees why they are not usable.
         actions.extend(skills.iter().map(|s| {
-            let usable = encounter::check_skill(&combat.vitals, pools, combat.level, s).is_ok();
+            let usable = gear::wields(&wielded, s).is_ok()
+                && encounter::check_skill(&combat.vitals, pools, combat.level, s).is_ok();
             let skill = s.id.clone();
             let target = target.clone();
             intent(Intent::Skill { skill, target }, free && usable)
@@ -471,6 +473,7 @@ fn fight_actions(
     let level = combat.level;
     let player = &combat.vitals;
     let pools = crate::character::resources::player_pools(world, &player_stats(world, combat));
+    let wielded = gear::capabilities(world, combat);
     let skills: Vec<_> = techniques::player_skills(world, combat)
         .into_iter()
         .filter(|s| s.level <= level)
@@ -487,7 +490,8 @@ fn fight_actions(
                 skill: s.id.clone(),
                 target: foe.character.clone(),
             },
-            available: encounter::check_skill(player, pools, level, s).is_ok(),
+            available: gear::wields(&wielded, s).is_ok()
+                && encounter::check_skill(player, pools, level, s).is_ok(),
         }));
     }
     actions.extend(consumables(world, state));

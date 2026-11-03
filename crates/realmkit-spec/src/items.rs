@@ -50,6 +50,11 @@ pub struct Equipment {
     /// A weapon's basic-attack time, in percent of a basic action.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basic_time: Option<u32>,
+    /// What wielding it lets the wearer do, by the world's own names
+    /// (`blade`, `bow`, `shield`): a skill that `requires` one is usable only
+    /// while something worn, or an empty slot's `bare` hands, provides it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capabilities: Vec<Id>,
     /// Real-time only: makes it a drawn weapon that looses projectiles.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ranged: Option<RangedWeapon>,

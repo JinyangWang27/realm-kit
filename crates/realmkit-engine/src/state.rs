@@ -211,6 +211,11 @@ pub struct Projectile {
     /// The shooter's stats when it left: a shot keeps the attack of the
     /// weapon that loosed it, whatever is worn when it lands.
     pub stats: Stats,
+    /// Its provenance: the pieces of gear worn when it left, in instance
+    /// order. A save check bounds `stats` by what they could have given and
+    /// takes the shot's force from the drawn weapon among them, so gear
+    /// changed in flight is no reason to refuse it, and none to inflate it.
+    pub worn: Vec<u64>,
     pub power: u32,
     pub channel: Channel,
     pub impact: u32,

@@ -89,6 +89,7 @@ pub(super) fn check(
     let no_flee = realtime::group(world, fight).is_some_and(|g| g.no_flee);
     let per_point = 100 * u128::from(realtime.steps_per_second);
     let known = techniques::player_skills(world, combat);
+    let wielded = gear::capabilities(world, combat);
     let fighters_ok = fight.fighters.iter().enumerate().all(|(i, f)| {
         let side = &sides[i];
         let v = fight.vitals(i, state);
@@ -111,13 +112,15 @@ pub(super) fn check(
             None => !f.yielded,
         };
         // A committed attack keeps the skill it began with, which a rank the
-        // attack itself earned may since have replaced.
+        // attack itself earned may since have replaced. Gear changes only
+        // while the player is free, so what they wield still allows it.
         let usable = |id: &Id| match i {
             0 => known
                 .iter()
                 .find(|s| &s.id == id)
                 .copied()
-                .or_else(|| superseded(world, combat, id)),
+                .or_else(|| superseded(world, combat, id))
+                .filter(|s| gear::wields(&wielded, s).is_ok()),
             _ => profile(world, &f.character)
                 .skills
                 .contains(id)
@@ -218,21 +221,38 @@ pub(super) fn check(
             && u128::from(f.mp_remainder) < per_point
     });
     // Live projectiles in the order loosed, below the counter, each still in
-    // flight, with the force a weapon the player owns can give: it may have
-    // gone back in the pack since. Its stats cannot be checked from here, since
-    // gear and ranks may have changed since it left; damage is checked arithmetic.
-    let owned: Vec<_> = combat
-        .gear
-        .values()
-        .filter_map(|g| world.item(&g.item)?.equipment.as_ref()?.ranged)
-        .collect();
+    // flight. Each names the pieces worn when it left: pieces the player
+    // still owns, worn together (no slot twice), the drawn weapon among them
+    // bounding its force and flight, and its stats no more than they could
+    // have given then. Gear may have changed since, so today's is never the
+    // measure. What it cannot tell is a shot made weaker, or stronger within
+    // that bound; damage is checked arithmetic. See docs/combat.md.
     let mut last = None;
     let shots_ok = fight.projectiles.iter().all(|p| {
         let ordered = last.is_none_or(|l| l < p.id) && p.id < fight.next_projectile;
         last = Some(p.id);
+        let pieces: Option<Vec<_>> = p
+            .worn
+            .iter()
+            .map(|id| world.item(&combat.gear.get(id)?.item)?.equipment.as_ref())
+            .collect();
+        let Some(pieces) = pieces else {
+            return false;
+        };
+        let mut slots = BTreeSet::new();
+        let together = p.worn.is_sorted_by(|a, b| a < b)
+            && pieces
+                .iter()
+                .flat_map(|e| &e.slots)
+                .all(|s| slots.insert(s));
+        let bound = character::player_stats_bound(world, combat, &p.worn);
+        let within = Stat::ALL.iter().all(|&s| p.stats.get(s) <= bound.get(s));
         ordered
+            && together
+            && within
+            && p.stats.speed >= 1
             && p.shooter == player.character
-            && owned.iter().any(|w| {
+            && pieces.iter().find_map(|e| e.ranged).is_some_and(|w| {
                 (w.min_power..=w.power).contains(&p.power)
                     && p.channel == w.channel
                     // Only a full draw carries impact, and it has full power.

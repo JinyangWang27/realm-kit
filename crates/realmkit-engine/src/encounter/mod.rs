@@ -281,6 +281,9 @@ pub(super) fn player_action(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let turn = state.turn;
+    if let (Some(skill), Some(combat)) = (skill, &state.combat) {
+        gear::wields(&gear::capabilities(world, combat), skill)?;
+    }
     let (mut board, me) = fighting(world, &mut state.combat)?;
     let index = (0..board.encounter.participants.len())
         .find(|&i| {

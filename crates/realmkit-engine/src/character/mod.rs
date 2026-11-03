@@ -20,6 +20,30 @@ pub use resources::Pools;
 /// techniques' current rank bonuses plus worn gear. Derived whenever needed,
 /// never saved, so no bonus can be counted twice.
 pub(crate) fn player_stats(world: &WorldSpec, combat: &CombatState) -> Stats {
+    let mut stats = base_stats(world, combat);
+    techniques::add_passives(world, combat, &mut stats);
+    gear::apply(world, combat, &mut stats);
+    stats
+}
+
+/// The most the player's stats can have been at an earlier step of this
+/// fight while wearing the pieces `worn`. Level, stat points and the
+/// techniques known stay put while a fight lasts; a rank can rise, and a
+/// later rank's passive may be smaller, so each technique adds its largest
+/// passive up to its current rank.
+pub(crate) fn player_stats_bound(world: &WorldSpec, combat: &CombatState, worn: &[u64]) -> Stats {
+    let mut then = combat.clone();
+    for (id, gear) in &mut then.gear {
+        gear.equipped = worn.contains(id);
+    }
+    let mut stats = base_stats(world, &then);
+    techniques::add_largest_passives(world, &then, &mut stats);
+    gear::apply(world, &then, &mut stats);
+    stats
+}
+
+/// The level table's stats with allocated points.
+fn base_stats(world: &WorldSpec, combat: &CombatState) -> Stats {
     let rules = world.combat().unwrap();
     let mut stats = rules.levels[combat.level - 1].stats;
     if let Some(points) = &rules.stat_points {
@@ -29,8 +53,6 @@ pub(crate) fn player_stats(world: &WorldSpec, combat: &CombatState) -> Stats {
             *total = total.saturating_add(spent.saturating_mul(value));
         }
     }
-    techniques::add_passives(world, combat, &mut stats);
-    gear::apply(world, combat, &mut stats);
     stats
 }
 
