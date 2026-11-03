@@ -58,6 +58,16 @@ pub enum Command {
     /// Starts a real-time fight with a fighter here and whoever engaging it
     /// would bring in: one opponent, or its whole group.
     EngageRealtime(Id),
+    /// Starts a real-time fight with a shot loosed while exploring that has
+    /// reached `target`, after `drawn` steps of drawing (at the world's step
+    /// rate) with the drawn weapon worn now. The fight starts as
+    /// `EngageRealtime` would, and the shot lands once, at its first step:
+    /// the host reports the contact, as it does in a fight, and RealmKit
+    /// decides whether a fight may start and what the hit does.
+    OpeningShot {
+        target: Id,
+        drawn: u64,
+    },
     /// In a real-time fight: one input on its fixed-step clock.
     Intent(Intent),
     /// Gives a named companion in the party a standing tactical order,

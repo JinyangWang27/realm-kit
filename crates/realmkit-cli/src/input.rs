@@ -52,6 +52,13 @@ pub fn help(world: &WorldSpec) -> String {
     if combat.is_some_and(|c| c.realtime.is_some()) {
         attack += "fight <character-id> — a real-time fight on a fixed-step clock, with its group\nstep [steps] — run the fight's clock on\nstrike [skill-id] [at <character-id>] | guard | lower | disengage\ncontact <character-id> [target-id] — that fighter's active attack touched, as a host reports it\njoin <character-id> <team> — that fighter arrives, as a host reports it (0 is your side)\n";
     }
+    let drawn = world
+        .items
+        .iter()
+        .any(|i| i.equipment.as_ref().is_some_and(|e| e.ranged.is_some()));
+    if drawn && combat.is_some_and(|c| c.realtime.is_some()) {
+        attack += "draw | loose | undraw — a drawn weapon in a fight\narrow <shot> [target-id] — that shot touched someone, or something else, as a host reports it\nshoot <character-id> <steps> — a shot loosed while exploring after that many steps of drawing reached them, as a host reports it: the fight starts with its hit\n";
+    }
     let realtime = combat.and_then(|c| c.realtime);
     if realtime.is_some_and(|r| r.parry.is_some() || r.dodge.is_some()) {
         attack += "parry | dodge — a timed defence: its window opens now, then you recover\n";
@@ -295,6 +302,10 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
             projectile: id.parse().map_err(|_| "expected a shot number")?,
             target: (*target).into(),
         }),
+        ("shoot", [id, steps]) => Command::OpeningShot {
+            target: (*id).into(),
+            drawn: steps.parse().map_err(|_| "expected steps of drawing")?,
+        },
         ("arrow", [id]) => Command::Intent(Intent::ProjectileSpent {
             projectile: id.parse().map_err(|_| "expected a shot number")?,
         }),

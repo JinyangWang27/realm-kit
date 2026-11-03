@@ -720,3 +720,183 @@ fn the_menu_offers_a_draw_and_never_a_report() {
     };
     assert!(!engine.actions().iter().any(reported));
 }
+
+fn opening(target: &str, drawn: u64) -> Command {
+    OpeningShot {
+        target: target.into(),
+        drawn,
+    }
+}
+
+#[test]
+fn a_shot_loosed_while_exploring_starts_the_fight_and_lands_once() {
+    let world = range();
+    let mut engine = Engine::new(&world).unwrap();
+    let events = engine.execute(opening("brawler", 8)).unwrap();
+    assert!(
+        matches!(&events[0], Event::EncounterStarted { opponents } if opponents == &["brawler"])
+    );
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::Loosed {
+            projectile: 0,
+            draw_percent: 100,
+            power: 200,
+            ..
+        }
+    )));
+    assert_eq!(
+        ended(&events),
+        [(0, ProjectileEnd::Landed)],
+        "settled once, at once"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::DamageDealt { target, .. } if target == "brawler")),
+        "{events:?}"
+    );
+    let fight = engine.realtime().unwrap();
+    assert_eq!(fight.step, 0);
+    assert!(
+        fight.projectiles.is_empty(),
+        "nothing left in the air to land again"
+    );
+    assert_eq!(fight.next_projectile, 1);
+    assert_eq!(
+        action(&engine, 0),
+        RealtimeAction::Ready,
+        "its recovery passed in flight"
+    );
+    // The full draw staggered him, as it would in a fight.
+    assert!(matches!(
+        action(&engine, 1),
+        RealtimeAction::Staggered { .. }
+    ));
+    assert!(matches!(
+        engine.execute(hit(0, "brawler")),
+        Err(EngineError::NoProjectile(0))
+    ));
+    // The same shot in a fight already started deals the same.
+    let mut fought = start(&world, "brawler");
+    shoot(&mut fought, 8);
+    fought.execute(hit(0, "brawler")).unwrap();
+    assert_eq!(hp(&fought, 1), hp(&engine, 1));
+    // Saved, resumed and replayed: the same state.
+    let json = engine.snapshot().to_json();
+    let resumed = Engine::restore(&world, SaveSnapshot::from_json(&json).unwrap()).unwrap();
+    assert_eq!(resumed.snapshot().to_json(), json);
+    let mut again = Engine::new(&world).unwrap();
+    again.execute(opening("brawler", 8)).unwrap();
+    assert_eq!(again.snapshot().to_json(), json);
+}
+
+#[test]
+fn an_opening_shot_follows_every_rule_of_starting_a_fight_or_changes_nothing() {
+    let world = range();
+    let mut engine = Engine::new(&world).unwrap();
+    let before = engine.snapshot();
+    // Too short a draw, and nobody here to shoot.
+    assert!(matches!(
+        engine.execute(opening("butt", 1)),
+        Err(EngineError::DrawTooShort)
+    ));
+    assert!(matches!(
+        engine.execute(opening("archer", 8)),
+        Err(EngineError::NotHere(_))
+    ));
+    assert!(matches!(
+        engine.execute(opening("ghost", 8)),
+        Err(EngineError::NotHere(_))
+    ));
+    // No bow in hand: no shot.
+    let staff = piece(&engine, "staff");
+    let mut staffed = Engine::new(&world).unwrap();
+    staffed.execute(Equip(staff)).unwrap();
+    assert!(matches!(
+        staffed.execute(opening("butt", 8)),
+        Err(EngineError::NoRangedWeapon)
+    ));
+    assert_eq!(engine.snapshot(), before, "a refused shot changes nothing");
+    // Never during a fight: there, a shot is a report.
+    engine.execute(EngageRealtime("butt".into())).unwrap();
+    assert!(matches!(
+        engine.execute(opening("butt", 8)),
+        Err(EngineError::InEncounter)
+    ));
+}
+
+#[test]
+fn an_opening_shot_on_an_ally_is_refused() {
+    let mut world = range();
+    let fencer = world
+        .characters
+        .iter_mut()
+        .find(|c| c.id == "fencer")
+        .unwrap();
+    let profile = fencer.combat.as_mut().unwrap();
+    profile.ally = true;
+    profile.group = None;
+    let mut engine = Engine::new(&world).unwrap();
+    assert!(matches!(
+        engine.execute(opening("fencer", 8)),
+        Err(EngineError::NotHostile(_))
+    ));
+    assert!(engine.realtime().is_none());
+}
+
+#[test]
+fn a_saved_shot_carries_the_gear_it_left_with_and_stats_no_more_than_it_gave() {
+    let mut world = range();
+    let bow = world
+        .items
+        .iter_mut()
+        .find(|i| i.id == "short_bow")
+        .unwrap();
+    bow.equipment
+        .as_mut()
+        .unwrap()
+        .bonuses
+        .insert(Stat::Patk, 20);
+    let mut engine = start(&world, "butt");
+    let staff = piece(&engine, "staff");
+    let bow = piece(&engine, "short_bow");
+    shoot(&mut engine, 8);
+    assert_eq!(engine.realtime().unwrap().projectiles[0].worn, [bow]);
+    // The bow goes back in the pack while the shot flies: still a good save.
+    engine.execute(step(3)).unwrap();
+    engine.execute(Intent(I::Equip(staff))).unwrap();
+    let good = engine.snapshot();
+    Engine::restore(&world, good.clone()).expect("gear changed in flight");
+    let tampered = |change: &dyn Fn(&mut Projectile)| {
+        let mut snapshot = good.clone();
+        let Stance::Realtime(fight) = &mut snapshot.state.combat.as_mut().unwrap().stance else {
+            panic!("in a fight");
+        };
+        change(&mut fight.projectiles[0]);
+        Engine::restore(&world, snapshot).is_ok()
+    };
+    assert!(tampered(&|_| {}));
+    assert!(
+        !tampered(&|p| p.stats.patk += 1),
+        "more attack than the bow gave"
+    );
+    assert!(!tampered(&|p| p.stats.hp = 10_000), "inflated");
+    assert!(
+        !tampered(&|p| p.worn = vec![staff]),
+        "no drawn weapon among them"
+    );
+    assert!(
+        !tampered(&|p| p.worn = vec![bow, staff]),
+        "both in one pair of hands"
+    );
+    assert!(
+        !tampered(&|p| p.worn = vec![99]),
+        "a piece the player never owned"
+    );
+    assert!(!tampered(&|p| p.worn.clear()), "no provenance");
+    assert!(
+        tampered(&|p| p.stats.patk -= 1),
+        "weaker is within the bound"
+    );
+}

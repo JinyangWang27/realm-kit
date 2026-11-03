@@ -5,6 +5,7 @@
     "description": "Ash and sinew, drawn to the ear.",
     "equipment": {
       "slots": ["hands"],
+      "capabilities": ["bow"],
       "ranged": {
         "draw": 8,
         "min_draw": 2,
@@ -21,6 +22,6 @@
     "id": "staff",
     "name": "Staff",
     "description": "A plain length of oak.",
-    "equipment": { "slots": ["hands"] }
+    "equipment": { "slots": ["hands"], "capabilities": ["staff"] }
   }
 ]

@@ -23,9 +23,32 @@ pub(super) fn equipment(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Comba
         }
     }
     competing_weapons(out, w);
+    capabilities(out, w, combat);
     for id in &combat.player_equipment {
         let wearable = w.item(id).is_some_and(|i| i.equipment.is_some());
         reference(out, &w.world.player, "equipment item", id, wearable);
+    }
+}
+
+/// Bare slots are declared slots, and every capability a skill requires is
+/// one some piece or empty slot provides: a misspelt one would lock the
+/// skill for good.
+fn capabilities(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
+    for slot in combat.bare.keys() {
+        reference(out, &w.world.id, "slot", slot, combat.slots.contains(slot));
+    }
+    let provided: BTreeSet<&Id> = w
+        .items
+        .iter()
+        .filter_map(|i| i.equipment.as_ref())
+        .flat_map(|e| &e.capabilities)
+        .chain(combat.bare.values().flatten())
+        .collect();
+    for skill in &combat.skills {
+        for capability in &skill.requires {
+            let known = provided.contains(capability);
+            reference(out, &skill.id, "capability", capability, known);
+        }
     }
 }
 

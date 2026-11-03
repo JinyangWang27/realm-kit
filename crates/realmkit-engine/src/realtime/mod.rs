@@ -300,10 +300,13 @@ pub(crate) fn intent(
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let realtime = *rules(world)?;
-    let known = state
+    let (known, wielded, worn) = state
         .combat
         .as_ref()
-        .map(|c| techniques::player_skills(world, c))
+        .map(|c| {
+            let known = techniques::player_skills(world, c);
+            (known, gear::capabilities(world, c), worn_pieces(c))
+        })
         .unwrap_or_default();
     let mut ring = ring(world, state)?;
     let now = ring.fight.step;
@@ -338,6 +341,7 @@ pub(crate) fn intent(
             }
             let target = aim(&ring, target)?;
             if let Some(skill) = skill {
+                gear::wields(&wielded, skill)?;
                 let side = ring.sides[0];
                 encounter::check_skill(ring.player, side.pools, side.level, skill)?;
             }
@@ -393,7 +397,7 @@ pub(crate) fn intent(
             events.push(Event::DrawBegun { character: player });
             Ok(())
         }
-        Intent::Loose => loose(&mut ring, events),
+        Intent::Loose => loose(&mut ring, worn, events),
         Intent::LowerDraw => {
             let RealtimeAction::Drawing { .. } = ring.fight.fighters[0].action else {
                 return Err(EngineError::NotDrawing);
@@ -544,18 +548,40 @@ fn end_projectile(ring: &mut Ring, p: usize, cause: ProjectileEnd, events: &mut 
     });
 }
 
+/// The pieces the player wears, in instance order.
+fn worn_pieces(combat: &CombatState) -> Vec<u64> {
+    let worn = combat.gear.iter().filter(|(_, g)| g.equipped);
+    worn.map(|(id, _)| *id).collect()
+}
+
 /// The player looses their draw. How long it was drawn settles its power,
 /// up to a full draw; holding longer adds nothing, and takes nothing away.
-fn loose(ring: &mut Ring, events: &mut Vec<Event>) -> Result<(), EngineError> {
+fn loose(ring: &mut Ring, worn: Vec<u64>, events: &mut Vec<Event>) -> Result<(), EngineError> {
     let RealtimeAction::Drawing { began } = ring.fight.fighters[0].action else {
         return Err(EngineError::NotDrawing);
     };
-    let side = ring.sides[0];
-    // Drawing needs the weapon, and gear cannot change during a fight.
-    let weapon = side.ranged.ok_or(EngineError::NoRangedWeapon)?;
-    let (full, least) = draw_steps(&weapon, side.stats.speed);
+    // Drawing needs the weapon, and gear changes only while not drawing.
+    let weapon = ring.sides[0].ranged.ok_or(EngineError::NoRangedWeapon)?;
     let now = ring.fight.step;
-    let drawn = now - began;
+    let until = now
+        .checked_add(phase_steps(weapon.recovery, ring.sides[0].stats.speed, 100))
+        .ok_or(EngineError::NumericLimit)?;
+    release(ring, weapon, worn, now - began, events)?;
+    ring.fight.fighters[0].action = RealtimeAction::Loosed { until };
+    Ok(())
+}
+
+/// A shot leaves the player's `weapon` now after `drawn` steps of drawing,
+/// with the stats and gear they have now. Its ID.
+fn release(
+    ring: &mut Ring,
+    weapon: RangedWeapon,
+    worn: Vec<u64>,
+    drawn: u64,
+    events: &mut Vec<Event>,
+) -> Result<u64, EngineError> {
+    let side = ring.sides[0];
+    let (full, least) = draw_steps(&weapon, side.stats.speed);
     if drawn < least {
         return Err(EngineError::DrawTooShort);
     }
@@ -565,9 +591,7 @@ fn loose(ring: &mut Ring, events: &mut Vec<Event>) -> Result<(), EngineError> {
         0 => span,
         steps => span * (held - least) / steps,
     };
-    let until = now
-        .checked_add(phase_steps(weapon.recovery, side.stats.speed, 100))
-        .ok_or(EngineError::NumericLimit)?;
+    let now = ring.fight.step;
     let expires = now
         .checked_add(u64::from(weapon.flight))
         .ok_or(EngineError::NumericLimit)?;
@@ -580,12 +604,12 @@ fn loose(ring: &mut Ring, events: &mut Vec<Event>) -> Result<(), EngineError> {
         id,
         shooter: character.clone(),
         stats: side.stats,
+        worn,
         power,
         channel: weapon.channel,
         impact: if held == full { weapon.impact } else { 0 },
         expires,
     });
-    ring.fight.fighters[0].action = RealtimeAction::Loosed { until };
     events.push(Event::Loosed {
         character,
         projectile: id,
@@ -593,7 +617,33 @@ fn loose(ring: &mut Ring, events: &mut Vec<Event>) -> Result<(), EngineError> {
         power,
         expires,
     });
-    Ok(())
+    Ok(id)
+}
+
+/// A shot loosed while exploring reaches `target`: the fight with it starts
+/// as engaging it would, the shot leaves at its first step with the force
+/// `drawn` steps give, and lands at once as a reported contact would. A
+/// refused shot starts nothing, since a command commits only whole. The
+/// player is free at once: the shot's recovery passed while it flew.
+pub(crate) fn opening_shot(
+    world: &WorldSpec,
+    state: &mut GameState,
+    target: Id,
+    drawn: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let combat = state.combat.as_ref().ok_or(EngineError::NoRangedWeapon)?;
+    let weapon = gear::ranged(world, combat).ok_or(EngineError::NoRangedWeapon)?;
+    let worn = worn_pieces(combat);
+    start(world, state, target.clone(), events)?;
+    let mut ring = ring(world, state)?;
+    let projectile = release(&mut ring, weapon, worn, drawn, events)?;
+    intent(
+        world,
+        state,
+        Intent::ProjectileContact { projectile, target },
+        events,
+    )
 }
 
 /// Whom the player aims at: `target` if it is a foe still fighting, or

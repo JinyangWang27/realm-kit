@@ -48,6 +48,30 @@ pub(super) fn basic(world: &WorldSpec, combat: &CombatState) -> (Option<Channel>
     )
 }
 
+/// What the player can do with what they wield now: every worn piece's
+/// capabilities, and the world's `bare` ones for each slot nothing occupies.
+pub(super) fn capabilities<'w>(world: &'w WorldSpec, combat: &CombatState) -> BTreeSet<&'w str> {
+    let pieces = worn(world, combat);
+    let bare = world.combat().unwrap().bare.iter();
+    let free = bare.filter(|(slot, _)| !pieces.iter().any(|p| p.slots.contains(slot)));
+    let worn = pieces.iter().flat_map(|p| &p.capabilities);
+    worn.chain(free.flat_map(|(_, c)| c))
+        .map(String::as_str)
+        .collect()
+}
+
+/// Whether wielding `capabilities` lets the player use `skill`.
+pub(super) fn wields(capabilities: &BTreeSet<&str>, skill: &Skill) -> Result<(), EngineError> {
+    match skill
+        .requires
+        .iter()
+        .all(|c| capabilities.contains(c.as_str()))
+    {
+        true => Ok(()),
+        false => Err(EngineError::Unwielded(skill.id.clone())),
+    }
+}
+
 /// The worn drawn weapon, if any.
 pub(super) fn ranged(world: &WorldSpec, combat: &CombatState) -> Option<RangedWeapon> {
     worn(world, combat).iter().find_map(|p| p.ranged)
