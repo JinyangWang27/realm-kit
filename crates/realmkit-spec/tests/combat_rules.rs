@@ -388,6 +388,7 @@ fn realtime() -> Realtime {
         friendly_fire: false,
         stagger: 0,
         guard_poise: 0,
+        swap: 0,
         parry: None,
         dodge: None,
     }

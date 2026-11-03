@@ -954,6 +954,36 @@ fn a_line_host_plays_light_and_heavy_attacks_parries_dodges_and_staggers() {
     }
 }
 
+const RANGE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/archery-range");
+
+#[test]
+fn a_line_host_draws_looses_and_reports_where_each_shot_went() {
+    let walkthrough = std::fs::read_to_string(format!("{RANGE}/walkthrough.txt")).unwrap();
+    let play = || run(&["play", RANGE, "--seed", "7", "--line"], &walkthrough);
+    let output = play();
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(String::from_utf8(play().stdout).unwrap(), text);
+    for passage in [
+        "Draw\n",
+        "Loose\n",
+        "Lower the draw\n",
+        "You: looses shot 0 at 25% draw, power 50, live until step 22.",
+        "You: full draw.",
+        "You: looses shot 1 at 100% draw, power 200",
+        "Shot 0 strikes home.\nYou hit The Butt: 3 damage.",
+        "Shot 1 strikes something else.",
+        "in the air: 2",
+        "projectile 3 is not in the air",
+        "the draw is too short to loose",
+        "You: lowers the draw.",
+        "Take up Staff\n",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?} in {text}");
+    }
+    assert!(!text.contains("ProjectileContact"), "{text}");
+}
+
 const FORD: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/hollow-ford");
 
 #[test]

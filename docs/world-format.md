@@ -1684,6 +1684,45 @@ real-time fights read; turn-based encounters ignore them:
   (ready or guarding) and a foe's attack aimed at it is active and has not
   landed. The world must have that defence (`invalid_reaction`).
 
+### Drawn weapons
+
+A worn piece with a `ranged` block is drawn and loosed in a real-time fight
+([combat.md](combat.md#drawn-weapons-and-projectiles)); a world without
+`realtime` cannot have one (`invalid_ranged`), and drawn pieces must share a
+slot with each other and with pieces that change the basic attack
+(`competing_weapons`).
+
+```json
+"equipment": {
+  "slots": ["hands"],
+  "ranged": {
+    "draw": 8, "min_draw": 2,
+    "power": 200, "min_power": 50,
+    "channel": "physical", "impact": 1,
+    "recovery": 3, "flight": 20
+  }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `draw` | Steps of drawing to a full draw, 1 to 10,000, at speed 100 |
+| `min_draw` | Steps of drawing before a shot can be loosed, 1 to `draw`, at speed 100 |
+| `power`, `min_power` | Power of a full and of the shortest draw, within skill power's bounds; those between scale evenly, rounded down |
+| `channel` | The hit's channel; default physical |
+| `impact` | Impact of a full draw's hit, 0 to 100; a partial draw's has none |
+| `recovery` | Steps committed after loosing, 1 to 10,000, at speed 100 |
+| `flight` | Steps a shot stays live, 1 to 10,000; speed does not change it |
+
+`realtime.swap` is the steps, 0 to 10,000 at speed 100, a player stays committed
+after changing what they wear during a fight (`Intent::Equip`). Absent or 0, gear
+cannot be changed during one.
+
+A combat profile's `inert: true` makes a fighter that never acts in real time
+and cannot be interrupted, as a practice target: it has no skills, guard or
+reaction and is nobody's ally (`invalid_inert`). A host keeps its figure still.
+On a turn-based timeline it takes its turns as usual.
+
 ### Weapon handling and timed defence
 
 Five optional fields of `realtime` and two of a skill tell light and heavy

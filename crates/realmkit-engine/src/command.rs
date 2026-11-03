@@ -156,6 +156,29 @@ pub enum Intent {
     LowerGuard,
     /// Turns to retreat; the escape happens after the retreat's steps.
     Retreat,
+    /// Takes up a piece from the pack, as [`Command::Equip`] does, in a world
+    /// with a `swap` time, from anything but a commitment. It is worn at once
+    /// and commits the player for those steps. Shots in the air fly on.
+    Equip(u64),
+    /// Begins drawing the worn ranged weapon, from ready or guarding.
+    Draw,
+    /// Looses the drawn shot: its force is settled by how long it was drawn.
+    Loose,
+    /// Lowers a draw with nothing loosed and nothing owed.
+    LowerDraw,
+    /// The host reports that a live projectile touched `target` now. The
+    /// engine accepts it once, on a fighter still fighting other than the
+    /// shooter and, unless the world allows friendly fire, on another team;
+    /// it decides the outcome itself and cannot check the geometry.
+    ProjectileContact {
+        projectile: u64,
+        target: Id,
+    },
+    /// The host reports that a live projectile struck nothing that fights:
+    /// scenery, the ground. It ends there, harming nobody.
+    ProjectileSpent {
+        projectile: u64,
+    },
     /// Begins the world's timed parry: contact during its window is
     /// deflected and staggers the attacker; after it, a committed recovery.
     Parry,
@@ -212,6 +235,20 @@ pub struct DialogueOption {
     /// Why it cannot be taken now; `None` when it can.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked: Option<String>,
+}
+
+/// How a projectile ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectileEnd {
+    /// It hit a fighter; the hit's own events follow.
+    Landed,
+    /// A parry turned it aside.
+    Deflected,
+    /// The host reported it spent on something that does not fight.
+    Obstructed,
+    /// Its flight ran out with no report.
+    Expired,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -348,6 +385,33 @@ pub enum Event {
     Evaded {
         character: Id,
         attacker: Id,
+    },
+    /// In a real-time fight: `character` began drawing, reached a full draw,
+    /// or lowered a draw with nothing loosed.
+    DrawBegun {
+        character: Id,
+    },
+    DrawFull {
+        character: Id,
+    },
+    DrawLowered {
+        character: Id,
+    },
+    /// In a real-time fight: `character` loosed `projectile`, drawn to
+    /// `draw_percent` of full, at `power`, live until step `expires`.
+    Loosed {
+        character: Id,
+        projectile: u64,
+        draw_percent: u32,
+        power: u32,
+        expires: u64,
+    },
+    /// In a real-time fight: a projectile ended. Reported exactly once for
+    /// each, unless the fight ends first, which takes every live one with it.
+    ProjectileEnded {
+        projectile: u64,
+        shooter: Id,
+        cause: ProjectileEnd,
     },
     /// In a real-time fight: `character` was interrupted and is staggered.
     Staggered {

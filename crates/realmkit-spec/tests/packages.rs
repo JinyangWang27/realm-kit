@@ -20,6 +20,7 @@ fn profile() -> CombatProfile {
         targeting: Targeting::First,
         guard_hold: None,
         reaction: None,
+        inert: false,
     }
 }
 

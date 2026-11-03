@@ -329,6 +329,13 @@ fn battle_actions(world: &WorldSpec, battle: &BattleState, panels: Vec<Action>) 
 /// The intents a real-time fight takes at its current step: strikes at
 /// each foe still fighting (untargeted when there is only one), then guard,
 /// the world's parry and dodge, and retreat. Contact and joins are the host's to report, never offered.
+fn rules_swap(world: &WorldSpec) -> u32 {
+    world
+        .combat()
+        .and_then(|c| c.realtime)
+        .map_or(0, |r| r.swap)
+}
+
 fn realtime_actions(
     world: &WorldSpec,
     state: &GameState,
@@ -337,7 +344,10 @@ fn realtime_actions(
 ) -> Vec<Action> {
     let combat = state.combat.as_ref().unwrap();
     let action = &fight.fighters[0].action;
-    let free = matches!(action, RealtimeAction::Ready | RealtimeAction::Guard { .. });
+    let free = matches!(
+        action,
+        RealtimeAction::Ready | RealtimeAction::Guard { .. } | RealtimeAction::Drawing { .. }
+    );
     let pools = crate::character::resources::player_pools(world, &player_stats(world, combat));
     let intent = |intent, available| Action {
         command: Command::Intent(intent),
@@ -374,6 +384,23 @@ fn realtime_actions(
     match action {
         RealtimeAction::Guard { .. } => actions.push(intent(Intent::LowerGuard, true)),
         _ => actions.push(intent(Intent::Guard, *action == RealtimeAction::Ready)),
+    }
+    if rules_swap(world) > 0 {
+        let pack = combat.gear.iter().filter(|(_, g)| !g.equipped);
+        actions.extend(pack.map(|(id, _)| intent(Intent::Equip(*id), free)));
+    }
+    if gear::ranged(world, combat).is_some() {
+        match action {
+            RealtimeAction::Drawing { began } => {
+                let drawn = fight.step.saturating_sub(*began);
+                let speed = player_stats(world, combat).speed;
+                let least =
+                    gear::ranged(world, combat).map_or(0, |w| realtime::draw_steps(&w, speed).1);
+                actions.push(intent(Intent::Loose, drawn >= least));
+                actions.push(intent(Intent::LowerDraw, true));
+            }
+            _ => actions.push(intent(Intent::Draw, free)),
+        }
     }
     let rules = world.combat().and_then(|c| c.realtime.as_ref());
     if rules.is_some_and(|r| r.parry.is_some()) {

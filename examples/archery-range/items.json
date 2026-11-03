@@ -1,0 +1,26 @@
+[
+  {
+    "id": "short_bow",
+    "name": "Short Bow",
+    "description": "Ash and sinew, drawn to the ear.",
+    "equipment": {
+      "slots": ["hands"],
+      "ranged": {
+        "draw": 8,
+        "min_draw": 2,
+        "power": 200,
+        "min_power": 50,
+        "channel": "physical",
+        "impact": 1,
+        "recovery": 3,
+        "flight": 20
+      }
+    }
+  },
+  {
+    "id": "staff",
+    "name": "Staff",
+    "description": "A plain length of oak.",
+    "equipment": { "slots": ["hands"] }
+  }
+]

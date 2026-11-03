@@ -289,6 +289,20 @@ impl<'w> Engine<'w> {
             Stance::Exploring | Stance::Fighting(_) | Stance::Battle(_) => None,
         }
     }
+    /// The drawn weapon the player wears, if any, with its draw timing at
+    /// the player's speed. A host reads it to show a draw and to know whether
+    /// [`Intent::Loose`] would be taken; the intent still decides.
+    pub fn player_ranged(&self) -> Option<PlayerRanged> {
+        let combat = self.state.combat.as_ref()?;
+        let weapon = gear::ranged(self.world, combat)?;
+        let speed = character::player_stats(self.world, combat).speed;
+        let (full, least) = realtime::draw_steps(&weapon, speed);
+        Some(PlayerRanged {
+            weapon,
+            full,
+            least,
+        })
+    }
     /// The named companions travelling with the player now, by ID.
     pub fn party(&self) -> Vec<&Id> {
         let party = self.state.companions.iter().filter(|(_, c)| c.in_party());

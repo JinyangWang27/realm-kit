@@ -7,6 +7,9 @@
 //! never by a host's frames or a wall clock, so the same state and intents
 //! give the same fight.
 //!
+//! A projectile outlives the action that loosed it: it has its own place in
+//! the fight, ends exactly once, and only a host's report can land it.
+//!
 //! Named companions fight here with their own persistent vitals, which
 //! stay in their `CompanionState` like the player's in `CombatState`, and
 //! aim by their standing tactical order.
@@ -19,7 +22,9 @@
 
 use super::*;
 use crate::character::{profile, resources, strike, Pools};
-use realmkit_spec::{Group, Reaction, Realtime, Targeting, TimedDefense, ADVANCE_BOUND};
+use realmkit_spec::{
+    Group, RangedWeapon, Reaction, Realtime, Targeting, TimedDefense, ADVANCE_BOUND,
+};
 
 mod clock;
 
@@ -31,8 +36,9 @@ pub(crate) fn rules(world: &WorldSpec) -> Result<&Realtime, EngineError> {
         .ok_or(EngineError::NoRealtime)
 }
 
-/// A fighter's numbers, which cannot change while the fight lasts: nothing
-/// that changes stats or gear can be done during one.
+/// A fighter's numbers. Only the player's can change while a fight lasts, by
+/// a rank earned or `Intent::Equip`, and never during a timed commitment that
+/// read them, so these are derived afresh rather than kept.
 #[derive(Clone, Copy)]
 pub(crate) struct Side {
     pub stats: Stats,
@@ -42,6 +48,8 @@ pub(crate) struct Side {
     pub basic: (Channel, u32),
     /// Worn damage modifiers for physical and special hits on this fighter.
     pub guard: [(u64, u64); 2],
+    /// The drawn weapon it wields; only the player wears gear.
+    pub ranged: Option<RangedWeapon>,
 }
 
 impl Side {
@@ -72,6 +80,7 @@ pub(crate) fn side(world: &WorldSpec, combat: &CombatState, character: &str) -> 
                 gear::modifier(world, combat, Channel::Physical),
                 gear::modifier(world, combat, Channel::Special),
             ],
+            ranged: gear::ranged(world, combat),
         };
     }
     let profile = profile(world, character);
@@ -81,6 +90,7 @@ pub(crate) fn side(world: &WorldSpec, combat: &CombatState, character: &str) -> 
         level: profile.level,
         basic: (profile.basic_channel, 100),
         guard: [(1, 1); 2],
+        ranged: None,
     }
 }
 
@@ -116,6 +126,15 @@ pub(crate) fn attack_steps(
     };
     let time = skill.map_or(side.basic.1, |s| s.time);
     phase_steps(length, side.stats.speed, time)
+}
+
+/// Steps to a full draw and to the shortest draw that can be loosed, for a
+/// fighter at `speed`.
+pub(crate) fn draw_steps(weapon: &RangedWeapon, speed: u32) -> (u64, u64) {
+    (
+        phase_steps(weapon.draw, speed, 100),
+        phase_steps(weapon.min_draw, speed, 100),
+    )
 }
 
 /// The group the fight started with, if any: its rules (yielding, flight,
@@ -261,7 +280,12 @@ pub(crate) fn start(
         .collect();
     let combat = state.combat.as_mut().unwrap();
     resources::after_fight(world, &mut combat.vitals);
-    combat.stance = Stance::Realtime(RealtimeEncounter { step: 0, fighters });
+    combat.stance = Stance::Realtime(RealtimeEncounter {
+        step: 0,
+        fighters,
+        projectiles: Vec::new(),
+        next_projectile: 0,
+    });
     state.dialogue = None;
     events.push(Event::EncounterStarted { opponents });
     Ok(())
@@ -285,7 +309,7 @@ pub(crate) fn intent(
     let now = ring.fight.step;
     let free = matches!(
         ring.fight.fighters[0].action,
-        RealtimeAction::Ready | RealtimeAction::Guard { .. }
+        RealtimeAction::Ready | RealtimeAction::Guard { .. } | RealtimeAction::Drawing { .. }
     );
     let player = ring.fight.fighters[0].character.clone();
     match intent {
@@ -347,6 +371,88 @@ pub(crate) fn intent(
             events.push(Event::RetreatStarted);
             Ok(())
         }
+        Intent::Equip(piece) => {
+            if realtime.swap == 0 {
+                return Err(EngineError::NoSwapping);
+            }
+            if !free {
+                return Err(EngineError::Committed);
+            }
+            swap(world, &realtime, state, piece, events)
+        }
+        Intent::Draw => {
+            ring.sides[0].ranged.ok_or(EngineError::NoRangedWeapon)?;
+            if matches!(
+                ring.fight.fighters[0].action,
+                RealtimeAction::Drawing { .. }
+            ) || !free
+            {
+                return Err(EngineError::Committed);
+            }
+            ring.fight.fighters[0].action = RealtimeAction::Drawing { began: now };
+            events.push(Event::DrawBegun { character: player });
+            Ok(())
+        }
+        Intent::Loose => loose(&mut ring, events),
+        Intent::LowerDraw => {
+            let RealtimeAction::Drawing { .. } = ring.fight.fighters[0].action else {
+                return Err(EngineError::NotDrawing);
+            };
+            ring.fight.fighters[0].action = RealtimeAction::Ready;
+            events.push(Event::DrawLowered { character: player });
+            Ok(())
+        }
+        Intent::ProjectileSpent { projectile } => {
+            let p = live(&ring, projectile)?;
+            end_projectile(&mut ring, p, ProjectileEnd::Obstructed, events);
+            Ok(())
+        }
+        Intent::ProjectileContact { projectile, target } => {
+            let p = live(&ring, projectile)?;
+            let shot = ring.fight.projectiles[p].clone();
+            let i = ring
+                .fight
+                .index(&shot.shooter)
+                .ok_or_else(|| EngineError::NotHere(shot.shooter.clone()))?;
+            let t = ring
+                .fight
+                .index(&target)
+                .filter(|&t| t != i && ring.fighting(t))
+                .ok_or_else(|| EngineError::InvalidTarget(target.clone()))?;
+            if ring.fight.fighters[t].team == ring.fight.fighters[i].team && !realtime.friendly_fire
+            {
+                return Err(EngineError::NotHostile(target));
+            }
+            let cause = match ring.fight.fighters[t].action {
+                // It finds nothing and stays live: it may fly on to someone else.
+                RealtimeAction::Dodge { open_until, .. } if now < open_until => {
+                    events.push(Event::Evaded {
+                        character: target,
+                        attacker: shot.shooter,
+                    });
+                    return Ok(());
+                }
+                RealtimeAction::Parry { open_until, .. } if now < open_until => {
+                    ProjectileEnd::Deflected
+                }
+                _ => ProjectileEnd::Landed,
+            };
+            end_projectile(&mut ring, p, cause, events);
+            let share = world.combat().unwrap().cross_share;
+            let blow = Blow {
+                skill: None,
+                stats: shot.stats,
+                attack: strike::Attack {
+                    channel: shot.channel,
+                    power: shot.power,
+                    share,
+                    crit: None,
+                },
+                impact: shot.impact,
+                projectile: true,
+            };
+            land(world, &realtime, state, i, t, blow, events)
+        }
         Intent::Parry | Intent::Dodge => {
             let reaction = match intent {
                 Intent::Parry => Reaction::Parry,
@@ -374,6 +480,10 @@ pub(crate) fn intent(
                 return Err(EngineError::NoContact(attacker));
             };
             let target = target.unwrap_or_else(|| aimed.clone());
+            let RealtimeAction::Attack { skill, .. } = &ring.fight.fighters[i].action else {
+                unreachable!("matched above");
+            };
+            let skill = skill.as_ref().map(|id| world.skill(id).unwrap());
             let t = ring
                 .fight
                 .index(&target)
@@ -383,10 +493,107 @@ pub(crate) fn intent(
             {
                 return Err(EngineError::NotHostile(target));
             }
-            land(world, &realtime, state, i, t, events)
+            let channel = ring.sides[i].basic.0;
+            let blow = Blow {
+                skill,
+                stats: ring.sides[i].stats,
+                attack: strike::Attack::of(world, skill, channel, None),
+                impact: skill.map_or(0, |s| s.impact),
+                projectile: false,
+            };
+            land(world, &realtime, state, i, t, blow, events)
         }
         Intent::Join { character, team } => join(world, state, character, team, events),
     }
+}
+
+/// The player wears `piece` now, by the character core's own rule, and their
+/// hands are busy for the world's `swap` steps at the speed it leaves them.
+fn swap(
+    world: &WorldSpec,
+    realtime: &Realtime,
+    state: &mut GameState,
+    piece: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    gear::equip(world, state, piece, events)?;
+    let ring = ring(world, state)?;
+    let steps = phase_steps(realtime.swap, ring.sides[0].stats.speed, 100);
+    let until = ring
+        .fight
+        .step
+        .checked_add(steps)
+        .ok_or(EngineError::NumericLimit)?;
+    ring.fight.fighters[0].action = RealtimeAction::Swapping { until };
+    Ok(())
+}
+
+/// The index of projectile `id` if it is in the air.
+fn live(ring: &Ring, id: u64) -> Result<usize, EngineError> {
+    let found = ring.fight.projectiles.iter().position(|p| p.id == id);
+    found.ok_or(EngineError::NoProjectile(id))
+}
+
+/// Takes projectile `p` out of the fight; it can never land after this.
+fn end_projectile(ring: &mut Ring, p: usize, cause: ProjectileEnd, events: &mut Vec<Event>) {
+    let shot = ring.fight.projectiles.remove(p);
+    events.push(Event::ProjectileEnded {
+        projectile: shot.id,
+        shooter: shot.shooter,
+        cause,
+    });
+}
+
+/// The player looses their draw. How long it was drawn settles its power,
+/// up to a full draw; holding longer adds nothing, and takes nothing away.
+fn loose(ring: &mut Ring, events: &mut Vec<Event>) -> Result<(), EngineError> {
+    let RealtimeAction::Drawing { began } = ring.fight.fighters[0].action else {
+        return Err(EngineError::NotDrawing);
+    };
+    let side = ring.sides[0];
+    // Drawing needs the weapon, and gear cannot change during a fight.
+    let weapon = side.ranged.ok_or(EngineError::NoRangedWeapon)?;
+    let (full, least) = draw_steps(&weapon, side.stats.speed);
+    let now = ring.fight.step;
+    let drawn = now - began;
+    if drawn < least {
+        return Err(EngineError::DrawTooShort);
+    }
+    let held = drawn.min(full);
+    let span = u64::from(weapon.power - weapon.min_power);
+    let gained = match full - least {
+        0 => span,
+        steps => span * (held - least) / steps,
+    };
+    let until = now
+        .checked_add(phase_steps(weapon.recovery, side.stats.speed, 100))
+        .ok_or(EngineError::NumericLimit)?;
+    let expires = now
+        .checked_add(u64::from(weapon.flight))
+        .ok_or(EngineError::NumericLimit)?;
+    let id = ring.fight.next_projectile;
+    let next = id.checked_add(1).ok_or(EngineError::NumericLimit)?;
+    let power = weapon.min_power + gained as u32;
+    let character = ring.fight.fighters[0].character.clone();
+    ring.fight.next_projectile = next;
+    ring.fight.projectiles.push(Projectile {
+        id,
+        shooter: character.clone(),
+        stats: side.stats,
+        power,
+        channel: weapon.channel,
+        impact: if held == full { weapon.impact } else { 0 },
+        expires,
+    });
+    ring.fight.fighters[0].action = RealtimeAction::Loosed { until };
+    events.push(Event::Loosed {
+        character,
+        projectile: id,
+        draw_percent: (held * 100 / full) as u32,
+        power,
+        expires,
+    });
+    Ok(())
 }
 
 /// Whom the player aims at: `target` if it is a foe still fighting, or
@@ -618,6 +825,7 @@ fn poise(world: &WorldSpec, realtime: &Realtime, action: &RealtimeAction, now: u
             phase: AttackPhase::Recovery,
             ..
         }
+        | RealtimeAction::Loosed { .. }
         | RealtimeAction::Parry { .. }
         | RealtimeAction::Dodge { .. }
         | RealtimeAction::Staggered { .. } => None,
@@ -627,9 +835,11 @@ fn poise(world: &WorldSpec, realtime: &Realtime, action: &RealtimeAction, now: u
                 .map_or(0, |id| world.skill(id).unwrap().poise),
         ),
         RealtimeAction::Guard { ready_at } if *ready_at <= now => Some(realtime.guard_poise),
-        RealtimeAction::Ready | RealtimeAction::Guard { .. } | RealtimeAction::Retreat { .. } => {
-            Some(0)
-        }
+        RealtimeAction::Ready
+        | RealtimeAction::Guard { .. }
+        | RealtimeAction::Retreat { .. }
+        | RealtimeAction::Drawing { .. }
+        | RealtimeAction::Swapping { .. } => Some(0),
     }
 }
 
@@ -652,11 +862,22 @@ fn stagger(
     Ok(())
 }
 
-/// Fighter `i`'s active attack lands on fighter `t`. The character core
-/// decides the damage, with no random crit: a real-time hit's force depends
-/// only on the state. A dodge's open window lets the blow find nothing and
-/// leaves the attack live; a parry's deflects it and staggers the attacker.
-/// Otherwise it hits: a raised guard lets `guard_percent` through, and an
+/// What is landing: an active attack, or a projectile with its force settled.
+struct Blow<'w> {
+    skill: Option<&'w Skill>,
+    /// The attacker's stats behind it.
+    stats: Stats,
+    attack: strike::Attack,
+    impact: u32,
+    projectile: bool,
+}
+
+/// Fighter `i`'s blow lands on fighter `t`. The character core decides the
+/// damage, with no random crit: a real-time hit's force depends only on the
+/// state. A dodge's open window lets the blow find nothing and leaves it
+/// live; a parry's deflects it and staggers an attacker in reach, which a
+/// projectile's shooter is not. A projectile leaves whatever its shooter is
+/// doing now alone. Otherwise it hits: a raised guard lets `guard_percent` through, and an
 /// impact above the target's poise staggers it, guard or not, unless it is
 /// already recovering or staggered. Rage for
 /// acting is credited only to an attack that lands, so swinging at the air
@@ -668,15 +889,19 @@ fn land(
     state: &mut GameState,
     i: usize,
     t: usize,
+    blow: Blow,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
+    let Blow {
+        skill,
+        stats,
+        attack,
+        impact,
+        projectile,
+    } = blow;
     let rules = world.combat().unwrap();
     let mut ring = ring(world, state)?;
     let now = ring.fight.step;
-    let RealtimeAction::Attack { skill, .. } = &ring.fight.fighters[i].action else {
-        unreachable!("only an active attack lands");
-    };
-    let skill = skill.as_ref().map(|id| world.skill(id).unwrap());
     let source = ring.fight.fighters[i].character.clone();
     let target = ring.fight.fighters[t].character.clone();
     match ring.fight.fighters[t].action {
@@ -697,21 +922,19 @@ fn land(
                 character: target,
                 attacker: source,
             });
-            return stagger(realtime, &mut ring, i, events);
+            return match projectile {
+                true => Ok(()),
+                false => stagger(realtime, &mut ring, i, events),
+            };
         }
         _ => {}
     }
-    let standing = poise(world, realtime, &ring.fight.fighters[t].action, now);
+    let standing = poise(world, realtime, &ring.fight.fighters[t].action, now)
+        // An inert fighter is doing nothing that could be interrupted.
+        .filter(|_| t == 0 || !profile(world, &target).inert);
     let (attacker, defender) = (ring.sides[i], ring.sides[t]);
-    let attack = strike::Attack::of(world, skill, attacker.basic.0, None);
     let modifier = defender.guard(attack.channel);
-    let (mut dealt, _) = strike::damage_of(
-        &attacker.stats,
-        &defender.stats,
-        attack,
-        modifier,
-        &mut None,
-    )?;
+    let (mut dealt, _) = strike::damage_of(&stats, &defender.stats, attack, modifier, &mut None)?;
     let guard = &ring.fight.fighters[t].action;
     if matches!(guard, RealtimeAction::Guard { ready_at } if *ready_at <= now) {
         let through = (u64::from(dealt) * u64::from(realtime.guard_percent) / 100) as u32;
@@ -726,7 +949,9 @@ fn land(
     if hostile {
         resources::on_action(world, ring.vitals_mut(i), attacker.pools);
     }
-    if let RealtimeAction::Attack { connected, .. } = &mut ring.fight.fighters[i].action {
+    if let (false, RealtimeAction::Attack { connected, .. }) =
+        (projectile, &mut ring.fight.fighters[i].action)
+    {
         *connected = true;
     }
     // In a yielding group nobody dies: a hit stops at 1 HP.
@@ -779,7 +1004,6 @@ fn land(
         });
     }
     // Nobody out of the fight is interrupted.
-    let impact = skill.map_or(0, |s| s.impact);
     if standing.is_some_and(|poise| impact > poise) && ring.fighting(t) {
         stagger(realtime, &mut ring, t, events)?;
     }

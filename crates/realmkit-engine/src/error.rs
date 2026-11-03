@@ -94,6 +94,16 @@ pub enum EngineError {
     InvalidTarget(Id),
     #[error("finish what you are doing first")]
     Committed,
+    #[error("gear cannot be changed during a fight in this world")]
+    NoSwapping,
+    #[error("nothing you carry can be drawn")]
+    NoRangedWeapon,
+    #[error("you are not drawing")]
+    NotDrawing,
+    #[error("the draw is too short to loose")]
+    DrawTooShort,
+    #[error("projectile {0} is not in the air")]
+    NoProjectile(u64),
     #[error("you are not guarding")]
     NotGuarding,
     #[error("there is no parrying in this world")]

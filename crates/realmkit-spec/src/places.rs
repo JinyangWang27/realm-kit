@@ -168,6 +168,10 @@ pub struct CombatProfile {
     /// foe's attack on it that is active and has not landed; absent, none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reaction: Option<Reaction>,
+    /// Real-time only: it never acts or moves on its own, as a practice
+    /// target. It can still be hit, and yield.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub inert: bool,
 }
 
 /// A timed defence an engine-controlled fighter reacts with.

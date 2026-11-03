@@ -315,6 +315,13 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   allies and companions, who parry or dodge by an authored `reaction`.
   Windows are the engine's; moving out of reach stays the host's. The
   `fencing-hall` example plays it headless.
+- **Drawn weapons and projectiles (Archery-01):** a worn weapon's `ranged`
+  block; `Draw`, `Loose` and `LowerDraw`, with force settled by the draw; live
+  projectiles in the fight's state, independent of what their shooter does
+  next, each ending exactly once by a host's `ProjectileContact` or
+  `ProjectileSpent`, by its flight running out, or with the fight. An `inert`
+  profile is a practice target. Flight, drop and collision stay the host's.
+  The `archery-range` example plays it headless.
 - **Host-driven world time (RT-Time-01):** `PassTime(minutes)`, a bounded,
   never-offered command by which a continuous host commits elapsed world
   time while its player explores. It reuses the waiting rules, keeps any

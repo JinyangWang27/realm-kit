@@ -1,0 +1,37 @@
+[
+  { "id": "archer", "name": "You", "description": "An archer with a short bow." },
+  {
+    "id": "butt",
+    "name": "The Butt",
+    "description": "Straw on a frame. It does not hit back.",
+    "combat": {
+      "stats": { "hp": 100, "patk": 1, "pdef": 5, "satk": 0, "sdef": 4, "speed": 100 },
+      "xp": 0,
+      "group": "butts",
+      "inert": true
+    }
+  },
+  {
+    "id": "brawler",
+    "name": "The Brawler",
+    "description": "He closes fast and swings to knock you off your aim.",
+    "combat": {
+      "stats": { "hp": 40, "patk": 9, "pdef": 5, "satk": 0, "sdef": 4, "speed": 100 },
+      "xp": 0,
+      "skills": ["shove"],
+      "group": "brawl"
+    }
+  },
+  {
+    "id": "fencer",
+    "name": "The Fencer",
+    "description": "She turns aside what she can see coming.",
+    "combat": {
+      "stats": { "hp": 40, "patk": 8, "pdef": 5, "satk": 0, "sdef": 4, "speed": 100 },
+      "xp": 0,
+      "group": "lesson",
+      "guard_hold": 3,
+      "reaction": "parry"
+    }
+  }
+]
