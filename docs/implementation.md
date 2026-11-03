@@ -173,7 +173,8 @@ proves the complete single-player loop with authored content.
   Vellmarket; engine tests cover monthly payroll.
 - [x] Presentation seam and start choices (P0): locations may author
   map positions and kinds, all or none; `Engine::map_view` returns the places,
-  roads with travel minutes (shortest and longest where they vary), one-way exits and the player's place, behind a
+  roads with travel minutes (shortest and longest where they vary), one-way exits and the player's place, each
+  place marked visited or not (see below), behind a
   `Map` panel; the CLI draws it as text, in a fixed 80 × 24 frame in line
   mode (`map`, `map zoom <n> <place>`) and on its own screen with zoom, pan
   and a Tab cycle in terminal play. Packages load from memory
@@ -192,7 +193,13 @@ proves the complete single-player loop with authored content.
   once after the command that meets them, refusing ambiguity; places hidden
   from the map and the roads until their `known_when` holds; characters of
   kind `feature`, examined rather than talked to; and `Engine::journal`,
-  which the CLI's Quests panel prints. Validation rejects undiscoverable
+  which the CLI's Quests panel prints. Knowing of a place is not having
+  been there: `GameState::visited` keeps the start and every place a road
+  or an exit brought the player to, never forgotten, read by
+  `Engine::visited` and each map place's `visited`, so a host can offer
+  journeys back to visited places only. It is optional in a save (one
+  from before it counts only where the player stands); saves check that
+  it names real places. Validation rejects undiscoverable
   evidence, unreachable phases, prerequisite cycles and main quests waiting
   on side quests; saves check evidence, phases, prerequisites and the
   outcome. `examples/caravan-trail` plays the MVP slice by combat,
@@ -313,7 +320,7 @@ every capability optional:
   parries; companions in turn-based encounters and battles, and
   companion progression and gear.
 - [x] Overland-map authored placement + engine map query, with
-  places known by an authored condition.
+  places known by an authored condition and places visited kept apart.
 - [x] Embeddable graphical-client seam, including a browser/WASM hosting proof
   without terminal or native-filesystem assumptions.
 - [x] Start choices.

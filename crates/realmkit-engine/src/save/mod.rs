@@ -75,6 +75,10 @@ fn basics(world: &WorldSpec, state: &GameState) -> Result<(), String> {
         "unknown player location",
     )?;
     ensure(
+        state.visited.iter().all(|l| world.location(l).is_some()),
+        "visited an unknown location",
+    )?;
+    ensure(
         state.combat.is_some() == world.combat().is_some(),
         "combat state does not match the world",
     )?;

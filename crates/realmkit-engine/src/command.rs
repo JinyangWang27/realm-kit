@@ -761,6 +761,8 @@ pub struct MapView {
 pub struct MapPlace {
     pub location: Id,
     pub point: MapPoint,
+    /// The player has been there ([`crate::Engine::visited`]).
+    pub visited: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
