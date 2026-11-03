@@ -1730,8 +1730,12 @@ nothing is worn in it:
 "equipment": { "slots": ["hands"], "capabilities": ["staff"] }
 ```
 
+The combat block's `attack_requires` is the same for the basic attack
+(`"attack_requires": ["fist"]`): a world whose basic attack is a blow names
+the capability that strikes, so a bow in the hands makes none.
+
 A `bare` key must be a declared slot, and a required capability must be one some
-piece or bare slot provides (`missing_reference`). All three default to empty,
+piece or bare slot provides (`missing_reference`). All four default to empty,
 which requires and provides nothing, so worlds without them are unchanged.
 
 ### Drawn weapons

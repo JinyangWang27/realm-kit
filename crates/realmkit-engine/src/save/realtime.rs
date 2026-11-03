@@ -146,10 +146,13 @@ pub(super) fn check(
                 connected,
             } => {
                 let skill = skill.as_ref().map(usable);
+                // Nor does a basic attack begin without what it needs.
+                let basic = i != 0 || skill.is_some() || gear::attacks(world, &wielded).is_ok();
                 let aimed = fight
                     .index(target)
                     .is_some_and(|t| fight.fighters[t].team != f.team);
                 aimed
+                    && basic
                     && skill.is_none_or(|s| s.is_some_and(|s| s.level <= side.level))
                     && *until > now
                     && until - now <= longest(realtime, side, i, skill.flatten(), *phase)
@@ -231,24 +234,12 @@ pub(super) fn check(
     let shots_ok = fight.projectiles.iter().all(|p| {
         let ordered = last.is_none_or(|l| l < p.id) && p.id < fight.next_projectile;
         last = Some(p.id);
-        let pieces: Option<Vec<_>> = p
-            .worn
-            .iter()
-            .map(|id| world.item(&combat.gear.get(id)?.item)?.equipment.as_ref())
-            .collect();
-        let Some(pieces) = pieces else {
+        let Some(pieces) = gear::together(world, combat, &p.worn) else {
             return false;
         };
-        let mut slots = BTreeSet::new();
-        let together = p.worn.is_sorted_by(|a, b| a < b)
-            && pieces
-                .iter()
-                .flat_map(|e| &e.slots)
-                .all(|s| slots.insert(s));
         let bound = character::player_stats_bound(world, combat, &p.worn);
         let within = Stat::ALL.iter().all(|&s| p.stats.get(s) <= bound.get(s));
         ordered
-            && together
             && within
             && p.stats.speed >= 1
             && p.shooter == player.character

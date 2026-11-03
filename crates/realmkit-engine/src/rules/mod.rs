@@ -306,9 +306,11 @@ pub(super) fn execute(
         }
         Command::Engage(id) => encounter::engage(world, state, id, &mut events)?,
         Command::EngageRealtime(id) => realtime::start(world, state, id, &mut events)?,
-        Command::OpeningShot { target, drawn } => {
-            realtime::opening_shot(world, state, target, drawn, &mut events)?
-        }
+        Command::OpeningShot {
+            target,
+            drawn,
+            worn,
+        } => realtime::opening_shot(world, state, target, drawn, worn, &mut events)?,
         Command::Intent(intent) => realtime::intent(world, state, intent, &mut events)?,
         Command::Tactic { companion, order } => {
             party::tactic(world, state, companion, order, &mut events)?

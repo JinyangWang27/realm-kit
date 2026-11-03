@@ -59,6 +59,12 @@ pub struct Combat {
     /// hands strike and grapple; a bow in them does neither.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub bare: BTreeMap<Id, Vec<Id>>,
+    /// What the player must wield to make a basic attack, as a skill's
+    /// `requires`: a world where the basic attack is a blow lists the
+    /// capability that strikes, so a bow in the hands makes none. Empty: any
+    /// weapon, or none, attacks.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attack_requires: Vec<Id>,
     /// Gear the player starts with, equipped in order while its slots are free.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_equipment: Vec<Id>,

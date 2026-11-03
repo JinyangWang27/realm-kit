@@ -50,6 +50,10 @@ fn capabilities(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat) {
             reference(out, &skill.id, "capability", capability, known);
         }
     }
+    for capability in &combat.attack_requires {
+        let known = provided.contains(capability);
+        reference(out, &w.world.id, "capability", capability, known);
+    }
 }
 
 /// A drawn weapon needs a real-time clock, timing and power in bounds, and a

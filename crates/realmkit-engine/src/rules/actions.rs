@@ -372,7 +372,7 @@ fn realtime_actions(
             Intent::Attack {
                 target: target.clone(),
             },
-            free,
+            free && gear::attacks(world, &wielded).is_ok(),
         ));
         // Unaffordable skills stay listed, so the player sees why they are not usable.
         actions.extend(skills.iter().map(|s| {
@@ -483,7 +483,10 @@ fn fight_actions(
         .filter(|&i| encounter.participants[i].side != 0 && encounter.fighting(i, player))
         .map(|i| &encounter.participants[i])
     {
-        actions.push(available(Command::Attack(foe.character.clone())));
+        actions.push(Action {
+            command: Command::Attack(foe.character.clone()),
+            available: gear::attacks(world, &wielded).is_ok(),
+        });
         // Unaffordable skills stay listed, so the player sees why they are not usable.
         actions.extend(skills.iter().map(|s| Action {
             command: Command::UseSkill {

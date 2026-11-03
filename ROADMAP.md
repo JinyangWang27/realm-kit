@@ -323,8 +323,10 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   The `archery-range` example plays it headless.
 - **Combat stabilization:** weapon capabilities that skills require (with
   bare-hand capabilities per empty slot), a shot from exploration that opens a
-  real-time fight and lands once (`OpeningShot`), and projectile provenance
-  that bounds a saved shot by the gear it left with.
+  real-time fight and lands once (`OpeningShot`, with the gear worn at
+  release), projectile provenance that bounds a saved shot by the gear it left
+  with, and an optional capability requirement for the basic attack
+  (`attack_requires`).
 - **Host-driven world time (RT-Time-01):** `PassTime(minutes)`, a bounded,
   never-offered command by which a continuous host commits elapsed world
   time while its player explores. It reuses the waiting rules, keeps any

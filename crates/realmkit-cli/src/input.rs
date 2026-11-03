@@ -57,7 +57,7 @@ pub fn help(world: &WorldSpec) -> String {
         .iter()
         .any(|i| i.equipment.as_ref().is_some_and(|e| e.ranged.is_some()));
     if drawn && combat.is_some_and(|c| c.realtime.is_some()) {
-        attack += "draw | loose | undraw — a drawn weapon in a fight\narrow <shot> [target-id] — that shot touched someone, or something else, as a host reports it\nshoot <character-id> <steps> — a shot loosed while exploring after that many steps of drawing reached them, as a host reports it: the fight starts with its hit\n";
+        attack += "draw | loose | undraw — a drawn weapon in a fight\narrow <shot> [target-id] — that shot touched someone, or something else, as a host reports it\nshoot <character-id> <steps> <#piece>... — a shot loosed while exploring, wearing those pieces, after that many steps of drawing reached them, as a host reports it: the fight starts with its hit\n";
     }
     let realtime = combat.and_then(|c| c.realtime);
     if realtime.is_some_and(|r| r.parry.is_some() || r.dodge.is_some()) {
@@ -302,9 +302,10 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
             projectile: id.parse().map_err(|_| "expected a shot number")?,
             target: (*target).into(),
         }),
-        ("shoot", [id, steps]) => Command::OpeningShot {
+        ("shoot", [id, steps, worn @ ..]) => Command::OpeningShot {
             target: (*id).into(),
             drawn: steps.parse().map_err(|_| "expected steps of drawing")?,
+            worn: worn.iter().map(|p| gear(p)).collect::<Result<_, _>>()?,
         },
         ("arrow", [id]) => Command::Intent(Intent::ProjectileSpent {
             projectile: id.parse().map_err(|_| "expected a shot number")?,

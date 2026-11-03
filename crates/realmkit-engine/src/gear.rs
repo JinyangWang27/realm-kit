@@ -18,6 +18,26 @@ pub(super) fn worn<'w>(world: &'w WorldSpec, combat: &CombatState) -> Vec<&'w Eq
         .collect()
 }
 
+/// The pieces `worn` names, if the player owns each and they could be worn
+/// together: listed in instance order, no slot taken twice.
+pub(super) fn together<'w>(
+    world: &'w WorldSpec,
+    combat: &CombatState,
+    worn: &[u64],
+) -> Option<Vec<&'w Equipment>> {
+    let pieces: Vec<_> = worn
+        .iter()
+        .map(|id| world.item(&combat.gear.get(id)?.item)?.equipment.as_ref())
+        .collect::<Option<_>>()?;
+    let mut slots = BTreeSet::new();
+    let ok = worn.is_sorted_by(|a, b| a < b)
+        && pieces
+            .iter()
+            .flat_map(|e| &e.slots)
+            .all(|s| slots.insert(s));
+    ok.then_some(pieces)
+}
+
 /// Adds equipped bonuses at each piece's tier, and their enchantments', then
 /// takes away speed penalties; speed stays at
 /// least 1. The speed cap applies later, when turns are scheduled.
@@ -214,4 +234,17 @@ pub(super) fn unequip(
     events.push(Event::Unequipped { gear });
     rules::clamp_vitals(world, state);
     Ok(())
+}
+
+/// Whether wielding `capabilities` lets the player make a basic attack.
+pub(super) fn attacks(world: &WorldSpec, capabilities: &BTreeSet<&str>) -> Result<(), EngineError> {
+    let rules = world.combat().unwrap();
+    match rules
+        .attack_requires
+        .iter()
+        .all(|c| capabilities.contains(c.as_str()))
+    {
+        true => Ok(()),
+        false => Err(EngineError::AttackUnwielded),
+    }
 }
