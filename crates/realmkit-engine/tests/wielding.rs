@@ -171,3 +171,107 @@ fn a_save_never_holds_an_attack_with_a_skill_its_gear_forbids() {
     }
     assert!(Engine::restore(&world, tampered).is_err());
 }
+
+#[test]
+fn a_basic_attack_needs_what_the_world_says_attacks() {
+    let mut world = range();
+    // Here a basic attack is a blow: the staff or a fist makes one, the bow
+    // none. Validated like a skill's requires.
+    world.world.combat.as_mut().unwrap().attack_requires = vec!["fist".into()];
+    let codes =
+        |w: &WorldSpec| -> Vec<String> { w.diagnostics().into_iter().map(|d| d.code).collect() };
+    assert!(codes(&world).is_empty());
+    let mut unknown = world.clone();
+    unknown.world.combat.as_mut().unwrap().attack_requires = vec!["claw".into()];
+    assert!(codes(&unknown).iter().any(|c| c == "missing_reference"));
+    for item in &mut world.items {
+        if item.id == "staff" {
+            item.equipment
+                .as_mut()
+                .unwrap()
+                .capabilities
+                .push("fist".into());
+        }
+    }
+
+    let mut engine = Engine::new(&world).unwrap();
+    engine.execute(EngageRealtime("brawler".into())).unwrap();
+    let attack = || Intent(I::Attack { target: None });
+    let offered = |engine: &Engine<'_>| {
+        engine
+            .actions()
+            .iter()
+            .any(|a| a.available && matches!(a.command, Intent(I::Attack { .. })))
+    };
+    // The bow in hand: refused, unchanged, not offered.
+    let before = engine.snapshot();
+    assert!(matches!(
+        engine.execute(attack()),
+        Err(EngineError::AttackUnwielded)
+    ));
+    assert_eq!(engine.snapshot(), before);
+    assert!(!offered(&engine));
+    // The staff: allowed.
+    let staff = piece(&engine, "staff");
+    engine.execute(Intent(I::Equip(staff))).unwrap();
+    engine.execute(Intent(I::Advance(40))).unwrap();
+    assert!(offered(&engine));
+    engine.execute(attack()).unwrap();
+    let good = engine.snapshot();
+    Engine::restore(&world, good.clone()).expect("a blow with the staff in hand");
+    // A save never holds a basic attack begun with the bow in hand.
+    let mut tampered = good;
+    for gear in tampered.state.combat.as_mut().unwrap().gear.values_mut() {
+        gear.equipped = gear.item == "short_bow";
+    }
+    assert!(Engine::restore(&world, tampered).is_err());
+
+    // Without `attack_requires`, anything attacks, as before.
+    let plain = range();
+    let mut engine = Engine::new(&plain).unwrap();
+    engine.execute(EngageRealtime("brawler".into())).unwrap();
+    engine.execute(attack()).unwrap();
+}
+
+#[test]
+fn a_turn_based_basic_attack_holds_the_same_rule() {
+    let mut duel =
+        WorldSpec::load(concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/duel")).unwrap();
+    let combat = duel.world.combat.as_mut().unwrap();
+    combat.slots = vec!["hands".into()];
+    combat.bare.insert("hands".into(), vec!["fist".into()]);
+    combat.attack_requires = vec!["fist".into()];
+    let mut engine = Engine::new(&duel).unwrap();
+    engine.execute(Move(Direction::North)).unwrap();
+    engine.execute(Engage("witch".into())).unwrap();
+    // Bare hands strike.
+    assert!(engine
+        .actions()
+        .iter()
+        .any(|a| a.available && matches!(&a.command, Attack(_))));
+    engine.execute(Attack("witch".into())).unwrap();
+    // A world whose blows need what nobody holds offers none.
+    duel.world.combat.as_mut().unwrap().bare.clear();
+    duel.items.push(Item {
+        id: "wand".into(),
+        name: "Wand".into(),
+        description: "Willow.".into(),
+        equipment: Some(Equipment {
+            slots: vec!["hands".into()],
+            capabilities: vec!["fist".into()],
+            ..serde_json::from_str(r#"{"slots": []}"#).unwrap()
+        }),
+        consumable: None,
+    });
+    let mut engine = Engine::new(&duel).unwrap();
+    engine.execute(Move(Direction::North)).unwrap();
+    engine.execute(Engage("witch".into())).unwrap();
+    assert!(!engine
+        .actions()
+        .iter()
+        .any(|a| a.available && matches!(&a.command, Attack(_))));
+    assert!(matches!(
+        engine.execute(Attack("witch".into())),
+        Err(EngineError::AttackUnwielded)
+    ));
+}

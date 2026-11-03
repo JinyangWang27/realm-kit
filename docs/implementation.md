@@ -304,6 +304,11 @@ every capability optional:
   with a shot loosed while exploring, landing it once; a live projectile's
   provenance (`worn`) bounds its saved force and stats. Packages are unchanged;
   a save from before with a shot in the air does not load (no `worn`).
+- [x] Release-time opening shots and basic-attack capabilities: `OpeningShot`
+  carries the pieces worn at release, so gear changed in flight changes
+  nothing (`NotWornTogether`); `attack_requires` gives the basic attack a
+  capability requirement (`AttackUnwielded`), in both fight layers, menus and
+  saves. Packages without it are unchanged.
 - [ ] Spatial authority for real-time contact, redirection and directional
   parries; companions in turn-based encounters and battles, and
   companion progression and gear.

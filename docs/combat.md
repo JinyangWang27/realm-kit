@@ -480,6 +480,14 @@ use. A requirement is all-of; one capability shared by several weapons
 (`blade` on swords and sabres) makes any-of, and a slot per hand lets a world
 model a shield beside a sword, two blades or a cultural style that needs both.
 
+A basic attack (`Intent::Attack`, turn-based `Attack`) is the same rule with
+the world's `attack_requires` as its requirement: a world whose basic attack
+is a blow lists the capability that strikes, so a drawn weapon in the hands
+makes none (`EngineError::AttackUnwielded`, unavailable in the action lists,
+never held by a save). With the list empty, which is the default, anything
+the player wields, or nothing, attacks. Engine-controlled fighters keep their
+basic attack. No weapon ID appears in the rule; content names capabilities.
+
 ### Drawn weapons and projectiles
 
 A melee `Contact` is only accepted inside its attacker's active window, and a
@@ -516,10 +524,18 @@ new piece in hand. A shot in the air keeps the power and the shooter's stats it
 left with, whatever is worn when it lands, and names the pieces worn when it
 left (`worn`, its provenance for save checks). `Command::Equip` is still refused during a fight.
 
-**A shot that opens a fight.** `Command::OpeningShot { target, drawn }` is a
-host's report that a shot loosed while exploring, after `drawn` steps of
-drawing at the world's step rate with the drawn weapon worn now, reached
-`target`. Exploring has no fight clock, so the host times that draw, as it
+**A shot that opens a fight.** `Command::OpeningShot { target, drawn, worn }`
+is a host's report that a shot loosed while exploring, after `drawn` steps of
+drawing at the world's step rate while wearing the gear instances `worn`,
+reached `target`. The host records `worn` when the shot leaves and sends it
+when it lands, so the shot keeps the weapon and the stats it left with, as one
+loosed in a fight does: gear changed while it flew (the staff taken up, a
+better bow) neither spoils it nor strengthens it. RealmKit checks the pieces
+are still the player's and could be worn together (`NotWornTogether`), and
+that a drawn weapon is among them (`NoRangedWeapon`); the stats are the
+player's with exactly those pieces worn. Level, stat points and techniques
+are the player's when it lands: a host lands a shot within its flight, and
+those change only through deliberate commands. Exploring has no fight clock, so the host times that draw, as it
 times every draw in a fight by when it sends `Draw` and `Loose`. The command
 starts the fight exactly as `EngageRealtime` would (here, undefeated, not an
 ally, not mid-fight), looses the shot at step 0 with the force those steps give
