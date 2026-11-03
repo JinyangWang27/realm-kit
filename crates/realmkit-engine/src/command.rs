@@ -60,13 +60,17 @@ pub enum Command {
     EngageRealtime(Id),
     /// Starts a real-time fight with a shot loosed while exploring that has
     /// reached `target`, after `drawn` steps of drawing (at the world's step
-    /// rate) with the drawn weapon worn now. The fight starts as
+    /// rate) while wearing the gear instances `worn` (in instance order; the
+    /// drawn weapon among them). The shot keeps what it left with, as a shot
+    /// loosed in a fight does: gear changed in its flight changes nothing.
+    /// The pieces must still be the player's. The fight starts as
     /// `EngageRealtime` would, and the shot lands once, at its first step:
     /// the host reports the contact, as it does in a fight, and RealmKit
     /// decides whether a fight may start and what the hit does.
     OpeningShot {
         target: Id,
         drawn: u64,
+        worn: Vec<u64>,
     },
     /// In a real-time fight: one input on its fixed-step clock.
     Intent(Intent),

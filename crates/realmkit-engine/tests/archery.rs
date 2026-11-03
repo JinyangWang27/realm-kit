@@ -721,10 +721,21 @@ fn the_menu_offers_a_draw_and_never_a_report() {
     assert!(!engine.actions().iter().any(reported));
 }
 
-fn opening(target: &str, drawn: u64) -> Command {
+/// The pieces the player wears now, as a host records them at release.
+fn worn(engine: &Engine<'_>) -> Vec<u64> {
+    let gear = &engine.state().combat.as_ref().unwrap().gear;
+    gear.iter()
+        .filter(|(_, g)| g.equipped)
+        .map(|(id, _)| *id)
+        .collect()
+}
+
+/// A shot loosed now that reaches `target`.
+fn opening(engine: &Engine<'_>, target: &str, drawn: u64) -> Command {
     OpeningShot {
         target: target.into(),
         drawn,
+        worn: worn(engine),
     }
 }
 
@@ -732,7 +743,7 @@ fn opening(target: &str, drawn: u64) -> Command {
 fn a_shot_loosed_while_exploring_starts_the_fight_and_lands_once() {
     let world = range();
     let mut engine = Engine::new(&world).unwrap();
-    let events = engine.execute(opening("brawler", 8)).unwrap();
+    let events = engine.execute(opening(&engine, "brawler", 8)).unwrap();
     assert!(
         matches!(&events[0], Event::EncounterStarted { opponents } if opponents == &["brawler"])
     );
@@ -787,7 +798,7 @@ fn a_shot_loosed_while_exploring_starts_the_fight_and_lands_once() {
     let resumed = Engine::restore(&world, SaveSnapshot::from_json(&json).unwrap()).unwrap();
     assert_eq!(resumed.snapshot().to_json(), json);
     let mut again = Engine::new(&world).unwrap();
-    again.execute(opening("brawler", 8)).unwrap();
+    again.execute(opening(&again, "brawler", 8)).unwrap();
     assert_eq!(again.snapshot().to_json(), json);
 }
 
@@ -798,15 +809,15 @@ fn an_opening_shot_follows_every_rule_of_starting_a_fight_or_changes_nothing() {
     let before = engine.snapshot();
     // Too short a draw, and nobody here to shoot.
     assert!(matches!(
-        engine.execute(opening("butt", 1)),
+        engine.execute(opening(&engine, "butt", 1)),
         Err(EngineError::DrawTooShort)
     ));
     assert!(matches!(
-        engine.execute(opening("archer", 8)),
+        engine.execute(opening(&engine, "archer", 8)),
         Err(EngineError::NotHere(_))
     ));
     assert!(matches!(
-        engine.execute(opening("ghost", 8)),
+        engine.execute(opening(&engine, "ghost", 8)),
         Err(EngineError::NotHere(_))
     ));
     // No bow in hand: no shot.
@@ -814,14 +825,14 @@ fn an_opening_shot_follows_every_rule_of_starting_a_fight_or_changes_nothing() {
     let mut staffed = Engine::new(&world).unwrap();
     staffed.execute(Equip(staff)).unwrap();
     assert!(matches!(
-        staffed.execute(opening("butt", 8)),
+        staffed.execute(opening(&staffed, "butt", 8)),
         Err(EngineError::NoRangedWeapon)
     ));
     assert_eq!(engine.snapshot(), before, "a refused shot changes nothing");
     // Never during a fight: there, a shot is a report.
     engine.execute(EngageRealtime("butt".into())).unwrap();
     assert!(matches!(
-        engine.execute(opening("butt", 8)),
+        engine.execute(opening(&engine, "butt", 8)),
         Err(EngineError::InEncounter)
     ));
 }
@@ -839,7 +850,7 @@ fn an_opening_shot_on_an_ally_is_refused() {
     profile.group = None;
     let mut engine = Engine::new(&world).unwrap();
     assert!(matches!(
-        engine.execute(opening("fencer", 8)),
+        engine.execute(opening(&engine, "fencer", 8)),
         Err(EngineError::NotHostile(_))
     ));
     assert!(engine.realtime().is_none());
@@ -899,4 +910,85 @@ fn a_saved_shot_carries_the_gear_it_left_with_and_stats_no_more_than_it_gave() {
         tampered(&|p| p.stats.patk -= 1),
         "weaker is within the bound"
     );
+}
+
+#[test]
+fn an_opening_shot_keeps_the_gear_it_left_with_and_replays() {
+    let mut world = range();
+    let bonus = |w: &mut WorldSpec, id: &str, patk: u32| {
+        let item = w.items.iter_mut().find(|i| i.id == id).unwrap();
+        item.equipment
+            .as_mut()
+            .unwrap()
+            .bonuses
+            .insert(Stat::Patk, patk);
+    };
+    bonus(&mut world, "short_bow", 20);
+    bonus(&mut world, "staff", 200);
+    // Loosed with the bow; the staff taken up in flight, before it lands.
+    let play = |swap: bool| {
+        let mut engine = Engine::new(&world).unwrap();
+        let shot = opening(&engine, "brawler", 8);
+        if swap {
+            let staff = piece(&engine, "staff");
+            engine.execute(Equip(staff)).unwrap();
+        }
+        let events = engine.execute(shot.clone()).unwrap();
+        assert_eq!(ended(&events), [(0, ProjectileEnd::Landed)]);
+        let dealt = events.iter().find_map(|e| match e {
+            Event::DamageDealt { target, amount, .. } if target == "brawler" => Some(*amount),
+            _ => None,
+        });
+        (dealt.unwrap(), engine)
+    };
+    let (kept, _) = play(false);
+    let (swapped, engine) = play(true);
+    assert_eq!(
+        swapped, kept,
+        "neither spoiled nor strengthened by the staff"
+    );
+    // The bow's bonus counts, from the pieces worn when it left.
+    let mut plain = world.clone();
+    bonus(&mut plain, "short_bow", 0);
+    let mut weaker = Engine::new(&plain).unwrap();
+    let shot = opening(&weaker, "brawler", 8);
+    let events = weaker.execute(shot).unwrap();
+    let base = events.iter().find_map(|e| match e {
+        Event::DamageDealt { amount, .. } => Some(*amount),
+        _ => None,
+    });
+    assert!(kept > base.unwrap(), "{kept} with the bow's bonus");
+    // Replayed from the same commands: the same state.
+    let mut again = Engine::new(&world).unwrap();
+    let shot = opening(&again, "brawler", 8);
+    again.execute(Equip(piece(&again, "staff"))).unwrap();
+    again.execute(shot).unwrap();
+    assert_eq!(again.snapshot().to_json(), engine.snapshot().to_json());
+
+    // Pieces the player does not own, or that were never worn together,
+    // are refused and change nothing.
+    let mut engine = Engine::new(&world).unwrap();
+    let before = engine.snapshot();
+    let (bow, staff) = (piece(&engine, "short_bow"), piece(&engine, "staff"));
+    for worn in [vec![999], vec![bow, staff], vec![staff, bow]] {
+        let shot = OpeningShot {
+            target: "brawler".into(),
+            drawn: 8,
+            worn,
+        };
+        assert!(matches!(
+            engine.execute(shot),
+            Err(EngineError::NotWornTogether)
+        ));
+    }
+    let staffed = OpeningShot {
+        target: "brawler".into(),
+        drawn: 8,
+        worn: vec![staff],
+    };
+    assert!(matches!(
+        engine.execute(staffed),
+        Err(EngineError::NoRangedWeapon)
+    ));
+    assert_eq!(engine.snapshot(), before);
 }

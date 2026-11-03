@@ -344,6 +344,8 @@ pub(crate) fn intent(
                 gear::wields(&wielded, skill)?;
                 let side = ring.sides[0];
                 encounter::check_skill(ring.player, side.pools, side.level, skill)?;
+            } else {
+                gear::attacks(world, &wielded)?;
             }
             begin(&realtime, &mut ring, 0, skill, target, events)
         }
@@ -566,22 +568,23 @@ fn loose(ring: &mut Ring, worn: Vec<u64>, events: &mut Vec<Event>) -> Result<(),
     let until = now
         .checked_add(phase_steps(weapon.recovery, ring.sides[0].stats.speed, 100))
         .ok_or(EngineError::NumericLimit)?;
-    release(ring, weapon, worn, now - began, events)?;
+    let stats = ring.sides[0].stats;
+    release(ring, weapon, stats, worn, now - began, events)?;
     ring.fight.fighters[0].action = RealtimeAction::Loosed { until };
     Ok(())
 }
 
 /// A shot leaves the player's `weapon` now after `drawn` steps of drawing,
-/// with the stats and gear they have now. Its ID.
+/// with the `stats` and `worn` pieces they had when it left. Its ID.
 fn release(
     ring: &mut Ring,
     weapon: RangedWeapon,
+    stats: Stats,
     worn: Vec<u64>,
     drawn: u64,
     events: &mut Vec<Event>,
 ) -> Result<u64, EngineError> {
-    let side = ring.sides[0];
-    let (full, least) = draw_steps(&weapon, side.stats.speed);
+    let (full, least) = draw_steps(&weapon, stats.speed);
     if drawn < least {
         return Err(EngineError::DrawTooShort);
     }
@@ -603,7 +606,7 @@ fn release(
     ring.fight.projectiles.push(Projectile {
         id,
         shooter: character.clone(),
-        stats: side.stats,
+        stats,
         worn,
         power,
         channel: weapon.channel,
@@ -630,14 +633,25 @@ pub(crate) fn opening_shot(
     state: &mut GameState,
     target: Id,
     drawn: u64,
+    worn: Vec<u64>,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
+    // The shot left with what was worn then, not now: gear changed while it
+    // flew neither spoils it nor strengthens it.
     let combat = state.combat.as_ref().ok_or(EngineError::NoRangedWeapon)?;
-    let weapon = gear::ranged(world, combat).ok_or(EngineError::NoRangedWeapon)?;
-    let worn = worn_pieces(combat);
+    let pieces = gear::together(world, combat, &worn).ok_or(EngineError::NotWornTogether)?;
+    let weapon = pieces
+        .iter()
+        .find_map(|p| p.ranged)
+        .ok_or(EngineError::NoRangedWeapon)?;
+    let mut then = combat.clone();
+    for (id, gear) in &mut then.gear {
+        gear.equipped = worn.contains(id);
+    }
+    let stats = character::player_stats(world, &then);
     start(world, state, target.clone(), events)?;
     let mut ring = ring(world, state)?;
-    let projectile = release(&mut ring, weapon, worn, drawn, events)?;
+    let projectile = release(&mut ring, weapon, stats, worn, drawn, events)?;
     intent(
         world,
         state,

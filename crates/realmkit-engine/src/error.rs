@@ -66,6 +66,10 @@ pub enum EngineError {
     SkillLocked(Id),
     #[error("what you wield does not allow {0}")]
     Unwielded(Id),
+    #[error("what you wield cannot make a basic attack")]
+    AttackUnwielded,
+    #[error("those pieces were not worn together")]
+    NotWornTogether,
     #[error("not enough MP for {0}")]
     NotEnoughMp(Id),
     #[error("not enough rage for {0}")]
