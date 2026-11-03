@@ -446,6 +446,8 @@ fn move_to(
         });
     }
     let from = std::mem::replace(&mut state.player.location, exit.destination.clone());
+    // The place left, too, as for a road.
+    state.visited.insert(from.clone());
     state.visited.insert(exit.destination.clone());
     state.dialogue = None;
     events.push(Event::Moved {

@@ -205,7 +205,30 @@ fn a_save_must_visit_only_real_places_and_may_predate_visits() {
     snapshot.state.visited.clear();
     let json = serde_json::to_string(&snapshot).unwrap();
     assert!(!json.contains("visited"));
-    let restored = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
+    let mut restored = Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
     assert!(restored.visited("greyford"));
     assert!(!restored.visited("ashmere"));
+    // Leaving keeps the place left, which such a save never recorded.
+    restored.execute(Travel("ashmere".into())).unwrap();
+    assert!(restored.visited("greyford") && restored.visited("ashmere"));
+}
+
+#[test]
+fn an_exit_from_a_save_before_visits_keeps_the_place_left() {
+    let world = demo();
+    let engine = Engine::new(&world).unwrap();
+    let mut snapshot = engine.snapshot();
+    snapshot.state.visited.clear();
+    let mut engine = Engine::restore(&world, snapshot).unwrap();
+    let start = engine.state().player.location.clone();
+    let direction = *world
+        .location(&start)
+        .unwrap()
+        .exits
+        .iter()
+        .find(|(_, e)| e.requires.is_none())
+        .unwrap()
+        .0;
+    engine.execute(Move(direction)).unwrap();
+    assert!(engine.visited(&start));
 }
