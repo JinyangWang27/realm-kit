@@ -171,7 +171,7 @@ proves the complete single-player loop with authored content.
   days closed so far. Worlds without a bank or monthly payroll behave
   exactly as before. `examples/marches` banks in Greyford and
   Vellmarket; engine tests cover monthly payroll.
-- [x] Presentation seam and start choices (original-game P0): locations may author
+- [x] Presentation seam and start choices (P0): locations may author
   map positions and kinds, all or none; `Engine::map_view` returns the places,
   roads with travel minutes (shortest and longest where they vary), one-way exits and the player's place, behind a
   `Map` panel; the CLI draws it as text, in a fixed 80 × 24 frame in line
@@ -204,7 +204,7 @@ proves the complete single-player loop with authored content.
   and a change to known evidence's reading is reported as
   `EvidenceReinterpreted`; the CLI journal prints it. The quiet archive's
   stitched map reads kinder once the vault opens.
-- [x] Authoring conveniences for the original game's first slice:
+- [x] Authoring conveniences for a first full slice:
   an `at_least` condition (`at_least_zero`, `at_least_exceeds`), allowed
   wherever `all` and `any` are, including readings; evidence facts gated by
   a lasting `when` (`fleeting_fact`), derived by `Engine::evidence_facts` and
@@ -241,7 +241,7 @@ proves the complete single-player loop with authored content.
 ## Next implementation priorities
 
 The open items are **not delivered** and do not change the format by
-themselves. They mirror the original-game-driven roadmap priority while keeping
+themselves. They mirror the roadmap priority while keeping
 every capability optional:
 
 - [x] Combat layers ([combat.md](combat.md)): a universal character core
@@ -307,7 +307,7 @@ every capability optional:
   without terminal or native-filesystem assumptions.
 - [x] Start choices.
 - [x] First-class authored story-phase/main-side-questline/outcome
-  progression, as far as the original game's MVP uses it. Failure,
+  progression, as far as an MVP uses it. Failure,
   deadlines and terminal outcomes wait for content that needs them.
 - [x] Factions, war/peace and typed standing tracks, global and per
   faction. Per-character relation tracks wait for companions or courtship.

@@ -294,7 +294,7 @@ requires a condition the other requires under `not`, or they require
 different statuses of one quest. Validation also rejects an outcome that could hold at
 the start (`outcome_at_start`) by requiring, on every branch, something no
 start provides. Only
-completed, non-terminal outcomes exist so far: the original game's MVP ends by
+completed, non-terminal outcomes exist so far: an MVP such as `caravan-trail` ends by
 choosing a lead while the others stay open. `terminal` and failure outcomes
 wait for content that needs them.
 
@@ -1323,7 +1323,7 @@ For overland worlds, the [overland map](sandbox-worlds.md#overland-map) proposal
 applies this: authored display positions, an engine map-view query, and a
 client-owned viewport with zoom and panning.
 
-**Original-game priority · delivered.** Locations author optional
+**Priority P0 · delivered.** Locations author optional
 positions (`x` east, `y` south, within `MAP_BOUND`) and a closed kind (town,
 castle, village, waypoint), all or none and never two on one spot.
 Coordinates carry no movement semantics. The engine's map query returns the
@@ -1340,7 +1340,7 @@ generic scene graph remain undefined.
 
 ### Client integration surface
 
-**Decided for original-game P0.** Packages load from memory through
+**Decided for P0.** Packages load from memory through
 `WorldSpec::from_files`; `Command`, `Event`, `Action`, the map view and
 the journal view (phase, known quests, evidence, outcome) are
 serializable; `SaveSnapshot` reads and writes JSON bytes, checking the save
@@ -1348,7 +1348,7 @@ format first; and `realmkit-engine` builds for `wasm32-unknown-unknown`
 without an adapter crate. The rest of this section stays the rule for what
 comes next.
 
-The original game's graphical client is a concrete consumer of RealmKit, but its framework
+A graphical client's framework
 must not leak into the engine. The next presentation slice should define/prove the
 smallest host boundary needed to:
 
@@ -1487,8 +1487,7 @@ Authoritative server
    └── emit permitted events/views
 ```
 
-The first concrete consumer is the original game's shared mode. Its product
-assumptions are: solo play remains local/offline; choosing the shared mode crosses
+The product assumptions for a shared mode are: solo play remains local/offline; choosing the shared mode crosses
 an explicit authority boundary; local and shared histories fork and are not later
 merged.
 
@@ -1611,8 +1610,7 @@ summary:
 The [sandbox design direction](sandbox-worlds.md) proposes the capabilities,
 and the roadmap schedules them as
 [M5 slices](../ROADMAP.md#delivery-slices--proposed-1) and
-[M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). The original game's world is now
-the concrete full-game pressure test: after the delivered economy and first
+[M6](../ROADMAP.md#m6--living-sandbox-worlds--proposed). After the delivered economy and first
 troop/battle slices, factions/standing and the remaining party needs come before
 holdings, world agents and faction strategy. Optional detail stays deferred until
 authored content needs it. Each question below has a proposed answer that still
@@ -1992,8 +1990,7 @@ needs to be confirmed:
 
 ## Discussion order
 
-Discuss decisions immediately before their first concrete consumer. With the original game
-as the current full-game pressure test:
+Discuss decisions immediately before their first concrete consumer:
 
 1. Presentation: overland-map data/disclosure and the minimal embeddable/WASM host
    boundary.

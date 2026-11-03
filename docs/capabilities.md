@@ -145,7 +145,7 @@ than adding capabilities of their own. Each of these is optional on its own, so
 smaller worlds take only the pieces they need; see
 [modularity](sandbox-worlds.md#modularity) for the dependencies between them.
 
-An original game currently pressure-tests a particular composition:
+A full sandbox game pressure-tests a particular composition:
 
 ```text
 authored quests/story phases + travel + time + combat + techniques + equipment
@@ -306,9 +306,9 @@ not which source characters exist.
 The implementation is already beyond the original investigation-first planning
 note: the format includes world time with a calendar, economy and banking,
 troop recruitment, a first mass battle slice, factions with war, peace and
-standing, and the investigation and progression slice the original game's MVP
-needs, with evidence readings that later knowledge changes, facts that fill in, question hubs and language overlays. The next priorities are driven by the original game as RealmKit's first full
-original-game pressure test, while every capability remains optional.
+standing, and the investigation and progression slice an MVP
+needs, with evidence readings that later knowledge changes, facts that fill in, question hubs and language overlays. The next priorities are driven by a full authored game as the pressure test,
+while every capability remains optional.
 
 1. Deliver the **presentation seam** needed by the game: authored overland-map
    placement plus a player-knowledge-aware map query, and prove that the core can

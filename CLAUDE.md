@@ -22,7 +22,7 @@ uvx ruff check scripts && uvx ruff format --check scripts   # Python lint/format
 uvx mypy --strict scripts/combat_sim                        # Python types; ruff does not check them
 ```
 
-Add `--offline` once dependencies are cached. Run the fmt, clippy and test commands before every commit. A pipe such as `| tail` hides failing exit codes.
+Add `--offline` once dependencies are cached. Run the fmt, clippy and test commands before every commit. CI (`.github/workflows/ci.yml`) runs the Rust and Python checks above, the wasm build and the worldgen check on every PR. A pipe such as `| tail` hides failing exit codes.
 
 ## Architecture
 
