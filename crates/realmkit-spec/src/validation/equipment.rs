@@ -136,14 +136,19 @@ fn piece(out: &mut Vec<Diagnostic>, combat: &Combat, id: &str, gear: &Equipment)
     }
 }
 
-/// Pieces that set the basic attack or are drawn must share a slot, so at
+/// Pieces that set the basic attack, are drawn or train a family must share a slot, so at
 /// most one is worn.
 fn competing_weapons(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
     let weapons: Vec<_> = w
         .items
         .iter()
         .filter_map(|i| Some((&i.id, i.equipment.as_ref()?)))
-        .filter(|(_, g)| g.basic_channel.is_some() || g.basic_time.is_some() || g.ranged.is_some())
+        .filter(|(_, g)| {
+            g.basic_channel.is_some()
+                || g.basic_time.is_some()
+                || g.ranged.is_some()
+                || g.weapon.is_some()
+        })
         .collect();
     for (i, (id, gear)) in weapons.iter().enumerate() {
         if weapons[..i]
@@ -154,7 +159,7 @@ fn competing_weapons(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 out,
                 id,
                 "competing_weapons",
-                "pieces that change the basic attack or are drawn must share a slot",
+                "pieces that change the basic attack, are drawn or train a weapon family must share a slot",
             );
         }
     }

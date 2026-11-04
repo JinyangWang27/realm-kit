@@ -224,3 +224,128 @@ fn a_two_handed_bonus_counts_once_in_the_worst_case() {
         .insert(Stat::Patk, 9_000);
     assert!(world.validate().is_ok(), "{:?}", world.diagnostics());
 }
+
+mod weapon_proficiency {
+    use realmkit_spec::*;
+
+    fn yard() -> WorldSpec {
+        WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/sword-yard"
+        ))
+        .unwrap()
+    }
+
+    fn rules(world: &mut WorldSpec) -> &mut WeaponProficiency {
+        let combat = world.world.combat.as_mut().unwrap();
+        combat.weapon_proficiency.as_mut().unwrap()
+    }
+
+    fn profile<'w>(world: &'w mut WorldSpec, item: &str) -> &'w mut Equipment {
+        let item = world.items.iter_mut().find(|i| i.id == item).unwrap();
+        item.equipment.as_mut().unwrap()
+    }
+
+    fn codes(world: &WorldSpec) -> Vec<String> {
+        match world.validate() {
+            Err(SpecError::Validation(found)) => found.into_iter().map(|d| d.code).collect(),
+            other => panic!("expected diagnostics, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn handling_weights_total_100_and_name_known_disciplines() {
+        let mut world = yard();
+        let spear = profile(&mut world, "spear").weapon.as_mut().unwrap();
+        spear.handling.insert("polearm".into(), 71);
+        assert!(codes(&world).contains(&"invalid_handling".to_string()));
+        let mut world = yard();
+        let spear = profile(&mut world, "spear").weapon.as_mut().unwrap();
+        spear.handling.insert("shield".into(), 0);
+        let found = codes(&world);
+        assert!(found.contains(&"invalid_handling".to_string()));
+        assert!(
+            found.contains(&"missing_reference".to_string()),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_family_must_be_declared_and_a_world_must_declare_them() {
+        let mut world = yard();
+        profile(&mut world, "rapier")
+            .weapon
+            .as_mut()
+            .unwrap()
+            .family = "whip".into();
+        assert!(codes(&world).contains(&"missing_reference".to_string()));
+        let mut world = yard();
+        world.world.combat.as_mut().unwrap().weapon_proficiency = None;
+        let found = codes(&world);
+        assert!(found.contains(&"missing_reference".to_string()));
+        assert!(found.contains(&"invalid_skill_mastery".to_string()));
+    }
+
+    #[test]
+    fn affinities_are_bounded_and_point_at_another_family() {
+        for (target, percent) in [("spear", 101), ("spear", 0), ("balanced_sword", 50)] {
+            let mut world = yard();
+            let families = &mut rules(&mut world).families;
+            families[0].affinities.insert(target.into(), percent);
+            assert!(codes(&world).contains(&"invalid_affinity".to_string()));
+        }
+    }
+
+    #[test]
+    fn ranks_rise_strictly_and_timing_and_xp_are_bounded() {
+        let mut world = yard();
+        rules(&mut world).ranks[1].xp = 20;
+        assert!(codes(&world).contains(&"invalid_proficiency_ranks".to_string()));
+        let mut world = yard();
+        rules(&mut world).ranks[0].rank = 101;
+        assert!(codes(&world).contains(&"invalid_proficiency_ranks".to_string()));
+        let mut world = yard();
+        rules(&mut world).recovery_percent = ATTACK_CUT_BOUND + 1;
+        assert!(codes(&world).contains(&"invalid_proficiency_timing".to_string()));
+        let mut world = yard();
+        rules(&mut world).xp.target_budget = 0;
+        assert!(codes(&world).contains(&"invalid_proficiency_xp".to_string()));
+    }
+
+    #[test]
+    fn two_trained_weapons_cannot_be_worn_at_once_and_none_is_drawn_yet() {
+        let mut world = yard();
+        let combat = world.world.combat.as_mut().unwrap();
+        combat.slots.push("off_hand".into());
+        profile(&mut world, "spear").slots = vec!["off_hand".into()];
+        assert!(codes(&world).contains(&"competing_weapons".to_string()));
+        let mut world = yard();
+        profile(&mut world, "spear").ranged = Some(RangedWeapon {
+            draw: 30,
+            min_draw: 6,
+            power: 100,
+            min_power: 40,
+            channel: Channel::Physical,
+            impact: 0,
+            recovery: 18,
+            flight: 120,
+        });
+        assert!(codes(&world).contains(&"invalid_weapon_profile".to_string()));
+    }
+
+    #[test]
+    fn names_are_prose_and_a_world_without_the_block_keeps_its_revision() {
+        let world = yard();
+        let texts = world.texts();
+        assert_eq!(
+            texts["world.combat.weapon_proficiency.families.balanced_sword.name"],
+            "Sword"
+        );
+        let mut renamed = world.clone();
+        rules(&mut renamed).families[0].name = "剑".into();
+        assert_eq!(renamed.revision(), world.revision());
+        let mut changed = world.clone();
+        rules(&mut changed).windup_percent = 5;
+        assert_ne!(changed.revision(), world.revision());
+    }
+}

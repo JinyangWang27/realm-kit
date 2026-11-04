@@ -1,0 +1,33 @@
+look
+techniques
+fight sparring_partner
+strike
+step 30
+contact student
+step 36
+strike
+step 30
+contact student
+step 36
+disengage
+step 12
+techniques
+equip 2
+fight sparring_partner
+strike
+step 30
+contact student
+step 36
+disengage
+step 12
+equip 3
+techniques
+equip 4
+fight sparring_partner
+strike
+step 30
+contact student
+step 36
+disengage
+step 12
+techniques

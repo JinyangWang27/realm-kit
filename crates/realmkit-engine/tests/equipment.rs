@@ -330,6 +330,7 @@ fn many_worn_modifiers_combine_exactly() {
                     basic_time: None,
                     capabilities: Vec::new(),
                     ranged: None,
+                    weapon: None,
                     modifiers,
                     tiers: Vec::new(),
                 }),

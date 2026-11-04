@@ -1,0 +1,26 @@
+[
+  {
+    "id": "plain_sword",
+    "name": "Eastern Sword",
+    "description": "A straight double-edged sword, for cut and thrust alike.",
+    "equipment": { "slots": ["hands"], "capabilities": ["blade"], "weapon": { "family": "balanced_sword", "handling": { "one_handed": 100 } } }
+  },
+  {
+    "id": "arming_sword",
+    "name": "Arming Sword",
+    "description": "A different country's answer to the same question: one hand, cut and thrust.",
+    "equipment": { "slots": ["hands"], "capabilities": ["blade"], "weapon": { "family": "balanced_sword", "handling": { "one_handed": 100 } } }
+  },
+  {
+    "id": "rapier",
+    "name": "Rapier",
+    "description": "Long and narrow, made for the point.",
+    "equipment": { "slots": ["hands"], "capabilities": ["blade"], "weapon": { "family": "thrusting_sword", "handling": { "one_handed": 100 } } }
+  },
+  {
+    "id": "spear",
+    "name": "Spear",
+    "description": "Two hands and a long reach.",
+    "equipment": { "slots": ["hands"], "capabilities": ["shaft"], "weapon": { "family": "spear", "handling": { "polearm": 70, "two_handed": 30 } } }
+  }
+]

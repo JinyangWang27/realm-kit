@@ -13,6 +13,7 @@ mod story;
 mod text;
 mod time;
 mod troops;
+mod weapons;
 mod world;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

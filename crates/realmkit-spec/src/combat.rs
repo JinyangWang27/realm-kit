@@ -68,6 +68,9 @@ pub struct Combat {
     /// Gear the player starts with, equipped in order while its slots are free.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_equipment: Vec<Id>,
+    /// Weapon families and handling disciplines; absent, no weapon trains.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weapon_proficiency: Option<WeaponProficiency>,
     /// What can be forged, and at which stations.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recipes: Vec<Recipe>,
@@ -305,6 +308,9 @@ pub struct Skill {
     /// up and striking, without interruption (it still takes the damage).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub poise: u32,
+    /// Weapon rank the player must have to use it, besides knowing it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mastery: Option<SkillMastery>,
 }
 
 /// A chance for a landed hit to deal more damage, drawn from the world's

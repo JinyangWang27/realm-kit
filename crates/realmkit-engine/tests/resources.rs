@@ -38,6 +38,7 @@ fn skill(id: &str, power: u32, costs: Costs) -> Skill {
         requires: Vec::new(),
         impact: 0,
         poise: 0,
+        mastery: None,
     }
 }
 

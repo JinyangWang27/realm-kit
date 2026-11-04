@@ -58,6 +58,9 @@ pub struct Equipment {
     /// Real-time only: makes it a drawn weapon that looses projectiles.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ranged: Option<RangedWeapon>,
+    /// What wielding it trains, in a world with weapon proficiency.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weapon: Option<WeaponProfile>,
     /// Damage taken on a channel is multiplied by `num / den`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub modifiers: BTreeMap<Channel, Modifier>,
