@@ -451,6 +451,59 @@ fn a_parry_and_a_raised_guard_teach_but_a_miss_does_not() {
 }
 
 #[test]
+fn a_guard_that_prevents_no_damage_teaches_nothing() {
+    let quick = |world: &mut WorldSpec| {
+        let partner = world
+            .characters
+            .iter_mut()
+            .find(|c| c.id == "sparring_partner");
+        partner.unwrap().combat.as_mut().unwrap().stats.speed = 200;
+    };
+    // A guard that lets everything through.
+    let mut leaky = yard();
+    quick(&mut leaky);
+    let combat = leaky.world.combat.as_mut().unwrap();
+    combat.realtime.as_mut().unwrap().guard_percent = 100;
+    // Worn immunity: nothing reaches the guard to stop.
+    let mut immune = yard();
+    quick(&mut immune);
+    let sword = immune.items.iter_mut().find(|i| i.id == "plain_sword");
+    let gear = sword.unwrap().equipment.as_mut().unwrap();
+    gear.modifiers
+        .insert(Channel::Physical, Modifier { num: 0, den: 1 });
+    for world in [&leaky, &immune] {
+        world.validate().unwrap();
+        let mut engine = Engine::new(world).unwrap();
+        fight(&mut engine, "sparring_partner");
+        engine.execute(Intent(I::Guard)).unwrap();
+        engine.execute(Intent(I::Advance(2))).unwrap();
+        let foe_active = |e: &Engine<'_>| {
+            let Stance::Realtime(f) = &e.state().combat.as_ref().unwrap().stance else {
+                panic!()
+            };
+            matches!(
+                f.fighters[1].action,
+                RealtimeAction::Attack {
+                    phase: AttackPhase::Active,
+                    connected: false,
+                    ..
+                }
+            )
+        };
+        while !foe_active(&engine) {
+            engine.execute(Intent(I::Advance(1))).unwrap();
+        }
+        engine
+            .execute(Intent(I::Contact {
+                attacker: "sparring_partner".into(),
+                target: None,
+            }))
+            .unwrap();
+        assert_eq!(training(&engine), &WeaponTraining::default());
+    }
+}
+
+#[test]
 fn borrowed_rank_opens_everyday_moves_and_not_direct_ones_or_unlearned_ones() {
     let mut world = yard();
     rules(&mut world).xp.target_budget = 1000;

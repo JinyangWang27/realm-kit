@@ -1033,13 +1033,14 @@ fn land(
     let modifier = defender.guard(attack.channel);
     let (mut dealt, _) = strike::damage_of(&stats, &defender.stats, attack, modifier, &mut None)?;
     let guard = &ring.fight.fighters[t].action;
-    let blocked = matches!(guard, RealtimeAction::Guard { ready_at } if *ready_at <= now);
-    if blocked {
+    let mut guarded = false;
+    if matches!(guard, RealtimeAction::Guard { ready_at } if *ready_at <= now) {
         let through = (u64::from(dealt) * u64::from(realtime.guard_percent) / 100) as u32;
         events.push(Event::Blocked {
             character: target.clone(),
             prevented: dealt - through,
         });
+        guarded = dealt > through;
         dealt = through;
     }
     // A stray blow on a teammate earns neither Rage for acting nor training.
@@ -1114,7 +1115,7 @@ fn land(
     if hostile && !projectile {
         if i == 0 && taken > 0 {
             proficiency::struck(world, state, skill, &target, events)?;
-        } else if t == 0 && blocked && player_standing(state) {
+        } else if t == 0 && guarded && player_standing(state) {
             proficiency::defended(world, state, &source_id, events)?;
         }
     }

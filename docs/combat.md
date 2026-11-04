@@ -536,7 +536,7 @@ checked against the weapon in hand (`EngineError::Unpracticed`).
 
 **XP.** Only outcomes teach, in real time and on the timeline alike: a weapon attack
 that does damage to a foe (`xp.hit`), and in real time a parry or raised guard
-that stops a foe's blow (`xp.defense`). A swing that misses, is parried or is
+that prevents some of a foe's blow (`xp.defense`). A swing that misses, is parried or is
 interrupted teaches nothing, nor does a blow on a teammate or a hit that does no damage.
 Inert targets teach nothing. The amount falls off against weaker foes by
 `xp_for_defeat`, reaching nothing five levels below. Each foe has a lifetime
