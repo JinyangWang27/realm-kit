@@ -5,7 +5,7 @@
 //! `scripts/combat_sim/encounter.py`; tests hold the two to the same numbers.
 
 use super::*;
-use crate::character::{profile, resources, Pools};
+use crate::character::{proficiency, profile, resources, Pools};
 use realmkit_spec::{Group, Timeline};
 
 mod action;
@@ -284,7 +284,10 @@ pub(super) fn player_action(
     if let Some(combat) = &state.combat {
         let wielded = gear::capabilities(world, combat);
         match skill {
-            Some(skill) => gear::wields(&wielded, skill)?,
+            Some(skill) => {
+                gear::wields(&wielded, skill)?;
+                proficiency::qualifies(world, combat, skill)?;
+            }
             None => gear::attacks(world, &wielded)?,
         }
     }
@@ -311,6 +314,17 @@ pub(super) fn player_action(
         skill,
         events,
     )?;
+    let landed = events
+        .iter()
+        .rev()
+        .find_map(|e| match e {
+            Event::DamageDealt { amount, .. } => Some(*amount > 0),
+            _ => None,
+        })
+        .unwrap_or(false);
+    if landed {
+        proficiency::struck(world, state, skill, &target, events)?;
+    }
     // Using a technique trains it, less so against much weaker opponents.
     let combat = state.combat.as_ref().unwrap();
     if let Some(technique) = skill.and_then(|s| techniques::of_skill(world, combat, &s.id)) {

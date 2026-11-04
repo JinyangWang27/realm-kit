@@ -23,6 +23,8 @@ mod settle;
 mod state;
 mod techniques;
 
+use character::proficiency;
+pub use character::proficiency::{FamilyStanding, WeaponStanding};
 pub use character::Pools;
 pub use command::*;
 pub use error::EngineError;
@@ -91,6 +93,7 @@ impl<'w> Engine<'w> {
                 techniques: BTreeMap::new(),
                 gear: BTreeMap::new(),
                 next_gear: 1,
+                weapon_training: WeaponTraining::default(),
                 vitals: character::resources::full(&stats, pools),
                 stance: Stance::Exploring,
             }
@@ -255,8 +258,22 @@ impl<'w> Engine<'w> {
             .find(|s| s.id == skill)
             .ok_or_else(unknown)?;
         gear::wields(&gear::capabilities(self.world, combat), skill)?;
+        proficiency::qualifies(self.world, combat, skill)?;
         let pools = self.player_pools().ok_or_else(unknown)?;
         encounter::check_skill(&combat.vitals, pools, combat.level, skill)
+    }
+    /// The weapon in hand and what the player's training gives it, in a world
+    /// with weapon proficiency; `None` for bare hands or an untrained weapon.
+    pub fn weapon_standing(&self) -> Option<WeaponStanding> {
+        proficiency::standing(self.world, self.state.combat.as_ref()?)
+    }
+    /// The player's rank in one weapon family, direct and borrowed.
+    pub fn family_standing(&self, family: &str) -> Option<FamilyStanding> {
+        proficiency::family(self.world, self.state.combat.as_ref()?, family)
+    }
+    /// The player's rank in one handling discipline.
+    pub fn discipline_rank(&self, discipline: &str) -> Option<u32> {
+        proficiency::discipline(self.world, self.state.combat.as_ref()?, discipline)
     }
     /// Stat points granted so far and not yet spent; `None` without combat.
     pub fn unspent_points(&self) -> Option<u32> {

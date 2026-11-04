@@ -513,5 +513,21 @@ pub fn techniques(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) ->
             None => writeln!(output, " (mastered)")?,
         }
     }
+    let Some(rules) = world.combat().and_then(|c| c.weapon_proficiency.as_ref()) else {
+        return Ok(());
+    };
+    writeln!(output, "{}", paint.title("Weapons:"))?;
+    for family in &rules.families {
+        let rank = engine.family_standing(&family.id).unwrap();
+        writeln!(
+            output,
+            "  {}: rank {} (effective {})",
+            family.name, rank.direct, rank.effective
+        )?;
+    }
+    for discipline in &rules.disciplines {
+        let rank = engine.discipline_rank(&discipline.id).unwrap();
+        writeln!(output, "  {}: rank {rank}", discipline.name)?;
+    }
     Ok(())
 }

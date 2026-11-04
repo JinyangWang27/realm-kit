@@ -11,6 +11,7 @@
 
 use super::*;
 
+pub(crate) mod proficiency;
 pub(crate) mod resources;
 pub(crate) mod strike;
 

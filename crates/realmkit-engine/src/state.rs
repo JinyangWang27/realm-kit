@@ -27,6 +27,9 @@ pub struct CombatState {
     pub gear: BTreeMap<u64, Gear>,
     /// The next instance ID; IDs are never reused.
     pub next_gear: u64,
+    /// Direct weapon experience and what each foe has taught so far.
+    #[serde(default, skip_serializing_if = "WeaponTraining::is_empty")]
+    pub weapon_training: WeaponTraining,
     /// The player's HP, MP and Rage: their only copy, whatever the stance.
     pub vitals: Vitals,
     pub stance: Stance,
@@ -93,6 +96,27 @@ pub struct Gear {
     pub tier: usize,
     /// The one enchantment laid on it, for good.
     pub enchantment: Option<Id>,
+}
+
+/// What weapon use has taught the player: only direct XP. Ranks, borrowed
+/// rank and timing derive from it, never saved. Every gain adds the same amount to one
+/// family, across disciplines and to one foe's credit, so the three totals agree.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WeaponTraining {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub families: BTreeMap<Id, u64>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub disciplines: BTreeMap<Id, u64>,
+    /// XP each foe has taught, for good: its budget outlasts any fight.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub taught: BTreeMap<Id, u64>,
+}
+
+impl WeaponTraining {
+    fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 /// A learned technique's 1-based rank and its technique XP.
@@ -192,6 +216,10 @@ fn is_zero(value: &u64) -> bool {
     *value == 0
 }
 
+fn no_cut(value: &u32) -> bool {
+    *value == 0
+}
+
 /// The player's drawn weapon, and the steps to its full and shortest draws
 /// at their speed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -261,6 +289,10 @@ pub enum RealtimeAction {
         until: u64,
         /// Whether this attack has landed; each lands at most once.
         connected: bool,
+        /// Percent off the recovery to come, fixed when the attack was
+        /// committed: a rank it earns serves only later attacks.
+        #[serde(default, skip_serializing_if = "no_cut")]
+        recovery_cut: u32,
     },
     /// A guard, which stops hits from step `ready_at` until it is lowered.
     Guard { ready_at: u64 },

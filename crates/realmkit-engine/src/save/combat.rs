@@ -14,6 +14,7 @@ pub(super) fn check(
 ) -> Result<(), String> {
     // Gear first: every stat check below derives stats from worn pieces.
     gear(world, combat)?;
+    weapon_training(world, combat, rules)?;
     level(combat, rules)?;
     defeats(world, combat)?;
     allocation(world, combat, rules)?;
@@ -77,6 +78,39 @@ fn gear(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
         }),
         "invalid equipment",
     )
+}
+
+/// Only the world's families, disciplines and fighters, each foe within its
+/// budget, and every gain counted once in each of the three ledgers.
+fn weapon_training(world: &WorldSpec, combat: &CombatState, rules: &Combat) -> Result<(), String> {
+    let t = &combat.weapon_training;
+    let ok = match &rules.weapon_proficiency {
+        None => t == &WeaponTraining::default(),
+        Some(r) => {
+            let sum = |ledger: &BTreeMap<Id, u64>| {
+                ledger
+                    .values()
+                    .try_fold(0_u64, |total, xp| total.checked_add(*xp))
+            };
+            t.families
+                .keys()
+                .all(|id| r.families.iter().any(|f| f.id == *id))
+                && t.disciplines
+                    .keys()
+                    .all(|id| r.disciplines.iter().any(|d| d.id == *id))
+                && t.taught.iter().all(|(id, xp)| {
+                    *xp <= u64::from(r.xp.target_budget)
+                        && world.character(id).is_some_and(|c| c.combat.is_some())
+                })
+                && [&t.families, &t.disciplines, &t.taught]
+                    .iter()
+                    .all(|ledger| ledger.values().all(|xp| *xp > 0))
+                && sum(&t.families).is_some()
+                && sum(&t.families) == sum(&t.disciplines)
+                && sum(&t.families) == sum(&t.taught)
+        }
+    };
+    ensure(ok, "invalid weapon training")
 }
 
 fn level(combat: &CombatState, rules: &Combat) -> Result<(), String> {

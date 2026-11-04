@@ -895,6 +895,7 @@ fn saves_with_fight_states_the_rules_cannot_reach_are_refused() {
             phase: AttackPhase::Windup,
             until: 6,
             connected: false,
+            recovery_cut: 0,
         }
     }));
     // A twin cannot be in the fight without his brother if they started it.

@@ -595,6 +595,19 @@ pub enum Event {
         amount: u64,
     },
     TechniquesViewed,
+    /// Meaningful use taught `family` (and its weapon's disciplines) `amount` XP.
+    WeaponTrained {
+        family: Id,
+        amount: u64,
+    },
+    WeaponRankUp {
+        family: Id,
+        rank: u32,
+    },
+    DisciplineRankUp {
+        discipline: Id,
+        rank: u32,
+    },
     Equipped {
         gear: u64,
     },
