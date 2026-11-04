@@ -596,7 +596,8 @@ fn saves_with_realtime_fight_states_the_rules_cannot_reach_are_refused() {
             phase: AttackPhase::Windup,
             until: 3,
             connected: false,
-            recovery_cut: 0,
+            active_steps: 6,
+            recovery_steps: 6,
         }
     }));
     // A world without real-time rules has no real-time fights to resume.
@@ -772,7 +773,7 @@ fn a_rank_earned_mid_attack_leaves_a_save_that_loads() {
         rank: 2,
     }));
     // The lunge is still active, though the player now knows the thrust,
-    // and faster: its remaining steps were set at the old speed.
+    // and faster: all of its steps were set at the old speed.
     let RealtimeAction::Attack {
         skill: committed,
         phase,
@@ -788,7 +789,7 @@ fn a_rank_earned_mid_attack_leaves_a_save_that_loads() {
     assert_eq!(engine.player_stats().unwrap().speed, 150);
     let mut whole = engine.clone();
     let mut resumed = Engine::restore(&world, engine.snapshot()).unwrap();
-    let rest = [step(1), step(6), skill("thrust"), step(4)];
+    let rest = [step(1), step(9), skill("thrust"), step(4)];
     assert_eq!(run(&mut resumed, &rest), run(&mut whole, &rest));
     assert_eq!(resumed.snapshot().to_json(), whole.snapshot().to_json());
     // A skill the player never knew is still refused.

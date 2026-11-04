@@ -1031,11 +1031,11 @@ fn a_line_host_trains_swords_that_share_rank_and_a_spear_that_does_not() {
     let text = String::from_utf8(output.stdout).unwrap();
     assert_eq!(String::from_utf8(play().stdout).unwrap(), text);
     for passage in [
-        "Sword +10",
-        "Sword: rank 20!",
+        "Balanced sword +10",
+        "Balanced sword: rank 20!",
         "One-handed: rank 20!",
         // Two hits with one sword and one with its fellow share a family.
-        "Sword: rank 20 (effective 20)",
+        "Balanced sword: rank 20 (effective 20)",
         // Rapier borrows from the family it is related to, spear from nothing.
         "Thrusting sword: rank 0 (effective 12)",
         "Spear: rank 0 (effective 0)",

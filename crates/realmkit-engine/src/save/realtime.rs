@@ -147,7 +147,8 @@ pub(super) fn check(
                 phase,
                 until,
                 connected,
-                recovery_cut,
+                active_steps,
+                recovery_steps,
             } => {
                 let skill = skill.as_ref().map(usable);
                 // Nor does a basic attack begin without what it needs.
@@ -155,18 +156,27 @@ pub(super) fn check(
                 let aimed = fight
                     .index(target)
                     .is_some_and(|t| fight.fighters[t].team != f.team);
-                // Rank never falls and the weapon stays in hand while
-                // committed, so today's standing bounds the cut it began with.
-                let bound = (i == 0)
-                    .then(|| proficiency::standing(world, combat))
-                    .flatten()
-                    .map_or(0, |w| w.recovery_cut);
+                // Settled at commitment, so only the fixed fighters' are exact.
+                // The player's speed can have changed since, and a cut only
+                // shortens, so theirs are bounded at the slowest speed.
+                let bound = |phase| longest(realtime, side, i, skill.flatten(), phase);
+                let lasts = |steps: u64, phase| match i {
+                    0 => (1..=bound(phase)).contains(&steps),
+                    _ => steps == bound(phase),
+                };
+                let timed = lasts(*active_steps, AttackPhase::Active)
+                    && lasts(*recovery_steps, AttackPhase::Recovery);
+                let left = match phase {
+                    AttackPhase::Windup => bound(AttackPhase::Windup),
+                    AttackPhase::Active => *active_steps,
+                    AttackPhase::Recovery => *recovery_steps,
+                };
                 aimed
                     && basic
-                    && *recovery_cut <= bound
+                    && timed
                     && skill.is_none_or(|s| s.is_some_and(|s| s.level <= side.level))
                     && *until > now
-                    && until - now <= longest(realtime, side, i, skill.flatten(), *phase)
+                    && until - now <= left
                     && !(*phase == AttackPhase::Windup && *connected)
             }
             RealtimeAction::Guard { ready_at } => {
@@ -289,10 +299,9 @@ fn superseded<'w>(world: &'w WorldSpec, combat: &CombatState, id: &str) -> Optio
     earlier.then(|| world.skill(id)).flatten()
 }
 
-/// The most steps a phase begun earlier in this fight can have left. Other
-/// fighters' stats are fixed, so their phases are exact. A rank the player
-/// earns mid-fight can change their speed after a phase began, so theirs is
-/// bounded at the slowest speed instead.
+/// A phase's length without a proficiency cut. Other fighters' stats are fixed,
+/// so theirs is exact. A rank the player earns mid-fight can change their speed
+/// after an attack was committed, so theirs is bounded at the slowest speed.
 fn longest(
     realtime: &realmkit_spec::Realtime,
     side: &realtime::Side,

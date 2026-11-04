@@ -264,6 +264,11 @@ fn a_novice_and_a_world_without_proficiency_keep_authored_timing() {
     for item in &mut bare.items {
         item.equipment.as_mut().unwrap().weapon = None;
     }
+    for character in &mut bare.characters {
+        if let Some(combat) = &mut character.combat {
+            combat.weapon_challenge = None;
+        }
+    }
     bare.validate().unwrap();
     let mut engine = Engine::new(&bare).unwrap();
     assert!(engine.weapon_standing().is_none());
@@ -354,9 +359,30 @@ fn a_foe_teaches_within_its_budget_however_the_fights_restart() {
     assert_eq!(training(&engine).families["balanced_sword"], 70);
 }
 
+/// What one hit on `foe` teaches, at character `level`, with `sword` XP in the
+/// balanced sword and `item` in hand.
+fn one_hit(world: &WorldSpec, level: usize, sword: u64, item: &str, foe: &str) -> u64 {
+    let mut snapshot = Engine::new(world).unwrap().snapshot();
+    let c = snapshot.state.combat.as_mut().unwrap();
+    (c.level, c.xp) = (level, level as u64 - 1);
+    if sword > 0 {
+        let t = &mut c.weapon_training;
+        t.families.insert("balanced_sword".into(), sword);
+        t.disciplines.insert("one_handed".into(), sword);
+        t.taught.insert("straw_man".into(), sword);
+    }
+    let mut engine = Engine::restore(world, snapshot).unwrap();
+    take_up(&mut engine, item);
+    fight(&mut engine, foe);
+    let before = training(&engine).taught.values().sum::<u64>();
+    hit(&mut engine);
+    training(&engine).taught.values().sum::<u64>() - before
+}
+
 #[test]
-fn much_weaker_foes_teach_less_and_then_nothing() {
+fn training_follows_weapon_rank_and_foe_challenge_not_character_level() {
     let mut world = yard();
+    rules(&mut world).xp.target_budget = 1000;
     let combat = world.world.combat.as_mut().unwrap();
     let first = combat.levels[0].clone();
     for xp in 1..=5 {
@@ -366,18 +392,93 @@ fn much_weaker_foes_teach_less_and_then_nothing() {
         });
     }
     world.validate().unwrap();
-    let at_level = |level: usize| {
-        let mut snapshot = Engine::new(&world).unwrap().snapshot();
-        let c = snapshot.state.combat.as_mut().unwrap();
-        (c.level, c.xp) = (level, level as u64 - 1);
-        let mut engine = Engine::restore(&world, snapshot).unwrap();
-        fight(&mut engine, "sparring_partner");
-        hit(&mut engine);
-        training(&engine).families.get("balanced_sword").copied()
+    let sword = "plain_sword";
+    // The recruit is level 1, so challenge 20 at this world's 20 per level.
+    // A high-level novice still learns in full, where level falloff gave nothing.
+    assert_eq!(one_hit(&world, 6, 0, sword, "recruit"), 10);
+    // A level-1 expert does not: 20 past the challenge of a margin of 40, then all of it.
+    assert_eq!(one_hit(&world, 1, 40, sword, "recruit"), 5);
+    assert_eq!(one_hit(&world, 1, 60, sword, "recruit"), 0);
+    // Level changes none of that.
+    assert_eq!(one_hit(&world, 6, 40, sword, "recruit"), 5);
+    // An authored challenge overrides the foe's level.
+    assert_eq!(one_hit(&world, 1, 60, sword, "veteran"), 10);
+    // Effective rank counts, so a master of a related family finds it easier
+    // than a stranger: 36 borrowed is 16 past, 24/40 of 10. A spear knows nothing.
+    assert_eq!(one_hit(&world, 1, 60, "rapier", "recruit"), 6);
+    assert_eq!(one_hit(&world, 1, 60, "spear", "recruit"), 10);
+}
+
+#[test]
+fn the_last_of_a_budget_is_partial_and_nothing_follows_it() {
+    let world = yard();
+    let mut snapshot = Engine::new(&world).unwrap().snapshot();
+    let t = &mut snapshot.state.combat.as_mut().unwrap().weapon_training;
+    t.families.insert("balanced_sword".into(), 55);
+    t.disciplines.insert("one_handed".into(), 55);
+    t.taught.insert("sparring_partner".into(), 55);
+    let mut engine = Engine::restore(&world, snapshot).unwrap();
+    fight(&mut engine, "sparring_partner");
+    let events = hit(&mut engine);
+    assert!(events.contains(&Event::WeaponTrained {
+        family: "balanced_sword".into(),
+        amount: 5
+    }));
+    let events = hit(&mut engine);
+    assert!(!events
+        .iter()
+        .any(|e| matches!(e, Event::WeaponTrained { .. })));
+    assert_eq!(training(&engine).taught["sparring_partner"], 60);
+}
+
+#[test]
+fn a_family_specific_skill_refuses_other_weapons_whatever_they_allow() {
+    let mut world = yard();
+    rules(&mut world).xp.target_budget = 1000;
+    // The spear allows what the skill requires, and its rank would meet the gate.
+    let spear = world.items.iter_mut().find(|i| i.id == "spear").unwrap();
+    let gear = spear.equipment.as_mut().unwrap();
+    gear.capabilities.push("blade".into());
+    let mut engine = trained(&world, "spear", "polearm", 80);
+    take_up(&mut engine, "spear");
+    assert_eq!(engine.weapon_standing().unwrap().rank.direct, 80);
+    let wrong_weapon = |r: Result<(), EngineError>| matches!(r, Err(EngineError::Unwielded(_)));
+    assert!(wrong_weapon(engine.skill_usable("master_cut")));
+    assert!(wrong_weapon(engine.skill_usable("feint")));
+    // Nor by the menu, or in either kind of fight.
+    let offered = |engine: &Engine<'_>, id: &str| {
+        engine.actions().iter().any(|a| {
+            a.available && matches!(&a.command, Intent(I::Skill { skill, .. }) if skill == id)
+        })
     };
-    // One level above the foe, 90%; five above, nothing at all.
-    assert_eq!(at_level(2), Some(9));
-    assert_eq!(at_level(6), None);
+    fight(&mut engine, "sparring_partner");
+    assert!(!offered(&engine, "master_cut"));
+    let before = engine.snapshot();
+    assert!(matches!(
+        engine.execute(Intent(I::Skill {
+            skill: "master_cut".into(),
+            target: None
+        })),
+        Err(EngineError::Unwielded(_))
+    ));
+    assert_eq!(engine.snapshot(), before);
+    leave(&mut engine);
+    engine.execute(Engage("sparring_partner".into())).unwrap();
+    assert!(matches!(
+        engine.execute(UseSkill {
+            skill: "master_cut".into(),
+            target: "sparring_partner".into()
+        }),
+        Err(EngineError::Unwielded(_))
+    ));
+
+    // Its own family is fine, and bare hands are no family.
+    let mut engine = trained(&world, "balanced_sword", "one_handed", 80);
+    engine.skill_usable("master_cut").unwrap();
+    let gear = &engine.state().combat.as_ref().unwrap().gear;
+    let worn = *gear.iter().find(|(_, g)| g.equipped).unwrap().0;
+    engine.execute(Unequip(worn)).unwrap();
+    assert!(wrong_weapon(engine.skill_usable("master_cut")));
 }
 
 #[test]
@@ -504,11 +605,47 @@ fn a_guard_that_prevents_no_damage_teaches_nothing() {
 }
 
 #[test]
+fn a_family_specific_skill_can_need_a_second_piece_as_well() {
+    let mut world = yard();
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.slots.push("off_hand".into());
+    combat.player_equipment.push("buckler".into());
+    let cut = combat.skills.iter_mut().find(|s| s.id == "feint").unwrap();
+    cut.requires.push("shield".into());
+    cut.mastery.as_mut().unwrap().effective = 0;
+    let mut buckler = world.items[0].clone();
+    buckler.id = "buckler".into();
+    buckler.equipment = Some(Equipment {
+        slots: vec!["off_hand".into()],
+        capabilities: vec!["shield".into()],
+        weapon: None,
+        ..buckler.equipment.unwrap()
+    });
+    world.items.push(buckler);
+    world.validate().unwrap();
+    // The sword and the buckler, worn from the start, allow it together.
+    let mut engine = Engine::new(&world).unwrap();
+    engine.skill_usable("feint").unwrap();
+    // Without the buckler, the capability is missing.
+    let gear = &engine.state().combat.as_ref().unwrap().gear;
+    let buckler = *gear.iter().find(|(_, g)| g.item == "buckler").unwrap().0;
+    engine.execute(Unequip(buckler)).unwrap();
+    assert!(matches!(
+        engine.skill_usable("feint"),
+        Err(EngineError::Unwielded(_))
+    ));
+}
+
+#[test]
 fn borrowed_rank_opens_everyday_moves_and_not_direct_ones_or_unlearned_ones() {
     let mut world = yard();
     rules(&mut world).xp.target_budget = 1000;
     let combat = world.world.combat.as_mut().unwrap();
     combat.player_skills.retain(|s| s != "shout");
+    // Both swords may make the cut here, so only its direct gate stands.
+    let cut = combat.skills.iter_mut().find(|s| s.id == "master_cut");
+    let mastery = cut.unwrap().mastery.as_mut().unwrap();
+    mastery.families.push("thrusting_sword".into());
     let mut engine = trained(&world, "balanced_sword", "one_handed", 80);
     // A sword at direct 80 knows and may use both.
     engine.skill_usable("feint").unwrap();
@@ -535,6 +672,178 @@ fn borrowed_rank_opens_everyday_moves_and_not_direct_ones_or_unlearned_ones() {
         engine.skill_usable("shout"),
         Err(EngineError::UnknownSkill(_))
     ));
+}
+
+/// A yard whose `lunge` technique doubles the player's speed at its second
+/// rank, which one use reaches.
+fn fleet_yard() -> WorldSpec {
+    let mut world = yard();
+    let combat = world.world.combat.as_mut().unwrap();
+    let shout = combat.skills.iter().find(|s| s.id == "shout").unwrap();
+    let lunge = Skill {
+        id: "lunge".into(),
+        requires: vec!["blade".into()],
+        mastery: None,
+        ..shout.clone()
+    };
+    combat.skills.push(lunge);
+    let rank = |xp, skill: Option<&str>, speed| TechniqueRank {
+        name: "Rank".into(),
+        xp,
+        skill: skill.map(Into::into),
+        passive: [(Stat::Speed, speed)].into_iter().collect(),
+        requires: None,
+    };
+    combat.techniques.push(Technique {
+        id: "fleet".into(),
+        name: "Fleet".into(),
+        ranks: vec![rank(0, Some("lunge"), 0), rank(1, Some("lunge"), 100)],
+        xp_share_percent: 0,
+    });
+    combat.player_techniques.push(TechniqueGrant {
+        technique: "fleet".into(),
+        rank: None,
+        xp: 0,
+    });
+    world.validate().unwrap();
+    world
+}
+
+fn lunge(engine: &mut Engine<'_>) {
+    engine
+        .execute(Intent(I::Skill {
+            skill: "lunge".into(),
+            target: None,
+        }))
+        .unwrap();
+}
+
+#[test]
+fn speed_gained_mid_attack_waits_for_the_next_attack() {
+    let world = fleet_yard();
+    let mut engine = Engine::new(&world).unwrap();
+    fight(&mut engine, "sparring_partner");
+    lunge(&mut engine);
+    assert_eq!(to_active(&mut engine), 30);
+    let slow = engine.player_stats().unwrap().speed;
+    let events = contact(&mut engine);
+    assert!(events.contains(&Event::TechniqueRankUp {
+        technique: "fleet".into(),
+        rank: 2
+    }));
+    assert_eq!(engine.player_stats().unwrap().speed, slow + 100);
+    // Commitment holds through the save, the rest of its phases and the reload.
+    let snapshot = serde_json::to_string(&engine.snapshot()).unwrap();
+    let mut restored = Engine::restore(&world, serde_json::from_str(&snapshot).unwrap()).unwrap();
+    for engine in [&mut engine, &mut restored] {
+        assert_eq!(to_recovery(engine), 6);
+        assert_eq!(to_ready(engine), 30, "the recovery it committed to");
+    }
+    assert_eq!(engine.snapshot(), restored.snapshot());
+    // The next attack is the quicker one: half of each phase.
+    lunge(&mut engine);
+    assert_eq!(to_active(&mut engine), 15);
+    assert_eq!(to_recovery(&mut engine), 3);
+    assert_eq!(to_ready(&mut engine), 15);
+}
+
+#[test]
+fn gear_cannot_change_while_an_attack_is_committed() {
+    let world = yard();
+    let mut engine = Engine::new(&world).unwrap();
+    fight(&mut engine, "sparring_partner");
+    engine.execute(Intent(I::Attack { target: None })).unwrap();
+    let gear = &engine.state().combat.as_ref().unwrap().gear;
+    let spear = *gear.iter().find(|(_, g)| g.item == "spear").unwrap().0;
+    let before = engine.snapshot();
+    assert!(matches!(
+        engine.execute(Intent(I::Equip(spear))),
+        Err(EngineError::Committed)
+    ));
+    assert_eq!(engine.snapshot(), before);
+}
+
+#[test]
+fn a_parry_of_a_blow_that_could_do_nothing_teaches_nothing() {
+    let mut world = yard();
+    let partner = world
+        .characters
+        .iter_mut()
+        .find(|c| c.id == "sparring_partner");
+    partner.unwrap().combat.as_mut().unwrap().stats.speed = 200;
+    let sword = world.items.iter_mut().find(|i| i.id == "plain_sword");
+    let gear = sword.unwrap().equipment.as_mut().unwrap();
+    gear.modifiers
+        .insert(Channel::Physical, Modifier { num: 0, den: 1 });
+    let mut engine = Engine::new(&world).unwrap();
+    fight(&mut engine, "sparring_partner");
+    while !foe_striking(&engine) {
+        engine.execute(Intent(I::Advance(1))).unwrap();
+    }
+    engine.execute(Intent(I::Parry)).unwrap();
+    let events = foe_contact(&mut engine).unwrap();
+    assert!(events.iter().any(|e| matches!(e, Event::Parried { .. })));
+    assert_eq!(training(&engine), &WeaponTraining::default());
+}
+
+#[test]
+fn one_blow_teaches_a_defence_once_however_often_it_is_reported() {
+    let mut world = yard();
+    let partner = world
+        .characters
+        .iter_mut()
+        .find(|c| c.id == "sparring_partner");
+    partner.unwrap().combat.as_mut().unwrap().stats.speed = 200;
+    let trained_by = |engine: &Engine<'_>| training(engine).taught["sparring_partner"];
+    // Parried: the attacker reels, and a second report has nothing to land.
+    let mut engine = Engine::new(&world).unwrap();
+    fight(&mut engine, "sparring_partner");
+    while !foe_striking(&engine) {
+        engine.execute(Intent(I::Advance(1))).unwrap();
+    }
+    engine.execute(Intent(I::Parry)).unwrap();
+    foe_contact(&mut engine).unwrap();
+    assert_eq!(trained_by(&engine), 5);
+    assert!(matches!(
+        foe_contact(&mut engine),
+        Err(EngineError::NoContact(_))
+    ));
+    assert_eq!(trained_by(&engine), 5);
+    // Guarded: the attack has landed, once.
+    let mut engine = Engine::new(&world).unwrap();
+    fight(&mut engine, "sparring_partner");
+    engine.execute(Intent(I::Guard)).unwrap();
+    while !foe_striking(&engine) {
+        engine.execute(Intent(I::Advance(1))).unwrap();
+    }
+    foe_contact(&mut engine).unwrap();
+    assert_eq!(trained_by(&engine), 5);
+    assert!(matches!(
+        foe_contact(&mut engine),
+        Err(EngineError::NoContact(_))
+    ));
+    assert_eq!(trained_by(&engine), 5);
+}
+
+fn foe_striking(engine: &Engine<'_>) -> bool {
+    let Stance::Realtime(fight) = &engine.state().combat.as_ref().unwrap().stance else {
+        panic!("not fighting");
+    };
+    matches!(
+        fight.fighters[1].action,
+        RealtimeAction::Attack {
+            phase: AttackPhase::Active,
+            connected: false,
+            ..
+        }
+    )
+}
+
+fn foe_contact(engine: &mut Engine<'_>) -> Result<Vec<Event>, EngineError> {
+    engine.execute(Intent(I::Contact {
+        attacker: "sparring_partner".into(),
+        target: None,
+    }))
 }
 
 #[test]
@@ -599,15 +908,23 @@ fn saves_and_replays_keep_a_commitment_and_refuse_impossible_training() {
             .taught
             .insert("sparring_partner".into(), 31);
     });
-    refused(&|c| {
-        let Stance::Realtime(fight) = &mut c.stance else {
-            panic!()
-        };
-        let RealtimeAction::Attack { recovery_cut, .. } = &mut fight.fighters[0].action else {
-            panic!()
-        };
-        *recovery_cut = 15;
-    });
+    // At speed 1 these phases last 600 and 3,000 steps at the most.
+    for (bad_active, bad_recovery) in [(0, 5), (5, 0), (601, 5), (5, 3001)] {
+        refused(&|c| {
+            let Stance::Realtime(fight) = &mut c.stance else {
+                panic!()
+            };
+            let RealtimeAction::Attack {
+                active_steps,
+                recovery_steps,
+                ..
+            } = &mut fight.fighters[0].action
+            else {
+                panic!()
+            };
+            (*active_steps, *recovery_steps) = (bad_active, bad_recovery);
+        });
+    }
 }
 
 #[test]
@@ -621,6 +938,6 @@ fn a_save_from_before_proficiency_still_loads_where_the_world_has_none() {
     engine.execute(EngageRealtime("duelist".into())).unwrap();
     engine.execute(Intent(I::Attack { target: None })).unwrap();
     let json = serde_json::to_string(&engine.snapshot()).unwrap();
-    assert!(!json.contains("weapon_training") && !json.contains("recovery_cut"));
+    assert!(!json.contains("weapon_training"));
     Engine::restore(&world, serde_json::from_str(&json).unwrap()).unwrap();
 }

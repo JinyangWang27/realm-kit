@@ -117,9 +117,20 @@ pub(crate) fn standing(world: &WorldSpec, combat: &CombatState) -> Option<Weapon
 }
 
 /// Whether the attack is made with the weapon in hand: a basic attack is, and
-/// a skill that requires something the weapon provides.
+/// a skill that requires something the weapon provides, if it is of a family
+/// the skill allows.
 fn uses(weapon: &Equipment, skill: Option<&Skill>) -> bool {
-    skill.is_none_or(|s| s.requires.iter().any(|c| weapon.capabilities.contains(c)))
+    skill.is_none_or(|s| {
+        s.requires.iter().any(|c| weapon.capabilities.contains(c)) && allows_family(weapon, s)
+    })
+}
+
+fn allows_family(weapon: &Equipment, skill: &Skill) -> bool {
+    let Some(mastery) = skill.mastery.as_ref().filter(|m| !m.families.is_empty()) else {
+        return true;
+    };
+    let family = weapon.weapon.as_ref().map(|w| &w.family);
+    family.is_some_and(|f| mastery.families.contains(f))
 }
 
 /// Percent off the wind-up and recovery of the player's attack with `skill`.
@@ -130,26 +141,30 @@ pub(crate) fn cuts(world: &WorldSpec, combat: &CombatState, skill: Option<&Skill
         .map_or((0, 0), |w| (w.windup_cut, w.recovery_cut))
 }
 
-/// Whether the player has the weapon rank `skill` asks, with what is in hand.
+/// Whether the weapon in hand is one `skill` allows, and the player has the
+/// rank in its family that it asks. A family-specific skill refuses every other
+/// weapon outright, whatever its capabilities and rank; so do bare hands.
 pub(crate) fn qualifies(
     world: &WorldSpec,
     combat: &CombatState,
     skill: &Skill,
 ) -> Result<(), EngineError> {
-    let Some(mastery) = skill.mastery else {
+    let Some(mastery) = &skill.mastery else {
         return Ok(());
     };
-    let rank = standing(world, combat)
-        .filter(|_| in_hand(world, combat).is_some_and(|w| uses(w, Some(skill))))
-        .map_or(
-            FamilyStanding {
-                direct: 0,
-                borrowed: 0,
-                effective: 0,
-            },
-            |w| w.rank,
-        );
-    match rank.direct >= mastery.direct && rank.effective >= mastery.effective {
+    let weapon = in_hand(world, combat);
+    let allowed = match weapon {
+        Some(weapon) => allows_family(weapon, skill),
+        None => mastery.families.is_empty(),
+    };
+    if !allowed {
+        return Err(EngineError::Unwielded(skill.id.clone()));
+    }
+    let rank = weapon
+        .filter(|w| uses(w, Some(skill)))
+        .and_then(|_| standing(world, combat))
+        .map_or((0, 0), |w| (w.rank.direct, w.rank.effective));
+    match rank.0 >= mastery.direct && rank.1 >= mastery.effective {
         true => Ok(()),
         false => Err(EngineError::Unpracticed(skill.id.clone())),
     }
@@ -186,8 +201,17 @@ pub(crate) fn defended(
     teach(world, state, rules.xp.defense, foe, events)
 }
 
-/// `amount` XP, less against weaker foes, up to what `foe` has left to teach,
-/// to the weapon in hand's family and, by its weights, its disciplines.
+/// How much of `amount` a foe of `challenge` teaches someone of `effective` rank:
+/// all of it at or below the challenge, evenly less above, nothing at
+/// `margin` past it, rounded down.
+fn challenged(amount: u32, effective: u32, challenge: u32, margin: u32) -> u64 {
+    let past = effective.saturating_sub(challenge);
+    u64::from(amount) * u64::from(margin.saturating_sub(past)) / u64::from(margin)
+}
+
+/// `amount` XP, falling off as the weapon's rank passes the foe's challenge, up
+/// to what `foe` has left to teach, to the weapon in hand's family and, by its
+/// weights, its disciplines. Character level plays no part.
 fn teach(
     world: &WorldSpec,
     state: &mut GameState,
@@ -206,7 +230,10 @@ fn teach(
     }
     let taught = combat.weapon_training.taught.get(foe).copied().unwrap_or(0);
     let left = u64::from(rules.xp.target_budget).saturating_sub(taught);
-    let gain = xp_for_defeat(u64::from(amount), combat.level, target.level).min(left);
+    let effective = standing_in(rules, combat, &profile.family).effective;
+    let by_level = (target.level as u64).saturating_mul(u64::from(rules.xp.challenge_per_level));
+    let challenge = target.weapon_challenge.unwrap_or(by_level.min(100) as u32);
+    let gain = challenged(amount, effective, challenge, rules.xp.trivial_margin).min(left);
     if gain == 0 {
         return Ok(());
     }
@@ -263,4 +290,21 @@ fn split(gain: u64, weights: &BTreeMap<Id, u32>) -> Vec<(&Id, u64)> {
         .into_iter()
         .map(|(id, share, _)| (id, share))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::challenged;
+
+    #[test]
+    fn a_foe_teaches_all_up_to_its_challenge_then_evenly_less() {
+        assert_eq!(challenged(10, 0, 30, 40), 10);
+        assert_eq!(challenged(10, 30, 30, 40), 10);
+        assert_eq!(challenged(10, 50, 30, 40), 5);
+        assert_eq!(challenged(10, 69, 30, 40), 0, "rounded down");
+        assert_eq!(challenged(10, 70, 30, 40), 0);
+        assert_eq!(challenged(10, 100, 30, 40), 0);
+        assert_eq!(challenged(10, 100, 100, 1), 10);
+        assert_eq!(challenged(1_000_000, 100, 0, 100), 0);
+    }
 }

@@ -54,8 +54,9 @@ pub struct ProficiencyRank {
     pub xp: u64,
 }
 
-/// What meaningful use teaches. Each amount falls off against weaker foes as
-/// defeat XP does; inert targets teach nothing.
+/// What meaningful use teaches. Each amount falls off as the rank of the weapon
+/// in hand passes the foe's challenge, whatever the player's character level;
+/// inert targets teach nothing.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WeaponXp {
@@ -67,6 +68,13 @@ pub struct WeaponXp {
     /// The most XP one foe can ever teach, across every fight with it, so
     /// neither restarting a fight nor reloading makes more.
     pub target_budget: u32,
+    /// A foe's challenge when it authors no `weapon_challenge`: this per level
+    /// of the foe, up to rank 100.
+    pub challenge_per_level: u32,
+    /// How far effective rank must pass a foe's challenge for it to teach
+    /// nothing; the amount falls evenly over that span, and is whole at or
+    /// below the challenge.
+    pub trivial_margin: u32,
 }
 
 /// What a wielded weapon trains. Pieces with one must share a slot, so at most
@@ -79,11 +87,14 @@ pub struct WeaponProfile {
     pub handling: BTreeMap<Id, u32>,
 }
 
-/// Ranks a skill asks of the wielded weapon's family, beyond knowing the move.
-/// Borrowed rank counts toward `effective` only.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+/// What a skill asks of the wielded weapon, beyond knowing the move. Borrowed
+/// rank counts toward `effective` only.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SkillMastery {
+    /// The weapon in hand must be of one of these families; empty is any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub families: Vec<Id>,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub direct: u32,
     #[serde(default, skip_serializing_if = "is_zero")]

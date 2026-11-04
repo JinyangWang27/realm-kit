@@ -801,8 +801,8 @@ fn join(
 }
 
 /// Begins fighter `i`'s attack on `target` now, paying an affordable skill's
-/// costs. `cuts` are the percent off its wind-up and recovery, fixed here for
-/// the whole attack.
+/// costs. Every phase's length is settled here, `cuts` being the percent off
+/// its wind-up and recovery, and nothing later changes them.
 #[allow(clippy::too_many_arguments)]
 fn begin(
     realtime: &Realtime,
@@ -815,17 +815,14 @@ fn begin(
 ) -> Result<(), EngineError> {
     let side = ring.sides[i];
     let character = ring.fight.fighters[i].character.clone();
+    let steps = |phase, cut| attack_steps(realtime, &side, skill, phase, cut);
     let until = ring
         .fight
         .step
-        .checked_add(attack_steps(
-            realtime,
-            &side,
-            skill,
-            AttackPhase::Windup,
-            windup_cut,
-        ))
+        .checked_add(steps(AttackPhase::Windup, windup_cut))
         .ok_or(EngineError::NumericLimit)?;
+    let active_steps = steps(AttackPhase::Active, 0);
+    let recovery_steps = steps(AttackPhase::Recovery, recovery_cut);
     if let Some(skill) = skill {
         resources::spend(ring.vitals_mut(i), &character, skill, events);
     }
@@ -835,7 +832,8 @@ fn begin(
         phase: AttackPhase::Windup,
         until,
         connected: false,
-        recovery_cut,
+        active_steps,
+        recovery_steps,
     };
     events.push(Event::Swing {
         character,
@@ -1011,6 +1009,10 @@ fn land(
                 open_until,
                 until: open_until,
             };
+            // What the deflected blow would have done: nothing is no defence.
+            let defender = ring.sides[t];
+            let guard = defender.guard(attack.channel);
+            let (would, _) = strike::damage_of(&stats, &defender.stats, attack, guard, &mut None)?;
             events.push(Event::Parried {
                 character: target,
                 attacker: source.clone(),
@@ -1019,7 +1021,7 @@ fn land(
                 stagger(realtime, &mut ring, i, events)?;
             }
             // A stray blow from a teammate teaches no parry.
-            if t == 0 && ring.fight.fighters[i].team != 0 {
+            if teaches_defense(t, ring.fight.fighters[i].team != 0, would > 0) {
                 proficiency::defended(world, state, &source, events)?;
             }
             return Ok(());
@@ -1112,12 +1114,10 @@ fn land(
     }
     let (contested, player_yielded) = (ring.contested(), ring.fight.fighters[0].yielded);
     // A technique that lands trains, less so against much weaker opponents.
-    if hostile && !projectile {
-        if i == 0 && taken > 0 {
-            proficiency::struck(world, state, skill, &target, events)?;
-        } else if t == 0 && guarded && player_standing(state) {
-            proficiency::defended(world, state, &source_id, events)?;
-        }
+    if hostile && i == 0 && !projectile && taken > 0 {
+        proficiency::struck(world, state, skill, &target, events)?;
+    } else if teaches_defense(t, hostile, guarded) && player_standing(state) {
+        proficiency::defended(world, state, &source_id, events)?;
     }
     let combat = state.combat.as_ref().unwrap();
     if let Some(technique) = skill
@@ -1135,6 +1135,13 @@ fn land(
     } else {
         Ok(())
     }
+}
+
+/// Whether stopping a blow teaches the player's weapon: fighter `t` is the
+/// player, the blow was a foe's, and the defence prevented damage. A melee blow
+/// or a projectile alike; each ends here, so each teaches once.
+fn teaches_defense(t: usize, hostile: bool, prevented: bool) -> bool {
+    t == 0 && hostile && prevented
 }
 
 fn player_standing(state: &GameState) -> bool {
@@ -1177,4 +1184,19 @@ fn end(
         }
     }
     settle::settle(world, state, outcome, group, fallen, events)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::teaches_defense;
+
+    // Only the player looses projectiles today, so a foe's shot cannot reach
+    // this rule through a fight yet; it holds for one when it can.
+    #[test]
+    fn a_defence_teaches_only_the_player_only_against_foes_and_only_if_it_prevented() {
+        assert!(teaches_defense(0, true, true));
+        assert!(!teaches_defense(0, true, false));
+        assert!(!teaches_defense(0, false, true));
+        assert!(!teaches_defense(1, true, true));
+    }
 }
