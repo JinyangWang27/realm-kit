@@ -363,6 +363,21 @@ mod weapon_proficiency {
         let mut world = yard();
         cut(&mut world, vec!["whip"], vec!["blade"]);
         assert!(codes(&world).contains(&"missing_reference".to_string()));
+        // A sword gives the blade and an off-hand piece the shield: wearable together.
+        let mut world = yard();
+        let combat = world.world.combat.as_mut().unwrap();
+        combat.slots.push("off_hand".into());
+        cut(&mut world, vec!["balanced_sword"], vec!["blade", "shield"]);
+        let mut shield = world.items[0].clone();
+        shield.id = "buckler".into();
+        shield.equipment = Some(Equipment {
+            slots: vec!["off_hand".into()],
+            capabilities: vec!["shield".into()],
+            weapon: None,
+            ..shield.equipment.unwrap()
+        });
+        world.items.push(shield);
+        world.validate().unwrap();
         // No spear has a blade: the skill could never be used.
         let mut world = yard();
         cut(&mut world, vec!["spear"], vec!["blade"]);

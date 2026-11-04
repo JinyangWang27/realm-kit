@@ -58,7 +58,8 @@ pub(super) fn weapons(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat)
             let known = rules.is_some_and(|r| r.families.iter().any(|f| f.id == *family));
             reference(out, &skill.id, "weapon family", family, known);
         }
-        // A family no weapon of which allows the skill would lock it for good.
+        // A family no weapon of which contributes to the skill would lock it for
+        // good. Other requirements can come from other worn pieces.
         let wieldable = mastery.families.is_empty()
             || w.items
                 .iter()
@@ -67,7 +68,7 @@ pub(super) fn weapons(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat)
                     g.weapon
                         .as_ref()
                         .is_some_and(|p| mastery.families.contains(&p.family))
-                        && skill.requires.iter().all(|c| g.capabilities.contains(c))
+                        && skill.requires.iter().any(|c| g.capabilities.contains(c))
                 });
         if rules.is_none()
             || skill.requires.is_empty()

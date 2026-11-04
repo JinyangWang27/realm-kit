@@ -605,6 +605,38 @@ fn a_guard_that_prevents_no_damage_teaches_nothing() {
 }
 
 #[test]
+fn a_family_specific_skill_can_need_a_second_piece_as_well() {
+    let mut world = yard();
+    let combat = world.world.combat.as_mut().unwrap();
+    combat.slots.push("off_hand".into());
+    combat.player_equipment.push("buckler".into());
+    let cut = combat.skills.iter_mut().find(|s| s.id == "feint").unwrap();
+    cut.requires.push("shield".into());
+    cut.mastery.as_mut().unwrap().effective = 0;
+    let mut buckler = world.items[0].clone();
+    buckler.id = "buckler".into();
+    buckler.equipment = Some(Equipment {
+        slots: vec!["off_hand".into()],
+        capabilities: vec!["shield".into()],
+        weapon: None,
+        ..buckler.equipment.unwrap()
+    });
+    world.items.push(buckler);
+    world.validate().unwrap();
+    // The sword and the buckler, worn from the start, allow it together.
+    let mut engine = Engine::new(&world).unwrap();
+    engine.skill_usable("feint").unwrap();
+    // Without the buckler, the capability is missing.
+    let gear = &engine.state().combat.as_ref().unwrap().gear;
+    let buckler = *gear.iter().find(|(_, g)| g.item == "buckler").unwrap().0;
+    engine.execute(Unequip(buckler)).unwrap();
+    assert!(matches!(
+        engine.skill_usable("feint"),
+        Err(EngineError::Unwielded(_))
+    ));
+}
+
+#[test]
 fn borrowed_rank_opens_everyday_moves_and_not_direct_ones_or_unlearned_ones() {
     let mut world = yard();
     rules(&mut world).xp.target_budget = 1000;

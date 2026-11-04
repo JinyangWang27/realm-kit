@@ -1790,7 +1790,8 @@ A skill's optional `mastery` (`{ "families": ["balanced_sword"], "direct": 40, "
 asks that rank of the wielded weapon's family, besides knowing the skill. `families`, if
 any, are the only families it can be used with (`missing_reference` for an unknown one).
 It needs weapon proficiency in the world, a required capability, and, with `families`, a
-weapon of one of them that provides what the skill requires (`invalid_skill_mastery`). Everything here
+weapon of one of them that provides one of its required capabilities; the rest may come
+from other worn pieces (`invalid_skill_mastery`). Everything here
 is optional and absent by default, and worlds without it are unchanged.
 
 ### Drawn weapons
