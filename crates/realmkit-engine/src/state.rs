@@ -216,10 +216,6 @@ fn is_zero(value: &u64) -> bool {
     *value == 0
 }
 
-fn no_cut(value: &u32) -> bool {
-    *value == 0
-}
-
 /// The player's drawn weapon, and the steps to its full and shortest draws
 /// at their speed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -289,10 +285,10 @@ pub enum RealtimeAction {
         until: u64,
         /// Whether this attack has landed; each lands at most once.
         connected: bool,
-        /// Percent off the recovery to come, fixed when the attack was
-        /// committed: a rank it earns serves only later attacks.
-        #[serde(default, skip_serializing_if = "no_cut")]
-        recovery_cut: u32,
+        /// How long its later phases last, fixed when it was committed:
+        /// speed, gear or rank that change mid-attack serve only later ones.
+        active_steps: u64,
+        recovery_steps: u64,
     },
     /// A guard, which stops hits from step `ready_at` until it is lowered.
     Guard { ready_at: u64 },

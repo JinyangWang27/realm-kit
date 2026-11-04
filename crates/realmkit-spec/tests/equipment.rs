@@ -334,12 +334,48 @@ mod weapon_proficiency {
     }
 
     #[test]
+    fn a_challenge_and_a_margin_are_on_the_rank_scale() {
+        for edit in [
+            |w: &mut WeaponXp| w.trivial_margin = 0,
+            |w: &mut WeaponXp| w.trivial_margin = 101,
+            |w: &mut WeaponXp| w.challenge_per_level = 101,
+        ] {
+            let mut world = yard();
+            edit(&mut rules(&mut world).xp);
+            assert!(codes(&world).contains(&"invalid_proficiency_xp".to_string()));
+        }
+        let mut world = yard();
+        let partner = world.characters.iter_mut().find(|c| c.id == "recruit");
+        partner.unwrap().combat.as_mut().unwrap().weapon_challenge = Some(101);
+        assert!(codes(&world).contains(&"invalid_weapon_challenge".to_string()));
+    }
+
+    #[test]
+    fn a_skills_families_exist_and_one_of_their_weapons_allows_it() {
+        let cut = |world: &mut WorldSpec, families: Vec<&str>, requires: Vec<&str>| {
+            let combat = world.world.combat.as_mut().unwrap();
+            let skill = combat.skills.iter_mut().find(|s| s.id == "master_cut");
+            let skill = skill.unwrap();
+            skill.mastery.as_mut().unwrap().families =
+                families.into_iter().map(Into::into).collect();
+            skill.requires = requires.into_iter().map(Into::into).collect();
+        };
+        let mut world = yard();
+        cut(&mut world, vec!["whip"], vec!["blade"]);
+        assert!(codes(&world).contains(&"missing_reference".to_string()));
+        // No spear has a blade: the skill could never be used.
+        let mut world = yard();
+        cut(&mut world, vec!["spear"], vec!["blade"]);
+        assert!(codes(&world).contains(&"invalid_skill_mastery".to_string()));
+    }
+
+    #[test]
     fn names_are_prose_and_a_world_without_the_block_keeps_its_revision() {
         let world = yard();
         let texts = world.texts();
         assert_eq!(
             texts["world.combat.weapon_proficiency.families.balanced_sword.name"],
-            "Sword"
+            "Balanced sword"
         );
         let mut renamed = world.clone();
         rules(&mut renamed).families[0].name = "剑".into();

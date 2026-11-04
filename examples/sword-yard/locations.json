@@ -3,7 +3,7 @@
     "id": "yard",
     "name": "The Sword Yard",
     "description": "Packed earth, a rack of weapons, and people willing to be hit, up to a point.",
-    "characters": ["sparring_partner", "veteran", "straw_man"],
+    "characters": ["sparring_partner", "veteran", "recruit", "straw_man"],
     "safe": true
   }
 ]

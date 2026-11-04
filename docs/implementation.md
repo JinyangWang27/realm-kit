@@ -296,8 +296,9 @@ every capability optional:
 - [x] Weapon proficiency ([combat.md](combat.md#weapon-proficiency)): world-authored
   families, disciplines and bounded directional affinities; direct XP kept, with
   rank, borrowed rank and competence derived; attack timing cut per action and fixed
-  at commitment, never through `speed`; XP only from meaningful outcomes, with
-  falloff and a lifetime budget per foe; a skill's optional `mastery`; validation and
+  at commitment, never through `speed`, with every attack's phases settled then; XP only
+  from meaningful outcomes, falling off by weapon rank against a foe's challenge, with a
+  lifetime budget per foe; a skill's optional `mastery`, which can name its families; validation and
   save checks. The `sword-yard` example plays it in line mode. Existing packages,
   saves and walkthroughs are unchanged.
 - [x] One name for real-time combat: the command that starts a real-time

@@ -53,7 +53,7 @@ fn step(
         ring.fight.fighters[i].mp_remainder = remainder;
     }
     for i in 0..ring.fight.fighters.len() {
-        if phase(world, &realtime, &mut ring, i, now, events)? {
+        if phase(&mut ring, i, now, events)? {
             return Ok(true);
         }
     }
@@ -123,8 +123,6 @@ fn policy(
 /// Moves fighter `i`'s action on if its current state ends at `now`;
 /// whether a retreat completed.
 fn phase(
-    world: &WorldSpec,
-    realtime: &Realtime,
     ring: &mut Ring,
     i: usize,
     now: u64,
@@ -139,11 +137,11 @@ fn phase(
             phase,
             until,
             connected,
-            recovery_cut,
+            active_steps,
+            recovery_steps,
             ..
         } if *until == now => {
             let id = skill.clone();
-            let skill = id.as_deref().map(|id| world.skill(id).unwrap());
             let next = match phase {
                 AttackPhase::Windup => AttackPhase::Active,
                 AttackPhase::Active => {
@@ -162,16 +160,10 @@ fn phase(
             };
             *phase = next;
             *until = now
-                .checked_add(attack_steps(
-                    realtime,
-                    &side,
-                    skill,
-                    next,
-                    match next {
-                        AttackPhase::Recovery => *recovery_cut,
-                        _ => 0,
-                    },
-                ))
+                .checked_add(match next {
+                    AttackPhase::Active => *active_steps,
+                    _ => *recovery_steps,
+                })
                 .ok_or(EngineError::NumericLimit)?;
             events.push(Event::Swing {
                 character,

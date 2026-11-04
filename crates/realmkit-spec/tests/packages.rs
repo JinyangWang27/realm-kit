@@ -21,6 +21,7 @@ fn profile() -> CombatProfile {
         guard_hold: None,
         reaction: None,
         inert: false,
+        weapon_challenge: None,
     }
 }
 

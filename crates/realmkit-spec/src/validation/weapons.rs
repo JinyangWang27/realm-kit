@@ -39,20 +39,47 @@ pub(super) fn weapons(out: &mut Vec<Diagnostic>, w: &WorldSpec, combat: &Combat)
             );
         }
     }
+    for character in &w.characters {
+        let challenge = character.combat.as_ref().and_then(|c| c.weapon_challenge);
+        if challenge.is_some_and(|c| rules.is_none() || c > PROFICIENCY_RANK_BOUND) {
+            issue(
+                out,
+                &character.id,
+                "invalid_weapon_challenge",
+                format!("a weapon challenge needs weapon proficiency in the world and is at most {PROFICIENCY_RANK_BOUND}"),
+            );
+        }
+    }
     for skill in &combat.skills {
-        let Some(mastery) = skill.mastery else {
+        let Some(mastery) = &skill.mastery else {
             continue;
         };
+        for family in &mastery.families {
+            let known = rules.is_some_and(|r| r.families.iter().any(|f| f.id == *family));
+            reference(out, &skill.id, "weapon family", family, known);
+        }
+        // A family no weapon of which allows the skill would lock it for good.
+        let wieldable = mastery.families.is_empty()
+            || w.items
+                .iter()
+                .filter_map(|i| i.equipment.as_ref())
+                .any(|g| {
+                    g.weapon
+                        .as_ref()
+                        .is_some_and(|p| mastery.families.contains(&p.family))
+                        && skill.requires.iter().all(|c| g.capabilities.contains(c))
+                });
         if rules.is_none()
             || skill.requires.is_empty()
             || mastery.direct > PROFICIENCY_RANK_BOUND
             || mastery.effective > PROFICIENCY_RANK_BOUND
+            || !wieldable
         {
             issue(
                 out,
                 &skill.id,
                 "invalid_skill_mastery",
-                format!("a skill asking weapon rank needs weapon proficiency in the world, a required capability, and ranks up to {PROFICIENCY_RANK_BOUND}"),
+                format!("a skill's mastery needs weapon proficiency in the world, a required capability, ranks up to {PROFICIENCY_RANK_BOUND}, and a weapon of its families that allows it"),
             );
         }
     }
@@ -115,14 +142,14 @@ fn table(out: &mut Vec<Diagnostic>, owner: &str, rules: &WeaponProficiency) {
         .any(|v| *v > WEAPON_XP_BOUND)
         || xp.target_budget == 0
         || xp.hit == 0
+        || xp.challenge_per_level > PROFICIENCY_RANK_BOUND
+        || !(1..=PROFICIENCY_RANK_BOUND).contains(&xp.trivial_margin)
     {
         issue(
             out,
             owner,
             "invalid_proficiency_xp",
-            format!(
-                "a hit's XP and a foe's budget are 1 to {WEAPON_XP_BOUND}; defense XP at most that"
-            ),
+            format!("a hit's XP and a foe's budget are 1 to {WEAPON_XP_BOUND}, defense XP at most that; the challenge per level is at most {PROFICIENCY_RANK_BOUND} and the trivial margin 1 to {PROFICIENCY_RANK_BOUND}"),
         );
     }
 }

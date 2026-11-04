@@ -7,7 +7,7 @@
   {
     "id": "sparring_partner",
     "name": "The Sparring Partner",
-    "description": "She will go again as often as you like, and teaches less each time.",
+    "description": "She will go again as often as you like, and has something to teach a master, up to a point.",
     "combat": {
       "stats": {
         "hp": 2000,
@@ -18,7 +18,8 @@
         "speed": 25
       },
       "xp": 0,
-      "group": "partner"
+      "group": "partner",
+      "weapon_challenge": 100
     }
   },
   {
@@ -35,7 +36,25 @@
         "speed": 25
       },
       "xp": 0,
-      "group": "veteran"
+      "group": "veteran",
+      "weapon_challenge": 60
+    }
+  },
+  {
+    "id": "recruit",
+    "name": "The Recruit",
+    "description": "Keen, and soon has nothing left to show you.",
+    "combat": {
+      "stats": {
+        "hp": 2000,
+        "patk": 1,
+        "pdef": 1,
+        "satk": 0,
+        "sdef": 1,
+        "speed": 25
+      },
+      "xp": 0,
+      "group": "recruit"
     }
   },
   {

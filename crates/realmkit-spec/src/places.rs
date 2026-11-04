@@ -172,6 +172,10 @@ pub struct CombatProfile {
     /// target. It can still be hit, and yield.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub inert: bool,
+    /// How much weapon rank it takes to find this foe trivial, 0 to 100; absent,
+    /// it follows from its level by the world's `challenge_per_level`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weapon_challenge: Option<u32>,
 }
 
 /// A timed defence an engine-controlled fighter reacts with.

@@ -31,7 +31,7 @@
         "power": 80,
         "channel": "physical",
         "requires": ["blade"],
-        "mastery": { "effective": 40 },
+        "mastery": { "families": ["balanced_sword", "thrusting_sword"], "effective": 40 },
         "text": "{attacker} feint at {target}: {damage} damage."
       },
       {
@@ -40,7 +40,7 @@
         "power": 150,
         "channel": "physical",
         "requires": ["blade"],
-        "mastery": { "direct": 40 },
+        "mastery": { "families": ["balanced_sword"], "direct": 40 },
         "text": "{attacker} cut through {target}: {damage} damage."
       },
       {
@@ -62,7 +62,7 @@
         { "id": "polearm", "name": "Polearm" }
       ],
       "families": [
-        { "id": "balanced_sword", "name": "Sword", "affinities": { "thrusting_sword": 60 } },
+        { "id": "balanced_sword", "name": "Balanced sword", "affinities": { "thrusting_sword": 60 } },
         { "id": "thrusting_sword", "name": "Thrusting sword", "affinities": { "balanced_sword": 60 } },
         { "id": "spear", "name": "Spear" }
       ],
@@ -76,11 +76,12 @@
       "family_percent": 70,
       "windup_percent": 10,
       "recovery_percent": 15,
-      "xp": { "hit": 10, "defense": 5, "target_budget": 60 }
+      "xp": { "hit": 10, "defense": 5, "target_budget": 60, "challenge_per_level": 20, "trivial_margin": 40 }
     },
     "groups": [
       { "id": "partner", "repeatable": true, "yield_share": 1 },
       { "id": "veteran", "repeatable": true, "yield_share": 1 },
+      { "id": "recruit", "repeatable": true, "yield_share": 1 },
       { "id": "straw", "repeatable": true, "yield_share": 1 }
     ],
     "narrative": {

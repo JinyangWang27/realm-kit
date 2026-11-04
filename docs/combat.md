@@ -522,24 +522,33 @@ Rank 0 gives the authored steps exactly. Which attack uses the weapon: a basic a
 and a skill that requires something the weapon provides. Bare hands, a drawn weapon
 and a skill requiring nothing take no cut and teach nothing.
 
-**Commitment.** Cuts resolve when the attack is accepted. The wind-up's is spent then
-and the recovery's kept in the attack (`recovery_cut`), so a rank that attack earns
-serves only later attacks. Saves carry it; a load refuses one above what the player's
-current rank could give.
+**Commitment.** Every attack's phases, in every world and for every fighter, are settled
+when it is accepted: the wind-up in its `until`, the other two in `active_steps` and
+`recovery_steps`. Speed, gear or rank that change mid-attack serve only later attacks,
+and gear cannot change while one is committed anyway. Saves carry them. A load requires
+another fighter's to be exactly what its fixed stats give, and the player's to be
+between 1 and what the slowest speed gives, since their speed can have changed since.
 
 **Who.** Only the player has training. Other fighters' attacks go through the same
 `attack_steps` with no cut; authored or persistent ranks for them are later work.
 
 **Learning.** Rank teaches no move: a skill must still be known. Its optional `mastery`
 adds a rank requirement, `direct` not met by borrowing and `effective` met by it, both
-checked against the weapon in hand (`EngineError::Unpracticed`).
+checked against the weapon in hand (`EngineError::Unpracticed`). Its `families` make it
+family-specific: any other weapon, or bare hands, is refused (`EngineError::Unwielded`),
+whatever capabilities it provides and whatever rank the player has in it.
 
 **XP.** Only outcomes teach, in real time and on the timeline alike: a weapon attack
-that does damage to a foe (`xp.hit`), and in real time a parry or raised guard
-that prevents some of a foe's blow (`xp.defense`). A swing that misses, is parried or is
+that does damage to a foe (`xp.hit`), and in real time a parry of a blow that would
+have done damage, or a raised guard that prevents some of it (`xp.defense`). Each blow
+ends there, so it teaches a defence once; a further report of it is refused. A foe's
+projectile would be treated alike, but only the player looses them today. A swing that misses, is parried or is
 interrupted teaches nothing, nor does a blow on a teammate or a hit that does no damage.
-Inert targets teach nothing. The amount falls off against weaker foes by
-`xp_for_defeat`, reaching nothing five levels below. Each foe has a lifetime
+Inert targets teach nothing. How much is taught depends on the weapon, not the
+character: the whole amount while the family's effective rank is at or below the foe's
+challenge, falling evenly to nothing `xp.trivial_margin` past it, rounded down. A foe's
+challenge is its `weapon_challenge`, or its level times `xp.challenge_per_level`; the
+player's level plays no part. Each foe has a lifetime
 `target_budget` kept in `weapon_training.taught`, so restarting a fight or reloading
 makes no more; total XP is finite in any world. Victory XP is not involved, so a foe
 worth none still teaches. A gain goes to the family and, by the handling weights with

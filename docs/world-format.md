@@ -1748,14 +1748,14 @@ which it trains ([combat.md](combat.md#weapon-proficiency)):
 "weapon_proficiency": {
   "disciplines": [{ "id": "one_handed", "name": "One-handed" }],
   "families": [
-    { "id": "balanced_sword", "name": "Sword", "affinities": { "thrusting_sword": 60 } },
+    { "id": "balanced_sword", "name": "Balanced sword", "affinities": { "thrusting_sword": 60 } },
     { "id": "thrusting_sword", "name": "Thrusting sword" }
   ],
   "ranks": [{ "rank": 20, "xp": 20 }, { "rank": 100, "xp": 100 }],
   "family_percent": 70,
   "windup_percent": 10,
   "recovery_percent": 15,
-  "xp": { "hit": 10, "defense": 5, "target_budget": 60 }
+  "xp": { "hit": 10, "defense": 5, "target_budget": 60, "challenge_per_level": 20, "trivial_margin": 40 }
 }
 ```
 
@@ -1776,14 +1776,21 @@ which it trains ([combat.md](combat.md#weapon-proficiency)):
   100 (`invalid_proficiency_timing`).
 - `xp.hit` and `xp.target_budget` are 1 to 1,000,000, `xp.defense` at most that
   (`invalid_proficiency_xp`). `target_budget` is the most one foe ever teaches.
+  `trivial_margin`, 1 to 100, is how far effective rank must pass a foe's challenge for
+  it to teach nothing; `challenge_per_level`, at most 100, gives the challenge of a foe
+  with no `weapon_challenge`.
+- A character's combat profile may set `weapon_challenge`, 0 to 100
+  (`invalid_weapon_challenge`).
 - `handling` weights are positive and total 100 (`invalid_handling`), over declared
   disciplines; `family` is a declared family (`missing_reference`).
 - Pieces with a `weapon` share a slot with each other (`competing_weapons`), and a
   drawn weapon cannot have one yet (`invalid_weapon_profile`).
 
-A skill's optional `mastery` (`{ "direct": 40, "effective": 60 }`) asks that rank of
-the wielded weapon's family, besides knowing the skill; it needs weapon proficiency
-in the world and a required capability (`invalid_skill_mastery`). Everything here
+A skill's optional `mastery` (`{ "families": ["balanced_sword"], "direct": 40, "effective": 60 }`)
+asks that rank of the wielded weapon's family, besides knowing the skill. `families`, if
+any, are the only families it can be used with (`missing_reference` for an unknown one).
+It needs weapon proficiency in the world, a required capability, and, with `families`, a
+weapon of one of them that provides what the skill requires (`invalid_skill_mastery`). Everything here
 is optional and absent by default, and worlds without it are unchanged.
 
 ### Drawn weapons
