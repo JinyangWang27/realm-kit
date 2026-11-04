@@ -407,7 +407,9 @@ Capability-owned competence state used when a mechanic needs it, such as
 smithing or stealth. RealmKit does not require a universal proficiency table or
 shared numeric scale.
 
-A proficiency is distinct from a learned ability/technique.
+A proficiency is distinct from a learned ability/technique. Weapon proficiency is a
+separate system, kept per weapon family and handling discipline and trained by combat
+use rather than points; see [combat.md](combat.md#weapon-proficiency).
 
 ## Check
 

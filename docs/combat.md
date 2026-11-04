@@ -488,6 +488,69 @@ never held by a save). With the list empty, which is the default, anything
 the player wields, or nothing, attacks. Engine-controlled fighters keep their
 basic attack. No weapon ID appears in the rule; content names capabilities.
 
+### Weapon proficiency
+
+Optional, and part of the universal character core (`character/proficiency.rs`),
+distinct from point-bought `Proficiency` and from techniques. Authored in
+[world-format.md](world-format.md#weapon-proficiency). The player keeps only direct
+XP per family and discipline, in `CombatState::weapon_training`; everything else
+derives.
+
+**Rank.** A family's direct rank comes from its XP. It may borrow from another
+family's direct rank, never from borrowed rank, and only from the best single donor:
+
+```text
+borrowed(f)  = max over donors j of floor(affinity(j, f) * direct(j) / 100)
+effective(f) = direct(f) + floor((100 - direct(f)) * borrowed(f) / 100)
+```
+
+So there are no chains and no stacking, the result does not depend on content order,
+it stays within 0 to 100, and direct rank always helps. Same-family weapons share
+one direct rank.
+
+**Timing.** Competence is `(family_percent * effective + (100 - family_percent) *
+handling) / 100`, where handling is the weapon's discipline ranks weighted inside one
+layer. It cuts this attack's phases, `floor(windup_percent * competence / 100)` and
+likewise for recovery, never the active window, the parry or dodge windows, or the
+`speed` stat that draws and gear changes read:
+
+```text
+steps = max(1, ceil(length * time * (100 - cut) / (speed * 100)))
+```
+
+Rank 0 gives the authored steps exactly. Which attack uses the weapon: a basic attack,
+and a skill that requires something the weapon provides. Bare hands, a drawn weapon
+and a skill requiring nothing take no cut and teach nothing.
+
+**Commitment.** Cuts resolve when the attack is accepted. The wind-up's is spent then
+and the recovery's kept in the attack (`recovery_cut`), so a rank that attack earns
+serves only later attacks. Saves carry it; a load refuses one above what the player's
+current rank could give.
+
+**Who.** Only the player has training. Other fighters' attacks go through the same
+`attack_steps` with no cut; authored or persistent ranks for them are later work.
+
+**Learning.** Rank teaches no move: a skill must still be known. Its optional `mastery`
+adds a rank requirement, `direct` not met by borrowing and `effective` met by it, both
+checked against the weapon in hand (`EngineError::Unpracticed`).
+
+**XP.** Only outcomes teach, in real time and on the timeline alike: a weapon attack
+that does damage to a foe (`xp.hit`), and in real time a parry or raised guard
+that stops a foe's blow (`xp.defense`). A swing that misses, is parried or is
+interrupted teaches nothing, nor does a blow on a teammate or a hit that does no damage.
+Inert targets teach nothing. The amount falls off against weaker foes by
+`xp_for_defeat`, reaching nothing five levels below. Each foe has a lifetime
+`target_budget` kept in `weapon_training.taught`, so restarting a fight or reloading
+makes no more; total XP is finite in any world. Victory XP is not involved, so a foe
+worth none still teaches. A gain goes to the family and, by the handling weights with
+the remainder to the largest fractions (ties by ID), to the disciplines; the saved
+family, discipline and foe totals must agree.
+
+**Limits.** No grips, weapon sets, stances, per-hand sources or dual wielding: a
+world's trained weapons share a slot, so one is in hand. No supervised drills or
+teachers granting weapon XP. The timeline layer teaches but takes no timing effect,
+since it has no wind-up or recovery.
+
 ### Drawn weapons and projectiles
 
 A melee `Contact` is only accepted inside its attacker's active window, and a
@@ -822,6 +885,8 @@ orders included.
 
 ## Not supported yet
 
+- Weapon proficiency for drawn weapons, for anyone but the player, or from
+  teachers and drills; grips, weapon sets and stances.
 - Verified real-time hit detection: real-time contact is host-reported and only
   bounded by the engine (see [Contact and its authority](#contact-and-its-authority)).
 - Consumables during a fight; gear changes for anyone but the player, or in a

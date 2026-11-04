@@ -314,6 +314,11 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   allies and companions, who parry or dodge by an authored `reaction`.
   Windows are the engine's; moving out of reach stays the host's. The
   `fencing-hall` example plays it headless.
+- **Weapon proficiency:** world-authored weapon families and handling disciplines,
+  directly trained by meaningful use within a lifetime budget per foe, with one
+  best donor's rank borrowed across related families; bounded cuts to one attack's
+  wind-up and recovery, fixed when it is committed. The `sword-yard` example plays
+  it headless. Grips, weapon sets and stances are later milestones.
 - **Drawn weapons and projectiles (Archery-01):** a worn weapon's `ranged`
   block; `Draw`, `Loose` and `LowerDraw`, with force settled by the draw; live
   projectiles in the fight's state, independent of what their shooter does
