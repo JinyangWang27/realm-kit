@@ -20,6 +20,7 @@ mod text;
 mod time;
 mod troops;
 mod validation;
+mod weapons;
 pub use combat::*;
 pub use crafting::*;
 pub use economy::*;
@@ -32,6 +33,7 @@ pub use techniques::*;
 pub use time::*;
 pub use troops::*;
 pub use validation::{Diagnostic, Severity, SpecError};
+pub use weapons::*;
 
 pub type Id = String;
 pub const FORMAT_VERSION: u32 = 19;

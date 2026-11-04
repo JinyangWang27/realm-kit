@@ -1,0 +1,93 @@
+{
+  "format_version": 19,
+  "id": "sword_yard",
+  "name": "The Sword Yard",
+  "language": "en",
+  "start": "yard",
+  "player": "student",
+  "time": { "start": 480, "clock": "Day {day}, {hour}:{minute}", "wait": 30, "rest": 480 },
+  "combat": {
+    "special_name": "Focus",
+    "realtime": {
+      "steps_per_second": 30,
+      "windup": 30,
+      "active": 6,
+      "recovery": 30,
+      "guard_raise": 2,
+      "guard_percent": 25,
+      "retreat": 12,
+      "swap": 6,
+      "stagger": 5,
+      "parry": { "window": 6, "recovery": 8 }
+    },
+    "timeline": { "action_cost": 100000, "speed_cap": 200 },
+    "levels": [
+      { "xp": 0, "stats": { "hp": 500, "mp": 0, "patk": 10, "pdef": 5, "satk": 0, "sdef": 4, "speed": 100 } }
+    ],
+    "skills": [
+      {
+        "id": "feint",
+        "name": "Feint",
+        "power": 80,
+        "channel": "physical",
+        "requires": ["blade"],
+        "mastery": { "effective": 40 },
+        "text": "{attacker} feint at {target}: {damage} damage."
+      },
+      {
+        "id": "master_cut",
+        "name": "Master Cut",
+        "power": 150,
+        "channel": "physical",
+        "requires": ["blade"],
+        "mastery": { "direct": 40 },
+        "text": "{attacker} cut through {target}: {damage} damage."
+      },
+      {
+        "id": "shout",
+        "name": "Shout",
+        "power": 50,
+        "channel": "physical",
+        "text": "{attacker} shout at {target}: {damage} damage."
+      }
+    ],
+    "player_skills": ["feint", "master_cut", "shout"],
+    "slots": ["hands"],
+    "bare": { "hands": ["fist"] },
+    "player_equipment": ["plain_sword", "arming_sword", "rapier", "spear"],
+    "weapon_proficiency": {
+      "disciplines": [
+        { "id": "one_handed", "name": "One-handed" },
+        { "id": "two_handed", "name": "Two-handed" },
+        { "id": "polearm", "name": "Polearm" }
+      ],
+      "families": [
+        { "id": "balanced_sword", "name": "Sword", "affinities": { "thrusting_sword": 60 } },
+        { "id": "thrusting_sword", "name": "Thrusting sword", "affinities": { "balanced_sword": 60 } },
+        { "id": "spear", "name": "Spear" }
+      ],
+      "ranks": [
+        { "rank": 20, "xp": 20 },
+        { "rank": 40, "xp": 40 },
+        { "rank": 60, "xp": 60 },
+        { "rank": 80, "xp": 80 },
+        { "rank": 100, "xp": 100 }
+      ],
+      "family_percent": 70,
+      "windup_percent": 10,
+      "recovery_percent": 15,
+      "xp": { "hit": 10, "defense": 5, "target_budget": 60 }
+    },
+    "groups": [
+      { "id": "partner", "repeatable": true, "yield_share": 1 },
+      { "id": "veteran", "repeatable": true, "yield_share": 1 },
+      { "id": "straw", "repeatable": true, "yield_share": 1 }
+    ],
+    "narrative": {
+      "attack": ["{attacker} strike {target}: {damage} damage."],
+      "hurt": ["{attacker} catches {target}: {damage} damage."],
+      "victory": "{target} is down.",
+      "death": "The yard goes quiet.\nStart a new game to try again."
+    }
+  }
+}

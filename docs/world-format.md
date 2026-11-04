@@ -1738,6 +1738,54 @@ A `bare` key must be a declared slot, and a required capability must be one some
 piece or bare slot provides (`missing_reference`). All four default to empty,
 which requires and provides nothing, so worlds without them are unchanged.
 
+### Weapon proficiency
+
+The combat block's optional `weapon_proficiency` declares weapon families and
+handling disciplines by the world's own names; an equipment's `weapon` says
+which it trains ([combat.md](combat.md#weapon-proficiency)):
+
+```json
+"weapon_proficiency": {
+  "disciplines": [{ "id": "one_handed", "name": "One-handed" }],
+  "families": [
+    { "id": "balanced_sword", "name": "Sword", "affinities": { "thrusting_sword": 60 } },
+    { "id": "thrusting_sword", "name": "Thrusting sword" }
+  ],
+  "ranks": [{ "rank": 20, "xp": 20 }, { "rank": 100, "xp": 100 }],
+  "family_percent": 70,
+  "windup_percent": 10,
+  "recovery_percent": 15,
+  "xp": { "hit": 10, "defense": 5, "target_budget": 60 }
+}
+```
+
+```json
+"equipment": {
+  "slots": ["hands"],
+  "capabilities": ["blade"],
+  "weapon": { "family": "balanced_sword", "handling": { "one_handed": 100 } }
+}
+```
+
+- `affinities` are the percent of this family's direct rank each named family
+  may borrow, 1 to 100, directional (`invalid_affinity`).
+- `ranks` rise strictly, ranks 1 to 100 (`invalid_proficiency_ranks`). Rank is the
+  highest entry whose XP is reached, else 0.
+- `family_percent` is the share of an attack's competence that is family rank;
+  `windup_percent` and `recovery_percent`, at most 50, are the cuts at competence
+  100 (`invalid_proficiency_timing`).
+- `xp.hit` and `xp.target_budget` are 1 to 1,000,000, `xp.defense` at most that
+  (`invalid_proficiency_xp`). `target_budget` is the most one foe ever teaches.
+- `handling` weights are positive and total 100 (`invalid_handling`), over declared
+  disciplines; `family` is a declared family (`missing_reference`).
+- Pieces with a `weapon` share a slot with each other (`competing_weapons`), and a
+  drawn weapon cannot have one yet (`invalid_weapon_profile`).
+
+A skill's optional `mastery` (`{ "direct": 40, "effective": 60 }`) asks that rank of
+the wielded weapon's family, besides knowing the skill; it needs weapon proficiency
+in the world and a required capability (`invalid_skill_mastery`). Everything here
+is optional and absent by default, and worlds without it are unchanged.
+
 ### Drawn weapons
 
 A worn piece with a `ranged` block is drawn and loosed in a real-time fight

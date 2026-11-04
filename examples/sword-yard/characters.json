@@ -1,0 +1,59 @@
+[
+  {
+    "id": "student",
+    "name": "You",
+    "description": "A student with a rack of weapons to try."
+  },
+  {
+    "id": "sparring_partner",
+    "name": "The Sparring Partner",
+    "description": "She will go again as often as you like, and teaches less each time.",
+    "combat": {
+      "stats": {
+        "hp": 2000,
+        "patk": 1,
+        "pdef": 1,
+        "satk": 0,
+        "sdef": 1,
+        "speed": 25
+      },
+      "xp": 0,
+      "group": "partner"
+    }
+  },
+  {
+    "id": "veteran",
+    "name": "The Veteran",
+    "description": "A second opinion, with a budget of his own.",
+    "combat": {
+      "stats": {
+        "hp": 2000,
+        "patk": 1,
+        "pdef": 1,
+        "satk": 0,
+        "sdef": 1,
+        "speed": 25
+      },
+      "xp": 0,
+      "group": "veteran"
+    }
+  },
+  {
+    "id": "straw_man",
+    "name": "The Straw Man",
+    "description": "Stands and takes it, and teaches nothing.",
+    "combat": {
+      "stats": {
+        "hp": 2000,
+        "patk": 1,
+        "pdef": 1,
+        "satk": 0,
+        "sdef": 1,
+        "speed": 25
+      },
+      "xp": 0,
+      "inert": true,
+      "group": "straw"
+    }
+  }
+]

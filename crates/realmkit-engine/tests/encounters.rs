@@ -375,6 +375,7 @@ fn skill(id: &str, power: u32, channel: Channel, cost: u32, resource: Resource) 
         requires: Vec::new(),
         impact: 0,
         poise: 0,
+        mastery: None,
     }
 }
 

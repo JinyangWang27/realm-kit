@@ -293,6 +293,13 @@ every capability optional:
   allies and companions; save checks for every new state. The
   `fencing-hall` example plays it in line mode. Existing packages, saves and
   walkthroughs are unchanged.
+- [x] Weapon proficiency ([combat.md](combat.md#weapon-proficiency)): world-authored
+  families, disciplines and bounded directional affinities; direct XP kept, with
+  rank, borrowed rank and competence derived; attack timing cut per action and fixed
+  at commitment, never through `speed`; XP only from meaningful outcomes, with
+  falloff and a lifetime budget per foe; a skill's optional `mastery`; validation and
+  save checks. The `sword-yard` example plays it in line mode. Existing packages,
+  saves and walkthroughs are unchanged.
 - [x] One name for real-time combat: the command that starts a real-time
   fight is `Command::EngageRealtime` (serialized `engage_realtime`, the
   CLI's `fight <id>`, the menu's `Fight <name>`), formerly `Duel`, and a

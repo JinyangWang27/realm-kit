@@ -377,6 +377,7 @@ fn realtime_actions(
         // Unaffordable skills stay listed, so the player sees why they are not usable.
         actions.extend(skills.iter().map(|s| {
             let usable = gear::wields(&wielded, s).is_ok()
+                && character::proficiency::qualifies(world, combat, s).is_ok()
                 && encounter::check_skill(&combat.vitals, pools, combat.level, s).is_ok();
             let skill = s.id.clone();
             let target = target.clone();
@@ -494,6 +495,7 @@ fn fight_actions(
                 target: foe.character.clone(),
             },
             available: gear::wields(&wielded, s).is_ok()
+                && character::proficiency::qualifies(world, combat, s).is_ok()
                 && encounter::check_skill(player, pools, level, s).is_ok(),
         }));
     }

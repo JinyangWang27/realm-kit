@@ -497,6 +497,21 @@ pub fn events(
                 "{} +{amount}",
                 world.technique(technique).unwrap().name
             )?,
+            Event::WeaponTrained { family, amount } => {
+                writeln!(output, "{} +{amount}", weapon_family(world, family))?
+            }
+            Event::WeaponRankUp { family, rank } => writeln!(
+                output,
+                "{}",
+                paint.good(&format!("{}: rank {rank}!", weapon_family(world, family)))
+            )?,
+            Event::DisciplineRankUp { discipline, rank } => {
+                let rules = world.combat().and_then(|c| c.weapon_proficiency.as_ref());
+                let name = rules
+                    .and_then(|r| r.disciplines.iter().find(|d| d.id == *discipline))
+                    .map_or(discipline.as_str(), |d| d.name.as_str());
+                writeln!(output, "{}", paint.good(&format!("{name}: rank {rank}!")))?
+            }
             Event::TechniquesViewed => panels::techniques(output, engine, paint)?,
             Event::EncounterStarted { opponents } => {
                 let names: Vec<_> = opponents.iter().map(|id| name(id).as_str()).collect();
@@ -984,6 +999,12 @@ pub fn events(
         }
     }
     Ok(())
+}
+
+fn weapon_family<'w>(world: &'w realmkit_spec::WorldSpec, id: &'w str) -> &'w str {
+    let rules = world.combat().and_then(|c| c.weapon_proficiency.as_ref());
+    let family = rules.and_then(|r| r.families.iter().find(|f| f.id == id));
+    family.map_or(id, |f| f.name.as_str())
 }
 
 #[cfg(test)]

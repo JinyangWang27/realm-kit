@@ -4,7 +4,7 @@
 //! vitals of everyone but the player) is in the snapshot.
 
 use super::*;
-use crate::character::profile;
+use crate::character::{proficiency, profile};
 use crate::realtime;
 use realmkit_spec::{Combat, Reaction};
 
@@ -120,7 +120,10 @@ pub(super) fn check(
                 .find(|s| &s.id == id)
                 .copied()
                 .or_else(|| superseded(world, combat, id))
-                .filter(|s| gear::wields(&wielded, s).is_ok()),
+                .filter(|s| {
+                    gear::wields(&wielded, s).is_ok()
+                        && proficiency::qualifies(world, combat, s).is_ok()
+                }),
             _ => profile(world, &f.character)
                 .skills
                 .contains(id)
@@ -144,6 +147,7 @@ pub(super) fn check(
                 phase,
                 until,
                 connected,
+                recovery_cut,
             } => {
                 let skill = skill.as_ref().map(usable);
                 // Nor does a basic attack begin without what it needs.
@@ -151,8 +155,15 @@ pub(super) fn check(
                 let aimed = fight
                     .index(target)
                     .is_some_and(|t| fight.fighters[t].team != f.team);
+                // Rank never falls and the weapon stays in hand while
+                // committed, so today's standing bounds the cut it began with.
+                let bound = (i == 0)
+                    .then(|| proficiency::standing(world, combat))
+                    .flatten()
+                    .map_or(0, |w| w.recovery_cut);
                 aimed
                     && basic
+                    && *recovery_cut <= bound
                     && skill.is_none_or(|s| s.is_some_and(|s| s.level <= side.level))
                     && *until > now
                     && until - now <= longest(realtime, side, i, skill.flatten(), *phase)
@@ -293,5 +304,5 @@ fn longest(
     if i == 0 {
         slowest.stats.speed = 1;
     }
-    realtime::attack_steps(realtime, &slowest, skill, phase)
+    realtime::attack_steps(realtime, &slowest, skill, phase, 0)
 }

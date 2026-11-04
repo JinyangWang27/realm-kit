@@ -181,6 +181,11 @@ its short window and leaves the attacker staggered for your counter; `dodge`
 lets a blow find nothing while its window is open. Either one, mistimed,
 leaves you committed and unprotected for a few steps. Foes and companions
 can parry or dodge by the same rules.
+Weapons can train by use (`examples/sword-yard`): `techniques` lists your rank in
+each family. Two swords of one family share a rank, a related family borrows part of
+it, and an unrelated weapon starts from nothing. Landing blows and turning them aside
+teaches, up to what each opponent has to teach, and a practised hand winds up and
+recovers a little quicker.
 A worn bow draws in real time too (`examples/archery-range`): `draw`, `step`
 and `loose` shoot, a short draw hits softer than a full one, and each shot
 flies on by itself, however many are in the air, until the host reports where

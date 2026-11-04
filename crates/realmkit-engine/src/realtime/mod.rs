@@ -21,7 +21,7 @@
 //! see `docs/combat.md`.
 
 use super::*;
-use crate::character::{profile, resources, strike, Pools};
+use crate::character::{proficiency, profile, resources, strike, Pools};
 use realmkit_spec::{
     Group, RangedWeapon, Reaction, Realtime, Targeting, TimedDefense, ADVANCE_BOUND,
 };
@@ -112,12 +112,15 @@ pub(crate) fn phase_steps(length: u32, speed: u32, time: u32) -> u64 {
         .max(1)
 }
 
-/// The steps `phase` lasts for an attack with `skill` (or a basic attack).
+/// The steps `phase` lasts for an attack with `skill` (or a basic attack),
+/// with `cut` percent off it. Weapon proficiency shortens only this attack's
+/// phases, never the fighter's speed, which draws and gear changes read too.
 pub(crate) fn attack_steps(
     realtime: &Realtime,
     side: &Side,
     skill: Option<&Skill>,
     phase: AttackPhase,
+    cut: u32,
 ) -> u64 {
     let length = match phase {
         AttackPhase::Windup => realtime.windup,
@@ -125,7 +128,9 @@ pub(crate) fn attack_steps(
         AttackPhase::Recovery => realtime.recovery,
     };
     let time = skill.map_or(side.basic.1, |s| s.time);
-    phase_steps(length, side.stats.speed, time)
+    (u64::from(length) * u64::from(time) * u64::from(100 - cut))
+        .div_ceil(u64::from(side.stats.speed.max(1)) * 100)
+        .max(1)
 }
 
 /// Steps to a full draw and to the shortest draw that can be loosed, for a
@@ -308,6 +313,16 @@ pub(crate) fn intent(
             (known, gear::capabilities(world, c), worn_pieces(c))
         })
         .unwrap_or_default();
+    let snapshot = state.combat.clone();
+    let skill_ok = |skill: &Skill| match &snapshot {
+        Some(c) => proficiency::qualifies(world, c, skill),
+        None => Ok(()),
+    };
+    let cuts_for = |skill: Option<&Skill>| {
+        snapshot
+            .as_ref()
+            .map_or((0, 0), |c| proficiency::cuts(world, c, skill))
+    };
     let mut ring = ring(world, state)?;
     let now = ring.fight.step;
     let free = matches!(
@@ -342,12 +357,14 @@ pub(crate) fn intent(
             let target = aim(&ring, target)?;
             if let Some(skill) = skill {
                 gear::wields(&wielded, skill)?;
+                skill_ok(skill)?;
                 let side = ring.sides[0];
                 encounter::check_skill(ring.player, side.pools, side.level, skill)?;
             } else {
                 gear::attacks(world, &wielded)?;
             }
-            begin(&realtime, &mut ring, 0, skill, target, events)
+            let cuts = cuts_for(skill);
+            begin(&realtime, &mut ring, 0, skill, target, cuts, events)
         }
         Intent::Guard => {
             if ring.fight.fighters[0].action != RealtimeAction::Ready {
@@ -783,13 +800,17 @@ fn join(
     Ok(())
 }
 
-/// Begins fighter `i`'s attack on `target` now, paying an affordable skill's costs.
+/// Begins fighter `i`'s attack on `target` now, paying an affordable skill's
+/// costs. `cuts` are the percent off its wind-up and recovery, fixed here for
+/// the whole attack.
+#[allow(clippy::too_many_arguments)]
 fn begin(
     realtime: &Realtime,
     ring: &mut Ring,
     i: usize,
     skill: Option<&Skill>,
     target: Id,
+    (windup_cut, recovery_cut): (u32, u32),
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     let side = ring.sides[i];
@@ -797,7 +818,13 @@ fn begin(
     let until = ring
         .fight
         .step
-        .checked_add(attack_steps(realtime, &side, skill, AttackPhase::Windup))
+        .checked_add(attack_steps(
+            realtime,
+            &side,
+            skill,
+            AttackPhase::Windup,
+            windup_cut,
+        ))
         .ok_or(EngineError::NumericLimit)?;
     if let Some(skill) = skill {
         resources::spend(ring.vitals_mut(i), &character, skill, events);
@@ -808,6 +835,7 @@ fn begin(
         phase: AttackPhase::Windup,
         until,
         connected: false,
+        recovery_cut,
     };
     events.push(Event::Swing {
         character,
@@ -968,6 +996,7 @@ fn land(
     let now = ring.fight.step;
     let source = ring.fight.fighters[i].character.clone();
     let target = ring.fight.fighters[t].character.clone();
+    let source_id = source.clone();
     match ring.fight.fighters[t].action {
         RealtimeAction::Dodge { open_until, .. } if now < open_until => {
             events.push(Event::Evaded {
@@ -984,12 +1013,16 @@ fn land(
             };
             events.push(Event::Parried {
                 character: target,
-                attacker: source,
+                attacker: source.clone(),
             });
-            return match projectile {
-                true => Ok(()),
-                false => stagger(realtime, &mut ring, i, events),
-            };
+            if !projectile {
+                stagger(realtime, &mut ring, i, events)?;
+            }
+            // A stray blow from a teammate teaches no parry.
+            if t == 0 && ring.fight.fighters[i].team != 0 {
+                proficiency::defended(world, state, &source, events)?;
+            }
+            return Ok(());
         }
         _ => {}
     }
@@ -1000,12 +1033,14 @@ fn land(
     let modifier = defender.guard(attack.channel);
     let (mut dealt, _) = strike::damage_of(&stats, &defender.stats, attack, modifier, &mut None)?;
     let guard = &ring.fight.fighters[t].action;
+    let mut guarded = false;
     if matches!(guard, RealtimeAction::Guard { ready_at } if *ready_at <= now) {
         let through = (u64::from(dealt) * u64::from(realtime.guard_percent) / 100) as u32;
         events.push(Event::Blocked {
             character: target.clone(),
             prevented: dealt - through,
         });
+        guarded = dealt > through;
         dealt = through;
     }
     // A stray blow on a teammate earns neither Rage for acting nor training.
@@ -1077,6 +1112,13 @@ fn land(
     }
     let (contested, player_yielded) = (ring.contested(), ring.fight.fighters[0].yielded);
     // A technique that lands trains, less so against much weaker opponents.
+    if hostile && !projectile {
+        if i == 0 && taken > 0 {
+            proficiency::struck(world, state, skill, &target, events)?;
+        } else if t == 0 && guarded && player_standing(state) {
+            proficiency::defended(world, state, &source_id, events)?;
+        }
+    }
     let combat = state.combat.as_ref().unwrap();
     if let Some(technique) = skill
         .filter(|_| i == 0 && hostile)
@@ -1093,6 +1135,10 @@ fn land(
     } else {
         Ok(())
     }
+}
+
+fn player_standing(state: &GameState) -> bool {
+    state.combat.as_ref().is_some_and(|c| c.vitals.hp > 0)
 }
 
 /// Ends the fight and settles its outcome, once. A victory rewards every

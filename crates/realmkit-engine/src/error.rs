@@ -66,6 +66,8 @@ pub enum EngineError {
     SkillLocked(Id),
     #[error("what you wield does not allow {0}")]
     Unwielded(Id),
+    #[error("you lack the weapon rank for {0}")]
+    Unpracticed(Id),
     #[error("what you wield cannot make a basic attack")]
     AttackUnwielded,
     #[error("those pieces were not worn together")]

@@ -117,7 +117,7 @@ fn policy(
     };
     let skill = encounter::choose(world, ring.vitals(i), character);
     let target = ring.fight.fighters[t].character.clone();
-    begin(realtime, ring, i, skill, target, events)
+    begin(realtime, ring, i, skill, target, (0, 0), events)
 }
 
 /// Moves fighter `i`'s action on if its current state ends at `now`;
@@ -139,6 +139,7 @@ fn phase(
             phase,
             until,
             connected,
+            recovery_cut,
             ..
         } if *until == now => {
             let id = skill.clone();
@@ -161,7 +162,16 @@ fn phase(
             };
             *phase = next;
             *until = now
-                .checked_add(attack_steps(realtime, &side, skill, next))
+                .checked_add(attack_steps(
+                    realtime,
+                    &side,
+                    skill,
+                    next,
+                    match next {
+                        AttackPhase::Recovery => *recovery_cut,
+                        _ => 0,
+                    },
+                ))
                 .ok_or(EngineError::NumericLimit)?;
             events.push(Event::Swing {
                 character,
