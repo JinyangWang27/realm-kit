@@ -324,6 +324,10 @@ every capability optional:
   nothing (`NotWornTogether`); `attack_requires` gives the basic attack a
   capability requirement (`AttackUnwielded`), in both fight layers, menus and
   saves. Packages without it are unchanged.
+- [x] Fights a host runs itself ([combat.md](combat.md#fights-a-host-runs-itself)):
+  `HostFight`, `SettleFight` and `Stance::Hosted` authorize a fight, suspend the
+  world and commit one checked settlement; `Engine::player_base_stats` and
+  `weapon_proficiency.hosted` leave gear changes and weapon training to the host.
 - [ ] Spatial authority for real-time contact, redirection and directional
   parries; companions in turn-based encounters and battles, and
   companion progression and gear.

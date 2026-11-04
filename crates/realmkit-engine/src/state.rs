@@ -47,6 +47,21 @@ pub enum Stance {
     Realtime(RealtimeEncounter),
     /// Leading a mass battle.
     Battle(BattleState),
+    /// In a fight the host runs itself. While it lasts the host holds the
+    /// fight's live vitals, and every value here is from before it.
+    Hosted(HostedFight),
+}
+
+/// A fight a host is running: the engine knows only that it is under way and
+/// whom it began against.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HostedFight {
+    /// Names this fight for its settlement: the turn it began on, so no two
+    /// fights of a playthrough share one.
+    pub id: u64,
+    /// Whoever engaging brought in, in the order any other fight lists them.
+    pub opponents: Vec<Id>,
 }
 
 /// A mass battle between the player's side (0) and an army (1), paused

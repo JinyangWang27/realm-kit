@@ -1759,6 +1759,10 @@ which it trains ([combat.md](combat.md#weapon-proficiency)):
 }
 ```
 
+With `"hosted": true` the host keeps the training: the engine still validates the
+taxonomy, but teaches nothing, gates no skill by rank and changes no attack's
+timing, and a save holding training of its own is refused.
+
 ```json
 "equipment": {
   "slots": ["hands"],

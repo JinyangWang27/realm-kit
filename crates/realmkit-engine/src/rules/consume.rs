@@ -62,6 +62,8 @@ pub(crate) fn consume(
         }
         Stance::Fighting(_) => encounter::consume_turn(world, state, hp, mp, events),
         // The real-time fight and battle gates refuse items before they get here.
-        Stance::Realtime(_) | Stance::Battle(_) => Err(EngineError::InEncounter),
+        Stance::Realtime(_) | Stance::Battle(_) | Stance::Hosted(_) => {
+            Err(EngineError::InEncounter)
+        }
     }
 }

@@ -116,7 +116,7 @@ pub(super) fn defeated(state: &GameState, id: &str) -> bool {
 pub(super) fn fighting(state: &GameState) -> Option<&Encounter> {
     match &state.combat.as_ref()?.stance {
         Stance::Fighting(encounter) => Some(encounter),
-        Stance::Exploring | Stance::Realtime(_) | Stance::Battle(_) => None,
+        Stance::Exploring | Stance::Realtime(_) | Stance::Battle(_) | Stance::Hosted(_) => None,
     }
 }
 
@@ -125,6 +125,13 @@ pub(super) fn in_realtime(state: &GameState) -> bool {
         .combat
         .as_ref()
         .is_some_and(|c| matches!(c.stance, Stance::Realtime(_)))
+}
+
+fn hosting(state: &GameState) -> bool {
+    state
+        .combat
+        .as_ref()
+        .is_some_and(|c| matches!(c.stance, Stance::Hosted(_)))
 }
 
 fn leading(state: &GameState) -> bool {
@@ -238,6 +245,11 @@ pub(super) fn execute(
     if in_realtime(state) && !panel && !realtime {
         return Err(EngineError::InEncounter);
     }
+    // In a host-run fight only its settlement and panels are possible.
+    let settlement = matches!(command, Command::SettleFight(_));
+    if hosting(state) && !panel && !settlement {
+        return Err(EngineError::InEncounter);
+    }
     // In a battle only orders and panels are possible.
     let order = matches!(command, Command::Order(_) | Command::Autoresolve);
     if leading(state) && !panel && !order {
@@ -312,6 +324,8 @@ pub(super) fn execute(
             worn,
         } => realtime::opening_shot(world, state, target, drawn, worn, &mut events)?,
         Command::Intent(intent) => realtime::intent(world, state, intent, &mut events)?,
+        Command::HostFight(id) => hosted::begin(world, state, id, &mut events)?,
+        Command::SettleFight(settlement) => hosted::settle(world, state, settlement, &mut events)?,
         Command::Tactic { companion, order } => {
             party::tactic(world, state, companion, order, &mut events)?
         }

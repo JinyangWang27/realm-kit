@@ -772,6 +772,27 @@ delta or host physics callback is read.
 - Consumables during a fight; host control of an ally or companion beyond
   orders; companion movement for `follow` and `hold` (the host's).
 
+## Fights a host runs itself
+
+A host with its own fight simulation can use the world without the engine's
+real-time layer. `HostFight(id)` authorizes a fight under the same conditions as
+any other personal fight and sets `Stance::Hosted`; until it ends the world
+stands still and only panels and `SettleFight` are possible. While it runs, the
+host holds the fight's live vitals, gear worn and companion orders; the state
+keeps the values from before it for recovery only, never as a second live copy.
+
+`SettleFight(FightSettlement)` hands back the outcome, who fell, the player's
+vitals and worn gear, and each companion the fight changed. The engine checks all
+of it against what the world allows, refuses it whole otherwise, and commits it
+through the settlement every personal fight ends in. The settlement names the
+fight by `HostedFight::id`, and the stance is gone before anything is granted, so
+a repeated settlement finds no fight and grants nothing. The engine cannot tell
+whether the account of the fight is true, only that the world could hold it.
+
+`Engine::player_base_stats` gives the player's stats before gear, for a host whose
+fights let gear change. `weapon_proficiency.hosted` leaves weapon training to the
+host: the turn-based layer then teaches nothing and gates no skill by rank.
+
 ## Named companions and tactical orders
 
 A named companion is a unique character (`"companion": {}` on a character

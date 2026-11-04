@@ -5,6 +5,7 @@ use super::*;
 
 mod battle;
 mod combat;
+pub(crate) use combat::within;
 mod realtime;
 mod retinue;
 

@@ -22,6 +22,11 @@ pub struct WeaponProficiency {
     /// Percent taken off an attack's recovery at competence 100, proportionally.
     pub recovery_percent: u32,
     pub xp: WeaponXp,
+    /// The host keeps the training: the engine still checks this taxonomy but
+    /// teaches nothing, gates no skill by rank, changes no attack's timing, and
+    /// refuses a save holding any training of its own.
+    #[serde(default, skip_serializing_if = "crate::time::is_false")]
+    pub hosted: bool,
 }
 
 /// Motor coordination common to a way of holding a weapon, such as one-handed
