@@ -169,6 +169,16 @@ fn an_account_the_world_could_not_have_is_refused_whole() {
             )]),
             ..fair.clone()
         },
+        FightSettlement {
+            companions: BTreeMap::from([(
+                "nobody".into(),
+                SettledCompanion {
+                    vitals: Some(fair.vitals),
+                    order: TacticalOrder::Hold,
+                },
+            )]),
+            ..fair.clone()
+        },
     ];
     for settlement in bad {
         let refused = engine.execute(SettleFight(settlement.clone()));

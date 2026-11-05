@@ -132,6 +132,10 @@ fn check_companions(
 ) -> Result<(), &'static str> {
     let rules = world.combat().unwrap();
     let ok = companions.iter().all(|(id, companion)| {
+        // First: only a party member is sure to have a profile to look up.
+        if !rules::in_party(state, id) {
+            return false;
+        }
         let ward = match &companion.order {
             TacticalOrder::Defend { ally } => {
                 *ally == world.world.player || (ally != id && rules::in_party(state, ally))
@@ -143,7 +147,7 @@ fn check_companions(
             let pools = resources::profile_pools(world, profile);
             save::within(rules, &v, &profile.stats, pools)
         });
-        rules::in_party(state, id) && ward && vitals
+        ward && vitals
     });
     ok.then_some(())
         .ok_or("a companion's account does not hold")
