@@ -205,6 +205,8 @@ pub enum EngineError {
     NumericLimit,
     #[error("answer each start question, in order, with one of its options")]
     StartChoices,
+    #[error("the fight's settlement was refused: {0}")]
+    InvalidSettlement(String),
     #[error("save cannot be loaded: {0}")]
     InvalidSave(String),
 }

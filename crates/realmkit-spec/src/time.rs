@@ -220,7 +220,7 @@ pub fn clock_values(time: &WorldTime, minute: u64) -> Vec<(&'static str, String)
     values
 }
 
-fn is_false(value: &bool) -> bool {
+pub(crate) fn is_false(value: &bool) -> bool {
     !value
 }
 

@@ -28,8 +28,10 @@ pub struct WeaponStanding {
     pub recovery_cut: u32,
 }
 
+/// The rules this engine applies: none where the host keeps weapon training.
 fn rules(world: &WorldSpec) -> Option<&WeaponProficiency> {
-    world.combat()?.weapon_proficiency.as_ref()
+    let rules = world.combat()?.weapon_proficiency.as_ref()?;
+    (!rules.hosted).then_some(rules)
 }
 
 /// The highest rank `xp` reaches.
@@ -152,6 +154,10 @@ pub(crate) fn qualifies(
     let Some(mastery) = &skill.mastery else {
         return Ok(());
     };
+    // Whoever keeps the training judges what it allows.
+    if rules(world).is_none() {
+        return Ok(());
+    }
     let weapon = in_hand(world, combat);
     let allowed = match weapon {
         Some(weapon) => allows_family(weapon, skill),

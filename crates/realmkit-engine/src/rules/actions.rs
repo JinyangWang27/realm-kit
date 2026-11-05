@@ -31,6 +31,7 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
     match state.combat.as_ref().map(|c| &c.stance) {
         Some(Stance::Battle(battle)) => return battle_actions(world, battle, panels),
         Some(Stance::Realtime(fight)) => return realtime_actions(world, state, fight, panels),
+        Some(Stance::Hosted(_)) => return panels,
         _ => {}
     }
     let location = world.location(&state.player.location).unwrap();

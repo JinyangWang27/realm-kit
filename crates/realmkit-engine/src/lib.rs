@@ -15,6 +15,7 @@ mod encounter;
 mod error;
 mod formulas;
 mod gear;
+mod hosted;
 mod realtime;
 mod rng;
 mod rules;
@@ -222,6 +223,17 @@ impl<'w> Engine<'w> {
         let combat = self.state.combat.as_ref()?;
         Some(character::player_stats(self.world, combat))
     }
+    /// The player's stats before what they wear: the level table, allocated
+    /// points and technique passives. A host that runs a fight itself and
+    /// lets gear change in it adds the gear to these.
+    pub fn player_base_stats(&self) -> Option<Stats> {
+        let combat = self.state.combat.as_ref()?;
+        let mut bare = combat.clone();
+        for gear in bare.gear.values_mut() {
+            gear.equipped = false;
+        }
+        Some(character::player_stats(self.world, &bare))
+    }
     /// The resources the player uses and their ceilings; `None` without combat.
     pub fn player_pools(&self) -> Option<Pools> {
         let stats = self.player_stats()?;
@@ -305,7 +317,16 @@ impl<'w> Engine<'w> {
     pub fn realtime(&self) -> Option<&RealtimeEncounter> {
         match &self.state.combat.as_ref()?.stance {
             Stance::Realtime(fight) => Some(fight),
-            Stance::Exploring | Stance::Fighting(_) | Stance::Battle(_) => None,
+            Stance::Exploring | Stance::Fighting(_) | Stance::Battle(_) | Stance::Hosted(_) => None,
+        }
+    }
+    /// The fight a host is running itself, if any.
+    pub fn hosted_fight(&self) -> Option<&HostedFight> {
+        match &self.state.combat.as_ref()?.stance {
+            Stance::Hosted(fight) => Some(fight),
+            Stance::Exploring | Stance::Fighting(_) | Stance::Realtime(_) | Stance::Battle(_) => {
+                None
+            }
         }
     }
     /// The drawn weapon the player wears, if any, with its draw timing at
@@ -342,7 +363,9 @@ impl<'w> Engine<'w> {
     pub fn battle(&self) -> Option<&BattleState> {
         match &self.state.combat.as_ref()?.stance {
             Stance::Battle(battle) => Some(battle),
-            Stance::Exploring | Stance::Fighting(_) | Stance::Realtime(_) => None,
+            Stance::Exploring | Stance::Fighting(_) | Stance::Realtime(_) | Stance::Hosted(_) => {
+                None
+            }
         }
     }
     /// The next `n` actors, projected as if every action took a basic

@@ -27,7 +27,10 @@ pub(super) fn check(
         "player vitals exceed their maximums",
     )?;
     // Rage that belongs to one fight is gone outside it.
-    let fighting = matches!(combat.stance, Stance::Fighting(_) | Stance::Realtime(_));
+    let fighting = matches!(
+        combat.stance,
+        Stance::Fighting(_) | Stance::Realtime(_) | Stance::Hosted(_)
+    );
     ensure(
         fighting
             || rules.resources.rage_carries
@@ -39,6 +42,7 @@ pub(super) fn check(
         Stance::Fighting(encounter) => encounter_state(world, state, combat, rules, encounter)?,
         Stance::Realtime(fight) => super::realtime::check(world, state, combat, rules, fight)?,
         Stance::Battle(battle) => super::battle::check(world, state, combat, battle)?,
+        Stance::Hosted(fight) => hosted(world, state, combat, fight)?,
     }
     ensure(
         combat.xp >= progress.xp_floor
@@ -47,10 +51,34 @@ pub(super) fn check(
     )
 }
 
+/// A host-run fight the world could have authorized: under way since an
+/// earlier turn, against someone present and whoever engaging them brings in,
+/// with the player alive and no conversation open.
+fn hosted(
+    world: &WorldSpec,
+    state: &GameState,
+    combat: &CombatState,
+    fight: &HostedFight,
+) -> Result<(), String> {
+    let first = fight.opponents.first().ok_or("invalid host-run fight")?;
+    let present = rules::character_here(world, state, first)
+        .and_then(|c| c.combat.as_ref())
+        .is_some_and(|c| !c.ally);
+    ensure(
+        present
+            && !combat.defeated.contains(first)
+            && fight.id < state.turn
+            && combat.vitals.hp > 0
+            && state.dialogue.is_none()
+            && fight.opponents == encounter::opponents_for(world, state, first),
+        "invalid host-run fight",
+    )
+}
+
 /// Vitals the rules could leave at stats `max` and `pools`: HP and each
 /// resource within its ceiling, nothing in a resource the character does not
 /// use, and damage-rage progress below one point (none at a world's cap).
-pub(super) fn within(rules: &Combat, v: &Vitals, max: &Stats, pools: Pools) -> bool {
+pub(crate) fn within(rules: &Combat, v: &Vitals, max: &Stats, pools: Pools) -> bool {
     let capped = rules.resources.rage_cap.is_some() && v.rage == pools.rage_cap();
     v.hp <= max.hp
         && v.mp <= pools.mp_max()
@@ -84,7 +112,7 @@ fn gear(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
 /// budget, and every gain counted once in each of the three ledgers.
 fn weapon_training(world: &WorldSpec, combat: &CombatState, rules: &Combat) -> Result<(), String> {
     let t = &combat.weapon_training;
-    let ok = match &rules.weapon_proficiency {
+    let ok = match rules.weapon_proficiency.as_ref().filter(|r| !r.hosted) {
         None => t == &WeaponTraining::default(),
         Some(r) => {
             let sum = |ledger: &BTreeMap<Id, u64>| {

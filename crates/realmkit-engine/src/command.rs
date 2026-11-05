@@ -74,6 +74,13 @@ pub enum Command {
     },
     /// In a real-time fight: one input on its fixed-step clock.
     Intent(Intent),
+    /// Starts a fight the host runs itself, with a fighter here and whoever
+    /// engaging it would bring in. Until [`Command::SettleFight`], only panels
+    /// are possible: the world and its clock stand still.
+    HostFight(Id),
+    /// Ends a host-run fight with the host's account of it, checked whole and
+    /// committed once: the outcome settles as any personal fight's does.
+    SettleFight(FightSettlement),
     /// Gives a named companion in the party a standing tactical order,
     /// while exploring or in a real-time fight. An order changes what the
     /// companion aims its next attacks at; it never starts or lands one.
@@ -239,6 +246,33 @@ pub enum TacticalOrder {
     /// while it still fights, else as Follow. Lapses to Follow when the
     /// fight ends.
     Attack { target: Id },
+}
+
+/// What a host-run fight left behind, for [`Command::SettleFight`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FightSettlement {
+    /// The [`HostedFight::id`] it settles.
+    pub fight: u64,
+    pub outcome: Outcome,
+    /// Opponents who fell, in the order their rewards are granted; a
+    /// victory rewards them, any other outcome ignores them.
+    pub fallen: Vec<Id>,
+    /// The player's vitals at the end, with worn gear at `worn`.
+    pub vitals: Vitals,
+    /// The gear instances worn at the end, in instance order.
+    pub worn: Vec<u64>,
+    /// Named companions in the party that the fight changed, by ID.
+    pub companions: BTreeMap<Id, SettledCompanion>,
+}
+
+/// A named companion after a host-run fight.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SettledCompanion {
+    /// Its vitals if it fought; `None` leaves them as they were.
+    pub vitals: Option<Vitals>,
+    pub order: TacticalOrder,
 }
 
 /// A dialogue choice as the conversation offers it.
