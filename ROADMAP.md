@@ -342,6 +342,10 @@ to run a fight over a universal character core ([combat.md](docs/combat.md)).
   its host passes time with `PassTime` and gives travel and rest their time
   with the atomic `Timed { action, minutes }`. RealmKit keeps the one clock
   and every consequence of it.
+- **Host-reported presence:** `Enter(location)`, a never-offered command by
+  which a continuous host commits that its player has walked into a
+  location across its own ground, with no road, exit or time; RealmKit keeps
+  the location, visits and every consequence.
 
 Next, when a client needs it: spatial authority for real-time contact
 (positions, reach and hit volumes on the fixed step, or a validated spatial

@@ -134,6 +134,10 @@ date is then derived from WorldTime, which stays the one time source of truth.
 
 `Command::PassTime(minutes)`: a continuous graphical host commits bounded whole minutes of in-world elapsed time, explicitly and deterministically, so schedules run on the same canonical [World Time](#world-time). The renderer's frame clock never mutates engine state; the real-to-world time scale and the pause policy belong to the host's game. See [Host-driven time](world-format.md#host-driven-time).
 
+## Host-reported Presence
+
+`Command::Enter(location)`: a continuous host whose locations are regions of ground commits that the player has walked into one, by no road or exit and passing no time. Distinct from `Command::Travel`, which takes a road and its time. See [Host-reported presence](world-format.md#host-reported-presence).
+
 ## Recurring Schedule
 
 Proposed for M5. An authored period of at least one minute and a first

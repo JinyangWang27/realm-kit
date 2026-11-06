@@ -459,7 +459,7 @@ pub struct GameState {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub companions: BTreeMap<Id, CompanionState>,
     /// Every location the player has been at: the start, and each place
-    /// a road or an exit brought them to. Never forgotten. A save made
+    /// a road, an exit or `Command::Enter` brought them to. Never forgotten. A save made
     /// before this was kept has none, and counts only where the player is.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub visited: BTreeSet<Id>,

@@ -298,6 +298,7 @@ pub(super) fn execute(
         }
         Command::Move(direction) => move_to(world, state, direction, &mut events)?,
         Command::Travel(to) => time::travel(world, state, to, None, &mut events)?,
+        Command::Enter(to) => enter(world, state, to, &mut events)?,
         Command::Wait(minutes) => time::wait(world, state, minutes, &mut events)?,
         Command::PassTime(minutes) => time::pass_time(world, state, minutes, &mut events)?,
         Command::Timed { action, minutes } => {
@@ -471,6 +472,33 @@ fn move_to(
     events.push(Event::LocationViewed {
         location: exit.destination.clone(),
     });
+    Ok(())
+}
+
+/// The host's report that the player has come into `to` across its
+/// continuous ground: an arrival with no road, no exit and no time.
+fn enter(
+    world: &WorldSpec,
+    state: &mut GameState,
+    to: Id,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    if world.location(&to).is_none() {
+        return Err(EngineError::UnknownLocation(to));
+    }
+    if state.player.location == to {
+        return Err(EngineError::AlreadyThere(to));
+    }
+    let from = std::mem::replace(&mut state.player.location, to.clone());
+    // The place left, too, as for a road.
+    state.visited.insert(from.clone());
+    state.visited.insert(to.clone());
+    state.dialogue = None;
+    events.push(Event::Moved {
+        from,
+        to: to.clone(),
+    });
+    events.push(Event::LocationViewed { location: to });
     Ok(())
 }
 
