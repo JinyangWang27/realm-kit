@@ -114,6 +114,15 @@ proves the complete single-player loop with authored content.
   occurrences; only the command counter differs. No package or save format
   change. `engine/tests/pass_time.rs` exercises it on `examples/marches`,
   `practice-yard`, `arena`, a clocked `duel`, `caravan-trail` and `sect`.
+- [x] Host-reported presence: `Enter(location)` lets a continuous host
+  that models places as regions of ground commit that the player has walked
+  into one, by no road or exit. It arrives as a road does (`Moved`, the
+  place left and the place reached kept as visited, any conversation ended,
+  `LocationViewed`) but passes no time and consults no road or exit
+  condition: those restrict an itinerary, not ground. The place need not be
+  known first. Refused for no such place, the place already here, and in
+  every kind of fight; never offered. No package or save format change.
+  `engine/tests/enter.rs`.
 - [x] Hosted world time: `time.hosted` opts a world into host-decided
   durations (no authored wait, rest or road times; `hosted_duration`), and
   `Timed { action, minutes }` gives a `Travel` or `Rest` the host's time as

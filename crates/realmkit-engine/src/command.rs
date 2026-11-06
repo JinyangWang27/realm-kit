@@ -9,6 +9,16 @@ pub enum Command {
     Move(Direction),
     /// Takes the road from here to a location, passing its travel time.
     Travel(Id),
+    /// Host-reported presence: the player has come into this location by
+    /// moving through the host's continuous space, on no road or exit. For a
+    /// host that models places as regions of ground the player walks
+    /// between; it decides when that ground is entered, and RealmKit
+    /// commits it as an arrival. No time passes (the host's `PassTime`
+    /// already counts the walking), no road or exit is needed and their
+    /// conditions are not consulted: those restrict an itinerary, not
+    /// ground. The place need not be known beforehand; being there makes it
+    /// known while there, as at the start. Never offered as an action.
+    Enter(Id),
     /// Lets this many minutes of world time pass.
     Wait(u64),
     /// Host-reported world time: this many minutes pass while the player

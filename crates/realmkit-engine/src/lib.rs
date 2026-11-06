@@ -459,7 +459,7 @@ impl<'w> Engine<'w> {
     }
 
     /// Whether the player has been at a location: where they stand, the
-    /// start, or anywhere a road or an exit brought them. Being there is
+    /// start, or anywhere a road, an exit or the host's `Enter` brought them. Being there is
     /// more than knowing of it ([`Engine::knows`]); a host may offer
     /// journeys back to visited places only, say.
     pub fn visited(&self, location: &str) -> bool {

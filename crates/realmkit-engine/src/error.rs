@@ -12,6 +12,10 @@ pub enum EngineError {
     ExitLocked { location: Id, direction: Direction },
     #[error("there is no road from here to {0}")]
     NoRoad(Id),
+    #[error("there is no location {0}")]
+    UnknownLocation(Id),
+    #[error("the player is already at {0}")]
+    AlreadyThere(Id),
     #[error("that road is closed")]
     RoadBlocked { road: Id },
     #[error("time cannot be passed by waiting in this world")]

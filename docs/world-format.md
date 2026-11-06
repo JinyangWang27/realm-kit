@@ -458,6 +458,15 @@ A world may opt in with `"time": { …, "hosted": true }`. RealmKit still keeps 
 
 Still open: background progression while the player is elsewhere, real-time mass battles and journey-progress modelling along a road (a host that wants partial journeys needs a different command, not `PassTime` during a `Travel`).
 
+### Host-reported presence
+
+A host that models locations as regions of continuous ground (its player walks off any road between them) commits each arrival with `Command::Enter(location)`. The host decides from its own geometry when the player has entered a region; RealmKit commits the consequences:
+
+- **An arrival without a road.** The player's location becomes `location`, the place left and the place reached are kept in `visited`, any conversation ends, and `Moved` then `LocationViewed` are reported, as for a road. Schedules, evidence, outcomes and breakthroughs settle once afterwards, as for any command.
+- **No time, no conditions.** No time passes: walking is the host's `PassTime`. A road's or an exit's `requires` is not consulted: it restricts that itinerary, not the ground beside it. `known_when` is not either: being there makes a place known while there, as at the start.
+- **Refusals.** An unknown location ID (`UnknownLocation`), the location the player already stands in (`AlreadyThere`), and any kind of fight (`InEncounter`). It is never offered as an action.
+- **Compatibility.** Nothing in a package or a save changes. A host that never sends it sees no difference.
+
 ## Economy
 
 The optional `economy` block in `world.json` gives the player currency and
