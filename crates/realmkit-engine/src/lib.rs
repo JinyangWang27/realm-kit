@@ -16,6 +16,7 @@ mod error;
 mod formulas;
 mod gear;
 mod hosted;
+mod load;
 mod realtime;
 mod rng;
 mod rules;
@@ -94,6 +95,7 @@ impl<'w> Engine<'w> {
                 techniques: BTreeMap::new(),
                 gear: BTreeMap::new(),
                 next_gear: 1,
+                dropped: BTreeMap::new(),
                 weapon_training: WeaponTraining::default(),
                 vitals: character::resources::full(&stats, pools),
                 stance: Stance::Exploring,
@@ -233,6 +235,14 @@ impl<'w> Engine<'w> {
             gear.equipped = false;
         }
         Some(character::player_stats(self.world, &bare))
+    }
+    /// The grams the player carries: each counted unit at its item's
+    /// `mass_g`, plus every owned piece of equipment exactly once, whether
+    /// worn or packed. Derived on every call, never saved; items without a
+    /// mass add nothing. `NumericLimit` if the total would not fit a `u64`,
+    /// which a validated world and a checked save never reach.
+    pub fn carried_mass(&self) -> Result<u64, EngineError> {
+        load::carried_mass(self.world, &self.state)
     }
     /// The resources the player uses and their ceilings; `None` without combat.
     pub fn player_pools(&self) -> Option<Pools> {

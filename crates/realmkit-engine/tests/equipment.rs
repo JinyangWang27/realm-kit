@@ -335,6 +335,7 @@ fn many_worn_modifiers_combine_exactly() {
                     tiers: Vec::new(),
                 }),
                 consumable: None,
+                mass_g: None,
             });
         }
         world

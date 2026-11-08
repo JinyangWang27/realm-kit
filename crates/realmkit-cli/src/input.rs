@@ -20,7 +20,7 @@ pub fn help(world: &WorldSpec) -> String {
         attack += "use <item> — use something you carry, such as a draught\n";
     }
     if combat.is_some_and(|c| !c.slots.is_empty()) {
-        attack += "equip <#> — wear a piece from your pack\nunequip <#>\n";
+        attack += "equip <#> — wear a piece from your pack\nunequip <#>\ndrop <#> — leave a packed piece behind for good\n";
     }
     if combat.is_some_and(|c| !c.recipes.is_empty()) {
         attack += "forge <recipe> — at its station\nimprove <#> — raise a piece one tier\n";
@@ -357,6 +357,7 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
         ("respec", []) => Command::Respec,
         ("equip", [piece]) => Command::Equip(gear(piece)?),
         ("unequip", [piece]) => Command::Unequip(gear(piece)?),
+        ("drop", [piece]) => Command::Drop(gear(piece)?),
         ("forge", [recipe]) => Command::Forge((*recipe).into()),
         ("improve", [piece]) => Command::Improve(gear(piece)?),
         ("enchant", [piece, enchantment]) => Command::Enchant {
@@ -588,6 +589,7 @@ mod tests {
         assert_eq!(parse("respec"), Ok(Input::Command(Command::Respec)));
         assert_eq!(parse("equip #3"), Ok(Input::Command(Command::Equip(3))));
         assert_eq!(parse("unequip 3"), Ok(Input::Command(Command::Unequip(3))));
+        assert_eq!(parse("drop #3"), Ok(Input::Command(Command::Drop(3))));
         assert!(parse("equip sword").is_err());
         assert_eq!(
             parse("forge iron_sword"),

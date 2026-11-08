@@ -123,6 +123,7 @@ fn turn_based_fights_hold_the_same_rule() {
             ..serde_json::from_str(r#"{"slots": []}"#).unwrap()
         }),
         consumable: None,
+        mass_g: None,
     });
     let mut engine = Engine::new(&duel).unwrap();
     assert!(matches!(
@@ -262,6 +263,7 @@ fn a_turn_based_basic_attack_holds_the_same_rule() {
             ..serde_json::from_str(r#"{"slots": []}"#).unwrap()
         }),
         consumable: None,
+        mass_g: None,
     });
     let mut engine = Engine::new(&duel).unwrap();
     engine.execute(Move(Direction::North)).unwrap();

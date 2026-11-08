@@ -88,9 +88,31 @@ pub(crate) fn within(rules: &Combat, v: &Vitals, max: &Stats, pools: Pools) -> b
         && !(capped && v.rage_remainder > 0)
 }
 
+/// The pieces of `item` the player ever kept: those owned now and those
+/// dropped. Only a drop removes a piece, so this is what was received.
+pub(super) fn pieces(combat: &CombatState, item: &Id) -> u64 {
+    let owned = combat.gear.values().filter(|g| &g.item == item).count() as u64;
+    owned.saturating_add(combat.dropped.get(item).copied().unwrap_or(0))
+}
+
 /// Pieces are real equipment at a tier it has, with IDs below the counter,
-/// and worn pieces never share a slot.
+/// and worn pieces never share a slot. Dropped pieces are equipment too,
+/// counted at least once each, and no more than IDs were ever issued.
 fn gear(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
+    let wearable = |item: &Id| world.item(item).is_some_and(|i| i.equipment.is_some());
+    let dropped = combat
+        .dropped
+        .values()
+        .try_fold(0_u64, |total, count| total.checked_add(*count));
+    let issued = combat.next_gear.saturating_sub(1);
+    ensure(
+        combat
+            .dropped
+            .iter()
+            .all(|(item, count)| *count > 0 && wearable(item))
+            && dropped.is_some_and(|d| d.saturating_add(combat.gear.len() as u64) <= issued),
+        "invalid dropped equipment",
+    )?;
     let mut worn = BTreeSet::new();
     ensure(
         combat.gear.iter().all(|(id, piece)| {
@@ -266,7 +288,7 @@ fn crafting(
         })
     });
     let forged_ok = progress.forged.iter().all(|output| {
-        let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
+        let pieces = pieces(combat, output);
         let granted = progress.inventory.get(*output).copied().unwrap_or(0);
         pieces <= granted
             || progress.renewable.contains(output)
@@ -301,13 +323,9 @@ fn crafting_lessons<'w>(
     };
     let mut lessons = Vec::new();
     for recipe in &rules.recipes {
-        let pieces = combat
-            .gear
-            .values()
-            .filter(|g| g.item == recipe.output)
-            .count() as u64;
+        let pieces = pieces(combat, &recipe.output);
         let granted = progress.inventory.get(&recipe.output).copied().unwrap_or(0);
-        // Pieces are never taken away, so only a piece beyond those granted
+        // Pieces are only dropped, and counted, so only a piece beyond those granted
         // can have been forged; one bought or looted again is no lesson, but
         // with no way to tell them apart, any extra piece may be.
         let forged = pieces > granted;

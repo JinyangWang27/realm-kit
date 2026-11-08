@@ -776,3 +776,17 @@ fn a_recipe_closed_to_an_answer_explains_no_piece_in_a_save_with_it() {
         );
     }
 }
+
+#[test]
+fn a_forged_piece_dropped_still_accounts_for_its_materials() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    engine.execute(Drop(1)).unwrap();
+    assert_eq!(ingots(&engine), 3);
+    // The two ingots went into a sword that is no longer held: the drop
+    // explains it, so the save loads, and the same state comes back.
+    let restored = Engine::restore(&world, engine.snapshot()).unwrap();
+    assert_eq!(restored.state(), engine.state());
+    assert_eq!(restored.carried_mass().unwrap(), 0);
+}

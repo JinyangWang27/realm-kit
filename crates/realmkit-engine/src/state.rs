@@ -27,6 +27,10 @@ pub struct CombatState {
     pub gear: BTreeMap<u64, Gear>,
     /// The next instance ID; IDs are never reused.
     pub next_gear: u64,
+    /// Pieces dropped for good, counted by item. They weigh and give nothing,
+    /// but progress still granted them, so save checks count them as held.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub dropped: BTreeMap<Id, u64>,
     /// Direct weapon experience and what each foe has taught so far.
     #[serde(default, skip_serializing_if = "WeaponTraining::is_empty")]
     pub weapon_training: WeaponTraining,

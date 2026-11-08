@@ -135,6 +135,9 @@ pub enum Command {
     /// Wears a piece of equipment, returning whatever held its slots to the pack.
     Equip(u64),
     Unequip(u64),
+    /// Leaves a piece from the pack behind for good: it is no longer owned,
+    /// weighs nothing and cannot be had back. A worn piece must be taken off first.
+    Drop(u64),
     /// Forges a new piece from a known recipe at its station.
     Forge(Id),
     /// Raises a piece one improvement tier at the tier's station.
@@ -657,6 +660,11 @@ pub enum Event {
     },
     Unequipped {
         gear: u64,
+    },
+    /// A piece left behind: its instance ID is gone, so the item is named.
+    Dropped {
+        gear: u64,
+        item: Id,
     },
     /// Materials used up by forging or improving.
     ItemsSpent {

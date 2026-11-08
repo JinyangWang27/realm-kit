@@ -236,6 +236,29 @@ pub(super) fn unequip(
     Ok(())
 }
 
+/// Leaves a packed piece behind for good. Its ID is never reused, and the
+/// item's dropped count keeps what progress granted accountable.
+pub(super) fn drop(
+    state: &mut GameState,
+    gear: u64,
+    events: &mut Vec<Event>,
+) -> Result<(), EngineError> {
+    let combat = state.combat.as_mut().ok_or(EngineError::NoSuchGear(gear))?;
+    let piece = combat
+        .gear
+        .get(&gear)
+        .ok_or(EngineError::NoSuchGear(gear))?;
+    if piece.equipped {
+        return Err(EngineError::DropWorn(gear));
+    }
+    let item = piece.item.clone();
+    let count = combat.dropped.entry(item.clone()).or_default();
+    *count = count.checked_add(1).ok_or(EngineError::NumericLimit)?;
+    combat.gear.remove(&gear);
+    events.push(Event::Dropped { gear, item });
+    Ok(())
+}
+
 /// Whether wielding `capabilities` lets the player make a basic attack.
 pub(super) fn attacks(world: &WorldSpec, capabilities: &BTreeSet<&str>) -> Result<(), EngineError> {
     let rules = world.combat().unwrap();
