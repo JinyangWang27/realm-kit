@@ -345,6 +345,7 @@ pub(super) fn execute(
         } => proficiency::train(world, state, proficiency, points, &mut events)?,
         Command::Equip(piece) => gear::equip(world, state, piece, &mut events)?,
         Command::Unequip(piece) => gear::unequip(world, state, piece, &mut events)?,
+        Command::Drop(piece) => gear::drop(state, piece, &mut events)?,
         Command::Forge(recipe) => crafting::forge(world, state, &recipe, &mut events)?,
         Command::Improve(piece) => crafting::improve(world, state, piece, &mut events)?,
         Command::Enchant { piece, enchantment } => {

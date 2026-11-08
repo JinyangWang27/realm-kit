@@ -1459,11 +1459,36 @@ an item with an `equipment` part can be worn:
 - The player wears pieces outside encounters (`equip <#>`); whatever held the
   slots returns to the pack. Worn bonuses are part of effective stats, derived
   and never saved.
+- `drop <#>` leaves a piece from the pack behind for good, outside fights
+  only; a worn piece must be taken off first (`DropWorn`). Its number is never
+  reused, and the save keeps each dropped piece's record under its old number
+  (`dropped`, tier and enchantment included), so the checks that tie held
+  items, spent materials and crafting lessons to recorded progress stay exact.
 - Several modifiers on one channel multiply, any immunity means no damage at
   all, and the product stays within 1/10 to 10. Speed penalties add up and
   apply before the speed cap; speed never drops below 1. The best piece for
   every slot, with levels, points and technique bonuses, must keep each stat
   within 9,999.
+
+### Mass
+
+Any item, counted or wearable, may give the mass of one unit or one piece in
+whole grams:
+
+```json
+{ "id": "iron_mail", "name": "Iron mail", "description": "Heavy rings.", "mass_g": 9000, "equipment": { "slots": ["body"] } }
+```
+
+- `mass_g` is 1 to 1,000,000 (`invalid_mass`); an item without one is not
+  weighed. Currency is a ledger and weighs nothing.
+- `Engine::carried_mass` derives what the player carries, never saved: each
+  counted unit at its mass, plus every owned piece exactly once, worn or
+  packed. Wearing, taking off and improving a piece change nothing; gaining,
+  using, selling, giving or dropping an item does. Sums use checked integer
+  arithmetic, and a save whose total would not fit 64 bits is refused.
+- The engine applies no rule of its own to mass: what load does (movement,
+  cargo limits) is the host's. `speed_penalty` stays a separate, worn-only
+  stat effect.
 
 ### Consumables
 

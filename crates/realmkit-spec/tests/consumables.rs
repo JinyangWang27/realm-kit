@@ -91,6 +91,7 @@ fn consumables_are_checked_with_stable_codes() {
         description: "It fizzes.".into(),
         equipment: None,
         consumable: Some(Consumable { hp: 0, mp: 5 }),
+        mass_g: None,
     });
     assert!(
         !codes(&fight).contains(&"invalid_consumable".to_string()),

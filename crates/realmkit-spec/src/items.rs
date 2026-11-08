@@ -21,7 +21,17 @@ pub struct Item {
     /// Makes the item usable: each use spends one and restores vitals.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consumable: Option<Consumable>,
+    /// The physical mass of one unit or one piece, in grams: 1 to
+    /// [`MASS_BOUND`]. An item without one is not weighed, and adds nothing
+    /// to [`carried mass`](https://docs.rs/realmkit-engine); a world that
+    /// models load gives every tangible item a mass.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mass_g: Option<u32>,
 }
+
+/// The heaviest single unit or piece an item can be, in grams: one tonne.
+/// With the inventory's own bounds it keeps a carried total far inside `u64`.
+pub const MASS_BOUND: u32 = 1_000_000;
 
 /// What using one unit restores, each capped at the maximum.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

@@ -145,6 +145,8 @@ pub enum EngineError {
     AlreadyEquipped(u64),
     #[error("#{0} is not equipped")]
     NotEquipped(u64),
+    #[error("take #{0} off before dropping it")]
+    DropWorn(u64),
     #[error("you do not know that recipe")]
     UnknownRecipe(Id),
     #[error("there is no {0} here")]

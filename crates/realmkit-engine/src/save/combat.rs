@@ -88,9 +88,34 @@ pub(crate) fn within(rules: &Combat, v: &Vitals, max: &Stats, pools: Pools) -> b
         && !(capped && v.rage_remainder > 0)
 }
 
+/// Every piece the player ever received: those owned now, then those
+/// dropped, each with what crafting did to it. Only a drop removes a piece,
+/// so history checks read this, never the owned pieces alone.
+pub(super) fn ever(combat: &CombatState) -> impl Iterator<Item = &Gear> {
+    combat.gear.values().chain(combat.dropped.values())
+}
+
+/// The pieces of `item` the player ever received.
+pub(super) fn pieces(combat: &CombatState, item: &Id) -> u64 {
+    ever(combat).filter(|g| &g.item == item).count() as u64
+}
+
 /// Pieces are real equipment at a tier it has, with IDs below the counter,
-/// and worn pieces never share a slot.
+/// and worn pieces never share a slot. A dropped piece is one too, under an
+/// ID no owned piece has, and not worn.
 fn gear(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
+    ensure(
+        combat.dropped.iter().all(|(id, piece)| {
+            !piece.equipped
+                && *id < combat.next_gear
+                && !combat.gear.contains_key(id)
+                && world
+                    .item(&piece.item)
+                    .and_then(|i| i.equipment.as_ref())
+                    .is_some_and(|e| piece.tier <= e.tiers.len())
+        }),
+        "invalid dropped equipment",
+    )?;
     let mut worn = BTreeSet::new();
     ensure(
         combat.gear.iter().all(|(id, piece)| {
@@ -242,7 +267,7 @@ fn crafting(
     progress: &Progress,
 ) -> Result<(), String> {
     // An enchantment that exists, fits its piece, and was the player's to lay.
-    let enchantments_ok = combat.gear.values().all(|gear| {
+    let enchantments_ok = ever(combat).all(|gear| {
         let equipment = world.item(&gear.item).unwrap().equipment.as_ref().unwrap();
         gear.enchantment.as_ref().is_none_or(|id| {
             world.enchantment(id).is_some_and(|e| {
@@ -253,7 +278,7 @@ fn crafting(
             })
         })
     });
-    let tiers_ok = combat.gear.values().all(|gear| {
+    let tiers_ok = ever(combat).all(|gear| {
         let tiers = &world
             .item(&gear.item)
             .unwrap()
@@ -266,7 +291,7 @@ fn crafting(
         })
     });
     let forged_ok = progress.forged.iter().all(|output| {
-        let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
+        let pieces = pieces(combat, output);
         let granted = progress.inventory.get(*output).copied().unwrap_or(0);
         pieces <= granted
             || progress.renewable.contains(output)
@@ -301,13 +326,9 @@ fn crafting_lessons<'w>(
     };
     let mut lessons = Vec::new();
     for recipe in &rules.recipes {
-        let pieces = combat
-            .gear
-            .values()
-            .filter(|g| g.item == recipe.output)
-            .count() as u64;
+        let pieces = pieces(combat, &recipe.output);
         let granted = progress.inventory.get(&recipe.output).copied().unwrap_or(0);
-        // Pieces are never taken away, so only a piece beyond those granted
+        // Pieces are only dropped, and counted, so only a piece beyond those granted
         // can have been forged; one bought or looted again is no lesson, but
         // with no way to tell them apart, any extra piece may be.
         let forged = pieces > granted;
@@ -317,7 +338,7 @@ fn crafting_lessons<'w>(
             lessons.push(grant);
         }
     }
-    for gear in combat.gear.values() {
+    for gear in ever(combat) {
         let tiers = &world
             .item(&gear.item)
             .unwrap()

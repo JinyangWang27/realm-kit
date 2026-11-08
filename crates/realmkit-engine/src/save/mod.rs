@@ -712,6 +712,11 @@ impl<'w> Progress<'w> {
 /// Held items: counts in the inventory, plus every piece of equipment.
 /// Equipment never sits in the counts, since it arrives as pieces.
 fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Result<(), String> {
+    // A loaded game can always report what it carries.
+    ensure(
+        crate::load::carried_mass(world, state).is_ok(),
+        "carried mass exceeds the engine's bounds",
+    )?;
     let mut held = state.player.inventory.clone();
     let wearable = |item: &str| world.item(item).is_some_and(|i| i.equipment.is_some());
     ensure(
@@ -719,7 +724,8 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
         "equipment cannot be held as a count",
     )?;
     if let Some(combat) = &state.combat {
-        for piece in combat.gear.values() {
+        // A dropped piece was still granted: it counts as held here.
+        for piece in combat::ever(combat) {
             *held.entry(piece.item.clone()).or_default() += 1;
         }
     }
@@ -783,9 +789,10 @@ fn spent<'w>(
         *total = total.saturating_add(quantity);
     };
     for output in &progress.forged {
-        // Pieces are never lost, so those beyond the grants were forged;
-        // with repeatable loot, any number of them may have dropped instead.
-        let pieces = combat.gear.values().filter(|g| &&g.item == output).count() as u64;
+        // Pieces are only ever dropped, and counted when they are, so those
+        // beyond the grants were forged; with repeatable loot, any number of
+        // them may have dropped instead.
+        let pieces = combat::pieces(combat, output);
         let granted = progress.inventory.get(*output).copied().unwrap_or(0);
         let forged = pieces.saturating_sub(granted);
         // Only recipes the player could have used explain a piece.
@@ -817,7 +824,8 @@ fn spent<'w>(
             add(&mut most, material, dearest.saturating_mul(forged));
         }
     }
-    for gear in combat.gear.values() {
+    // Dropped pieces too: their tiers and enchantments were paid for.
+    for gear in combat::ever(combat) {
         let tiers = &world
             .item(&gear.item)
             .unwrap()

@@ -47,6 +47,14 @@ pub(super) fn header(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
         }
     }
     for item in &w.items {
+        if item.mass_g.is_some_and(|g| !(1..=MASS_BOUND).contains(&g)) {
+            issue(
+                out,
+                &item.id,
+                "invalid_mass",
+                format!("an item's mass is 1 to {MASS_BOUND} grams"),
+            );
+        }
         let Some(consumable) = item.consumable else {
             continue;
         };

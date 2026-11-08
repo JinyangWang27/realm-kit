@@ -776,3 +776,59 @@ fn a_recipe_closed_to_an_answer_explains_no_piece_in_a_save_with_it() {
         );
     }
 }
+
+#[test]
+fn a_forged_piece_dropped_still_accounts_for_its_materials() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    engine.execute(Drop(1)).unwrap();
+    assert_eq!(ingots(&engine), 3);
+    // The two ingots went into a sword that is no longer held: the drop
+    // explains it, so the save loads, and the same state comes back.
+    let restored = Engine::restore(&world, engine.snapshot()).unwrap();
+    assert_eq!(restored.state(), engine.state());
+    assert_eq!(restored.carried_mass().unwrap(), 0);
+}
+
+#[test]
+fn an_enchanted_piece_dropped_still_explains_its_catalyst_and_its_lesson() {
+    let mut world = smithy();
+    // One shard, spent on one enchantment (as in the enchantment save test).
+    world.world.combat.as_mut().unwrap().groups[0].repeatable = false;
+    world.world.combat.as_mut().unwrap().recipes[0].inputs[0].quantity = 1;
+    let mut engine = at_the_anvil(&world, 1);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    to_the_altar(&mut engine);
+    engine.execute(keen(1)).unwrap();
+    engine.execute(Drop(1)).unwrap();
+    let restored = Engine::restore(&world, engine.snapshot()).unwrap();
+    assert_eq!(restored.state(), engine.state());
+
+    // Laying Keenness the only lesson: the dropped piece still teaches it.
+    let mut world = smithy();
+    let maud = world.dialogues.iter_mut().find(|d| d.id == "maud").unwrap();
+    maud.nodes[1].choices[0].effects.clear();
+    world.world.combat.as_mut().unwrap().enchantments[0].requires = None;
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    to_the_altar(&mut engine);
+    engine.execute(keen(1)).unwrap();
+    engine.execute(Drop(1)).unwrap();
+    assert!(combat_state_has(&engine, "enchanting"));
+    assert!(Engine::restore(&world, engine.snapshot()).is_ok());
+}
+
+#[test]
+fn an_improved_piece_dropped_still_explains_its_tier_costs() {
+    let world = smithy();
+    let mut engine = at_the_anvil(&world, 5);
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    // The second forge makes a Journeyman, who can improve.
+    engine.execute(Forge("iron_sword".into())).unwrap();
+    engine.execute(Improve(1)).unwrap();
+    engine.execute(Drop(1)).unwrap();
+    assert_eq!(combat(&engine).dropped[&1].tier, 1);
+    let restored = Engine::restore(&world, engine.snapshot()).unwrap();
+    assert_eq!(restored.state(), engine.state());
+}

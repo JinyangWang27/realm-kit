@@ -45,7 +45,8 @@ model, worldgen crate, or source material.
 
 In a terminal, each scene shows a context-sensitive menu: use ↑/↓ and Enter,
 or press the number. Stat training and equipment wait behind one entry each
-(`Train stats ›`, `Equipment ›`) and stay open while you use them. Esc steps
+(`Train stats ›`, `Equipment ›`) and stay open while you use them; a piece
+you no longer want can be left behind for good with `:drop <#>`. Esc steps
 back out of a submenu or a conversation,
 `n/s/e/w/u/d` (or `h/j/k/l`) move directly, and `:` opens a typed command
 such as `:talk elder`. Ctrl-C quits. Terminal play adds bold and colour;
