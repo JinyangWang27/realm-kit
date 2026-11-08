@@ -724,13 +724,9 @@ fn inventory(world: &WorldSpec, state: &GameState, progress: &Progress) -> Resul
         "equipment cannot be held as a count",
     )?;
     if let Some(combat) = &state.combat {
-        for piece in combat.gear.values() {
-            *held.entry(piece.item.clone()).or_default() += 1;
-        }
         // A dropped piece was still granted: it counts as held here.
-        for (item, count) in &combat.dropped {
-            let held = held.entry(item.clone()).or_default();
-            *held = held.checked_add(*count).ok_or("impossible inventory")?;
+        for piece in combat::ever(combat) {
+            *held.entry(piece.item.clone()).or_default() += 1;
         }
     }
     ensure(
@@ -828,7 +824,8 @@ fn spent<'w>(
             add(&mut most, material, dearest.saturating_mul(forged));
         }
     }
-    for gear in combat.gear.values() {
+    // Dropped pieces too: their tiers and enchantments were paid for.
+    for gear in combat::ever(combat) {
         let tiers = &world
             .item(&gear.item)
             .unwrap()

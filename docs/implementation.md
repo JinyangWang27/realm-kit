@@ -69,7 +69,7 @@ proves the complete single-player loop with authored content.
 - [x] Item mass and dropping: an optional `mass_g` on any item, validated;
   `Engine::carried_mass` derives counted units plus every owned piece once,
   with checked arithmetic, never saved. `drop <#>` leaves a packed piece
-  behind, recorded per item so save checks stay exact.
+  behind, its record kept as history so save checks stay exact.
 - [x] Forging and improvement (M4d): locations offer stations; recipes,
   hidden until known and gated by requirements such as a Smithing technique
   rank, forge new pieces from counted materials; improvement tiers replace a

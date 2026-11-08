@@ -88,29 +88,32 @@ pub(crate) fn within(rules: &Combat, v: &Vitals, max: &Stats, pools: Pools) -> b
         && !(capped && v.rage_remainder > 0)
 }
 
-/// The pieces of `item` the player ever kept: those owned now and those
-/// dropped. Only a drop removes a piece, so this is what was received.
+/// Every piece the player ever received: those owned now, then those
+/// dropped, each with what crafting did to it. Only a drop removes a piece,
+/// so history checks read this, never the owned pieces alone.
+pub(super) fn ever(combat: &CombatState) -> impl Iterator<Item = &Gear> {
+    combat.gear.values().chain(combat.dropped.values())
+}
+
+/// The pieces of `item` the player ever received.
 pub(super) fn pieces(combat: &CombatState, item: &Id) -> u64 {
-    let owned = combat.gear.values().filter(|g| &g.item == item).count() as u64;
-    owned.saturating_add(combat.dropped.get(item).copied().unwrap_or(0))
+    ever(combat).filter(|g| &g.item == item).count() as u64
 }
 
 /// Pieces are real equipment at a tier it has, with IDs below the counter,
-/// and worn pieces never share a slot. Dropped pieces are equipment too,
-/// counted at least once each, and no more than IDs were ever issued.
+/// and worn pieces never share a slot. A dropped piece is one too, under an
+/// ID no owned piece has, and not worn.
 fn gear(world: &WorldSpec, combat: &CombatState) -> Result<(), String> {
-    let wearable = |item: &Id| world.item(item).is_some_and(|i| i.equipment.is_some());
-    let dropped = combat
-        .dropped
-        .values()
-        .try_fold(0_u64, |total, count| total.checked_add(*count));
-    let issued = combat.next_gear.saturating_sub(1);
     ensure(
-        combat
-            .dropped
-            .iter()
-            .all(|(item, count)| *count > 0 && wearable(item))
-            && dropped.is_some_and(|d| d.saturating_add(combat.gear.len() as u64) <= issued),
+        combat.dropped.iter().all(|(id, piece)| {
+            !piece.equipped
+                && *id < combat.next_gear
+                && !combat.gear.contains_key(id)
+                && world
+                    .item(&piece.item)
+                    .and_then(|i| i.equipment.as_ref())
+                    .is_some_and(|e| piece.tier <= e.tiers.len())
+        }),
         "invalid dropped equipment",
     )?;
     let mut worn = BTreeSet::new();
@@ -264,7 +267,7 @@ fn crafting(
     progress: &Progress,
 ) -> Result<(), String> {
     // An enchantment that exists, fits its piece, and was the player's to lay.
-    let enchantments_ok = combat.gear.values().all(|gear| {
+    let enchantments_ok = ever(combat).all(|gear| {
         let equipment = world.item(&gear.item).unwrap().equipment.as_ref().unwrap();
         gear.enchantment.as_ref().is_none_or(|id| {
             world.enchantment(id).is_some_and(|e| {
@@ -275,7 +278,7 @@ fn crafting(
             })
         })
     });
-    let tiers_ok = combat.gear.values().all(|gear| {
+    let tiers_ok = ever(combat).all(|gear| {
         let tiers = &world
             .item(&gear.item)
             .unwrap()
@@ -335,7 +338,7 @@ fn crafting_lessons<'w>(
             lessons.push(grant);
         }
     }
-    for gear in combat.gear.values() {
+    for gear in ever(combat) {
         let tiers = &world
             .item(&gear.item)
             .unwrap()

@@ -236,8 +236,9 @@ pub(super) fn unequip(
     Ok(())
 }
 
-/// Leaves a packed piece behind for good. Its ID is never reused, and the
-/// item's dropped count keeps what progress granted accountable.
+/// Leaves a packed piece behind for good. Its ID is never reused, and its
+/// record moves to `dropped`, so what progress granted and what crafting
+/// did to it stay accountable.
 pub(super) fn drop(
     state: &mut GameState,
     gear: u64,
@@ -251,10 +252,9 @@ pub(super) fn drop(
     if piece.equipped {
         return Err(EngineError::DropWorn(gear));
     }
+    let piece = combat.gear.remove(&gear).unwrap();
     let item = piece.item.clone();
-    let count = combat.dropped.entry(item.clone()).or_default();
-    *count = count.checked_add(1).ok_or(EngineError::NumericLimit)?;
-    combat.gear.remove(&gear);
+    combat.dropped.insert(gear, piece);
     events.push(Event::Dropped { gear, item });
     Ok(())
 }

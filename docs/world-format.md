@@ -1461,8 +1461,9 @@ an item with an `equipment` part can be worn:
   and never saved.
 - `drop <#>` leaves a piece from the pack behind for good, outside fights
   only; a worn piece must be taken off first (`DropWorn`). Its number is never
-  reused, and the save counts dropped pieces per item (`dropped`), so the
-  checks that tie held items to recorded progress stay exact.
+  reused, and the save keeps each dropped piece's record under its old number
+  (`dropped`, tier and enchantment included), so the checks that tie held
+  items, spent materials and crafting lessons to recorded progress stay exact.
 - Several modifiers on one channel multiply, any immunity means no damage at
   all, and the product stays within 1/10 to 10. Speed penalties add up and
   apply before the speed cap; speed never drops below 1. The best piece for

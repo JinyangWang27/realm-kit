@@ -134,7 +134,11 @@ fn loot_adds_its_pieces_and_dropping_one_takes_it_away() {
     }));
     assert_eq!(mass(&engine), looted - 3_000);
     assert!(!combat(&engine).gear.contains_key(&greatsword));
-    assert_eq!(combat(&engine).dropped.get("greatsword"), Some(&1));
+    let dropped = &combat(&engine).dropped[&greatsword];
+    assert_eq!(
+        (dropped.item.as_str(), dropped.equipped),
+        ("greatsword", false)
+    );
     // Gone for good: it cannot be dropped or worn again.
     assert!(
         matches!(engine.execute(Drop(greatsword)), Err(EngineError::NoSuchGear(id)) if id == greatsword)
@@ -192,20 +196,36 @@ fn saves_with_impossible_drops_or_loads_are_refused() {
     let good = engine.snapshot();
     assert!(Engine::restore(&world, good.clone()).is_ok());
     let broken: Vec<fn(&mut SaveSnapshot)> = vec![
-        // More dropped than were ever issued.
+        // An ID never issued.
         |s| {
             let combat = s.state.combat.as_mut().unwrap();
-            combat.dropped.insert("practice_sword".into(), 9);
+            let mut piece = combat.dropped.values().next().unwrap().clone();
+            piece.item = "buckler".into();
+            combat.dropped.insert(combat.next_gear, piece);
+        },
+        // The ID of a piece still owned.
+        |s| {
+            let combat = s.state.combat.as_mut().unwrap();
+            let owned = *combat.gear.keys().next().unwrap();
+            let piece = combat.gear[&owned].clone();
+            combat.dropped.insert(owned, piece);
         },
         // A drop of something that is not equipment.
         |s| {
             let combat = s.state.combat.as_mut().unwrap();
-            combat.dropped.insert("rat_tail".into(), 1);
+            combat
+                .dropped
+                .values_mut()
+                .for_each(|p| p.item = "rat_tail".into());
         },
-        // A zero count.
+        // A piece dropped while worn, or at a tier it does not have.
         |s| {
             let combat = s.state.combat.as_mut().unwrap();
-            combat.dropped.insert("buckler".into(), 0);
+            combat.dropped.values_mut().for_each(|p| p.equipped = true);
+        },
+        |s| {
+            let combat = s.state.combat.as_mut().unwrap();
+            combat.dropped.values_mut().for_each(|p| p.tier = 9);
         },
         // The drop forgotten: a granted piece is missing.
         |s| {
