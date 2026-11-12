@@ -207,6 +207,10 @@ fn a_companion_joins_only_by_its_authored_conditions_and_parts_where_the_player_
         character: "wren".into()
     }));
     assert_eq!(engine.party(), vec!["wren"]);
+    assert_eq!(
+        engine.character_location("wren"),
+        Some(engine.state().player.location.as_str())
+    );
     let wren = companion(&engine, "wren");
     assert_eq!((wren.vitals.hp, wren.vitals.mp), (30, 6));
     assert_eq!(wren.order, TacticalOrder::Follow);
@@ -231,17 +235,23 @@ fn a_companion_joins_only_by_its_authored_conditions_and_parts_where_the_player_
         character: "wren".into()
     }));
     assert!(engine.party().is_empty());
+    assert_eq!(engine.character_location("wren"), Some("crossroads"));
     assert_eq!(
         companion(&engine, "wren").parted_at.as_deref(),
         Some("crossroads")
     );
     run(&mut engine, &[Travel("inn".into())]);
     assert!(!engine.present_here().iter().any(|c| c.id == "wren"));
+    assert_eq!(engine.character_location("wren"), Some("crossroads"));
     run(&mut engine, &[Travel("crossroads".into())]);
     assert!(engine.present_here().iter().any(|c| c.id == "wren"));
     // Asked again where she stays, she rejoins.
     run(&mut engine, &[Talk("wren".into()), ChooseDialogue(1)]);
     assert_eq!(engine.party(), vec!["wren"]);
+    assert_eq!(
+        engine.character_location("wren"),
+        Some(engine.state().player.location.as_str())
+    );
 }
 
 #[test]
@@ -261,6 +271,10 @@ fn recruiting_a_companion_twice_is_refused_whole() {
         EngineError::AlreadyInParty("wren".into()),
     );
     assert_eq!(engine.party(), vec!["wren"]);
+    assert_eq!(
+        engine.character_location("wren"),
+        Some(engine.state().player.location.as_str())
+    );
     assert_eq!(engine.state().companions.len(), 1);
 }
 

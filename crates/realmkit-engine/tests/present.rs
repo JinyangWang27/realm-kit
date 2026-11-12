@@ -484,3 +484,83 @@ fn closure_observes_the_answered_start_not_the_unanswered_intermediate_state() {
     assert_eq!(engine.state().quests["testimony"], QuestStatus::Available);
     Engine::restore(&world, engine.snapshot()).unwrap();
 }
+
+#[test]
+fn chronicle_query_revealed_later_returns_the_original_recorded_minute() {
+    let world = ford();
+    let mut engine = changed(&world);
+    engine.execute(Wait(2880)).unwrap();
+    assert!(!engine.chronicle().iter().any(|(e, _)| e.id == "dispersal"));
+    engine.execute(Wait(123)).unwrap();
+    choose(&mut engine, "notice");
+    assert_eq!(engine.state().time, Some(3003));
+    assert_eq!(
+        engine
+            .chronicle()
+            .iter()
+            .find(|(e, _)| e.id == "dispersal")
+            .unwrap()
+            .1,
+        2880
+    );
+    let restored = Engine::restore(&world, engine.snapshot()).unwrap();
+    assert_eq!(restored.chronicle(), engine.chronicle());
+}
+
+#[test]
+fn public_location_query_resolves_static_remote_moving_relocated_and_absent_actors() {
+    let world = ford();
+    let mut engine = Engine::new(&world).unwrap();
+    assert_eq!(engine.character_location("clerk"), Some("ford"));
+    assert_eq!(engine.character_location("keeper"), Some("refuge"));
+    assert_eq!(engine.character_location("unknown"), None);
+    assert_eq!(engine.character_location("you"), None); // player uses state.player.location
+    choose(&mut engine, "envoy");
+    engine.execute(Wait(2880)).unwrap();
+    assert_eq!(engine.character_location("clerk"), None);
+    assert_eq!(engine.character_location("envoy"), Some("refuge"));
+    assert_eq!(
+        engine.state().departed["clerk"].reason,
+        DepartureReason::Exiled
+    );
+
+    let world = common::marches();
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    assert_eq!(
+        engine.character_location("wenna"),
+        engine.state().whereabouts.get("wenna").map(String::as_str)
+    );
+    engine.execute(Wait(1440)).unwrap();
+    assert_eq!(
+        engine.character_location("wenna"),
+        engine.state().whereabouts.get("wenna").map(String::as_str)
+    );
+}
+
+#[test]
+fn location_query_is_independent_of_visibility_and_prefers_a_local_static_placement() {
+    let mut world = ford();
+    // This fixture deliberately duplicates placement; remove the departure rule
+    // whose target must, separately, have unique placement.
+    world.world.events.clear();
+    world
+        .characters
+        .iter_mut()
+        .find(|c| c.id == "clerk")
+        .unwrap()
+        .requires = Some(Condition::Flag {
+        flag: "heard".into(),
+    });
+    world
+        .locations
+        .iter_mut()
+        .find(|l| l.id == "refuge")
+        .unwrap()
+        .characters
+        .push("clerk".into());
+    let mut engine = Engine::new(&world).unwrap();
+    assert!(!engine.present_here().iter().any(|c| c.id == "clerk"));
+    assert_eq!(engine.character_location("clerk"), Some("ford"));
+    engine.execute(Move(Direction::East)).unwrap();
+    assert_eq!(engine.character_location("clerk"), Some("refuge"));
+}

@@ -80,21 +80,48 @@ pub fn xp_for_defeat(xp: u64, player_level: usize, opponent_level: usize) -> u64
 /// What one unit costs to buy: the base price at `index` thousandths, raised
 /// by the spread, rounded down once, and never free.
 pub fn buy_price(price: u64, index: u32, spread: u32) -> u64 {
-    let raw = u128::from(price) * u128::from(index) * (100 + u128::from(spread)) / 100_000;
-    u64::try_from(raw).unwrap_or(u64::MAX).max(1)
+    levied_buy_price(price, index, spread, 0)
 }
 
 /// What one unit sells for: the base price at `index` thousandths, divided
 /// by the spread, rounded down once.
 pub fn sell_price(price: u64, index: u32, spread: u32) -> u64 {
-    let raw = u128::from(price) * u128::from(index) * 100 / (1_000 * (100 + u128::from(spread)));
+    levied_sell_price(price, index, spread, 0)
+}
+
+/// Buying with additive levies, applied before the single final rounding.
+/// Validated content bounds every factor; buying always costs at least one.
+pub fn levied_buy_price(price: u64, index: u32, spread: u32, levy: u32) -> u64 {
+    let raw = u128::from(price)
+        * u128::from(index)
+        * (100 + u128::from(spread))
+        * (100 + u128::from(levy))
+        / 10_000_000;
+    u64::try_from(raw).unwrap_or(u64::MAX).max(1)
+}
+
+/// Selling with additive levies (0..=100), before the single final rounding.
+pub fn levied_sell_price(price: u64, index: u32, spread: u32, levy: u32) -> u64 {
+    let raw = u128::from(price) * u128::from(index) * u128::from(100_u32.saturating_sub(levy))
+        / (1_000 * (100 + u128::from(spread)));
     u64::try_from(raw).unwrap_or(u64::MAX)
 }
 
-/// One unit of a good at a market: what it costs and fetches now, and after
-/// one unit has been bought or sold.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// One charge applied to a quote or a completed trade, in authored order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppliedLevy {
+    pub id: Id,
+    pub text: String,
+    pub percent: u32,
+}
+
+/// One unit of a good at a market: what it costs and fetches now, and at
+/// the next index using the same pre-trade facts (the next unit in a batch).
+/// A new command re-evaluates conditions, including cargo/currency conditions.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Quote {
+    /// Charges already included in these prices.
+    pub levies: Vec<AppliedLevy>,
     pub buy: u64,
     pub sell: u64,
     pub next_buy: u64,

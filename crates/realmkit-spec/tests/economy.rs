@@ -521,3 +521,93 @@ fn banking_is_checked_with_stable_codes() {
         r#"{ "branches": ["greyford"], "monthly_interest_basis_points": 25, "loans": true }"#;
     assert!(serde_json::from_str::<Banking>(json).is_err());
 }
+
+fn levy() -> Levy {
+    Levy {
+        id: "handling".into(),
+        text: "Handling charge".into(),
+        requires: Condition::Flag {
+            flag: "letter_delivered".into(),
+        },
+        percent: 10,
+        goods: None,
+    }
+}
+
+#[test]
+fn conditional_levies_validate_references_bounds_filters_and_ids() {
+    type Change = fn(&mut Levy);
+    for (change, code) in [
+        ((|l: &mut Levy| l.percent = 0) as Change, "invalid_levy"),
+        (|l| l.percent = 101, "invalid_levy"),
+        (|l| l.percent = u32::MAX, "invalid_levy"),
+        (|l| l.text = " ".into(), "invalid_levy"),
+        (|l| l.id = "!".into(), "invalid_id"),
+        (|l| l.goods = Some(vec![]), "invalid_levy"),
+        (
+            |l| l.goods = Some(vec!["missing".into()]),
+            "missing_reference",
+        ),
+        (
+            |l| l.goods = Some(vec!["wool".into(), "wool".into()]),
+            "duplicate_id",
+        ),
+        (
+            |l| {
+                l.requires = Condition::Flag {
+                    flag: "missing".into(),
+                }
+            },
+            "missing_reference",
+        ),
+    ] {
+        let mut world = marches();
+        let mut charge = levy();
+        change(&mut charge);
+        economy(&mut world).markets[0].levies = vec![charge];
+        assert!(
+            codes(&world).iter().any(|c| c == code),
+            "{code}: {:?}",
+            codes(&world)
+        );
+    }
+    let mut world = marches();
+    let mut other = levy();
+    other.id = "second".into();
+    other.percent = 91;
+    economy(&mut world).markets[0].levies = vec![levy(), other];
+    assert!(codes(&world).contains(&"invalid_levy".into()));
+    economy(&mut world).markets[0].levies = vec![levy(), levy()];
+    assert!(codes(&world).contains(&"duplicate_id".into()));
+    economy(&mut world).markets[0].levies = vec![levy()];
+    assert!(codes(&world).is_empty(), "{:?}", codes(&world));
+}
+
+#[test]
+fn levy_rules_bind_saves_but_text_is_translatable_prose() {
+    let mut world = marches();
+    let original = world.revision();
+    economy(&mut world).markets[0].levies = vec![levy()];
+    let revision = world.revision();
+    assert_ne!(original, revision);
+    economy(&mut world).markets[0].levies[0].text = "Reworded charge".into();
+    assert_eq!(world.revision(), revision);
+    assert!(world.texts().values().any(|text| text == "Reworded charge"));
+    for change in [
+        (|l: &mut Levy| l.percent = 11) as fn(&mut Levy),
+        |l| l.goods = Some(vec!["wool".into()]),
+        |l| l.id = "different".into(),
+        |l| {
+            l.requires = Condition::Not {
+                condition: Box::new(l.requires.clone()),
+            }
+        },
+    ] {
+        let mut edited = world.clone();
+        change(&mut economy(&mut edited).markets[0].levies[0]);
+        assert_ne!(edited.revision(), revision);
+    }
+    let encoded = serde_json::to_vec(&world).unwrap();
+    let decoded: WorldSpec = serde_json::from_slice(&encoded).unwrap();
+    assert_eq!(decoded.revision(), revision);
+}

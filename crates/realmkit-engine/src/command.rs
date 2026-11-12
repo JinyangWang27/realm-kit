@@ -356,11 +356,13 @@ pub enum Event {
         character: Id,
     },
     Bought {
+        levies: Vec<AppliedLevy>,
         good: Id,
         quantity: u64,
         cost: u64,
     },
     Sold {
+        levies: Vec<AppliedLevy>,
         good: Id,
         quantity: u64,
         earned: u64,

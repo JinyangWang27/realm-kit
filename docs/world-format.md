@@ -533,6 +533,33 @@ the index moves with what the market makes and needs.
   (`invalid_price`), and it is sold once per market and is not also a good
   (`invalid_ware`). Wares follow the market's merchant: no merchant, no sale.
 
+Markets may author `levies: [{ "id": "handling", "text": "League handling charge",
+"requires": { "kind": "controls", "location": "ford", "faction": "league" },
+"percent": 10, "goods": ["grain"] }]`. Each levy needs a unique market-local ASCII
+`id`, nonblank translatable `text`, any valid `Condition` as `requires`, and positive
+integer `percent`. `goods` is optional (all trade goods); when present it must be a
+nonempty list of distinct trade-good IDs. Wares are excluded. Invalid percentages,
+empty text/filters, or an authored total above 100% use `invalid_levy`; IDs and
+references use `invalid_id`, `duplicate_id`, and `missing_reference` as usual.
+The total bound includes inactive and disjoint levies, keeping all combinations safe.
+
+Active matching percentages add to `L`. Conditions are evaluated against the
+pre-trade state, once per command, including multi-unit trades. Buying one unit is
+`max(1, floor(price × index × (100 + spread) × (100 + L) / 10,000,000))`;
+selling is `floor(price × index × (100 - L) / (1,000 × (100 + spread)))`.
+There is one final rounding per unit, before summing the command's units; 100%
+levies pay zero on sales. Levies do not narrow with trading proficiency.
+They are derived at quote/command time: no state, ticks, RNG draws or changes to
+index evolution. All existing checked totals, stock/purse limits and atomic refusal
+still apply. Rule edits bind saves through the revision; editing levy `text` does not.
+`Engine::quote()` includes `levies: [{ id, text, percent }]` in authored order,
+already included in its current/next prices. Next prices project the next index
+with the same facts (the next unit in a batch); a new command re-evaluates conditions.
+`actions()` uses these charged prices
+for availability. `Bought`/`Sold` events include the same applied charges (empty for
+wares). A client can pair a buy/sell action with `quote(good)` to explain the cost.
+The CLI prints the charges in both market rows and completed trade lines.
+
 Buying one unit costs `price × index × (100 + spread) / 100,000`, at least 1;
 selling one fetches `price × index × 100 / (1,000 × (100 + spread))`, each
 rounded down once. Units trade one at a time: each bought unit raises the
@@ -2335,3 +2362,19 @@ closure reason remain translatable prose.
 relocation, exile and standing change → quest closure and another conclusion.
 Its tests compare cuts byte for byte (including the counter), exercise fleeting
 conditions and chained elapsed rules, and save/reload halfway through the delay.
+
+### Host actor locations and Chronicle dates
+
+`Engine::character_location(id)` is a public host query, independent of knowledge
+and visibility. Enumerate `engine.world().characters` for actor IDs; read
+`engine.state().player.location` for the player. Resolution is departure → no place,
+active companion → player's place, parted companion → parting place, explicit
+station → relocated place, scheduled whereabouts → moving place, then static
+placement (prefer the player's location if listed in more than one place).
+Unknown and unplaced IDs also return `None`; `engine.state().departed` distinguishes
+irreversible departure and exposes its reason and original minute. A hidden actor
+may still have a location; the host controls what it displays.
+
+`Engine::chronicle()` returns readable entries with their original recorded minute,
+in first-recorded order. A `known_when` condition becoming true later reveals the
+entry without redating it, including after save/reload.

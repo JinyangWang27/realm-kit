@@ -101,5 +101,41 @@
         }
       ]
     }
-  ]
+  ],
+  "economy": {
+    "currency": {
+      "format": "{amount} copper",
+      "start": 100
+    },
+    "goods": [
+      {
+        "item": "grain",
+        "price": 20
+      }
+    ],
+    "markets": [
+      {
+        "location": "ford",
+        "kind": "village",
+        "levies": [
+          {
+            "id": "reed_handling",
+            "text": "Reed Council handling charge",
+            "requires": {
+              "kind": "controls",
+              "location": "ford",
+              "faction": "reed"
+            },
+            "percent": 10
+          }
+        ]
+      }
+    ],
+    "index_bounds": [
+      100,
+      10000
+    ],
+    "spread_percent": 0,
+    "trade_step": 0
+  }
 }

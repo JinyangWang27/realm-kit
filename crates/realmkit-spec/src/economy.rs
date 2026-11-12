@@ -236,6 +236,9 @@ pub struct Producer {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Market {
+    /// Conditional charges on trade goods; derived at quote/command time.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub levies: Vec<Levy>,
     pub location: Id,
     pub kind: MarketKind,
     /// Trading needs this character present, if set.
@@ -259,6 +262,19 @@ pub struct Market {
     /// A village's market town, whose trade counts the village's too.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub town: Option<Id>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Levy {
+    pub id: Id,
+    pub text: String,
+    pub requires: Condition,
+    /// Positive; the sum of all authored levies at a market is at most 100.
+    pub percent: u32,
+    /// Omitted means all trade goods; an authored list must be nonempty.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goods: Option<Vec<Id>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

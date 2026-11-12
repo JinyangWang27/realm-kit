@@ -998,24 +998,28 @@ pub fn events(
             }
             Event::CharacterLeft { character } => writeln!(output, "{} leaves.", name(character))?,
             Event::Bought {
+                levies,
                 good,
                 quantity,
                 cost,
             } => writeln!(
                 output,
-                "Bought: {} ×{quantity} for {}",
+                "Bought: {} ×{quantity} for {}{}",
                 world.item(good).unwrap().name,
-                money(world, *cost)
+                money(world, *cost),
+                panels::levy_label(levies)
             )?,
             Event::Sold {
+                levies,
                 good,
                 quantity,
                 earned,
             } => writeln!(
                 output,
-                "Sold: {} ×{quantity} for {}",
+                "Sold: {} ×{quantity} for {}{}",
                 world.item(good).unwrap().name,
-                money(world, *earned)
+                money(world, *earned),
+                panels::levy_label(levies)
             )?,
             Event::CurrencyReceived { amount } => {
                 writeln!(output, "Received: {}", money(world, *amount))?

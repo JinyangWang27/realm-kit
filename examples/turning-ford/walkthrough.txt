@@ -1,7 +1,13 @@
+market
+buy grain
+sell grain
 talk clerk
 choose 1
 talk envoy
 choose 1
+market
+buy grain
+sell grain
 wait 1440
 chronicle
 save

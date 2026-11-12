@@ -1474,7 +1474,10 @@ fixture actually uses them.
    supplies, herds of livestock, and bandit trouble cleared through offers.
 6. **M6f — world agents.** **First history part delivered**: authored, dated
    chronicle entries, knowledge-filtered reads and `elapsed` consequences on
-   existing schedules. `examples/turning-ford` exercises the seam; no agents,
+   existing schedules. Conditional market levies now connect control (or any
+   condition) to derived buy/sell charges, with quotes and receipts explaining
+   the active percentages; no saved levy state or index changes.
+   `examples/turning-ford` exercises the seam; no agents,
    runtime-created schedules or pending-effect queue. Party instances on the
    road graph that apply a
    closed set of engine policies on recurring world ticks, with priorities

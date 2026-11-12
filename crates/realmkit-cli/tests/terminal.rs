@@ -1083,3 +1083,26 @@ fn turning_ford_plays_delayed_loss_and_a_known_chronicle_deterministically() {
     assert!(before.contains("Read the council notice."));
     assert!(!after.contains("Talk to Toll clerk"));
 }
+
+#[test]
+fn market_and_trade_lines_explain_control_dependent_levies() {
+    let world = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/turning-ford");
+    let output = run(
+        &["play", world, "--line", "--seed", "7"],
+        "market\nbuy grain\ntalk envoy\nchoose 1\nmarket\nbuy grain\nsell grain\nquit\n",
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    for line in [
+        "Grain — buy 20 copper · sell 20 copper",
+        "Grain — buy 22 copper · sell 18 copper",
+        "Bought: Grain ×1 for 22 copper · Reed Council handling charge 10%",
+        "Sold: Grain ×1 for 18 copper · Reed Council handling charge 10%",
+    ] {
+        assert!(text.contains(line), "missing {line:?}: {text}");
+    }
+}

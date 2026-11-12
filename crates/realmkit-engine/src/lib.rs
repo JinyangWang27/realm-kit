@@ -224,6 +224,7 @@ impl<'w> Engine<'w> {
     }
 
     /// Recorded entries the player may read, in first-recorded order.
+    /// Each minute is the original recording time, even if `known_when` reveals it later.
     pub fn chronicle(&self) -> Vec<(&realmkit_spec::ChronicleEntry, u64)> {
         self.state
             .chronicle
@@ -240,7 +241,14 @@ impl<'w> Engine<'w> {
             .collect()
     }
 
-    /// The one resolved place; departure has no place.
+    /// The resolved place of a non-player character, independent of visibility.
+    /// Precedence: departure (no place), active party (player's place), parted
+    /// companion, explicit relocation, scheduled whereabouts, then authored
+    /// placement (prefer the player's location if placed more than once).
+    /// Unknown/unplaced characters return `None` too; inspect `state().departed`
+    /// for an irreversible departure's reason and minute. The player's location
+    /// is `state().player.location`. Hosts may enumerate `world().characters`
+    /// and call this query to position actors; it does not filter hidden actors.
     pub fn character_location(&self, character: &str) -> Option<&str> {
         rules::character_location(self.world, &self.state, character)
     }
@@ -461,6 +469,8 @@ impl<'w> Engine<'w> {
     }
 
     /// Location-level actions in display order: talk, attack, travel, panels.
+    /// Trade availability includes conditional levies; call [`Self::quote`] for
+    /// a buy/sell good to display the price and applied charge descriptions.
     pub fn actions(&self) -> Vec<Action> {
         rules::actions(self.world, &self.state)
     }
@@ -484,7 +494,8 @@ impl<'w> Engine<'w> {
     }
 
     /// A good's prices at the open market here: one unit now, and the next
-    /// after it. `None` away from an open market or for an untraded good.
+    /// index with the same pre-trade facts. `Quote::levies` explains charges already included in each price.
+    /// `None` away from an open market or for an untraded good.
     pub fn quote(&self, good: &str) -> Option<Quote> {
         rules::quote(self.world, &self.state, good)
     }

@@ -20,7 +20,9 @@ chronicle shows only news the player could know; a quest can close with a reason
 when its route is lost. Play `examples/turning-ford` for a small two-day causal
 chain, then open **Chronicle** (or type `chronicle`). Completing the testimony
 before the change preserves that conclusion; arriving late leaves the ferry
-records as another route.
+records as another route. Its grain market also shows the new controller’s 10%
+handling charge in market prices and trade receipts. Markets can author conditional
+levies for all goods or selected goods; charges follow the current facts immediately.
 
 ## Play
 
