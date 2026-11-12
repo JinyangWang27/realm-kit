@@ -6,6 +6,17 @@ proves the complete single-player loop with authored content.
 
 ## Implementation sequence
 
+- [x] Present facts (first parts of M5c/M5d/M6e/M6f): static-character stations
+  and irreversible dated departure; a bounded, knowledge-filtered chronicle;
+  one faction controller per place; terminal quest closure with authored reason.
+  Shared presence resolution serves rules, groups, menus and the host query.
+  Scheduled rules admit the four effects without admitting Knowledge or party
+  effects. Every time producer settles occurrences and minute boundaries;
+  property-style tests pin cut invariance, transient closure, chained elapsed
+  consequences and byte-identical mid-delay reload. Format 20 changes the time
+  counter and settling semantics; optional content growth itself needs no bump.
+  `examples/turning-ford` shows both lost testimony and the remaining route.
+
 - [x] Spec: serde domain types, versioned JSON directory loader, references and
   template validation. Test valid demo content and malformed packages.
 - [x] Engine: explicit in-memory state and command/event API. Test the entire quest

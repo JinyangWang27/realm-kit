@@ -40,6 +40,8 @@ pub struct MapPoint {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Location {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub controller: Option<Id>,
     pub id: Id,
     pub name: String,
     pub description: String,

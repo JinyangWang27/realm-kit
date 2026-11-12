@@ -1,0 +1,33 @@
+[
+  {
+    "id": "ford",
+    "name": "The Ford",
+    "description": "A notice board stands beside the toll house.",
+    "controller": "stone",
+    "characters": [
+      "clerk",
+      "envoy",
+      "notice"
+    ],
+    "exits": {
+      "east": {
+        "destination": "refuge",
+        "blocked_text": ""
+      }
+    }
+  },
+  {
+    "id": "refuge",
+    "name": "The Refuge",
+    "description": "A keeper tends the ferry records.",
+    "characters": [
+      "keeper"
+    ],
+    "exits": {
+      "west": {
+        "destination": "ford",
+        "blocked_text": ""
+      }
+    }
+  }
+]

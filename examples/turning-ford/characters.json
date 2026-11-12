@@ -1,0 +1,32 @@
+[
+  {
+    "id": "you",
+    "name": "You",
+    "description": "A traveller."
+  },
+  {
+    "id": "clerk",
+    "name": "Toll clerk",
+    "description": "A witness to the old tolls.",
+    "dialogue": "clerk"
+  },
+  {
+    "id": "envoy",
+    "name": "Council envoy",
+    "description": "An envoy with a sealed order.",
+    "dialogue": "envoy"
+  },
+  {
+    "id": "notice",
+    "name": "Notice board",
+    "description": "News posted at the ford.",
+    "dialogue": "notice",
+    "kind": "feature"
+  },
+  {
+    "id": "keeper",
+    "name": "Ferry keeper",
+    "description": "A keeper of another account.",
+    "dialogue": "keeper"
+  }
+]

@@ -88,6 +88,23 @@ pub(super) fn header(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             );
         }
     }
+    ids(
+        out,
+        "chronicle entry",
+        w.world.chronicle.iter().map(|e| e.id.as_str()),
+    );
+    for entry in &w.world.chronicle {
+        time::needed(out, w, &entry.id);
+        condition(out, w, &entry.id, entry.known_when.as_ref());
+        if entry.text.trim().is_empty() {
+            issue(
+                out,
+                &entry.id,
+                "empty_chronicle_text",
+                "chronicle text must not be empty",
+            );
+        }
+    }
     ids(out, "quest", w.quests.iter().map(|v| v.id.as_str()));
     ids(out, "dialogue", w.dialogues.iter().map(|v| v.id.as_str()));
     ids(out, "flag", w.world.flags.iter().map(String::as_str));
@@ -104,6 +121,9 @@ pub(super) fn header(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
 pub(super) fn locations<'w>(out: &mut Vec<Diagnostic>, w: &'w WorldSpec) -> BTreeSet<&'w str> {
     let mut placed = BTreeSet::new();
     for l in &w.locations {
+        if let Some(faction) = &l.controller {
+            story::control(out, w, &l.id, &l.id, faction);
+        }
         ids(out, "station", l.stations.iter().map(String::as_str));
         if !l.stations.is_empty() && w.combat().is_none() {
             issue(
@@ -419,8 +439,12 @@ fn lasts(condition: &Condition) -> bool {
         | Condition::Evidence { .. }
         | Condition::Phase { .. }
         | Condition::Technique { .. }
-        | Condition::Proficiency { .. } => true,
-        Condition::Quest { status, .. } => *status == QuestStatus::Completed,
+        | Condition::Proficiency { .. }
+        | Condition::Departed { .. }
+        | Condition::Elapsed { .. } => true,
+        Condition::Quest { status, .. } => {
+            matches!(status, QuestStatus::Completed | QuestStatus::Closed)
+        }
         _ => false,
     }
 }

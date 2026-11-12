@@ -468,6 +468,9 @@ pub fn quests(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
             "  {} [{}]: {:?}{main}",
             quest.name, quest.id, entry.status
         )?;
+        if entry.status == realmkit_spec::QuestStatus::Closed {
+            writeln!(output, "    {}", quest.void_reason.as_deref().unwrap())?;
+        }
     }
     if !journal.evidence.is_empty() {
         writeln!(output, "{}", paint.title("Evidence:"))?;
@@ -528,6 +531,14 @@ pub fn techniques(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) ->
     for discipline in &rules.disciplines {
         let rank = engine.discipline_rank(&discipline.id).unwrap();
         writeln!(output, "  {}: rank {rank}", discipline.name)?;
+    }
+    Ok(())
+}
+
+pub fn chronicle(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
+    writeln!(output, "{}", paint.title("Chronicle:"))?;
+    for (entry, minute) in engine.chronicle() {
+        writeln!(output, "  [{minute}] {}", entry.text)?;
     }
     Ok(())
 }

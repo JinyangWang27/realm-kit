@@ -83,7 +83,7 @@ pub fn help(world: &WorldSpec) -> String {
     {
         attack += "examine <feature-id> — look closely at something here\n";
     }
-    format!("<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\n{attack}talk <character-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nsave\nload [number] — list saves, or restore one\nhelp\nquit")
+    format!("<number> — choose from the menu (or arrows and Enter, then : to type a command)\nlook\ngo north|south|east|west|up|down (or n/s/e/w/u/d, h/j/k/l)\n{attack}talk <character-id>\nchoose <number> (or just the number)\naccept <quest-id>\ncomplete <quest-id>\ninventory\nstatus\nquests\nchronicle\nsave\nload [number] — list saves, or restore one\nhelp\nquit")
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -226,6 +226,7 @@ fn parse_with(line: &str, context: Context) -> Result<Input, &'static str> {
         ("inventory" | "i", []) => Command::Inventory,
         ("status" | "c", []) => Command::Status,
         ("quests" | "q", []) => Command::Quests,
+        ("chronicle", []) => Command::Chronicle,
         ("techniques" | "t", []) => Command::Techniques,
         // A direction, or else a location a road leads to.
         ("go", [value]) => match direction(&value.to_ascii_lowercase()) {

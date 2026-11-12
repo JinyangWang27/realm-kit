@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 /// The fields that hold prose, wherever they appear. Every other string in a
 /// package is an ID, a tag or a reference, so it belongs to the rules.
-const PROSE: [&str; 16] = [
+const PROSE: [&str; 17] = [
     "name",
     "description",
     "text",
@@ -15,6 +15,7 @@ const PROSE: [&str; 16] = [
     "introduction",
     "progress",
     "completion",
+    "void_reason",
     "source",
     "facts",
     "attack",

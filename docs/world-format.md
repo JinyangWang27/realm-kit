@@ -1,6 +1,6 @@
 # World package format
 
-This guide describes the current package format, `"format_version": 19`.
+This guide describes the current package format, `"format_version": 20`.
 Combat stays optional. The level table and combat prose live in an
 optional `combat` block in `world.json`; a world without that block has no
 fighting, no XP and no levels, and its saves carry no combat state. Authors
@@ -2215,7 +2215,123 @@ placement, template placeholders, evidence that can be discovered, phases
 that can be entered, quest prerequisite cycles, main quests waiting on side
 quests, and factions, diplomacy pairs and standing tracks with their scopes,
 bounds and thresholds. `load()` reports a package whose
-`format_version` is not 19 as `SpecError::UnsupportedFormat` before parsing it.
+`format_version` is not 20 as `SpecError::UnsupportedFormat` before parsing it.
 Checks do not yet analyze graph reachability, condition satisfiability,
 never-set flags, narrative quality, or battle/quest solvability. Passing validation
 means the engine can interpret the data, not that every route is winnable.
+
+
+## Present facts
+
+Present facts use the same tagged JSON conditions and ordered, atomic effect
+lists as story rules. These are the first parts of M5c quest closure, M5d unique
+character state, M6e control and M6f history; they add no agent simulation.
+
+| Surface | JSON shape |
+| --- | --- |
+| Station effect | `{"kind":"relocate","character":"clerk","to":"refuge"}` |
+| Departure effect | `{"kind":"depart","character":"clerk","reason":"exiled"}` |
+| Departure condition | `{"kind":"departed","character":"clerk"}` |
+| Chronicle effect | `{"kind":"record","entry":"transfer"}` |
+| Chronicle condition | `{"kind":"elapsed","entry":"transfer","minutes":2880}` |
+| Control effect | `{"kind":"set_control","location":"ford","faction":"council"}` |
+| Control condition | `{"kind":"controls","location":"ford","faction":"council"}` |
+
+A location may author `"controller":"council"`, referencing a faction. There
+is at most one controller per location, with no implied income, hostility,
+garrison or restriction on entering ground. `set_control` replaces that fact;
+setting its current value does nothing.
+
+`world.chronicle` is an optional list of entries:
+
+```json
+"chronicle": [
+  { "id": "transfer", "text": "The council took the ford." },
+  { "id": "exile", "text": "The clerk left.",
+    "known_when": { "kind": "flag", "flag": "heard_news" } }
+]
+```
+
+`text` is prose, with overlay key `world.chronicle.<id>.text`. Entries need a
+clock. `record` keeps the first minute, in effect order at equal minutes;
+recording again is an infallible no-op. `elapsed.minutes` defaults to zero
+("recorded") and is bounded by `WORLD_TIME_BOUND`. It never resets a deadline.
+`Engine::chronicle()` returns `(entry, minute)` pairs in recorded order, filtered
+by `known_when`. Recording emits no player-facing event: hidden history must
+not leak through the event stream. The CLI's `chronicle` command and Chronicle
+menu show this same query in both line and raw-key modes.
+
+Departure reasons are exactly `dead`, `exiled`, `left`, `destroyed`. The first
+reason and minute are kept, including minute zero in a world without a clock.
+Departure is permanent; another departure does nothing, and relocation refuses
+if the character has departed. A failed scheduled occurrence skips its whole
+effect list, as for existing fallible effects. A departed character cannot be
+talked to, examined, engaged, traded with or used as a quest giver.
+
+`Engine::character_location()` and every presence rule use this order:
+**departed → in party → parted location → relocated station → mover whereabouts
+→ authored placement**. Conditions still decide visibility, and defeated
+characters remain unavailable as before. Validation rejects station/departure
+effects targeting the player, companions, movers or characters not authored at
+exactly one place (`invalid_present_target`). Their party ownership, active
+schedules and shared placements are not overridden. Legacy noncombat shared
+placements remain supported: the authored fallback resolves to the player's
+place when listed there, otherwise the first authored place. Unique Present
+targets never use that compatibility tie-break. Relocated arrivals append by ID
+after the existing placement/mover/companion display order.
+
+A quest may pair these optional fields:
+
+```json
+"void_when": { "kind": "departed", "character": "clerk" },
+"void_reason": "The witness was exiled; testimony is no longer possible."
+```
+
+Both must occur together, with a nonempty reason (`invalid_void_reason`). The
+reason is prose under `quests.<id>.void_reason`. Once `void_when` holds an
+Available, Active or Ready quest becomes `closed`; Completed and Closed are
+terminal. Closure runs to a fixed point in quest order, reports `QuestClosed`
+once, and refuses acceptance, progress and completion thereafter. The journal
+keeps the closed quest and its reason. A completed quest is not retroactively
+closed. Any ordinary condition is allowed, including `time_of_day` and `not`.
+
+All four new effects are allowed in scheduled events. Evidence, phases, quests
+and party effects remain forbidden (`invalid_effect`). The exhaustive production
+match and the effect-classification test require every new variant to be
+classified. Start answers do not admit the new effects.
+
+### Time cuts and saves
+
+Every time producer uses the same minute evolution: settle after each scheduled
+occurrence in existing tie order, then after each minute, even an empty one.
+This catches fleeting closure, outcome and breakthrough conditions during long
+Wait, Rest, travel and Timed commands. No monotonicity restriction is imposed
+on `void_when`. Scheduled rules read the same state in every cut. Rest restores
+before time passes and travel arrives before time passes, as before; comparisons
+must start with the same non-time action and location. Wait explicitly ends a
+conversation, whereas PassTime may keep one: their explicit action semantics
+still differ.
+
+`GameState.turn` counts elapsed minutes for a command advancing world time,
+and one for other successful state-changing commands; panels count zero. This
+makes the counter independent of time batching too. Format **20** replaces 19
+because the old counter and long-span settling behavior could otherwise load
+unchanged packages/saves and behave differently without a revision mismatch.
+The optional fields alone would not require a version bump.
+
+New save fields (empty collections omitted) are `stations` (character → location),
+`departed` (character → `{reason, minute}`), `chronicle` (ordered
+`[{entry, minute}]`) and `control` (location → faction). Load checks references,
+target restrictions, minutes between the authored start and now, chronological order, unique chronicle
+entries, initial control coverage, no departed character in a fight, and quest
+terminal-state consistency. A Closed quest must author closure; a nonterminal
+quest cannot load while its closure condition holds. Historical conditions need
+not still hold: a time window can have passed. As with other historical save
+checks this is an invariant check, not replay-based authentication. Rules
+revision hashing covers every new ID, condition and effect; entry text and
+closure reason remain translatable prose.
+
+`examples/turning-ford` exercises control → dated history → a two-day delayed
+relocation, exile and standing change → quest closure and another conclusion.
+Its tests compare cuts byte for byte (including the counter), exercise fleeting
+conditions and chained elapsed rules, and save/reload halfway through the delay.

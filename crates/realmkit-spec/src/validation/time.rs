@@ -243,7 +243,8 @@ fn event_effect(
     recurs: bool,
 ) {
     match effect {
-        Effect::SetFlag { .. }
+        Effect::Relocate { .. } | Effect::Depart { .. } | Effect::Record { .. } | Effect::SetControl { .. }
+        | Effect::SetFlag { .. }
         | Effect::GrantItems { .. }
         | Effect::GrantCurrency { .. }
         | Effect::ChangeStanding { .. }

@@ -415,11 +415,20 @@ pub struct ChoiceRef {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GameState {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub stations: BTreeMap<Id, Id>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub departed: BTreeMap<Id, Departure>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chronicle: Vec<RecordedEntry>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub control: BTreeMap<Id, Id>,
     pub player: PlayerState,
     pub combat: Option<CombatState>,
     pub quests: BTreeMap<Id, QuestStatus>,
     pub flags: BTreeSet<Id>,
     pub dialogue: Option<DialogueState>,
+    /// Elapsed minutes for timed commands, one for other transitions, zero for panels.
     pub turn: u64,
     /// Present only in worlds with random content.
     pub rng: Option<RngState>,
@@ -593,7 +602,7 @@ pub struct MarketStock {
     pub goods: BTreeMap<Id, u64>,
 }
 
-pub const SAVE_FORMAT_VERSION: u32 = 19;
+pub const SAVE_FORMAT_VERSION: u32 = 20;
 /// Format 1 has one implicit player route; saves name it explicitly.
 pub const DEFAULT_ROUTE: &str = "default";
 
@@ -636,4 +645,18 @@ impl SaveSnapshot {
     pub fn to_json(&self) -> Vec<u8> {
         serde_json::to_vec_pretty(self).expect("snapshots always serialize")
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Departure {
+    pub reason: realmkit_spec::DepartureReason,
+    pub minute: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RecordedEntry {
+    pub entry: Id,
+    pub minute: u64,
 }

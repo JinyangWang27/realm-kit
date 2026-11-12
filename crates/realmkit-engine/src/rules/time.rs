@@ -96,7 +96,7 @@ pub(crate) fn advance(
 
 /// [`advance`], with the player at their location (`present`) or on the
 /// road, where nobody's comings and goings are seen.
-fn pass(
+fn step(
     world: &WorldSpec,
     state: &mut GameState,
     minutes: u64,
@@ -132,6 +132,7 @@ fn pass(
         resources::elapse(world, state, elapsed, minute);
         elapsed = minute;
         state.time = Some(minute);
+        let readings_before = readings(world, state);
         match due[index].1 {
             Due::Midnight => midnight(world, state, events),
             Due::Event(event) => {
@@ -147,14 +148,55 @@ fn pass(
             Due::Upkeep => retinue::upkeep(world, state, events),
             Due::Refill(location) => retinue::refill(world, state, &location.id),
         }
+        settle(world, state, &readings_before, events);
     }
+    let readings_before = readings(world, state);
     resources::elapse(world, state, elapsed, end);
     state.time = Some(end);
+    settle(world, state, &readings_before, events);
     if minutes > 0 {
         events.push(Event::TimePassed {
             minutes,
             now: end,
             // Setting a flag is bookkeeping; the player sees nothing.
+            eventful: events[before..]
+                .iter()
+                .any(|e| !matches!(e, Event::StoryFlagSet { .. })),
+        });
+    }
+    Ok(())
+}
+
+/// Every time producer uses the same minute evolution, with settling after
+/// each occurrence and at each minute boundary (including empty minutes).
+fn pass(
+    world: &WorldSpec,
+    state: &mut GameState,
+    minutes: u64,
+    events: &mut Vec<Event>,
+    present: bool,
+) -> Result<(), EngineError> {
+    let Some(start) = state.time else {
+        return Ok(());
+    };
+    start
+        .checked_add(minutes)
+        .filter(|end| *end <= WORLD_TIME_BOUND)
+        .ok_or(EngineError::NumericLimit)?;
+    let before = events.len();
+    for _ in 0..minutes {
+        let mut minute = Vec::new();
+        step(world, state, 1, &mut minute, present)?;
+        events.extend(
+            minute
+                .into_iter()
+                .filter(|e| !matches!(e, Event::TimePassed { .. })),
+        );
+    }
+    if minutes > 0 {
+        events.push(Event::TimePassed {
+            minutes,
+            now: start + minutes,
             eventful: events[before..]
                 .iter()
                 .any(|e| !matches!(e, Event::StoryFlagSet { .. })),
@@ -331,31 +373,7 @@ pub(crate) fn pass_time(
     if minutes == 0 || minutes > DURATION_BOUND {
         return Err(EngineError::InvalidDuration);
     }
-    // A condition can hold for only part of the span: a speaker away for an
-    // hour, a time of day an outcome or breakthrough needs, a reading a flag
-    // unlocks before the next. Each minute therefore settles as a one-minute
-    // command would, so the span brings exactly what any split of it would.
-    let start = state.time.unwrap();
-    let before = events.len();
-    for _ in 0..minutes {
-        let readings_before = readings(world, state);
-        let mut minute = Vec::new();
-        advance(world, state, 1, &mut minute)?;
-        events.extend(
-            minute
-                .into_iter()
-                .filter(|e| !matches!(e, Event::TimePassed { .. })),
-        );
-        settle(world, state, &readings_before, events);
-    }
-    events.push(Event::TimePassed {
-        minutes,
-        now: start + minutes,
-        eventful: events[before..]
-            .iter()
-            .any(|e| !matches!(e, Event::StoryFlagSet { .. })),
-    });
-    Ok(())
+    advance(world, state, minutes, events)
 }
 
 /// A hosted world's travel or rest, taking the host's `minutes` in place of

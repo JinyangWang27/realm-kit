@@ -233,6 +233,34 @@ fn condition(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, value: Optio
             at_least,
         } => factions::at_least(out, w, owner, track, faction.as_ref(), *at_least),
         Condition::AtWar { factions: pair } => factions::pair(out, w, owner, pair),
+        Condition::Departed { character } => reference(
+            out,
+            owner,
+            "character",
+            character,
+            w.character(character).is_some(),
+        ),
+        Condition::Elapsed { entry, minutes } => {
+            reference(
+                out,
+                owner,
+                "chronicle entry",
+                entry,
+                w.world.chronicle.iter().any(|e| &e.id == entry),
+            );
+            time::needed(out, w, owner);
+            if *minutes > WORLD_TIME_BOUND {
+                issue(
+                    out,
+                    owner,
+                    "invalid_elapsed",
+                    "elapsed exceeds the world clock bound",
+                );
+            }
+        }
+        Condition::Controls { location, faction } => {
+            story::control(out, w, owner, location, faction)
+        }
         Condition::Companion { character } => story::companion(out, w, owner, character),
     }
 }

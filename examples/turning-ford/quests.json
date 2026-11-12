@@ -1,0 +1,36 @@
+[
+  {
+    "id": "testimony",
+    "name": "The clerk\u2019s account",
+    "giver": "clerk",
+    "objective": {
+      "kind": "flag",
+      "flag": "testified"
+    },
+    "introduction": "Ask the clerk before the council acts.",
+    "progress": "The clerk has testified.",
+    "completion": "The old tolls are explained by testimony.",
+    "void_when": {
+      "kind": "departed",
+      "character": "clerk"
+    },
+    "void_reason": "The clerk was exiled; testimony is no longer possible."
+  },
+  {
+    "id": "salvage",
+    "name": "The ferry account",
+    "giver": "keeper",
+    "requires": {
+      "kind": "elapsed",
+      "entry": "dispersal",
+      "minutes": 0
+    },
+    "objective": {
+      "kind": "flag",
+      "flag": "salvaged"
+    },
+    "introduction": "The keeper offers a different account.",
+    "progress": "The ferry records have been checked.",
+    "completion": "The remaining records tell a narrower story."
+  }
+]

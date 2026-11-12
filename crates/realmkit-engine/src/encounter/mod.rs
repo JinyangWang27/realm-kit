@@ -171,11 +171,8 @@ pub(super) fn opponents_for(world: &WorldSpec, state: &GameState, id: &str) -> V
             .as_ref()
             .is_some_and(|s| s.defeated.contains(c))
     };
-    world
-        .location(&state.player.location)
-        .unwrap()
-        .characters
-        .iter()
+    rules::placed_here(world, state)
+        .into_iter()
         .filter(|c| !defeated(c))
         .filter(|c| {
             rules::character_here(world, state, c)

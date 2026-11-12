@@ -1283,7 +1283,9 @@ dialogue in the opening town would otherwise duplicate content.
    quest `requires` for chains and phase-gated waves, and route outcomes
    recorded once (completion only, non-terminal); validation rejects
    prerequisite cycles, main quests waiting on side quests and phases
-   nothing enters. Still proposed: the rest of this item. Generalize the current
+   nothing enters. **Closure delivered**: optional `void_when`/`void_reason`,
+   terminal Closed quests and once-only closure reporting. Still proposed: the
+   rest of this item. Generalize the current
    quest table into explicit story phases, one route-owned main questline and
    optional side questlines with typed prerequisites/chains; side outcomes may
    feed explicit state back into later main progression. Add first-class authored
@@ -1295,7 +1297,9 @@ dialogue in the opening town would otherwise duplicate content.
 4. **M5d — runtime instances** for spawned copies and parties whose state
    outlives one encounter, as in the first bullet above. Unique authored
    characters keep their authored IDs and carry state such as wounds or
-   captivity under them.
+   captivity under them. **First unique-state part delivered**: relocated
+   stations and dated, irreversible departure for static unique characters,
+   with one presence resolver. Companions and movers cannot be targeted yet.
 5. **M5e — dialogue by role, text variants and languages · languages
    delivered**. Authored roles whose dialogues and topics every
    member shares, `Speaker` references in conditions, effects and templates,
@@ -1461,12 +1465,18 @@ fixture actually uses them.
    their scheduled wages and legacy desertion. Still to come: companions, provisions, persistent morale,
    travel speed, leaders and companions as individuals, ground, prisoners,
    injuries and loot tables.
-5. **M6e — holdings and sieges.** Ownership that changes during play, income,
+5. **M6e — holdings and sieges.** **First control fact delivered**: optional
+   location controller, `set_control` and `controls`, without income, garrisons
+   or siege simulation. Ownership that changes during play, income,
    garrisons, authored buildings, sieges as mass battles after a preparation
    time, and raiding enemy villages for loot at the cost of their income.
    Villages add rent collected in person with a risk of unrest, demanding
    supplies, herds of livestock, and bandit trouble cleared through offers.
-6. **M6f — world agents.** Party instances on the road graph that apply a
+6. **M6f — world agents.** **First history part delivered**: authored, dated
+   chronicle entries, knowledge-filtered reads and `elapsed` consequences on
+   existing schedules. `examples/turning-ford` exercises the seam; no agents,
+   runtime-created schedules or pending-effect queue. Party instances on the
+   road graph that apply a
    closed set of engine policies on recurring world ticks, with priorities
    that may test the leader's traits, routing by shortest travel time with ties
    broken by authored road order, spawners with caps, interception of the

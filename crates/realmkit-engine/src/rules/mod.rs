@@ -39,6 +39,11 @@ pub(super) fn holds(state: &GameState, condition: &Condition) -> bool {
         Condition::Any { of } => of.iter().any(|c| holds(state, c)),
         Condition::AtLeast { count, of } => of.iter().filter(|c| holds(state, c)).count() >= *count,
         Condition::Not { condition } => !holds(state, condition),
+        Condition::Departed { character } => state.departed.contains_key(character),
+        Condition::Elapsed { entry, minutes } => state.chronicle.iter().any(|r| {
+            &r.entry == entry && state.time.unwrap_or(0).saturating_sub(r.minute) >= *minutes
+        }),
+        Condition::Controls { location, faction } => state.control.get(location) == Some(faction),
         Condition::Flag { flag } => state.flags.contains(flag),
         Condition::Quest { quest, status } => state.quests.get(quest) == Some(status),
         Condition::Technique { technique, rank } => state
@@ -145,24 +150,44 @@ fn leading(state: &GameState) -> bool {
 /// placed here in the location's order, then movers who are here now, then
 /// recruited companions, in the party or parted here, by ID.
 pub(super) fn placed_here<'a>(world: &'a WorldSpec, state: &GameState) -> Vec<&'a Id> {
-    let here = &state.player.location;
-    let placed = world
-        .location(here)
+    // Retain the existing listing order, then append relocated arrivals.
+    let mut ids: Vec<&Id> = world
+        .location(&state.player.location)
         .unwrap()
         .characters
         .iter()
-        .filter(|id| !state.whereabouts.contains_key(*id) && !state.companions.contains_key(*id));
-    let movers = world
-        .characters
-        .iter()
-        .filter(|c| state.whereabouts.get(&c.id) == Some(here))
-        .map(|c| &c.id);
-    let companions = state
-        .companions
-        .iter()
-        .filter(|(_, c)| c.parted_at.as_ref().is_none_or(|at| at == here))
-        .filter_map(|(id, _)| world.character(id).map(|c| &c.id));
-    placed.chain(movers).chain(companions).collect()
+        .filter(|id| {
+            !state.whereabouts.contains_key(*id)
+                && !state.companions.contains_key(*id)
+                && !state.stations.contains_key(*id)
+        })
+        .collect();
+    ids.extend(
+        world
+            .characters
+            .iter()
+            .filter(|c| c.moves.is_some())
+            .map(|c| &c.id),
+    );
+    ids.extend(
+        state
+            .companions
+            .keys()
+            .filter_map(|id| world.character(id).map(|c| &c.id)),
+    );
+    ids.extend(
+        state
+            .stations
+            .keys()
+            .filter_map(|id| world.character(id).map(|c| &c.id)),
+    );
+    let mut seen = BTreeSet::new();
+    ids.into_iter()
+        .filter(|id| {
+            seen.insert(*id)
+                && character_location(world, state, id) == Some(state.player.location.as_str())
+        })
+        .collect()
 }
 
 /// Who is at the player's location now: placed or moved here, present
@@ -175,31 +200,49 @@ pub(super) fn present_here<'a>(world: &'a WorldSpec, state: &GameState) -> Vec<&
         .collect()
 }
 
+/// Single authority for station resolution, independent of visibility.
+pub(super) fn character_location<'a>(
+    world: &'a WorldSpec,
+    state: &'a GameState,
+    id: &str,
+) -> Option<&'a str> {
+    if state.departed.contains_key(id) {
+        return None;
+    }
+    if in_party(state, id) {
+        return Some(&state.player.location);
+    }
+    state
+        .companions
+        .get(id)
+        .and_then(|c| c.parted_at.as_deref())
+        .or_else(|| state.stations.get(id).map(String::as_str))
+        .or_else(|| state.whereabouts.get(id).map(String::as_str))
+        .or_else(|| {
+            world
+                .location(&state.player.location)
+                .filter(|l| l.characters.iter().any(|c| c == id))
+                .map(|l| l.id.as_str())
+        })
+        .or_else(|| {
+            world
+                .locations
+                .iter()
+                .find(|l| l.characters.iter().any(|c| c == id))
+                .map(|l| l.id.as_str())
+        })
+}
+
 /// At the player's location and present under its conditions.
 pub(super) fn character_here<'a>(
     world: &'a WorldSpec,
     state: &GameState,
     id: &str,
 ) -> Option<&'a Character> {
-    // A companion in the party is with the player whatever its conditions;
-    // one that parted stays where it did, under them.
-    let parted = match state.companions.get(id) {
-        Some(c) if c.in_party() => return world.character(id),
-        Some(c) => c.parted_at.as_ref(),
-        None => None,
-    };
-    let here = match parted.or(state.whereabouts.get(id)) {
-        Some(at) => *at == state.player.location,
-        None => world
-            .location(&state.player.location)
-            .unwrap()
-            .characters
-            .iter()
-            .any(|c| c == id),
-    };
-    world
-        .character(id)
-        .filter(|c| here && allowed(state, c.requires.as_ref()))
+    world.character(id).filter(|c| {
+        character_location(world, state, id) == Some(state.player.location.as_str())
+            && (in_party(state, id) || allowed(state, c.requires.as_ref()))
+    })
 }
 
 /// Can be talked to here; a defeated fighter is gone, like its listing.
@@ -215,6 +258,7 @@ pub(super) fn is_panel(command: &Command) -> bool {
             | Command::Status
             | Command::Inventory
             | Command::Quests
+            | Command::Chronicle
             | Command::Techniques
             | Command::Market
             | Command::Retinue
@@ -229,6 +273,14 @@ pub(super) fn execute(
 ) -> Result<Vec<Event>, EngineError> {
     let panel = is_panel(&command);
     let host_time = matches!(command, Command::PassTime(_));
+    let advances_time = matches!(
+        command,
+        Command::PassTime(_)
+            | Command::Wait(_)
+            | Command::Rest
+            | Command::Travel(_)
+            | Command::Timed { .. }
+    );
     if dead(state) && !panel {
         return Err(EngineError::PlayerDead);
     }
@@ -265,6 +317,7 @@ pub(super) fn execute(
         Command::Inventory => events.push(Event::InventoryViewed),
         Command::Status => events.push(Event::StatusViewed),
         Command::Quests => events.push(Event::QuestsViewed),
+        Command::Chronicle => events.push(Event::ChronicleViewed),
         Command::Techniques => events.push(Event::TechniquesViewed),
         Command::Map => {
             if map_view(world, state).is_none() {
@@ -360,7 +413,11 @@ pub(super) fn execute(
         settle(
             world,
             state,
-            &readings_before.unwrap_or_default(),
+            &if advances_time {
+                readings(world, state)
+            } else {
+                readings_before.unwrap_or_default()
+            },
             &mut events,
         );
     }
@@ -377,6 +434,7 @@ pub(super) fn settle(
     before: &[story::Understanding<'_>],
     events: &mut Vec<Event>,
 ) {
+    close_quests(world, state, events);
     techniques::promote(world, state, events);
     // Any change, such as a trade that empties a choice's condition, can
     // leave the conversation with no speaker or nothing to say: it ends.
@@ -401,6 +459,28 @@ pub(super) fn settle(
         }
     }
     reach_outcome(world, state, events);
+}
+
+pub(super) fn close_quests(world: &WorldSpec, state: &mut GameState, events: &mut Vec<Event>) {
+    loop {
+        let mut changed = false;
+        for q in &world.quests {
+            if !matches!(
+                state.quests[&q.id],
+                QuestStatus::Completed | QuestStatus::Closed
+            ) && q.void_when.as_ref().is_some_and(|c| holds(state, c))
+            {
+                state.quests.insert(q.id.clone(), QuestStatus::Closed);
+                events.push(Event::QuestClosed {
+                    quest: q.id.clone(),
+                });
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
 }
 
 /// Records the first authored outcome whose condition holds now, if none

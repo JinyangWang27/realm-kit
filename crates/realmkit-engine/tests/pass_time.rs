@@ -1,6 +1,6 @@
 //! Host-reported world time: `PassTime` lets minutes pass as a continuous
 //! host sees them go by. However the host batches them, the world comes out
-//! the same; only the command counter tells the batches apart.
+//! the same, including the elapsed-minute counter.
 
 mod common;
 
@@ -12,11 +12,9 @@ fn now(engine: &Engine<'_>) -> u64 {
     engine.state().time.unwrap()
 }
 
-/// Everything but the command counter, which counts how a host batched time.
+/// Full state, including the cut-invariant counter.
 fn played(engine: &Engine<'_>) -> GameState {
-    let mut state = engine.state().clone();
-    state.turn = 0;
-    state
+    engine.state().clone()
 }
 
 /// What a span of time brought, without the `TimePassed` reports that say
@@ -67,8 +65,8 @@ fn one_long_pass_and_many_short_ones_make_the_same_world() {
     assert_eq!(played(&minutes), played(&once));
     assert_eq!(played(&uneven), played(&once));
     assert_eq!(minutes.state().rng, once.state().rng);
-    // Only the counter differs: one command per commit.
-    assert_eq!(minutes.state().turn, once.state().turn + TWO_DAYS - 1);
+    // The counter is cut invariant too.
+    assert_eq!(minutes.state(), once.state());
 }
 
 #[test]

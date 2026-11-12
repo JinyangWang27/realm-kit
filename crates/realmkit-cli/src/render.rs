@@ -952,6 +952,28 @@ pub fn events(
             )?,
             Event::InventoryViewed => panels::inventory(output, engine, paint)?,
             Event::StatusViewed => panels::status(output, engine, paint)?,
+            Event::CharacterRelocated { character, to } => writeln!(
+                output,
+                "{} is now at {}.",
+                world.character(character).unwrap().name,
+                world.location(to).unwrap().name
+            )?,
+            Event::CharacterDeparted { character, reason, .. } => writeln!(
+                output,
+                "{}: {reason:?}.",
+                world.character(character).unwrap().name
+            )?,
+            Event::ControlChanged { location, faction } => writeln!(
+                output,
+                "{} is held by {}.",
+                world.location(location).unwrap().name,
+                world.world.factions.iter().find(|f| &f.id == faction).unwrap().name
+            )?,
+            Event::QuestClosed { quest } => {
+                let quest = world.quest(quest).unwrap();
+                writeln!(output, "{}: {}", quest.name, quest.void_reason.as_deref().unwrap())?;
+            }
+            Event::ChronicleViewed => panels::chronicle(output, engine, paint)?,
             Event::QuestsViewed => panels::quests(output, engine, paint)?,
             Event::MapViewed => {
                 let view = engine.map_view().unwrap();

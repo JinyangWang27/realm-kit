@@ -155,6 +155,7 @@ pub enum Command {
     Inventory,
     Status,
     Quests,
+    Chronicle,
     /// Lists learned techniques and their ranks; only in worlds with techniques.
     Techniques,
     /// Shows the overland map; only in worlds whose places have positions.
@@ -315,6 +316,22 @@ pub enum ProjectileEnd {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Event {
+    CharacterRelocated {
+        character: Id,
+        to: Id,
+    },
+    CharacterDeparted {
+        character: Id,
+        reason: realmkit_spec::DepartureReason,
+        minute: u64,
+    },
+    ControlChanged {
+        location: Id,
+        faction: Id,
+    },
+    QuestClosed {
+        quest: Id,
+    },
     LocationViewed {
         location: Id,
     },
@@ -762,6 +779,7 @@ pub enum Event {
     InventoryViewed,
     StatusViewed,
     QuestsViewed,
+    ChronicleViewed,
     MapViewed,
 }
 

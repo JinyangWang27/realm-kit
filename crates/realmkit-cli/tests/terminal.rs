@@ -1044,3 +1044,42 @@ fn a_line_host_trains_swords_that_share_rank_and_a_spear_that_does_not() {
         assert!(text.contains(passage), "missing {passage:?} in:\n{text}");
     }
 }
+
+#[test]
+fn turning_ford_plays_delayed_loss_and_a_known_chronicle_deterministically() {
+    let world = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/turning-ford");
+    let walkthrough = std::fs::read_to_string(format!("{world}/walkthrough.txt")).unwrap();
+    let play = || {
+        let dir = saves_dir("turning-ford");
+        run(
+            &["play", world, "--seed", "7", "--line", "--saves", &dir],
+            &walkthrough,
+        )
+    };
+    let output = play();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(play().stdout, output.stdout);
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "The Ford is held by Reed Council.",
+        "Council envoy is now at The Refuge.",
+        "Toll clerk: Exiled.",
+        "The clerk was exiled; testimony is no longer possible.",
+        "[0] The ford passed to the Reed Council.",
+        "[2880] Two days later the clerk was exiled and the envoy took refuge.",
+        "The remaining records tell a narrower story.",
+        "[testimony]: Closed",
+        "[salvage]: Completed",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?}: {text}");
+    }
+    let (before, after) = text
+        .split_once("Two days later the clerk was exiled")
+        .unwrap();
+    assert!(before.contains("Read the council notice."));
+    assert!(!after.contains("Talk to Toll clerk"));
+}

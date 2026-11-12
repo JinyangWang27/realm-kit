@@ -36,7 +36,7 @@ pub use validation::{Diagnostic, Severity, SpecError};
 pub use weapons::*;
 
 pub type Id = String;
-pub const FORMAT_VERSION: u32 = 19;
+pub const FORMAT_VERSION: u32 = 20;
 /// The files every package holds, by name.
 pub const PACKAGE_FILES: [&str; 6] = [
     "world.json",
@@ -104,6 +104,8 @@ pub struct World {
     /// What the player can discover in an investigation.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<EvidenceDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chronicle: Vec<ChronicleEntry>,
     /// The story's phases in order; absent in a world without them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub phases: Vec<Phase>,

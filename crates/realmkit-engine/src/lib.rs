@@ -71,6 +71,8 @@ impl<'w> Engine<'w> {
                 .ok_or(EngineError::StartChoices)?;
             rules::apply_effects(world, &mut engine.state, &option.effects, &mut ignored)?;
         }
+        // Answers form the initial state before any closure is evaluated.
+        rules::close_quests(world, &mut engine.state, &mut ignored);
         // A flag an answer set may open a breakthrough gate, as after any command.
         techniques::promote(world, &mut engine.state, &mut ignored);
         engine.state.start_choices = choices.to_vec();
@@ -104,6 +106,14 @@ impl<'w> Engine<'w> {
         let mut engine = Self {
             world,
             state: GameState {
+                stations: BTreeMap::new(),
+                departed: BTreeMap::new(),
+                chronicle: Vec::new(),
+                control: world
+                    .locations
+                    .iter()
+                    .filter_map(|l| l.controller.as_ref().map(|f| (l.id.clone(), f.clone())))
+                    .collect(),
                 player: PlayerState {
                     location: world.world.start.clone(),
                     inventory: BTreeMap::new(),
@@ -211,6 +221,28 @@ impl<'w> Engine<'w> {
             gear::receive_starting(world, engine.state.combat.as_mut().unwrap())?;
         }
         Ok(engine)
+    }
+
+    /// Recorded entries the player may read, in first-recorded order.
+    pub fn chronicle(&self) -> Vec<(&realmkit_spec::ChronicleEntry, u64)> {
+        self.state
+            .chronicle
+            .iter()
+            .filter_map(|r| {
+                let entry = self
+                    .world
+                    .world
+                    .chronicle
+                    .iter()
+                    .find(|e| e.id == r.entry)?;
+                rules::allowed(&self.state, entry.known_when.as_ref()).then_some((entry, r.minute))
+            })
+            .collect()
+    }
+
+    /// The one resolved place; departure has no place.
+    pub fn character_location(&self, character: &str) -> Option<&str> {
+        rules::character_location(self.world, &self.state, character)
     }
 
     pub fn state(&self) -> &GameState {
@@ -415,7 +447,14 @@ impl<'w> Engine<'w> {
         let spends_time = !rules::is_panel(&command);
         let events = rules::execute(self.world, &mut next, command)?;
         if spends_time {
-            next.turn = next.turn.checked_add(1).ok_or(EngineError::NumericLimit)?;
+            let elapsed = next
+                .time
+                .unwrap_or(0)
+                .saturating_sub(self.state.time.unwrap_or(0));
+            next.turn = next
+                .turn
+                .checked_add(elapsed.max(1))
+                .ok_or(EngineError::NumericLimit)?;
         }
         self.state = next;
         Ok(events)

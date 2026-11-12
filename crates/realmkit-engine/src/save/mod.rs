@@ -27,6 +27,7 @@ pub(super) fn check(
     header(world, snapshot)?;
     let state = &snapshot.state;
     basics(world, state)?;
+    present(world, state)?;
     quests(world, fresh, state)?;
     // Before anything evaluates standing conditions, which read every track.
     standing(world, state)?;
@@ -451,6 +452,8 @@ fn could_have_been(
         | Condition::Proficiency { .. }
         | Condition::Evidence { .. }
         | Condition::Phase { .. }
+        | Condition::Departed { .. }
+        | Condition::Elapsed { .. }
             if value =>
         {
             rules::holds(state, condition)
@@ -469,7 +472,11 @@ fn could_have_been(
             }))
             .any(|g| &g.technique == technique && g.rank.unwrap_or(1) >= *rank),
         // A quest passes through every status in order, starting available.
-        Condition::Quest { quest, status } if value => state.quests[quest] >= *status,
+        Condition::Quest { quest, status } if value => match (state.quests[quest], status) {
+            (QuestStatus::Closed, QuestStatus::Completed)
+            | (QuestStatus::Completed, QuestStatus::Closed) => false,
+            (actual, expected) => actual >= *expected,
+        },
         Condition::Quest { quest, status } => {
             *status != QuestStatus::Available || state.quests[quest] != QuestStatus::Available
         }
@@ -535,8 +542,10 @@ fn quests(world: &WorldSpec, fresh: &GameState, state: &GameState) -> Result<(),
     ensure(
         state.quests.keys().eq(fresh.quests.keys())
             && world.quests.iter().all(|quest| {
-                state.quests[&quest.id] == QuestStatus::Available
-                    || lasting(world, state, quest.requires.as_ref())
+                matches!(
+                    state.quests[&quest.id],
+                    QuestStatus::Available | QuestStatus::Closed
+                ) || lasting(world, state, quest.requires.as_ref())
             })
             && world.quests.iter().all(|quest| {
                 let done = match &quest.objective {
@@ -547,7 +556,18 @@ fn quests(world: &WorldSpec, fresh: &GameState, state: &GameState) -> Result<(),
                     QuestObjective::Defeat { character } => defeated(state, character),
                     QuestObjective::Flag { flag } => state.flags.contains(flag),
                 };
+                if !matches!(
+                    state.quests[&quest.id],
+                    QuestStatus::Closed | QuestStatus::Completed
+                ) && quest
+                    .void_when
+                    .as_ref()
+                    .is_some_and(|c| rules::holds(state, c))
+                {
+                    return false;
+                }
                 match state.quests[&quest.id] {
+                    QuestStatus::Closed => quest.void_when.is_some(),
                     QuestStatus::Available => true,
                     QuestStatus::Active => !done,
                     QuestStatus::Ready | QuestStatus::Completed => done,
@@ -1052,4 +1072,74 @@ fn dialogue(world: &WorldSpec, state: &GameState) -> Result<(), String> {
             && !rules::choices(world, state, &dialogue.npc, &dialogue.node).is_empty(),
         "invalid conversation state",
     )
+}
+
+fn present(world: &WorldSpec, state: &GameState) -> Result<(), String> {
+    let target = |id: &str| {
+        world
+            .locations
+            .iter()
+            .filter(|l| l.characters.iter().any(|c| c == id))
+            .count()
+            == 1
+            && id != world.world.player
+            && world
+                .character(id)
+                .is_some_and(|c| c.companion.is_none() && c.moves.is_none())
+    };
+    let start = world.world.time.as_ref().map_or(0, |time| time.start);
+    ensure(
+        state
+            .stations
+            .iter()
+            .all(|(c, l)| target(c) && world.location(l).is_some()),
+        "invalid relocated station",
+    )?;
+    ensure(
+        state
+            .departed
+            .iter()
+            .all(|(id, d)| target(id) && (start..=state.time.unwrap_or(0)).contains(&d.minute)),
+        "invalid departure",
+    )?;
+    let mut seen = BTreeSet::new();
+    ensure(
+        state.chronicle.iter().all(|r| {
+            world.world.chronicle.iter().any(|e| e.id == r.entry)
+                && (start..=state.time.unwrap_or(0)).contains(&r.minute)
+                && seen.insert(&r.entry)
+        }) && state
+            .chronicle
+            .windows(2)
+            .all(|p| p[0].minute <= p[1].minute),
+        "invalid chronicle",
+    )?;
+    ensure(
+        state.chronicle.is_empty() || state.time.is_some(),
+        "chronicle without clock",
+    )?;
+    ensure(
+        state.control.iter().all(|(l, f)| {
+            world.location(l).is_some() && world.world.factions.iter().any(|a| &a.id == f)
+        }) && world
+            .locations
+            .iter()
+            .all(|l| l.controller.is_none() || state.control.contains_key(&l.id)),
+        "invalid control",
+    )?;
+    // Time cannot pass in a fight, but authored fates must also be rejected in forged fight saves.
+    if let Some(combat) = &state.combat {
+        let absent = |id: &str| !state.departed.contains_key(id);
+        ensure(
+            match &combat.stance {
+                Stance::Fighting(f) => f.participants.iter().all(|p| absent(&p.character)),
+                Stance::Realtime(f) => f.fighters.iter().all(|p| absent(&p.character)),
+                Stance::Hosted(f) => f.opponents.iter().all(|id| absent(id)),
+                Stance::Battle(f) => absent(&f.army) && f.allies.iter().all(|id| absent(id)),
+                Stance::Exploring => true,
+            },
+            "departed character in fight",
+        )?;
+    }
+    Ok(())
 }

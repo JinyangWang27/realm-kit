@@ -556,3 +556,21 @@ RPG literature uses "campaign" for several different concepts, including a world
 an adventure, or a playable storyline. RealmKit uses the more precise terms
 `World` and `PlayerRoute`. Do not introduce a first-class `Campaign` type
 unless a future requirement cannot be expressed cleanly with those concepts.
+
+
+## Present
+
+Typed changing world facts: a unique character's station and departure, a
+place's controller, dated chronicle entries, and existing economic and faction
+state. Knowledge (evidence and reached phases) remains separate and only grows.
+
+## Station
+
+A character's relocated location, below party and parted locations in presence
+resolution. It is separate from a mover's schedule and from authored placement.
+
+## Chronicle
+
+Bounded authored world history, first-recorded once per entry with its minute.
+An entry's `known_when` controls what the player may read, independently of when
+the event happened. `elapsed` reads the recorded minute for delayed rules.
