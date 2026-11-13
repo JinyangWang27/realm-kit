@@ -61,12 +61,14 @@ def tdiv(a: int, b: int) -> int:
     return quotient if a >= 0 else -quotient
 
 
-def buy_price(price: int, index: int, spread: int) -> int:
-    return max(1, price * index * (100 + spread) // 100_000)
+def buy_price(price: int, index: int, spread: int, levy: int = 0) -> int:
+    """Add active levy percentages; apply before the single final rounding."""
+    return max(1, price * index * (100 + spread) * (100 + levy) // 10_000_000)
 
 
-def sell_price(price: int, index: int, spread: int) -> int:
-    return price * index * 100 // (1_000 * (100 + spread))
+def sell_price(price: int, index: int, spread: int, levy: int = 0) -> int:
+    """Active levies total at most 100 percent, as validated by the spec."""
+    return price * index * max(0, 100 - levy) // (1_000 * (100 + spread))
 
 
 def scaled(value: int, percent: list[int], prosperity: int) -> int:

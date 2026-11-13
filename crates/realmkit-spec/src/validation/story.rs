@@ -45,6 +45,20 @@ pub(super) fn quests(out: &mut Vec<Diagnostic>, w: &WorldSpec, placed: &BTreeSet
             reference(out, &quest.id, "flag", flag, w.world.flags.contains(flag));
         }
         condition(out, w, &quest.id, quest.requires.as_ref());
+        condition(out, w, &quest.id, quest.void_when.as_ref());
+        if quest.void_when.is_some() != quest.void_reason.is_some()
+            || quest
+                .void_reason
+                .as_ref()
+                .is_some_and(|r| r.trim().is_empty())
+        {
+            issue(
+                out,
+                &quest.id,
+                "invalid_void_reason",
+                "void_when and nonempty void_reason must occur together",
+            );
+        }
         // The main story may branch on side stories, never wait on one.
         if quest.main {
             for side in prerequisites(w, quest).filter(|p| !p.main) {
@@ -234,6 +248,19 @@ pub(super) fn companion(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, i
 
 pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effect: &Effect) {
     match effect {
+        Effect::Relocate { character, to } => {
+            present_target(out, w, owner, character);
+            reference(out, owner, "location", to, w.location(to).is_some());
+        }
+        Effect::Depart { character, .. } => present_target(out, w, owner, character),
+        Effect::Record { entry } => reference(
+            out,
+            owner,
+            "chronicle entry",
+            entry,
+            w.world.chronicle.iter().any(|e| &e.id == entry),
+        ),
+        Effect::SetControl { location, faction } => control(out, w, owner, location, faction),
         Effect::AcceptQuest { quest } | Effect::CompleteQuest { quest } => {
             reference(out, owner, "quest", quest, w.quest(quest).is_some())
         }
@@ -324,7 +351,8 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 Effect::GrantTechnique(grant) => {
                     progression::technique_grant(out, w, &question.id, grant)
                 }
-                Effect::AcceptQuest { .. }
+                Effect::Relocate { .. } | Effect::Depart { .. } | Effect::Record { .. } | Effect::SetControl { .. }
+                | Effect::AcceptQuest { .. }
                 | Effect::CompleteQuest { .. }
                 | Effect::TakeItems { .. }
                 | Effect::PayCurrency { .. }
@@ -500,7 +528,15 @@ pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
         })
         .collect();
     let never_at_start = |leaf: &Condition| match leaf {
-        Condition::Quest { status, .. } => *status != QuestStatus::Available,
+        // Closed can already hold at New Game through void_when.
+        Condition::Quest { status, .. } => matches!(
+            status,
+            QuestStatus::Active | QuestStatus::Ready | QuestStatus::Completed
+        ),
+        Condition::Departed { .. } | Condition::Elapsed { .. } => true,
+        Condition::Controls { location, faction } => w
+            .location(location)
+            .is_some_and(|l| l.controller.as_ref() != Some(faction)),
         Condition::Evidence { .. } | Condition::Workshop { .. } => true,
         Condition::Phase { phase } => w.phase_index(phase).is_some_and(|i| i > 0),
         Condition::Flag { flag } => !answered.contains(flag),
@@ -527,7 +563,20 @@ pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                 );
             }
         }
-        if !outcome.when.requires(&never_at_start) {
+        let excludes_start = |leaf: &Condition| {
+            never_at_start(leaf)
+                || match leaf {
+                    Condition::Quest {
+                        quest,
+                        status: QuestStatus::Closed,
+                    } => w
+                        .quest(quest)
+                        .and_then(|q| q.void_when.as_ref())
+                        .is_some_and(|c| c.requires(&never_at_start)),
+                    _ => false,
+                }
+        };
+        if !outcome.when.requires(&excludes_start) {
             issue(
                 out,
                 &outcome.id,
@@ -536,4 +585,52 @@ pub(super) fn outcomes(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
             );
         }
     }
+}
+
+pub(super) fn present_target(
+    out: &mut Vec<Diagnostic>,
+    w: &WorldSpec,
+    owner: &str,
+    character: &str,
+) {
+    reference(
+        out,
+        owner,
+        "character",
+        character,
+        w.character(character).is_some(),
+    );
+    if w.locations
+        .iter()
+        .filter(|l| l.characters.iter().any(|id| id == character))
+        .count()
+        != 1
+        || character == w.world.player
+        || w.character(character)
+            .is_some_and(|c| c.companion.is_some() || c.moves.is_some())
+    {
+        issue(out, owner, "invalid_present_target", "station and departure effects require unique placement and cannot target the player, companions or movers");
+    }
+}
+pub(super) fn control(
+    out: &mut Vec<Diagnostic>,
+    w: &WorldSpec,
+    owner: &str,
+    location: &str,
+    faction: &str,
+) {
+    reference(
+        out,
+        owner,
+        "location",
+        location,
+        w.location(location).is_some(),
+    );
+    reference(
+        out,
+        owner,
+        "faction",
+        faction,
+        w.world.factions.iter().any(|f| f.id == faction),
+    );
 }

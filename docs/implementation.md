@@ -6,6 +6,36 @@ proves the complete single-player loop with authored content.
 
 ## Implementation sequence
 
+- [x] Conditional market levies: validated conditions and optional goods filters,
+  additive percentages with a 100% authored-total ceiling, derived quote/charge
+  calculation with one final rounding per unit. Applied metadata reaches quotes,
+  trade events and CLI rows; Python mirrors the formula with pinned Rust numbers.
+  Turning-ford demonstrates immediate control-dependent pricing. Host location
+  query documents every resolution branch; tests cover delayed Chronicle disclosure
+  retaining the recorded minute. Opt-in release benchmark: `cargo test -p
+  realmkit-engine --release --test time_cost --locked -- --ignored --nocapture`.
+  30-day commands are the maximum (43,200 minutes); 400 days uses thirteen maximum
+  commands plus one ten-day command. Baseline 400-day runs were below 0.1 seconds,
+  so minute-by-minute settling is retained; no skip-ahead semantics are introduced.
+  Final seed-7 release measurements (fresh engines, world load excluded):
+
+  | World | 30 days wall time | Minutes/s | 400 days wall time | Minutes/s |
+  |---|---:|---:|---:|---:|
+  | marches | 0.005818 s | 7,424,807 | 0.074099 s | 7,773,332 |
+  | turning-ford | 0.002581 s | 16,739,858 | 0.034030 s | 16,926,345 |
+
+
+- [x] Present facts (first parts of M5c/M5d/M6e/M6f): static-character stations
+  and irreversible dated departure; a bounded, knowledge-filtered chronicle;
+  one faction controller per place; terminal quest closure with authored reason.
+  Shared presence resolution serves rules, groups, menus and the host query.
+  Scheduled rules admit the four effects without admitting Knowledge or party
+  effects. Every time producer settles occurrences and minute boundaries;
+  property-style tests pin cut invariance, transient closure, chained elapsed
+  consequences and byte-identical mid-delay reload. Format 20 changes the time
+  counter and settling semantics; optional content growth itself needs no bump.
+  `examples/turning-ford` shows both lost testimony and the remaining route.
+
 - [x] Spec: serde domain types, versioned JSON directory loader, references and
   template validation. Test valid demo content and malformed packages.
 - [x] Engine: explicit in-memory state and command/event API. Test the entire quest

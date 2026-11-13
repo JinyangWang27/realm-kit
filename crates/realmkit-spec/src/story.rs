@@ -15,6 +15,10 @@ pub struct Quest {
     /// Part of the route's main questline rather than a side story.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub main: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub void_when: Option<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub void_reason: Option<String>,
     /// The condition to take the quest up, such as an earlier quest done.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires: Option<Condition>,
@@ -35,7 +39,7 @@ pub enum QuestObjective {
     Flag { flag: Id },
 }
 
-/// A quest only ever moves forward through these, in order.
+/// Available → Active → Ready → Completed, or Closed from any nonterminal status.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestStatus {
@@ -43,6 +47,7 @@ pub enum QuestStatus {
     Active,
     Ready,
     Completed,
+    Closed,
 }
 
 /// A pure query over the playthrough: typed leaf predicates composed with
@@ -50,6 +55,18 @@ pub enum QuestStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Condition {
+    Departed {
+        character: Id,
+    },
+    Elapsed {
+        entry: Id,
+        #[serde(default)]
+        minutes: u64,
+    },
+    Controls {
+        location: Id,
+        faction: Id,
+    },
     /// Every condition holds.
     All {
         of: Vec<Condition>,
@@ -261,6 +278,21 @@ pub struct DialogueChoice {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Effect {
+    Relocate {
+        character: Id,
+        to: Id,
+    },
+    Depart {
+        character: Id,
+        reason: DepartureReason,
+    },
+    Record {
+        entry: Id,
+    },
+    SetControl {
+        location: Id,
+        faction: Id,
+    },
     AcceptQuest {
         quest: Id,
     },
@@ -443,4 +475,24 @@ pub struct RouteOutcome {
     pub name: String,
     pub text: String,
     pub when: Condition,
+}
+
+/// An irreversible authored fate, independent of combat outcomes.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DepartureReason {
+    Dead,
+    Exiled,
+    Left,
+    Destroyed,
+}
+
+/// Bounded world history; visibility is a separate pure query.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ChronicleEntry {
+    pub id: Id,
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub known_when: Option<Condition>,
 }

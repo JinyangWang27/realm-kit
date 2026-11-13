@@ -786,6 +786,7 @@ fn label(engine: &Engine<'_>, action: &realmkit_engine::Action) -> Option<String
         Command::Inventory => INVENTORY.into(),
         Command::Status => CHARACTER.into(),
         Command::Quests => QUESTS.into(),
+        Command::Chronicle => "Chronicle".into(),
         Command::Techniques => TECHNIQUES.into(),
         Command::Map => MAP.into(),
         _ => return None,
@@ -1240,6 +1241,32 @@ mod tests {
                 "Quests"
             ]
         );
+    }
+
+    #[test]
+    fn chronicle_uses_the_same_menu_command_for_keys_and_numbers() {
+        let world = WorldSpec::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../examples/turning-ford"
+        ))
+        .unwrap();
+        let mut engine = Engine::new(&world).unwrap();
+        engine.execute(Command::Talk("envoy".into())).unwrap();
+        engine.execute(Command::ChooseDialogue(1)).unwrap();
+        engine.execute(Command::Wait(2880)).unwrap();
+        let mut menu = Menu::new(&engine, false, None);
+        assert!(!menu
+            .entries()
+            .iter()
+            .any(|e| e.label.contains("Toll clerk")));
+        let index = menu
+            .entries()
+            .iter()
+            .position(|e| e.label == "Chronicle")
+            .unwrap();
+        assert_eq!(menu.choose(index + 1), Outcome::Run(Command::Chronicle));
+        menu.cursor = index;
+        assert_eq!(menu.handle(Key::Enter), Outcome::Run(Command::Chronicle));
     }
 
     #[test]

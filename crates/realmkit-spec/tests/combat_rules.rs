@@ -224,6 +224,8 @@ fn groups_and_profile_levels_are_validated() {
                 reward_items: vec![],
                 completion_flags: vec![],
                 main: false,
+                void_when: None,
+                void_reason: None,
                 requires: None,
                 reward_techniques: vec![],
             })

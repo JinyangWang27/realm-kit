@@ -272,6 +272,41 @@ fn markets(out: &mut Vec<Diagnostic>, w: &WorldSpec, economy: &Economy) {
     let [low, high] = economy.index_bounds;
     for market in &economy.markets {
         let owner = &market.location;
+        ids(out, "levy", market.levies.iter().map(|l| l.id.as_str()));
+        let total: u64 = market.levies.iter().map(|l| u64::from(l.percent)).sum();
+        if total > 100 {
+            issue(
+                out,
+                owner,
+                "invalid_levy",
+                "market levies total at most 100 percent",
+            );
+        }
+        for levy in &market.levies {
+            if levy.percent == 0 || levy.percent > 100 || levy.text.trim().is_empty() {
+                issue(
+                    out,
+                    &levy.id,
+                    "invalid_levy",
+                    "a levy needs text and 1 to 100 percent",
+                );
+            }
+            condition(out, w, &levy.id, Some(&levy.requires));
+            if let Some(goods) = &levy.goods {
+                if goods.is_empty() {
+                    issue(
+                        out,
+                        &levy.id,
+                        "invalid_levy",
+                        "a goods filter must be nonempty",
+                    );
+                }
+                ids(out, "levy good", goods.iter().map(String::as_str));
+                for good in goods {
+                    reference(out, &levy.id, "good", good, economy.good(good).is_some());
+                }
+            }
+        }
         reference(out, owner, "location", owner, w.location(owner).is_some());
         if let Some(merchant) = &market.merchant {
             reference(

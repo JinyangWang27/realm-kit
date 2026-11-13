@@ -1,0 +1,141 @@
+{
+  "format_version": 20,
+  "id": "turning_ford",
+  "name": "The Turning Ford",
+  "language": "en",
+  "start": "ford",
+  "player": "you",
+  "flags": [
+    "heard",
+    "testified",
+    "salvaged"
+  ],
+  "time": {
+    "start": 0,
+    "wait": 1440,
+    "clock": "Day {day}, {hour}:{minute}"
+  },
+  "factions": [
+    {
+      "id": "reed",
+      "name": "Reed Council"
+    },
+    {
+      "id": "stone",
+      "name": "Stone Wardens"
+    }
+  ],
+  "standing": [
+    {
+      "id": "trust",
+      "name": "Trust",
+      "scope": "global",
+      "min": -10,
+      "max": 10,
+      "start": 0
+    }
+  ],
+  "chronicle": [
+    {
+      "id": "transfer",
+      "text": "The ford passed to the Reed Council."
+    },
+    {
+      "id": "dispersal",
+      "text": "Two days later the clerk was exiled and the envoy took refuge.",
+      "known_when": {
+        "kind": "flag",
+        "flag": "heard"
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "disperse",
+      "schedule": {
+        "at": 60,
+        "every": 60
+      },
+      "requires": {
+        "kind": "all",
+        "of": [
+          {
+            "kind": "elapsed",
+            "entry": "transfer",
+            "minutes": 2880
+          },
+          {
+            "kind": "controls",
+            "location": "ford",
+            "faction": "reed"
+          },
+          {
+            "kind": "not",
+            "condition": {
+              "kind": "elapsed",
+              "entry": "dispersal",
+              "minutes": 0
+            }
+          }
+        ]
+      },
+      "effects": [
+        {
+          "kind": "relocate",
+          "character": "envoy",
+          "to": "refuge"
+        },
+        {
+          "kind": "depart",
+          "character": "clerk",
+          "reason": "exiled"
+        },
+        {
+          "kind": "change_standing",
+          "track": "trust",
+          "by": -2
+        },
+        {
+          "kind": "record",
+          "entry": "dispersal"
+        }
+      ]
+    }
+  ],
+  "economy": {
+    "currency": {
+      "format": "{amount} copper",
+      "start": 100
+    },
+    "goods": [
+      {
+        "item": "grain",
+        "price": 20
+      }
+    ],
+    "markets": [
+      {
+        "location": "ford",
+        "kind": "village",
+        "levies": [
+          {
+            "id": "reed_handling",
+            "text": "Reed Council handling charge",
+            "requires": {
+              "kind": "controls",
+              "location": "ford",
+              "faction": "reed"
+            },
+            "percent": 10
+          }
+        ]
+      }
+    ],
+    "index_bounds": [
+      100,
+      10000
+    ],
+    "spread_percent": 0,
+    "trade_step": 0
+  }
+}

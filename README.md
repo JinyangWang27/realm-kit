@@ -15,6 +15,15 @@ The first playable world, *The Bell in the Pines*, is hand-authored. Talk to
 Elder Mara, choose dialogue, accept her quest, defeat the ash wolf, collect loot
 and XP, level up, and return to unlock the chapel and its crypt.
 
+Worlds can change hands and lose witnesses through authored rules. A dated
+chronicle shows only news the player could know; a quest can close with a reason
+when its route is lost. Play `examples/turning-ford` for a small two-day causal
+chain, then open **Chronicle** (or type `chronicle`). Completing the testimony
+before the change preserves that conclusion; arriving late leaves the ferry
+records as another route. Its grain market also shows the new controller’s 10%
+handling charge in market prices and trade receipts. Markets can author conditional
+levies for all goods or selected goods; charges follow the current facts immediately.
+
 ## Play
 
 Install a stable Rust toolchain, then run from the repository root:

@@ -283,6 +283,17 @@ the world authors it, and it arrives with a fixture that proves it.
 
 ### Economy
 
+Conditional market levies connect Present facts to trade costs without changing
+production or saved price indices. A market authors `levies` with an `id`, display
+`text`, `requires` condition, positive `percent`, and optional `goods` filter. Thus
+`controls(ford, reed)` can activate a handling charge immediately when control
+changes. Active percentages add, bounded by a market-wide authored total of 100;
+they raise buy receipts and reduce sale proceeds before the unit's final rounding.
+They are derived, never saved or ticked. Quotes and trade events explain each
+applied charge; action affordability uses the same quote. The turning-ford market
+and walkthrough show grain at 20/20 before transfer and 22/18 under Reed control.
+This is not a treasury, tax collection schedule or market-index modifier.
+
 M6a-1 delivered goods, producers, markets, the price tick, links, buying and
 selling, merchants who must be present and currency conditions and effects
 ([Economy](world-format.md#economy)). M6a-2 delivered prosperity,

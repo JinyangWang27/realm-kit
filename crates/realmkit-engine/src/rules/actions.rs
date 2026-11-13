@@ -12,6 +12,9 @@ pub(crate) fn actions(world: &WorldSpec, state: &GameState) -> Vec<Action> {
         available(Command::Status),
         available(Command::Quests),
     ];
+    if !world.world.chronicle.is_empty() {
+        panels.push(available(Command::Chronicle));
+    }
     if world.combat().is_some_and(|c| !c.techniques.is_empty()) {
         panels.push(available(Command::Techniques));
     }

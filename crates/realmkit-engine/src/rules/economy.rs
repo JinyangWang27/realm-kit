@@ -41,6 +41,25 @@ fn lowered(economy: &Economy, index: u32) -> u32 {
         .max(economy.index_bounds[0])
 }
 
+/// Active charges for one good, never persisted or involved in price ticks.
+fn levies(state: &GameState, market: &Market, good: &str) -> Vec<AppliedLevy> {
+    market
+        .levies
+        .iter()
+        .filter(|l| {
+            l.goods
+                .as_ref()
+                .is_none_or(|goods| goods.iter().any(|g| g == good))
+                && allowed(state, Some(&l.requires))
+        })
+        .map(|l| AppliedLevy {
+            id: l.id.clone(),
+            text: l.text.clone(),
+            percent: l.percent,
+        })
+        .collect()
+}
+
 /// A good's prices at the open market here, as trading would charge them.
 pub(crate) fn quote(world: &WorldSpec, state: &GameState, good: &str) -> Option<Quote> {
     let (economy, market) = market_here(world, state).ok()?;
@@ -52,12 +71,15 @@ pub(crate) fn quote(world: &WorldSpec, state: &GameState, good: &str) -> Option<
         .get(&market.location)?
         .get(good)?;
     let spread = economy.spread(market, proficiency::rank(state, Proficiency::Trading));
+    let levies = levies(state, market, good);
+    let percent = levies.iter().map(|l| l.percent).sum();
     let stock = state.economy.as_ref()?.stock.get(&market.location);
     Some(Quote {
-        buy: buy_price(price, index, spread),
-        sell: sell_price(price, index, spread),
-        next_buy: buy_price(price, raised(economy, index), spread),
-        next_sell: sell_price(price, lowered(economy, index), spread),
+        levies,
+        buy: levied_buy_price(price, index, spread, percent),
+        sell: levied_sell_price(price, index, spread, percent),
+        next_buy: levied_buy_price(price, raised(economy, index), spread, percent),
+        next_sell: levied_sell_price(price, lowered(economy, index), spread, percent),
         stock: stock.map(|s| s.goods[good]),
         purse: stock.map(|s| s.currency),
     })
@@ -89,10 +111,14 @@ pub(crate) fn trade(
         item: good.item.clone(),
         quantity,
     }];
+    // Quote and charge against the same pre-trade facts, even for conditions
+    // on carried cargo or currency. The charge is fixed for this command.
+    let levies = levies(state, market, &good.item);
+    let percent = levies.iter().map(|l| l.percent).sum();
+    let spread = economy.spread(market, proficiency::rank(state, Proficiency::Trading));
     if !buying {
         story::take_items(state, &stack, &mut Vec::new())?;
     }
-    let spread = economy.spread(market, proficiency::rank(state, Proficiency::Trading));
     let wallet = state.economy.as_mut().unwrap();
     let index = wallet
         .prices
@@ -102,9 +128,9 @@ pub(crate) fn trade(
     let mut total = 0_u64;
     for _ in 0..quantity {
         let unit = if buying {
-            buy_price(good.price, *index, spread)
+            levied_buy_price(good.price, *index, spread, percent)
         } else {
-            sell_price(good.price, *index, spread)
+            levied_sell_price(good.price, *index, spread, percent)
         };
         total = total.checked_add(unit).ok_or(EngineError::NumericLimit)?;
         *index = if buying {
@@ -141,6 +167,7 @@ pub(crate) fn trade(
             .ok_or(EngineError::NotEnoughCurrency)?;
         story::grant_items(world, state, &stack, &mut Vec::new())?;
         events.push(Event::Bought {
+            levies,
             good,
             quantity,
             cost: total,
@@ -148,6 +175,7 @@ pub(crate) fn trade(
     } else {
         receive(wallet, total)?;
         events.push(Event::Sold {
+            levies,
             good,
             quantity,
             earned: total,
@@ -191,6 +219,7 @@ fn buy_ware(
     }];
     story::grant_items(world, state, &stack, &mut Vec::new())?;
     events.push(Event::Bought {
+        levies: Vec::new(),
         good: ware.item.clone(),
         quantity,
         cost,

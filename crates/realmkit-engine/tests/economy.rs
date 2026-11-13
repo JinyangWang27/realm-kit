@@ -138,6 +138,7 @@ fn buying_and_selling_move_currency_goods_and_the_index() {
     assert_eq!(
         events,
         [Event::Bought {
+            levies: vec![],
             good: "eels".into(),
             quantity: 3,
             cost: buy_price(15, 388, 25) + buy_price(15, 414, 25) + buy_price(15, 440, 25)
@@ -152,6 +153,7 @@ fn buying_and_selling_move_currency_goods_and_the_index() {
     assert_eq!(
         events,
         [Event::Sold {
+            levies: vec![],
             good: "eels".into(),
             quantity: 1,
             earned
@@ -557,6 +559,7 @@ fn wares_sell_at_a_fixed_price_and_gear_arrives_as_pieces() {
     assert_eq!(engine.ware_price("rat_tail"), None);
     let events = engine.execute(buy("healing_draught", 1)).unwrap();
     assert!(events.contains(&Event::Bought {
+        levies: vec![],
         good: "healing_draught".into(),
         quantity: 1,
         cost: 8

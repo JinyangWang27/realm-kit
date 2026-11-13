@@ -1,0 +1,156 @@
+[
+  {
+    "id": "envoy",
+    "start": "start",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "Shall the Reed Council take the ford?",
+        "choices": [
+          {
+            "text": "Hand over the ford.",
+            "next": null,
+            "effects": [
+              {
+                "kind": "set_control",
+                "location": "ford",
+                "faction": "reed"
+              },
+              {
+                "kind": "record",
+                "entry": "transfer"
+              }
+            ],
+            "requires": {
+              "kind": "not",
+              "condition": {
+                "kind": "elapsed",
+                "entry": "transfer",
+                "minutes": 0
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "clerk",
+    "start": "start",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "I can explain the old tolls.",
+        "choices": [
+          {
+            "text": "Open the inquiry.",
+            "next": null,
+            "effects": [
+              {
+                "kind": "accept_quest",
+                "quest": "testimony"
+              }
+            ],
+            "requires": {
+              "kind": "quest",
+              "quest": "testimony",
+              "status": "available"
+            }
+          },
+          {
+            "text": "Take the testimony.",
+            "next": null,
+            "effects": [
+              {
+                "kind": "set_flag",
+                "flag": "testified"
+              },
+              {
+                "kind": "complete_quest",
+                "quest": "testimony"
+              }
+            ],
+            "requires": {
+              "kind": "quest",
+              "quest": "testimony",
+              "status": "active"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "notice",
+    "start": "start",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "The council posts its news here.",
+        "choices": [
+          {
+            "text": "Read the council notice.",
+            "next": null,
+            "effects": [
+              {
+                "kind": "set_flag",
+                "flag": "heard"
+              }
+            ],
+            "requires": {
+              "kind": "elapsed",
+              "entry": "dispersal",
+              "minutes": 0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "keeper",
+    "start": "start",
+    "nodes": [
+      {
+        "id": "start",
+        "text": "The ferry books survived the change of hands.",
+        "choices": [
+          {
+            "text": "Open another inquiry.",
+            "next": null,
+            "effects": [
+              {
+                "kind": "accept_quest",
+                "quest": "salvage"
+              }
+            ],
+            "requires": {
+              "kind": "quest",
+              "quest": "salvage",
+              "status": "available"
+            }
+          },
+          {
+            "text": "Check the ferry books.",
+            "next": null,
+            "effects": [
+              {
+                "kind": "set_flag",
+                "flag": "salvaged"
+              },
+              {
+                "kind": "complete_quest",
+                "quest": "salvage"
+              }
+            ],
+            "requires": {
+              "kind": "quest",
+              "quest": "salvage",
+              "status": "active"
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

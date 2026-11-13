@@ -234,6 +234,12 @@ pub(crate) fn grant_xp(
 }
 
 pub(crate) fn progress(state: &mut GameState, quest: &Id, events: &mut Vec<Event>) {
+    if matches!(
+        state.quests[quest],
+        QuestStatus::Closed | QuestStatus::Completed
+    ) {
+        return;
+    }
     state.quests.insert(quest.clone(), QuestStatus::Ready);
     events.push(Event::QuestProgressed {
         quest: quest.clone(),
@@ -266,6 +272,7 @@ pub(crate) fn quest(
     complete: bool,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
+    close_quests(world, state, events);
     let quest = world
         .quest(id)
         .ok_or_else(|| EngineError::UnknownQuest(id.into()))?;
@@ -334,6 +341,50 @@ pub(crate) fn apply(
 ) -> Result<(), EngineError> {
     for effect in effects {
         match effect {
+            Effect::Relocate { character, to } => {
+                if state.departed.contains_key(character) {
+                    return Err(EngineError::NotHere(character.clone()));
+                }
+                state.stations.insert(character.clone(), to.clone());
+                events.push(Event::CharacterRelocated {
+                    character: character.clone(),
+                    to: to.clone(),
+                });
+            }
+            Effect::Depart { character, reason } => {
+                if !state.departed.contains_key(character) {
+                    state.departed.insert(
+                        character.clone(),
+                        Departure {
+                            reason: *reason,
+                            minute: state.time.unwrap_or(0),
+                        },
+                    );
+                    events.push(Event::CharacterDeparted {
+                        character: character.clone(),
+                        reason: *reason,
+                        minute: state.time.unwrap_or(0),
+                    });
+                }
+            }
+            Effect::Record { entry } => {
+                if !state.chronicle.iter().any(|r| &r.entry == entry) {
+                    state.chronicle.push(RecordedEntry {
+                        entry: entry.clone(),
+                        minute: state.time.unwrap_or(0),
+                    });
+                    // No event leaks history hidden by known_when.
+                }
+            }
+            Effect::SetControl { location, faction } => {
+                if state.control.get(location) != Some(faction) {
+                    state.control.insert(location.clone(), faction.clone());
+                    events.push(Event::ControlChanged {
+                        location: location.clone(),
+                        faction: faction.clone(),
+                    });
+                }
+            }
             Effect::AcceptQuest { quest: id } => quest(world, state, id, false, events)?,
             Effect::CompleteQuest { quest: id } => quest(world, state, id, true, events)?,
             Effect::SetFlag { flag } => set_flag(world, state, flag, events),

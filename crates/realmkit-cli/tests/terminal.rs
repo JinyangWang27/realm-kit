@@ -1044,3 +1044,65 @@ fn a_line_host_trains_swords_that_share_rank_and_a_spear_that_does_not() {
         assert!(text.contains(passage), "missing {passage:?} in:\n{text}");
     }
 }
+
+#[test]
+fn turning_ford_plays_delayed_loss_and_a_known_chronicle_deterministically() {
+    let world = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/turning-ford");
+    let walkthrough = std::fs::read_to_string(format!("{world}/walkthrough.txt")).unwrap();
+    let play = || {
+        let dir = saves_dir("turning-ford");
+        run(
+            &["play", world, "--seed", "7", "--line", "--saves", &dir],
+            &walkthrough,
+        )
+    };
+    let output = play();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(play().stdout, output.stdout);
+    let text = String::from_utf8(output.stdout).unwrap();
+    for passage in [
+        "The Ford is held by Reed Council.",
+        "Council envoy is now at The Refuge.",
+        "Toll clerk: Exiled.",
+        "The clerk was exiled; testimony is no longer possible.",
+        "[0] The ford passed to the Reed Council.",
+        "[2880] Two days later the clerk was exiled and the envoy took refuge.",
+        "The remaining records tell a narrower story.",
+        "[testimony]: Closed",
+        "[salvage]: Completed",
+    ] {
+        assert!(text.contains(passage), "missing {passage:?}: {text}");
+    }
+    let (before, after) = text
+        .split_once("Two days later the clerk was exiled")
+        .unwrap();
+    assert!(before.contains("Read the council notice."));
+    assert!(!after.contains("Talk to Toll clerk"));
+}
+
+#[test]
+fn market_and_trade_lines_explain_control_dependent_levies() {
+    let world = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/turning-ford");
+    let output = run(
+        &["play", world, "--line", "--seed", "7"],
+        "market\nbuy grain\ntalk envoy\nchoose 1\nmarket\nbuy grain\nsell grain\nquit\n",
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    for line in [
+        "Grain — buy 20 copper · sell 20 copper",
+        "Grain — buy 22 copper · sell 18 copper",
+        "Bought: Grain ×1 for 22 copper · Reed Council handling charge 10%",
+        "Sold: Grain ×1 for 18 copper · Reed Council handling charge 10%",
+    ] {
+        assert!(text.contains(line), "missing {line:?}: {text}");
+    }
+}

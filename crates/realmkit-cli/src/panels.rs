@@ -147,10 +147,11 @@ pub fn market(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
             .map_or(String::new(), |n| format!(" · stock {n}"));
         writeln!(
             output,
-            "  {} — buy {} · sell {}{stock} · carried {held}",
+            "  {} — buy {} · sell {}{stock} · carried {held}{}",
             world.item(&good.item).unwrap().name,
             money(world, quote.buy),
             money(world, quote.sell),
+            levy_label(&quote.levies),
         )?;
     }
     if !market.wares.is_empty() {
@@ -468,6 +469,9 @@ pub fn quests(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io:
             "  {} [{}]: {:?}{main}",
             quest.name, quest.id, entry.status
         )?;
+        if entry.status == realmkit_spec::QuestStatus::Closed {
+            writeln!(output, "    {}", quest.void_reason.as_deref().unwrap())?;
+        }
     }
     if !journal.evidence.is_empty() {
         writeln!(output, "{}", paint.title("Evidence:"))?;
@@ -530,4 +534,27 @@ pub fn techniques(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) ->
         writeln!(output, "  {}: rank {rank}", discipline.name)?;
     }
     Ok(())
+}
+
+pub fn chronicle(output: &mut impl Write, engine: &Engine<'_>, paint: Paint) -> io::Result<()> {
+    writeln!(output, "{}", paint.title("Chronicle:"))?;
+    for (entry, minute) in engine.chronicle() {
+        writeln!(output, "  [{minute}] {}", entry.text)?;
+    }
+    Ok(())
+}
+
+/// Charges already included in a quote or trade line.
+pub(crate) fn levy_label(levies: &[realmkit_engine::AppliedLevy]) -> String {
+    if levies.is_empty() {
+        return String::new();
+    }
+    format!(
+        " · {}",
+        levies
+            .iter()
+            .map(|l| format!("{} {}%", l.text, l.percent))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
