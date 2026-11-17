@@ -1128,6 +1128,7 @@ Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 { "kind": "declare_war", "factions": ["fen", "guild"] }
 { "kind": "make_peace", "factions": ["keep", "fen"] }
 { "kind": "join_party", "character": "wren" }
+{ "kind": "join_party", "character": "oake", "summon": true }
 { "kind": "leave_party", "character": "wren" }
 ```
 
@@ -1974,7 +1975,10 @@ one location, where it can first be recruited (`companion_placement`).
   order, striking only at foes whose attack is aimed at it.
 
 A dialogue choice's `join_party` effect brings a companion who is here into
-the party; one already in it refuses the whole choice. `leave_party` leaves
+the party; one already in it refuses the whole choice. With `summon: true`
+(false by default) the companion need not be here: it comes to the player
+from wherever it is, as when the story says it travelled on ahead. Only
+its place is waived; its `requires` must still hold. `leave_party` leaves
 a companion of the party where the player stands. Both name a companion
 (`not_a_companion`, `missing_reference`), and only dialogue choices may use
 them: an event or start option that does is `invalid_effect`. The `companion`

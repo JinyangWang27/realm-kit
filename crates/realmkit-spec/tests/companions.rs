@@ -92,6 +92,7 @@ fn party_effects_and_conditions_name_companions_and_only_dialogue_changes_the_pa
     let wren = world.dialogues.iter_mut().find(|d| d.id == "wren").unwrap();
     wren.nodes[0].choices[1].effects = vec![Effect::JoinParty {
         character: "mara".into(),
+        summon: false,
     }];
     wren.nodes[0].choices[2].requires = Some(Condition::Companion {
         character: "nobody".into(),
@@ -126,8 +127,64 @@ fn party_effects_and_conditions_name_companions_and_only_dialogue_changes_the_pa
             text: "A friend.".into(),
             effects: vec![Effect::JoinParty {
                 character: "wren".into(),
+                summon: false,
             }],
         }],
     });
     assert!(common::codes(&world).contains(&"invalid_effect".to_string()));
+}
+
+/// Every `join_party` effect in the world's dialogues.
+fn joins(world: &mut WorldSpec) -> impl Iterator<Item = &mut bool> {
+    world
+        .dialogues
+        .iter_mut()
+        .flat_map(|d| &mut d.nodes)
+        .flat_map(|n| &mut n.choices)
+        .flat_map(|c| &mut c.effects)
+        .filter_map(|e| match e {
+            Effect::JoinParty { summon, .. } => Some(summon),
+            _ => None,
+        })
+}
+
+#[test]
+fn a_summons_is_written_only_when_asked_for_so_older_packages_keep_their_revision() {
+    let plain = Effect::JoinParty {
+        character: "wren".into(),
+        summon: false,
+    };
+    let written = serde_json::to_value(&plain).unwrap();
+    assert_eq!(
+        written,
+        serde_json::json!({ "kind": "join_party", "character": "wren" })
+    );
+    assert_eq!(serde_json::from_value::<Effect>(written).unwrap(), plain);
+    let summons: Effect = serde_json::from_value(
+        serde_json::json!({ "kind": "join_party", "character": "wren", "summon": true }),
+    )
+    .unwrap();
+    assert_eq!(
+        serde_json::to_value(&summons).unwrap()["summon"],
+        serde_json::json!(true)
+    );
+    // The ford's recruits name no summons; its revision is the one it had
+    // before the field existed, and only an actual summons changes it.
+    let mut world = ford();
+    assert_eq!(world.revision(), "fnv1a64:5d74d0ff62177d9a");
+    assert_eq!(joins(&mut world).count(), 2);
+    assert!(joins(&mut world).all(|s| !*s));
+    *joins(&mut world).next().unwrap() = true;
+    assert_ne!(world.revision(), "fnv1a64:5d74d0ff62177d9a");
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    // A companion cannot be sent away for good, so a summons never meets one
+    // who has departed.
+    let mut world = ford();
+    world.dialogues[0].nodes[0].choices[0]
+        .effects
+        .push(Effect::Depart {
+            character: "wren".into(),
+            reason: DepartureReason::Left,
+        });
+    assert!(codes(&world).contains(&"invalid_present_target".to_string()));
 }

@@ -28,10 +28,13 @@ pub(crate) fn in_party(state: &GameState, id: &str) -> bool {
 /// A companion here joins the party, under its standing order to follow.
 /// The first time, it arrives whole; after that it brings the vitals it
 /// had when it parted, so leaving and joining again heals nothing.
+/// Summoned, it may be anywhere: only its place is waived, so a departed
+/// companion, or one whose `requires` does not hold, still cannot join.
 pub(crate) fn join(
     world: &WorldSpec,
     state: &mut GameState,
     id: &Id,
+    summon: bool,
     events: &mut Vec<Event>,
 ) -> Result<(), EngineError> {
     if !is_companion(world, id) {
@@ -40,7 +43,16 @@ pub(crate) fn join(
     if in_party(state, id) {
         return Err(EngineError::AlreadyInParty(id.clone()));
     }
-    if character_here(world, state, id).is_none() {
+    let available = match summon {
+        false => character_here(world, state, id).is_some(),
+        true => {
+            !state.departed.contains_key(id)
+                && world
+                    .character(id)
+                    .is_some_and(|c| allowed(state, c.requires.as_ref()))
+        }
+    };
+    if !available {
         return Err(EngineError::NotHere(id.clone()));
     }
     let record = state

@@ -1057,3 +1057,131 @@ fn temporary_allies_and_worlds_without_companions_are_as_before() {
         EngineError::NotACompanion("warden".into()),
     );
 }
+
+/// Mara can send for `character` from the inn, as a summons or not.
+fn sending_for(mut world: WorldSpec, character: &str, summon: bool) -> WorldSpec {
+    let mara = world.dialogues.iter_mut().find(|d| d.id == "mara").unwrap();
+    mara.nodes[0].choices.push(
+        serde_json::from_value(json!({
+            "text": "Send for them.",
+            "next": null,
+            "effects": [{ "kind": "join_party", "character": character, "summon": summon }]
+        }))
+        .unwrap(),
+    );
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    world
+}
+
+/// Talks to Mara and returns the command that takes her "Send for them." choice.
+fn send_for(engine: &mut Engine<'_>) -> Command {
+    run(engine, &[Talk("mara".into())]);
+    let at = engine
+        .dialogue_choices()
+        .iter()
+        .position(|c| c.text == "Send for them.")
+        .unwrap();
+    ChooseDialogue(at + 1)
+}
+
+#[test]
+fn a_summoned_companion_comes_from_wherever_it_is_and_joins() {
+    let world = sending_for(ford(), "oake", true);
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    assert_eq!(engine.character_location("oake"), Some("crossroads"));
+    let choice = send_for(&mut engine);
+    let events = run(&mut engine, &[choice]);
+    assert!(events.contains(&Event::JoinedParty {
+        character: "oake".into()
+    }));
+    assert_eq!(engine.party(), vec!["oake"]);
+    assert_eq!(engine.character_location("oake"), Some("inn"));
+    assert!(engine.present_here().iter().any(|c| c.id == "oake"));
+    let oake = companion(&engine, "oake");
+    assert_eq!((oake.parted_at, oake.order), (None, TacticalOrder::Follow));
+    assert_eq!(oake.vitals.hp, 36);
+    // He is in the party like any recruit: he travels, and the save loads.
+    run(&mut engine, &[Travel("crossroads".into())]);
+    assert_eq!(engine.character_location("oake"), Some("crossroads"));
+    let snapshot = SaveSnapshot::from_json(&engine.snapshot().to_json()).unwrap();
+    Engine::restore(&world, snapshot).unwrap();
+}
+
+#[test]
+fn without_a_summons_a_companion_elsewhere_still_cannot_join() {
+    let world = sending_for(ford(), "oake", false);
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    let choice = send_for(&mut engine);
+    refused(&mut engine, choice, EngineError::NotHere("oake".into()));
+    assert!(engine.party().is_empty());
+    assert_eq!(engine.character_location("oake"), Some("crossroads"));
+}
+
+#[test]
+fn a_summoned_companion_brings_the_vitals_it_parted_with() {
+    let world = sending_for(ford(), "wren", true);
+    let mut engine = at_the_ford(&world);
+    run(
+        &mut engine,
+        &[
+            EngageRealtime("ford_captain".into()),
+            join("wren"),
+            join("oake"),
+        ],
+    );
+    fight_on(&mut engine, "ford_captain", 2_000);
+    assert!(engine.realtime().is_none(), "the fight should end");
+    assert_eq!(companion(&engine, "wren").vitals.hp, 15);
+    // She parts at the ford; the player goes back to the inn without her.
+    run(
+        &mut engine,
+        &[
+            Talk("wren".into()),
+            ChooseDialogue(1),
+            Travel("crossroads".into()),
+            Travel("inn".into()),
+        ],
+    );
+    assert_eq!(engine.character_location("wren"), Some("ford"));
+    let parted = companion(&engine, "wren").vitals;
+    let choice = send_for(&mut engine);
+    let events = run(&mut engine, &[choice]);
+    assert!(events.contains(&Event::JoinedParty {
+        character: "wren".into()
+    }));
+    let wren = companion(&engine, "wren");
+    assert_eq!(wren.vitals, parted);
+    assert_eq!(wren.vitals.hp, 15);
+    assert_eq!(wren.parted_at, None);
+    assert_eq!(engine.character_location("wren"), Some("inn"));
+}
+
+#[test]
+fn summoning_a_companion_already_in_the_party_is_refused_whole() {
+    let world = sending_for(ford(), "oake", true);
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    let choice = send_for(&mut engine);
+    run(&mut engine, &[choice]);
+    let choice = send_for(&mut engine);
+    refused(
+        &mut engine,
+        choice,
+        EngineError::AlreadyInParty("oake".into()),
+    );
+    assert_eq!(engine.party(), vec!["oake"]);
+}
+
+#[test]
+fn a_summons_waives_only_the_place_not_the_companions_conditions() {
+    // Oake keeps to his shrine until the ford is cleared; sent for before
+    // that, he does not come, wherever the player is.
+    let mut world = sending_for(ford(), "oake", true);
+    character(&mut world, "oake").requires = Some(Condition::Flag {
+        flag: "ford_cleared".into(),
+    });
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    let choice = send_for(&mut engine);
+    refused(&mut engine, choice, EngineError::NotHere("oake".into()));
+    assert!(engine.party().is_empty());
+}

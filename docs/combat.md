@@ -810,10 +810,14 @@ party state and nothing in its saves changes.
   so recruitment is gated by the choice's authored `requires`, like any other
   transition. The companion must be here: at its placed location under its
   conditions before it is first recruited, or where it parted from the party
-  since (`NotHere`). A companion already in the party refuses the whole
-  choice (`AlreadyInParty`), so nobody is recruited twice. The first
-  recruitment creates its `CompanionState` with full HP and MP and no Rage;
-  every later one reuses it, so parting and rejoining heals nothing.
+  since (`NotHere`). An effect with `summon: true` waives only that place
+  check, so a story can recruit a companion the player has not met where
+  it stands; the companion's own `requires` must still hold (`NotHere`),
+  and a departed character is never summoned. A companion already in the
+  party refuses the whole choice (`AlreadyInParty`), so nobody is recruited
+  twice. The first recruitment creates its `CompanionState` with full HP and
+  MP and no Rage; every later one reuses it, so parting and rejoining heals
+  nothing.
 - **Travelling.** A companion in the party is wherever the player is,
   whatever its own `requires`: it goes by every exit and road the player
   takes, under the same conditions and world time, and is listed and can be
