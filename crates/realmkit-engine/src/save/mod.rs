@@ -334,7 +334,7 @@ fn companions(world: &WorldSpec, state: &GameState) -> Result<(), String> {
             };
             let recruited = fired
                 .iter()
-                .any(|e| matches!(e, Effect::JoinParty { character } if character == id));
+                .any(|e| matches!(e, Effect::JoinParty { character, .. } if character == id));
             let pools = crate::character::resources::profile_pools(world, profile);
             let fighting = fight.is_some_and(|f| f.index(id).is_some());
             let vitals_ok = combat::within(rules, &c.vitals, &profile.stats, pools)

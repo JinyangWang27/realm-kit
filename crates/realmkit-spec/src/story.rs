@@ -358,9 +358,12 @@ pub enum Effect {
         factions: [Id; 2],
     },
     /// A named companion here joins the player's party; one already in it
-    /// refuses the whole transition.
+    /// refuses the whole transition. With `summon`, a companion elsewhere
+    /// comes to the player and joins: only where it is stops mattering.
     JoinParty {
         character: Id,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        summon: bool,
     },
     /// A companion in the party leaves it and stays where the player is.
     LeaveParty {

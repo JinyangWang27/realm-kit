@@ -298,7 +298,7 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
         Effect::DeclareWar { factions: pair } | Effect::MakePeace { factions: pair } => {
             factions::pair(out, w, owner, pair)
         }
-        Effect::JoinParty { character } | Effect::LeaveParty { character } => {
+        Effect::JoinParty { character, .. } | Effect::LeaveParty { character } => {
             companion(out, w, owner, character)
         }
         Effect::GrantTechnique(grant) => {

@@ -408,7 +408,9 @@ pub(crate) fn apply(
             }
             Effect::DeclareWar { factions: pair } => factions::diplomacy(state, pair, true, events),
             Effect::MakePeace { factions: pair } => factions::diplomacy(state, pair, false, events),
-            Effect::JoinParty { character } => party::join(world, state, character, events)?,
+            Effect::JoinParty { character, summon } => {
+                party::join(world, state, character, *summon, events)?
+            }
             Effect::LeaveParty { character } => party::leave(world, state, character, events)?,
             Effect::DiscoverEvidence { evidence } => {
                 if state.evidence.insert(evidence.clone()) {
