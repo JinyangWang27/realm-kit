@@ -376,8 +376,8 @@ every capability optional:
 - [x] A story crossing: the `move_player` effect puts the player at an
   authored place with no road, the party with them and no time passing,
   reporting the same `Moved` and `LocationViewed` as a journey; dialogue
-  choices only. The `demo-world` farewell uses it. Existing packages and
-  saves are unchanged.
+  choices only. The `demo-world` farewell uses it, so older demo saves no
+  longer load (a rule edit); other packages and saves are unchanged.
 - [ ] Spatial authority for real-time contact, redirection and directional
   parries; companions in turn-based encounters and battles, and
   companion progression and gear.
