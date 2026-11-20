@@ -35,6 +35,15 @@ fn a_place_that_does_not_exist_is_a_missing_reference() {
 }
 
 #[test]
+fn a_choice_moves_the_player_at_most_once() {
+    let mut world = demo_choosing(move_player("ruins"));
+    world.dialogues[0].nodes[0].choices[0]
+        .effects
+        .push(move_player("crypt"));
+    assert_eq!(codes(&world), ["multiple_moves"]);
+}
+
+#[test]
 fn a_start_option_cannot_move_the_player() {
     let mut world = demo();
     world.world.start_questions.push(StartQuestion {

@@ -1155,7 +1155,8 @@ and the place reached both count as visited, the party comes along, and no
 world time passes. A place already reached changes nothing. The client sees
 the same `Moved` and `LocationViewed` events a journey ends with. If the
 speaker is not at the new place (a companion in the party is), the
-conversation ends there instead of going on to `next`. Only dialogue
+conversation ends there instead of going on to `next`. A choice moves the
+player at most once (`multiple_moves`). Only dialogue
 choices may move the player (`invalid_effect` in an event or a start
 option), and none can while a fight is on, as no choice can.
 A choice can be taken again while its condition holds, so a one-time gift

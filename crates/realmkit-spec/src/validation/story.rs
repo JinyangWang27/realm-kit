@@ -224,6 +224,21 @@ pub(super) fn dialogues(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                     dialogue.nodes.iter().any(|n| &n.id == next),
                 );
             }
+            // Each arrival shows its place; a second one in the same choice
+            // would show a place the player only passed through.
+            let moves = choice
+                .effects
+                .iter()
+                .filter(|e| matches!(e, Effect::MovePlayer { .. }))
+                .count();
+            if moves > 1 {
+                issue(
+                    out,
+                    &dialogue.id,
+                    "multiple_moves",
+                    format!("a choice moves the player at most once: {:?}", choice.text),
+                );
+            }
             condition(out, w, &dialogue.id, choice.requires.as_ref());
             for effect in &choice.effects {
                 self::effect(out, w, &dialogue.id, effect);
