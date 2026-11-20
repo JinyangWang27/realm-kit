@@ -234,7 +234,8 @@ pub(super) fn schedule(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, sc
 }
 
 /// Events change the world, not the player's conversations: they cannot
-/// accept or complete quests at a giver, or take what the player carries.
+/// accept or complete quests at a giver, take what the player carries, or
+/// move the player.
 fn event_effect(
     out: &mut Vec<Diagnostic>,
     w: &WorldSpec,
@@ -272,7 +273,8 @@ fn event_effect(
         | Effect::DiscoverEvidence { .. }
         | Effect::EnterPhase { .. }
         | Effect::JoinParty { .. }
-        | Effect::LeaveParty { .. } => issue(
+        | Effect::LeaveParty { .. }
+        | Effect::MovePlayer { .. } => issue(
             out,
             owner,
             "invalid_effect",

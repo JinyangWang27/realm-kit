@@ -252,6 +252,9 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
             present_target(out, w, owner, character);
             reference(out, owner, "location", to, w.location(to).is_some());
         }
+        Effect::MovePlayer { to } => {
+            reference(out, owner, "location", to, w.location(to).is_some())
+        }
         Effect::Depart { character, .. } => present_target(out, w, owner, character),
         Effect::Record { entry } => reference(
             out,
@@ -352,6 +355,7 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                     progression::technique_grant(out, w, &question.id, grant)
                 }
                 Effect::Relocate { .. } | Effect::Depart { .. } | Effect::Record { .. } | Effect::SetControl { .. }
+                | Effect::MovePlayer { .. }
                 | Effect::AcceptQuest { .. }
                 | Effect::CompleteQuest { .. }
                 | Effect::TakeItems { .. }

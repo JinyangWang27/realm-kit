@@ -282,6 +282,12 @@ pub enum Effect {
         character: Id,
         to: Id,
     },
+    /// The player is at `to` with no road between, as a scripted arrival:
+    /// the party comes along and no time passes. Already there, nothing
+    /// changes.
+    MovePlayer {
+        to: Id,
+    },
     Depart {
         character: Id,
         reason: DepartureReason,
