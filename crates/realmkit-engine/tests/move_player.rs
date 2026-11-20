@@ -207,4 +207,11 @@ fn a_save_after_the_move_loads_and_a_forged_place_is_refused() {
     let mut forged = saved;
     forged.state.visited.insert("atlantis".into());
     assert!(Engine::restore(&world, forged).is_err());
+    // Moved away mid-conversation with a speaker left behind: the rules end
+    // that conversation, so a save still holding it is forged.
+    let mut talking = Engine::new_with_seed(&world, 7).unwrap();
+    talking.execute(Talk("mara".into())).unwrap();
+    let mut forged = talking.snapshot();
+    forged.state.player.location = "crossroads".into();
+    assert!(Engine::restore(&world, forged).is_err());
 }

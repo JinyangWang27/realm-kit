@@ -42,7 +42,16 @@
       { "id": "accepted", "text": "'North, past the last roof. Come back while there is still light.'" },
       { "id": "reminder", "text": "'The north track. You will know the place by the red thread.'" },
       { "id": "thanks", "text": "She leaves the gate ajar. Beyond it, the chapel stair descends into darkness." },
-      { "id": "farewell", "text": "'Set it where you think it belongs,' she says. 'That will be enough.'" }
+      {
+        "id": "farewell",
+        "text": "'Set it where you think it belongs,' she says. 'That will be enough.'",
+        "choices": [
+          {
+            "text": "Follow the candle's light.",
+            "effects": [{ "kind": "move_player", "to": "ruins" }]
+          }
+        ]
+      }
     ]
   }
 ]
