@@ -1029,8 +1029,10 @@ fn outcome(world: &WorldSpec, state: &GameState) -> Result<(), String> {
 }
 
 /// Every ask-once choice taken exists and could have been chosen: its
-/// condition once held, and the quests it takes up or completes moved on,
-/// since taking it applied its effects.
+/// condition once held, the quests it takes up or completes moved on, and
+/// the place it moves the player to was reached (every arrival marks both
+/// ends visited, so it is visited or the player still stands there), since
+/// taking it applied its effects.
 fn taken_choices(world: &WorldSpec, state: &GameState) -> Result<(), String> {
     ensure(
         state.taken_choices.iter().all(|r| {
@@ -1047,6 +1049,9 @@ fn taken_choices(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                             }
                             Effect::CompleteQuest { quest } => {
                                 state.quests[quest] == QuestStatus::Completed
+                            }
+                            Effect::MovePlayer { to } => {
+                                state.visited.contains(to) || state.player.location == *to
                             }
                             _ => true,
                         })

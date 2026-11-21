@@ -215,3 +215,45 @@ fn a_save_after_the_move_loads_and_a_forged_place_is_refused() {
     forged.state.player.location = "crossroads".into();
     assert!(Engine::restore(&world, forged).is_err());
 }
+
+/// Mara's greeting with one more choice, asked once: "Walk on." to `place`.
+fn ford_walking_once_to(place: &str) -> WorldSpec {
+    let mut world = ford_walking_on(vec![to(place)]);
+    let mara = world.dialogues.iter_mut().find(|d| d.id == "mara").unwrap();
+    let greeting = mara.nodes.iter_mut().find(|n| n.id == "greeting").unwrap();
+    let walk = greeting.choices.last_mut().unwrap();
+    walk.id = Some("walk".into());
+    walk.once = true;
+    world
+}
+
+fn walked() -> ChoiceRef {
+    ChoiceRef {
+        dialogue: "mara".into(),
+        node: "greeting".into(),
+        choice: "walk".into(),
+    }
+}
+
+#[test]
+fn a_save_with_the_move_taken_once_but_its_place_never_reached_is_refused() {
+    // Taken and moved: the save loads, after walking back too.
+    let world = ford_walking_once_to("crossroads");
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    engine.execute(Talk("mara".into())).unwrap();
+    pick(&mut engine, "Walk on.").unwrap();
+    assert!(engine.state().taken_choices.contains(&walked()));
+    engine.execute(Travel("inn".into())).unwrap();
+    Engine::restore(&world, engine.snapshot()).unwrap();
+    // Taken where the player already stood: nothing moved, and it loads.
+    let world = ford_walking_once_to("inn");
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    engine.execute(Talk("mara".into())).unwrap();
+    pick(&mut engine, "Walk on.").unwrap();
+    Engine::restore(&world, engine.snapshot()).unwrap();
+    // Marked taken, but the crossroads were never reached: forged.
+    let world = ford_walking_once_to("crossroads");
+    let mut forged = Engine::new_with_seed(&world, 7).unwrap().snapshot();
+    forged.state.taken_choices.insert(walked());
+    assert!(Engine::restore(&world, forged).is_err());
+}
