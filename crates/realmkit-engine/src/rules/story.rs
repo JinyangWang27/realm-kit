@@ -331,6 +331,19 @@ fn enter_phase(world: &WorldSpec, state: &mut GameState, phase: &str, events: &m
     });
 }
 
+/// A scripted arrival at `to`, as `Enter` reports one: no road, no time.
+/// The party stands wherever the player does, so it comes along; whether a
+/// conversation goes on is the choice's to settle, by who is still here.
+fn move_player(state: &mut GameState, to: &Id, events: &mut Vec<Event>) {
+    if state.player.location == *to {
+        return;
+    }
+    arrive(state, to, events);
+    events.push(Event::LocationViewed {
+        location: to.clone(),
+    });
+}
+
 /// Applies effects in authored order to the staged state. An error refuses
 /// the whole command, so nothing they did is kept.
 pub(crate) fn apply(
@@ -351,6 +364,7 @@ pub(crate) fn apply(
                     to: to.clone(),
                 });
             }
+            Effect::MovePlayer { to } => move_player(state, to, events),
             Effect::Depart { character, reason } => {
                 if !state.departed.contains_key(character) {
                     state.departed.insert(

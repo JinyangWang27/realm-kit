@@ -47,6 +47,23 @@ fn terminal_plays_the_complete_authored_journey() {
 }
 
 #[test]
+fn the_demo_walkthrough_follows_a_story_crossing() {
+    let walkthrough = std::fs::read_to_string(format!("{WORLD}/walkthrough.txt")).unwrap();
+    let output = run(&["play", WORLD, "--line"], &walkthrough);
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    // Mara's farewell carries the player to the chapel with no road taken.
+    let (_, after) = text
+        .split_once("Follow the candle's light.")
+        .unwrap_or_else(|| panic!("no crossing in {text}"));
+    let arrival = after
+        .find("> The Roofless Chapel")
+        .expect("the chapel is shown");
+    assert!(!after[..arrival].contains("Travel east"), "{after}");
+    assert!(text.contains("Your journey through the demo is complete."));
+}
+
+#[test]
 fn numbered_menus_alone_finish_the_demo() {
     // 3 first: the locked chapel gate explains itself instead of opening.
     let output = run(

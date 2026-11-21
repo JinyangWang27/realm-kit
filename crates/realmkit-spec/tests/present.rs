@@ -34,6 +34,7 @@ fn every_effect_is_deliberately_classified_for_scheduled_rules() {
         r#"{"kind":"make_peace","factions":["reed","stone"]}"#,
         r#"{"kind":"join_party","character":"clerk"}"#,
         r#"{"kind":"leave_party","character":"clerk"}"#,
+        r#"{"kind":"move_player","to":"ford"}"#,
     ];
     for json in samples {
         let effect: Effect = serde_json::from_str(json).unwrap();
@@ -60,7 +61,8 @@ fn every_effect_is_deliberately_classified_for_scheduled_rules() {
             | Effect::DiscoverEvidence { .. }
             | Effect::EnterPhase { .. }
             | Effect::JoinParty { .. }
-            | Effect::LeaveParty { .. } => false,
+            | Effect::LeaveParty { .. }
+            | Effect::MovePlayer { .. } => false,
         };
         let mut world = ford();
         world.world.events[0].effects = vec![effect];

@@ -306,16 +306,8 @@ pub(crate) fn travel(
             road: road.id.clone(),
         });
     }
-    let from = std::mem::replace(&mut state.player.location, to.clone());
-    // The place left, too: a save from before visits were kept counts it
-    // only while the player stands there.
-    state.visited.insert(from.clone());
-    state.visited.insert(to.clone());
+    arrive(state, &to, events);
     state.dialogue = None;
-    events.push(Event::Moved {
-        from,
-        to: to.clone(),
-    });
     let minutes = minutes.unwrap_or_else(|| journey(state, road));
     // On the road: the destination shows who is there on arrival.
     pass(world, state, minutes, events, false)?;

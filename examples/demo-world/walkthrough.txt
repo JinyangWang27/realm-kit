@@ -13,6 +13,8 @@ choose 1
 inventory
 status
 quests
-east
+talk elder
+choose 1
+choose 1
 down
 quit

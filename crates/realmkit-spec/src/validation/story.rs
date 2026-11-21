@@ -224,6 +224,21 @@ pub(super) fn dialogues(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                     dialogue.nodes.iter().any(|n| &n.id == next),
                 );
             }
+            // Each arrival shows its place; a second one in the same choice
+            // would show a place the player only passed through.
+            let moves = choice
+                .effects
+                .iter()
+                .filter(|e| matches!(e, Effect::MovePlayer { .. }))
+                .count();
+            if moves > 1 {
+                issue(
+                    out,
+                    &dialogue.id,
+                    "multiple_moves",
+                    format!("a choice moves the player at most once: {:?}", choice.text),
+                );
+            }
             condition(out, w, &dialogue.id, choice.requires.as_ref());
             for effect in &choice.effects {
                 self::effect(out, w, &dialogue.id, effect);
@@ -251,6 +266,9 @@ pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effe
         Effect::Relocate { character, to } => {
             present_target(out, w, owner, character);
             reference(out, owner, "location", to, w.location(to).is_some());
+        }
+        Effect::MovePlayer { to } => {
+            reference(out, owner, "location", to, w.location(to).is_some())
         }
         Effect::Depart { character, .. } => present_target(out, w, owner, character),
         Effect::Record { entry } => reference(
@@ -352,6 +370,7 @@ pub(super) fn start_questions(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                     progression::technique_grant(out, w, &question.id, grant)
                 }
                 Effect::Relocate { .. } | Effect::Depart { .. } | Effect::Record { .. } | Effect::SetControl { .. }
+                | Effect::MovePlayer { .. }
                 | Effect::AcceptQuest { .. }
                 | Effect::CompleteQuest { .. }
                 | Effect::TakeItems { .. }

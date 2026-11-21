@@ -523,6 +523,18 @@ pub(super) fn outcomes(world: &WorldSpec, state: &GameState) -> Vec<Id> {
         .collect()
 }
 
+/// Puts the player at `to`, remembering both the place left and the place
+/// reached as visited, and reports the move.
+pub(super) fn arrive(state: &mut GameState, to: &Id, events: &mut Vec<Event>) {
+    let from = std::mem::replace(&mut state.player.location, to.clone());
+    state.visited.insert(from.clone());
+    state.visited.insert(to.clone());
+    events.push(Event::Moved {
+        from,
+        to: to.clone(),
+    });
+}
+
 fn move_to(
     world: &WorldSpec,
     state: &mut GameState,
@@ -541,15 +553,8 @@ fn move_to(
             direction,
         });
     }
-    let from = std::mem::replace(&mut state.player.location, exit.destination.clone());
-    // The place left, too, as for a road.
-    state.visited.insert(from.clone());
-    state.visited.insert(exit.destination.clone());
+    arrive(state, &exit.destination, events);
     state.dialogue = None;
-    events.push(Event::Moved {
-        from,
-        to: exit.destination.clone(),
-    });
     events.push(Event::LocationViewed {
         location: exit.destination.clone(),
     });
@@ -570,15 +575,8 @@ fn enter(
     if state.player.location == to {
         return Err(EngineError::AlreadyThere(to));
     }
-    let from = std::mem::replace(&mut state.player.location, to.clone());
-    // The place left, too, as for a road.
-    state.visited.insert(from.clone());
-    state.visited.insert(to.clone());
+    arrive(state, &to, events);
     state.dialogue = None;
-    events.push(Event::Moved {
-        from,
-        to: to.clone(),
-    });
     events.push(Event::LocationViewed { location: to });
     Ok(())
 }

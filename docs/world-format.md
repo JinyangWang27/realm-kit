@@ -1130,6 +1130,7 @@ Each dialogue has a `start` node ID and a `nodes` array. A node has authored
 { "kind": "join_party", "character": "wren" }
 { "kind": "join_party", "character": "oake", "summon": true }
 { "kind": "leave_party", "character": "wren" }
+{ "kind": "move_player", "to": "ruins" }
 ```
 
 Effects apply in authored order to the staged state, and the choice commits
@@ -1146,6 +1147,18 @@ use these three. `change_standing`, `declare_war` and `make_peace` are
 described under [Factions](#factions-diplomacy-and-standing), and
 `join_party` and `leave_party` under [Named companions](#named-companions);
 only dialogue choices may change the party.
+`move_player` puts the player at `to`, an authored location
+(`missing_reference` otherwise), with no road between: a scripted arrival,
+such as a crossing at the end of a story. Like `Enter`, it ignores roads,
+exits and their `requires`, and whether the place is known; the place left
+and the place reached both count as visited, the party comes along, and no
+world time passes. A place already reached changes nothing. The client sees
+the same `Moved` and `LocationViewed` events a journey ends with. If the
+speaker is not at the new place (a companion in the party is), the
+conversation ends there instead of going on to `next`. A choice moves the
+player at most once (`multiple_moves`). Only dialogue
+choices may move the player (`invalid_effect` in an event or a start
+option), and none can while a fight is on, as no choice can.
 A choice can be taken again while its condition holds, so a one-time gift
 pairs `grant_items` with `set_flag` under a `not` condition on that flag.
 
