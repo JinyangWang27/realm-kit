@@ -1309,7 +1309,7 @@ fn a_save_with_a_companion_both_in_the_party_and_stationed_is_refused() {
         engine.snapshot()
     };
     let in_party = engine.snapshot();
-    let tamper: [Tamper; 2] = [
+    let tamper: [Tamper; 3] = [
         // In the party, yet stationed at the crossroads.
         (&in_party, |s| {
             s.stations.insert("wren".into(), "crossroads".into());
@@ -1317,6 +1317,10 @@ fn a_save_with_a_companion_both_in_the_party_and_stationed_is_refused() {
         // Parted at the inn, yet also stationed at the crossroads.
         (&parted, |s| {
             s.stations.insert("wren".into(), "crossroads".into());
+        }),
+        // Never recruited, and stationed where no choice sends him.
+        (&parted, |s| {
+            s.stations.insert("oake".into(), "ford".into());
         }),
     ];
     for (index, (base, change)) in tamper.into_iter().enumerate() {
@@ -1328,7 +1332,11 @@ fn a_save_with_a_companion_both_in_the_party_and_stationed_is_refused() {
         );
     }
     assert!(Engine::restore(&world, in_party).is_ok());
-    assert!(Engine::restore(&world, parted).is_ok());
+    assert!(Engine::restore(&world, parted.clone()).is_ok());
+    // Where a choice does send him, the station loads.
+    let mut sent = parted;
+    sent.state.stations.insert("oake".into(), "inn".into());
+    assert!(Engine::restore(&world, sent).is_ok());
 }
 
 #[test]
