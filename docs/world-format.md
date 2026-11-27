@@ -1992,7 +1992,9 @@ the party; one already in it refuses the whole choice. With `summon: true`
 (false by default) the companion need not be here: it comes to the player
 from wherever it is, as when the story says it travelled on ahead. Only
 its place is waived; its `requires` must still hold. `leave_party` leaves
-a companion of the party where the player stands. Both name a companion
+a companion of the party where the player stands; a choice's `relocate` can
+then send it to a named place, which becomes where it parted (see
+[Present facts](#present-facts)). Both name a companion
 (`not_a_companion`, `missing_reference`), and only dialogue choices may use
 them: an event or start option that does is `invalid_effect`. The `companion`
 condition holds while one travels in the party, so a recruiting choice is
@@ -2316,9 +2318,15 @@ talked to, examined, engaged, traded with or used as a quest giver.
 **departed → in party → parted location → relocated station → mover whereabouts
 → authored placement**. Conditions still decide visibility, and defeated
 characters remain unavailable as before. Validation rejects station/departure
-effects targeting the player, companions, movers or characters not authored at
-exactly one place (`invalid_present_target`). Their party ownership, active
-schedules and shared placements are not overridden. Legacy noncombat shared
+effects targeting the player, movers or characters not authored at exactly one
+place, and departures of companions (`invalid_present_target`). Active
+schedules and shared placements are not overridden. A companion may be
+relocated only by a dialogue choice and only while out of the party: her new
+place replaces where she parted (or, before she is first recruited, is her
+station until she joins). In the party the effect refuses the whole choice
+(`AlreadyInParty`); a choice that joins her and then relocates her with no
+`leave_party` between is `relocate_in_party`, and an event that relocates a
+companion is `invalid_effect`. Legacy noncombat shared
 placements remain supported: the authored fallback resolves to the player's
 place when listed there, otherwise the first authored place. Unique Present
 targets never use that compatibility tie-break. Relocated arrivals append by ID

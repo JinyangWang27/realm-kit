@@ -326,7 +326,8 @@ every capability optional:
   Hold, Defend and Attack orders that shape only whom a companion aims at,
   with deterministic fallbacks and an authored `caution`; mid-fight saves and
   save checks; an optional `summon` on `join_party` that brings a companion
-  from wherever it is, waiving only its place. The `hollow-ford` example
+  from wherever it is, waiving only its place; `relocate` of a companion out
+  of the party, which becomes where it parted. The `hollow-ford` example
   plays it in line mode. Existing packages, saves and walkthroughs are
   unchanged.
 - [x] Weapon handling and timed defence

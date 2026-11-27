@@ -16,7 +16,7 @@ yet. Package fields are in
 | **Character core** (universal) | Levels and XP, stat points, effective stats, gear and techniques, HP, MP and Rage, skill costs, damage and crits, Rage from acting and from damage, resource regeneration and decay, validated vitals | `realmkit-engine/src/character/`, `gear.rs`, `techniques.rs`, `formulas.rs`; spec `stats.rs`, most of `combat.rs` |
 | **Turn-based encounters** (optional) | The initiative timeline, action delays, whose turn it is, opponents' policy, attack, skill, flee and item turns, how encounters start and end, and timeline MP regeneration | `realmkit-engine/src/encounter/`; spec `Timeline` |
 | **Real-time fights** (optional) | A fight's fixed-step clock, its fighters and teams, joins, targets, attack phases, guard and retreat timing, parry and dodge windows, poise and stagger, which intents are legal at each step, engine-controlled fighters' policies, named companions' orders as targeting, host-reported contact, when the fight ends, and fight-time MP regeneration | `realmkit-engine/src/realtime/`; spec `Realtime`, a skill's `impact` and `poise`, a profile's `ally`, `targeting`, `guard_hold` and `reaction`, a companion's `caution` |
-| **Party** (optional, world level) | Which named companions travel with the player, where a parted one stays, each companion's persistent vitals and standing order, and what resting and world time do to them | `realmkit-engine/src/rules/party.rs`; spec `Character::companion`, the `join_party` and `leave_party` effects, the `companion` condition |
+| **Party** (optional, world level) | Which named companions travel with the player, where a parted one stays, each companion's persistent vitals and standing order, and what resting and world time do to them | `realmkit-engine/src/rules/party.rs`; spec `Character::companion`, the `join_party` and `leave_party` effects, `relocate` of a companion out of the party, the `companion` condition |
 | **Mass battles** (strategic, separate) | Troop stacks, frontage, orders, morale, pursuit and autoresolve | `realmkit-engine/src/battle.rs`; spec `troops.rs` |
 
 The core knows nothing of initiative, turns, ticks, frames or a host engine.
@@ -732,7 +732,8 @@ snapshot, with every companion's vitals and standing order beside it in
   now and recovers for exactly `recovery` steps after its window (or, for a
   parry that deflected, not at all); a stagger lasts at most `stagger` steps.
 - **Companions.** Each is a companion character a dialogue choice could have
-  recruited, parted (if at all) at a real place, with vitals within its
+  recruited, parted or sent (if at all) to a real place, stationed only
+  before it is first recruited, with vitals within its
   maxima and Rage only in a fight or where Rage carries. A parted companion
   follows; one in the party defends only the player or another companion in
   the party, and attacks only someone of another team in the current fight.
@@ -825,6 +826,14 @@ party state and nothing in its saves changes.
   faction or which team it fights on.
 - **Parting.** `leave_party` leaves it where the player stands now, under its
   `requires` again, with its vitals; orders to defend it lapse to following.
+- **Sending away.** A dialogue choice's `relocate` puts a companion out of the
+  party at a named place, as a follower dismissed and sent home: that place
+  becomes where it parted, so it is met and asked back there and nowhere else.
+  One never recruited is stationed there until it first joins. One in the
+  party cannot be sent anywhere: the effect refuses the whole choice
+  (`AlreadyInParty`), and a choice that recruits and then relocates it with no
+  parting between is `relocate_in_party`. Events cannot relocate a companion
+  (`invalid_effect`), since one may fire while it travels with the player.
   Scheduled events and start answers cannot recruit or dismiss anyone
   (`invalid_effect`), so the party never changes while nobody is looking.
 - **Conditions.** `{ "kind": "companion", "character": "wren" }` holds while
