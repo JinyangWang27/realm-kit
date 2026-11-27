@@ -344,6 +344,26 @@ fn move_player(state: &mut GameState, to: &Id, events: &mut Vec<Event>) {
     });
 }
 
+/// Puts `id` at `to` until something moves it again. A companion out of the
+/// party stays there as where she parted, and one never recruited is
+/// stationed there until she joins; one in the party goes where the player
+/// goes, so cannot be sent anywhere.
+fn relocate(state: &mut GameState, id: &Id, to: &Id) -> Result<(), EngineError> {
+    if state.departed.contains_key(id) {
+        return Err(EngineError::NotHere(id.clone()));
+    }
+    if party::in_party(state, id) {
+        return Err(EngineError::AlreadyInParty(id.clone()));
+    }
+    match state.companions.get_mut(id) {
+        Some(parted) => parted.parted_at = Some(to.clone()),
+        None => {
+            state.stations.insert(id.clone(), to.clone());
+        }
+    }
+    Ok(())
+}
+
 /// Applies effects in authored order to the staged state. An error refuses
 /// the whole command, so nothing they did is kept.
 pub(crate) fn apply(
@@ -355,10 +375,7 @@ pub(crate) fn apply(
     for effect in effects {
         match effect {
             Effect::Relocate { character, to } => {
-                if state.departed.contains_key(character) {
-                    return Err(EngineError::NotHere(character.clone()));
-                }
-                state.stations.insert(character.clone(), to.clone());
+                relocate(state, character, to)?;
                 events.push(Event::CharacterRelocated {
                     character: character.clone(),
                     to: to.clone(),

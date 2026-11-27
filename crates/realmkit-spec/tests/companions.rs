@@ -188,3 +188,76 @@ fn a_summons_is_written_only_when_asked_for_so_older_packages_keep_their_revisio
         });
     assert!(codes(&world).contains(&"invalid_present_target".to_string()));
 }
+
+/// Wren's parting choice, with `effects` in place of its own.
+fn wren_parting(world: &mut WorldSpec, effects: Vec<Effect>) {
+    let wren = world.dialogues.iter_mut().find(|d| d.id == "wren").unwrap();
+    wren.nodes[0].choices[2].effects = effects;
+}
+
+fn relocate(character: &str, to: &str) -> Effect {
+    Effect::Relocate {
+        character: character.into(),
+        to: to.into(),
+    }
+}
+
+#[test]
+fn a_choice_may_send_a_companion_out_of_the_party_elsewhere() {
+    // She parts and goes on to the ford: a companion out of the party may be
+    // put anywhere, though she still cannot depart for good.
+    let mut world = ford();
+    wren_parting(
+        &mut world,
+        vec![
+            Effect::LeaveParty {
+                character: "wren".into(),
+            },
+            relocate("wren", "ford"),
+        ],
+    );
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    // Joined in the same choice, she travels with the player when the
+    // relocation comes, so it could never hold.
+    let mut world = ford();
+    wren_parting(
+        &mut world,
+        vec![
+            Effect::JoinParty {
+                character: "wren".into(),
+                summon: true,
+            },
+            relocate("wren", "ford"),
+        ],
+    );
+    assert_eq!(common::codes(&world), ["relocate_in_party"]);
+    // Joined, parted and then sent away is sound.
+    let mut world = ford();
+    wren_parting(
+        &mut world,
+        vec![
+            Effect::JoinParty {
+                character: "wren".into(),
+                summon: true,
+            },
+            Effect::LeaveParty {
+                character: "wren".into(),
+            },
+            relocate("wren", "ford"),
+        ],
+    );
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    // An event may fire while she travels with the player, so it cannot
+    // move her.
+    let mut world = ford();
+    world.world.events.push(WorldEvent {
+        id: "called_away".into(),
+        schedule: Schedule {
+            at: 600,
+            every: None,
+        },
+        requires: None,
+        effects: vec![relocate("wren", "ford")],
+    });
+    assert_eq!(common::codes(&world), ["invalid_effect"]);
+}

@@ -65,6 +65,8 @@ pub(crate) fn join(
         });
     record.parted_at = None;
     record.order = TacticalOrder::Follow;
+    // From now on her place is the party's or where she parts.
+    state.stations.remove(id);
     events.push(Event::JoinedParty {
         character: id.clone(),
     });
