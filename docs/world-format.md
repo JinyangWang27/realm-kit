@@ -2326,7 +2326,8 @@ place replaces where she parted (or, before she is first recruited, is her
 station until she joins). In the party the effect refuses the whole choice
 (`AlreadyInParty`); a choice that joins her and then relocates her with no
 `leave_party` between is `relocate_in_party`, and an event that relocates a
-companion is `invalid_effect`. Legacy noncombat shared
+companion is `invalid_effect`. A save's station must be a place some authored `relocate` sends
+that character to. Legacy noncombat shared
 placements remain supported: the authored fallback resolves to the player's
 place when listed there, otherwise the first authored place. Unique Present
 targets never use that compatibility tie-break. Relocated arrivals append by ID
