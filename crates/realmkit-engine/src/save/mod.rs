@@ -1092,12 +1092,25 @@ fn present(world: &WorldSpec, state: &GameState) -> Result<(), String> {
                 .character(id)
                 .is_some_and(|c| c.companion.is_none() && c.moves.is_none())
     };
+    // A companion is stationed only before she is first recruited; after
+    // that her place is the party's or where she parted.
+    let stationed = |id: &str| {
+        target(id)
+            || (world.character(id).is_some_and(|c| c.companion.is_some())
+                && !state.companions.contains_key(id))
+    };
+    let fired = fired(world, state);
+    let sent = |id: &Id, to: &Id| {
+        fired.iter().any(
+            |e| matches!(e, Effect::Relocate { character, to: at } if character == id && at == to),
+        )
+    };
     let start = world.world.time.as_ref().map_or(0, |time| time.start);
     ensure(
         state
             .stations
             .iter()
-            .all(|(c, l)| target(c) && world.location(l).is_some()),
+            .all(|(c, l)| stationed(c) && sent(c, l)),
         "invalid relocated station",
     )?;
     ensure(

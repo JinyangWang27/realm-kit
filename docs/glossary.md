@@ -567,7 +567,8 @@ state. Knowledge (evidence and reached phases) remains separate and only grows.
 ## Station
 
 A character's relocated location, below party and parted locations in presence
-resolution. It is separate from a mover's schedule and from authored placement.
+resolution. A companion holds one only before she is first recruited; after
+that a relocation moves where she parted. It is separate from a mover's schedule and from authored placement.
 
 ## Chronicle
 

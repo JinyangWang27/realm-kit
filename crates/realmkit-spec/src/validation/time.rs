@@ -244,6 +244,12 @@ fn event_effect(
     recurs: bool,
 ) {
     match effect {
+        Effect::Relocate { character, .. } if story::is_companion(w, character) => issue(
+            out,
+            owner,
+            "invalid_effect",
+            "an event cannot relocate a companion: she may be travelling with the player when it happens",
+        ),
         Effect::Relocate { .. } | Effect::Depart { .. } | Effect::Record { .. } | Effect::SetControl { .. }
         | Effect::SetFlag { .. }
         | Effect::GrantItems { .. }

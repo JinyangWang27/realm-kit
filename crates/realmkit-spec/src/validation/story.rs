@@ -239,12 +239,42 @@ pub(super) fn dialogues(out: &mut Vec<Diagnostic>, w: &WorldSpec) {
                     format!("a choice moves the player at most once: {:?}", choice.text),
                 );
             }
+            relocated_in_party(out, &dialogue.id, &choice.effects);
             condition(out, w, &dialogue.id, choice.requires.as_ref());
             for effect in &choice.effects {
                 self::effect(out, w, &dialogue.id, effect);
             }
         }
     }
+}
+
+/// A choice that recruits a companion and then relocates her, with no
+/// parting between, moves someone who travels with the player.
+fn relocated_in_party(out: &mut Vec<Diagnostic>, owner: &str, effects: &[Effect]) {
+    let mut joined = BTreeSet::new();
+    for effect in effects {
+        match effect {
+            Effect::JoinParty { character, .. } => {
+                joined.insert(character);
+            }
+            Effect::LeaveParty { character } => {
+                joined.remove(character);
+            }
+            Effect::Relocate { character, .. } if joined.contains(character) => issue(
+                out,
+                owner,
+                "relocate_in_party",
+                format!(
+                    "{character} travels with the player after joining, so cannot be relocated"
+                ),
+            ),
+            _ => {}
+        }
+    }
+}
+
+pub(super) fn is_companion(w: &WorldSpec, id: &str) -> bool {
+    w.character(id).is_some_and(|c| c.companion.is_some())
 }
 
 /// A reference to a character that is a named companion.
@@ -264,7 +294,11 @@ pub(super) fn companion(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, i
 pub(super) fn effect(out: &mut Vec<Diagnostic>, w: &WorldSpec, owner: &str, effect: &Effect) {
     match effect {
         Effect::Relocate { character, to } => {
-            present_target(out, w, owner, character);
+            // A companion is placed once by validation; only a dialogue
+            // choice may move her, and only while she is out of the party.
+            if !is_companion(w, character) {
+                present_target(out, w, owner, character);
+            }
             reference(out, owner, "location", to, w.location(to).is_some());
         }
         Effect::MovePlayer { to } => {
@@ -628,7 +662,7 @@ pub(super) fn present_target(
         || w.character(character)
             .is_some_and(|c| c.companion.is_some() || c.moves.is_some())
     {
-        issue(out, owner, "invalid_present_target", "station and departure effects require unique placement and cannot target the player, companions or movers");
+        issue(out, owner, "invalid_present_target", "station and departure effects require unique placement and cannot target the player or movers, and a companion never departs");
     }
 }
 pub(super) fn control(

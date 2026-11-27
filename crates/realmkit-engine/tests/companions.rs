@@ -1185,3 +1185,177 @@ fn a_summons_waives_only_the_place_not_the_companions_conditions() {
     refused(&mut engine, choice, EngineError::NotHere("oake".into()));
     assert!(engine.party().is_empty());
 }
+
+/// Mara can send `character` to `to` from the inn, wherever they are.
+fn sending_away(mut world: WorldSpec, character: &str, to: &str) -> WorldSpec {
+    let mara = world.dialogues.iter_mut().find(|d| d.id == "mara").unwrap();
+    mara.nodes[0].choices.push(
+        serde_json::from_value(json!({
+            "text": "Send them away.",
+            "next": null,
+            "effects": [{ "kind": "relocate", "character": character, "to": to }]
+        }))
+        .unwrap(),
+    );
+    assert!(world.diagnostics().is_empty(), "{:?}", world.diagnostics());
+    world
+}
+
+/// Talks to Mara and returns the command that takes her "Send them away." choice.
+fn send_away(engine: &mut Engine<'_>) -> Command {
+    run(engine, &[Talk("mara".into())]);
+    let at = engine
+        .dialogue_choices()
+        .iter()
+        .position(|c| c.text == "Send them away.")
+        .unwrap();
+    ChooseDialogue(at + 1)
+}
+
+/// Wren is vouched for, joins at the inn and parts there.
+fn wren_parted_at_the_inn() -> Vec<Command> {
+    let mut commands = recruiting()[..5].to_vec();
+    commands.extend([Talk("wren".into()), ChooseDialogue(1)]);
+    commands
+}
+
+#[test]
+fn a_parted_companion_sent_elsewhere_is_met_there_and_joins_again() {
+    let world = sending_away(ford(), "wren", "crossroads");
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    run(&mut engine, &wren_parted_at_the_inn());
+    assert_eq!(engine.character_location("wren"), Some("inn"));
+    let parted = companion(&engine, "wren").vitals;
+    let choice = send_away(&mut engine);
+    let events = run(&mut engine, &[choice]);
+    assert!(events.contains(&Event::CharacterRelocated {
+        character: "wren".into(),
+        to: "crossroads".into()
+    }));
+    assert_eq!(
+        companion(&engine, "wren").parted_at.as_deref(),
+        Some("crossroads")
+    );
+    assert!(engine.state().stations.is_empty());
+    assert_eq!(engine.character_location("wren"), Some("crossroads"));
+    assert!(!engine.present_here().iter().any(|c| c.id == "wren"));
+    // A save made now loads, with her still at the crossroads.
+    let snapshot = SaveSnapshot::from_json(&engine.snapshot().to_json()).unwrap();
+    let restored = Engine::restore(&world, snapshot).unwrap();
+    assert_eq!(restored.character_location("wren"), Some("crossroads"));
+    // Met where she was sent, she is asked back by the same offer.
+    run(&mut engine, &[Travel("crossroads".into())]);
+    assert!(engine.present_here().iter().any(|c| c.id == "wren"));
+    run(&mut engine, &[Talk("wren".into()), ChooseDialogue(1)]);
+    assert_eq!(engine.party(), vec!["wren"]);
+    assert_eq!(companion(&engine, "wren").vitals, parted);
+    assert_eq!(engine.character_location("wren"), Some("crossroads"));
+}
+
+#[test]
+fn a_companion_in_the_party_cannot_be_sent_away() {
+    let world = sending_away(ford(), "wren", "crossroads");
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    run(&mut engine, &recruiting()[..5]);
+    let choice = send_away(&mut engine);
+    refused(
+        &mut engine,
+        choice,
+        EngineError::AlreadyInParty("wren".into()),
+    );
+    assert_eq!(engine.party(), vec!["wren"]);
+    assert_eq!(companion(&engine, "wren").parted_at, None);
+    assert!(engine.state().stations.is_empty());
+}
+
+#[test]
+fn a_companion_never_recruited_is_sent_away_and_recruited_there() {
+    let world = sending_away(ford(), "oake", "inn");
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    assert_eq!(engine.character_location("oake"), Some("crossroads"));
+    let choice = send_away(&mut engine);
+    run(&mut engine, &[choice]);
+    assert_eq!(engine.character_location("oake"), Some("inn"));
+    assert!(engine.present_here().iter().any(|c| c.id == "oake"));
+    let snapshot = SaveSnapshot::from_json(&engine.snapshot().to_json()).unwrap();
+    Engine::restore(&world, snapshot).unwrap();
+    // Recruited at the inn, he travels with the party: no station is left
+    // to say otherwise, and he parts wherever the player stands.
+    run(&mut engine, &[Talk("oake".into()), ChooseDialogue(1)]);
+    assert_eq!(engine.party(), vec!["oake"]);
+    assert!(engine.state().stations.is_empty());
+    run(
+        &mut engine,
+        &[
+            Travel("crossroads".into()),
+            Talk("oake".into()),
+            ChooseDialogue(1),
+            Travel("inn".into()),
+        ],
+    );
+    assert_eq!(engine.character_location("oake"), Some("crossroads"));
+    let snapshot = SaveSnapshot::from_json(&engine.snapshot().to_json()).unwrap();
+    Engine::restore(&world, snapshot).unwrap();
+}
+
+#[test]
+fn a_save_with_a_companion_both_in_the_party_and_stationed_is_refused() {
+    let world = sending_away(ford(), "oake", "inn");
+    let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+    run(&mut engine, &recruiting()[..5]);
+    let parted = {
+        let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+        run(&mut engine, &wren_parted_at_the_inn());
+        engine.snapshot()
+    };
+    let in_party = engine.snapshot();
+    let tamper: [Tamper; 3] = [
+        // In the party, yet stationed at the crossroads.
+        (&in_party, |s| {
+            s.stations.insert("wren".into(), "crossroads".into());
+        }),
+        // Parted at the inn, yet also stationed at the crossroads.
+        (&parted, |s| {
+            s.stations.insert("wren".into(), "crossroads".into());
+        }),
+        // Never recruited, and stationed where no choice sends him.
+        (&parted, |s| {
+            s.stations.insert("oake".into(), "ford".into());
+        }),
+    ];
+    for (index, (base, change)) in tamper.into_iter().enumerate() {
+        let mut snapshot = base.clone();
+        change(&mut snapshot.state);
+        assert!(
+            Engine::restore(&world, snapshot).is_err(),
+            "tampered save {index} loaded"
+        );
+    }
+    assert!(Engine::restore(&world, in_party).is_ok());
+    assert!(Engine::restore(&world, parted.clone()).is_ok());
+    // Where a choice does send him, the station loads.
+    let mut sent = parted;
+    sent.state.stations.insert("oake".into(), "inn".into());
+    assert!(Engine::restore(&world, sent).is_ok());
+}
+
+#[test]
+fn sending_a_companion_away_replays_byte_for_byte() {
+    let world = sending_away(ford(), "wren", "crossroads");
+    let play = || {
+        let mut engine = Engine::new_with_seed(&world, 7).unwrap();
+        let mut events = run(&mut engine, &wren_parted_at_the_inn());
+        let choice = send_away(&mut engine);
+        events.extend(run(
+            &mut engine,
+            &[
+                choice,
+                Travel("crossroads".into()),
+                Talk("wren".into()),
+                ChooseDialogue(1),
+            ],
+        ));
+        (events, engine.snapshot().to_json())
+    };
+    assert_eq!(play(), play());
+}
